@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Lüfter Steuerung</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{
+    margin:0;
+    padding:20px;
+    background:#0f172a;
+    color:#e5e7eb;
+    font-family:system-ui;
+}
+.card{
+    background:#1e293b;
+    border-radius:16px;
+    padding:20px;
+    max-width:600px;
+    margin:auto;
+}
+h1{margin-bottom:20px}
+.row{margin-bottom:12px}
+label{display:block;margin-bottom:4px;color:#94a3b8}
+select,input{
+    width:100%;
+    padding:8px;
+    border-radius:8px;
+    border:1px solid #334155;
+    background:#020617;
+    color:#e5e7eb;
+}
+button{
+    margin-top:20px;
+    padding:10px;
+    width:100%;
+    border:none;
+    border-radius:10px;
+    background:#22c55e;
+    font-weight:600;
+    cursor:pointer;
+}
+.back{
+    display:inline-block;
+    margin-bottom:15px;
+    color:#94a3b8;
+    text-decoration:none;
+}
+.section{
+    margin-top:25px;
+    padding-top:15px;
+    border-top:1px solid #334155;
+}
+</style>
+</head>
+<body>
+
+<a href="/" class="back">← zurück</a>
+
+<div class="card">
+<h1>💨 Lüfter Steuerung</h1>
+
+<div class="row">
+<label>Modus</label>
+<select id="mode">
+<option value="OFF">Deaktiviert</option>
+<option value="ON">Dauerbetrieb</option>
+<option value="TIME">Zeitgesteuert</option>
+<option value="INTERVAL">Intervall</option>
+<option value="ENV">Umgebung</option>
+</select>
+</div>
+
+<!-- ================= TIME ================= -->
+<div id="time-section" class="section">
+<h3>Zeitfenster</h3>
+<div class="row">
+<label>Start (HH:MM)</label>
+<input type="time" id="time-start">
+</div>
+<div class="row">
+<label>Ende (HH:MM)</label>
+<input type="time" id="time-end">
+</div>
+</div>
+
+<!-- ================= INTERVAL ================= -->
+<div id="interval-section" class="section">
+<h3>Intervall</h3>
+<div class="row">
+<label>EIN (Sekunden)</label>
+<input type="number" id="interval-on">
+</div>
+<div class="row">
+<label>AUS (Sekunden)</label>
+<input type="number" id="interval-off">
+</div>
+</div>
+
+<!-- ================= ENV ================= -->
+<div id="env-section" class="section">
+<h3>Umgebungsregelung</h3>
+
+<div class="row">
+<label><input type="checkbox" id="use-temp"> Temperatur berücksichtigen</label>
+</div>
+
+<div class="row">
+<label><input type="checkbox" id="use-hum"> Luftfeuchtigkeit berücksichtigen</label>
+</div>
+
+<div class="row">
+<label>Logik</label>
+<select id="logic">
+<option value="OR">ODER</option>
+<option value="AND">UND</option>
+</select>
+</div>
+
+<div class="row">
+<label>Richtung</label>
+<select id="direction">
+<option value="HIGH">Bei zu hoch aktivieren</option>
+<option value="LOW">Bei zu niedrig aktivieren</option>
+</select>
+</div>
+
+</div>
+
+<button onclick="save()">💾 Speichern</button>
+</div>
+
+<script>
+function minutesFromTime(t){
+    if(!t) return 0;
+    const [h,m]=t.split(":");
+    return parseInt(h)*60 + parseInt(m);
+}
+function timeFromMinutes(min){
+    const h=Math.floor(min/60).toString().padStart(2,"0");
+    const m=(min%60).toString().padStart(2,"0");
+    return h+":"+m;
+}
+
+async function load(){
+    const cfg = await fetch("/api/config").then(r=>r.json());
+
+    const mode = cfg.DEVICE_MODES?.fan || "OFF";
+    const params = cfg.DEVICE_PARAMS?.fan || {};
+    const env = cfg.DEVICE_ENV_CONFIG?.fan || {};
+
+    document.getElementById("mode").value = mode;
+
+    if(params.start_min !== undefined)
+        document.getElementById("time-start").value = timeFromMinutes(params.start_min);
+
+    if(params.end_min !== undefined)
+        document.getElementById("time-end").value = timeFromMinutes(params.end_min);
+
+    document.getElementById("interval-on").value = params.interval_on || 300;
+    document.getElementById("interval-off").value = params.interval_off || 900;
+
+    document.getElementById("use-temp").checked = env.use_temp || false;
+    document.getElementById("use-hum").checked = env.use_hum || false;
+    document.getElementById("logic").value = env.logic || "OR";
+    document.getElementById("direction").value = env.direction || "HIGH";
+
+    updateSections();
+}
+
+function updateSections(){
+    const mode=document.getElementById("mode").value;
+
+    document.getElementById("time-section").style.display =
+        mode==="TIME" ? "block":"none";
+
+    document.getElementById("interval-section").style.display =
+        mode==="INTERVAL" ? "block":"none";
+
+    document.getElementById("env-section").style.display =
+        mode==="ENV" ? "block":"none";
+}
+
+async function save(){
+
+    const mode=document.getElementById("mode").value;
+
+    const data={
+        DEVICE_MODES:{
+            fan:mode
+        },
+        DEVICE_PARAMS:{
+            fan:{
+                start_min: minutesFromTime(document.getElementById("time-start").value),
+                end_min: minutesFromTime(document.getElementById("time-end").value),
+                interval_on: parseInt(document.getElementById("interval-on").value),
+                interval_off: parseInt(document.getElementById("interval-off").value)
+            }
+        },
+        DEVICE_ENV_CONFIG:{
+            fan:{
+                use_temp: document.getElementById("use-temp").checked,
+                use_hum: document.getElementById("use-hum").checked,
+                logic: document.getElementById("logic").value,
+                direction: document.getElementById("direction").value
+            }
+        }
+    };
+
+    await fetch("/api/config",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(data)
+    });
+
+    alert("Gespeichert");
+}
+
+document.getElementById("mode").addEventListener("change",updateSections);
+
+load();
+</script>
+
+</body>
+</html>

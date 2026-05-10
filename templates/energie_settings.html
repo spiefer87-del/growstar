@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Energie Einstellungen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+    --accent:#22c55e;
+    --danger:#ef4444;
+}
+body{
+    margin:0;
+    padding:20px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui;
+}
+header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:18px;
+}
+h1{margin:0}
+a.back{color:var(--muted);text-decoration:none}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:20px;
+    max-width:1000px;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);
+    margin-bottom:18px;
+}
+
+h2{
+    margin:0 0 12px;
+    font-size:.95rem;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+}
+
+.row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    padding:10px 0;
+    border-bottom:1px solid #334155;
+    flex-wrap:wrap;
+}
+.row:last-child{border-bottom:none}
+
+input{
+    background:#020617;
+    color:var(--text);
+    border:1px solid rgba(255,255,255,.15);
+    border-radius:10px;
+    padding:8px 10px;
+    font-size:.95rem;
+    width:160px;
+    text-align:center;
+}
+
+button{
+    border:none;
+    border-radius:12px;
+    padding:10px 14px;
+    font-weight:700;
+    cursor:pointer;
+}
+
+.btn{
+    background:var(--accent);
+    color:#022c22;
+}
+.btn-danger{
+    background:rgba(239,68,68,.15);
+    color:var(--danger);
+    border:1px solid rgba(239,68,68,.3);
+}
+.small{
+    font-size:.9rem;
+    padding:8px 12px;
+}
+
+.table{
+    display:grid;
+    grid-template-columns: 1.5fr 1fr 1fr;
+    gap:10px;
+    align-items:center;
+}
+.header{
+    color:var(--muted);
+    font-weight:700;
+    border-bottom:2px solid #334155;
+    padding-bottom:10px;
+    margin-bottom:6px;
+}
+.right{text-align:right}
+.muted{color:var(--muted)}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>⚙️ Energie Einstellungen</h1>
+    <a href="/energie" class="back">← zurück</a>
+</header>
+
+<div class="card">
+    <h2>Strompreis</h2>
+
+    <div class="row">
+        <div>💶 Strompreis (€/kWh)</div>
+        <div style="display:flex;gap:10px;align-items:center">
+            <input id="price" type="number" step="0.01">
+            <button class="btn small" onclick="savePrice()">Speichern</button>
+        </div>
+    </div>
+
+    <div class="muted" style="margin-top:10px;font-size:.9rem">
+        Dieser Wert wird im Backend gespeichert und gilt für alle Geräte.
+    </div>
+</div>
+
+<div class="card">
+    <h2>Automatischer Tagesreset</h2>
+
+    <div class="row">
+        <div>🕛 Reset Uhrzeit</div>
+        <div style="display:flex;gap:10px;align-items:center">
+            <input id="resetTime" type="time">
+            <button class="btn small" onclick="saveResetTime()">Speichern</button>
+        </div>
+    </div>
+
+    <div class="muted" style="margin-top:10px;font-size:.9rem">
+        Wird als ENERGY_DAY_RESET_MIN gespeichert.
+    </div>
+</div>
+
+<div class="card">
+    <h2>Reset Funktionen</h2>
+
+    <div class="row">
+        <div>🔁 Heute zurücksetzen (alle Geräte)</div>
+        <button class="btn-danger" onclick="resetTodayAll()">Heute Reset</button>
+    </div>
+
+    <div class="row">
+        <div>♻️ Gesamt zurücksetzen (alle Geräte)</div>
+        <button class="btn-danger" onclick="resetTotalAll()">Gesamt Reset</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Reset pro Gerät</h2>
+
+    <div class="table header">
+        <div>Gerät</div>
+        <div class="right">Heute</div>
+        <div class="right">Gesamt</div>
+    </div>
+
+    <div id="rows"></div>
+</div>
+
+<script>
+const DEVICE_LABELS = {
+    heating: "🔥 Heizung",
+    light: "💡 Licht",
+    fan: "💨 Lüfter",
+    vent: "🌀 Ventilator",
+    irrigation: "🚿 Bewässerung",
+    humidifier: "💧 Luftbefeuchter",
+    dehumidifier: "🌵 Luftentfeuchter",
+    light2: "💡 Licht 2",
+    vent2: "🌀 Ventilator 2"
+};
+
+function minutesToTime(m){
+    const hh = String(Math.floor(m/60)).padStart(2,"0");
+    const mm = String(m%60).padStart(2,"0");
+    return `${hh}:${mm}`;
+}
+function timeToMinutes(t){
+    const [h,m] = t.split(":").map(x=>parseInt(x));
+    return h*60+m;
+}
+
+async function loadConfig(){
+    const cfg = await fetch("/api/config").then(r=>r.json());
+
+    document.getElementById("price").value =
+        parseFloat(cfg.POWER_PRICE ?? 0.45).toFixed(2);
+
+    const m = cfg.ENERGY_DAY_RESET_MIN ?? 0;
+    document.getElementById("resetTime").value = minutesToTime(m);
+}
+
+async function savePrice(){
+    const price = parseFloat(document.getElementById("price").value || "0.45");
+
+    await fetch("/api/config",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ POWER_PRICE: price })
+    });
+
+    alert("✅ Strompreis gespeichert");
+}
+
+async function saveResetTime(){
+    const t = document.getElementById("resetTime").value;
+    const m = timeToMinutes(t);
+
+    await fetch("/api/config",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({ ENERGY_DAY_RESET_MIN: m })
+    });
+
+    alert("✅ Tagesreset Uhrzeit gespeichert");
+}
+
+async function resetTodayAll(){
+    if(!confirm("Heute-Verbrauch für ALLE Geräte zurücksetzen?")) return;
+    await fetch("/api/energy/reset_today_all", {method:"POST"});
+    alert("✅ Heute-Verbrauch zurückgesetzt");
+}
+
+async function resetTotalAll(){
+    if(!confirm("Gesamtverbrauch für ALLE Geräte zurücksetzen?")) return;
+    await fetch("/api/energy/reset_total_all", { method:"POST" });
+    alert("✅ Gesamt Reset ausgeführt");
+}
+
+async function resetTodayDevice(device){
+    if(!confirm(`Heute-Verbrauch für ${device} zurücksetzen?`)) return;
+    await fetch(`/api/energy/reset_today/${device}`, { method:"POST" });
+    alert(`✅ Heute Reset: ${device}`);
+}
+
+async function resetTotalDevice(device){
+    if(!confirm(`Gesamtverbrauch für ${device} zurücksetzen?`)) return;
+    await fetch(`/api/energy/reset_total/${device}`, { method:"POST" });
+    alert(`✅ Gesamt Reset: ${device}`);
+}
+
+async function loadDevices(){
+    const data = await fetch("/api/energy").then(r=>r.json());
+    const wrap = document.getElementById("rows");
+    wrap.innerHTML = "";
+
+    const keys = Object.keys(data);
+    keys.sort((a,b)=>{
+        const A = Object.keys(DEVICE_LABELS).indexOf(a);
+        const B = Object.keys(DEVICE_LABELS).indexOf(b);
+        return (A<0?999:A) - (B<0?999:B);
+    });
+
+    for(const key of keys){
+        const row = document.createElement("div");
+        row.className = "table";
+        row.style.padding = "10px 0";
+        row.style.borderBottom = "1px solid #334155";
+
+        row.innerHTML = `
+            <div>${DEVICE_LABELS[key] ?? key}</div>
+            <div class="right">
+                <button class="btn-danger small" onclick="resetTodayDevice('${key}')">Heute</button>
+            </div>
+            <div class="right">
+                <button class="btn-danger small" onclick="resetTotalDevice('${key}')">Gesamt</button>
+            </div>
+        `;
+        wrap.appendChild(row);
+    }
+}
+
+loadConfig();
+loadDevices();
+</script>
+
+</body>
+</html>

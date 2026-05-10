@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Heizung</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;padding:20px;background:#0f172a;color:#e5e7eb;font-family:system-ui}
+.card{background:#1e293b;border-radius:16px;padding:20px;max-width:500px;margin:auto}
+h1{margin-bottom:20px}
+.row{margin-bottom:12px}
+select{width:100%;padding:8px;border-radius:8px;border:1px solid #334155;background:#020617;color:#e5e7eb}
+button{margin-top:20px;padding:10px;width:100%;border:none;border-radius:10px;background:#22c55e;font-weight:600}
+.back{display:inline-block;margin-bottom:15px;color:#94a3b8;text-decoration:none}
+.info{margin-top:15px;color:#94a3b8;font-size:.9rem}
+</style>
+</head>
+<body>
+
+<a href="/" class="back">← zurück</a>
+
+<div class="card">
+<h1>🔥 Heizung</h1>
+
+<div class="row">
+<label>Modus</label>
+<select id="mode">
+<option value="OFF">Deaktiviert</option>
+<option value="ON">Dauerbetrieb</option>
+<option value="ENV">Automatisch (Temperatur)</option>
+</select>
+</div>
+
+<div class="info">
+Im Automatik-Modus wird die Heizung aktiviert,
+wenn die Temperatur unter den Sollwert fällt.
+</div>
+
+<button onclick="save()">💾 Speichern</button>
+</div>
+
+<script>
+async function load(){
+    const cfg = await fetch("/api/config").then(r=>r.json());
+    document.getElementById("mode").value =
+        cfg.DEVICE_MODES?.heating || "ENV";
+}
+
+async function save(){
+    await fetch("/api/config",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            DEVICE_MODES:{heating:document.getElementById("mode").value}
+        })
+    });
+    alert("Gespeichert");
+}
+
+load();
+</script>
+
+</body>
+</html>

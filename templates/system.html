@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --accent: #22c55e;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+a.back {
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
+  text-align: center;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 15px 40px rgba(0,0,0,.45);
+}
+
+.icon {
+  font-size: 2.4rem;
+  margin-bottom: 10px;
+}
+
+.title {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.sub {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 6px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>⚙️ System</h1>
+  <a href="/" class="back">← Dashboard</a>
+</header>
+
+<div class="grid">
+
+  <!-- SENSOR -->
+  <a href="/sensoren" class="card-link">
+    <div class="card">
+      <div class="icon">🧪</div>
+      <div class="title">Sensoren</div>
+      <div class="sub">Kalibrierung & Offsets</div>
+    </div>
+  </a>
+
+  <!-- DIAGRAMME -->
+  <a href="/diagrams" class="card-link">
+      <div class="card">
+        <div class="icon">📊</div>
+        <div class="title">Diagramme</div>
+        <div class="sub">Verlauf & Trends</div>
+      </div>
+  </a>
+
+  <!-- VERBINDUNGEN -->
+  <a href="/connections" class="card-link">
+    <div class="card">
+      <div class="icon">🔗</div>
+      <div class="title">Verbindungen</div>
+      <div class="sub">WLAN & Shelly</div>
+    </div>
+  </a>
+
+  <!-- Energie -->
+  <a href="/energie/settings" class="card-link">
+    <div class="card">
+      <div class="icon">⚡</div>
+      <div class="title">Energie</div>
+      <div class="sub">Verbrauch & Kosten</div>
+    </div>
+  </a>
+
+  <!-- WATCHDOG -->
+  <a href="/watchdog" class="card-link">
+    <div class="card">
+      <div class="icon">🛡</div>
+      <div class="title">Watchdog</div>
+      <div class="sub">Überwachung & Neustart</div>
+    </div>
+  </a>
+
+  <!-- DESIGN -->
+  <a href="/design" class="card-link">
+    <div class="card">
+      <div class="icon">🎨</div>
+      <div class="title">Design</div>
+      <div class="sub">Theme & Layout</div>
+    </div>
+  </a>
+
+</div>
+
+</body>
+</html>

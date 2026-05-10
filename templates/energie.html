@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Energie</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+    --accent:#22c55e;
+}
+body{
+    margin:0;
+    padding:20px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui;
+}
+header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+}
+h1{margin:0}
+a.link{color:var(--muted);text-decoration:none;font-size:.95rem}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:20px;
+    max-width:1200px;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+
+h3{
+    margin-top:0;
+    font-size:.9rem;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+}
+
+.table{
+    display:grid;
+    grid-template-columns: 1.6fr 0.9fr 0.9fr 0.9fr 0.9fr 0.9fr;
+    gap:10px;
+    align-items:center;
+    font-size:.95rem;
+}
+.row{
+    padding:10px 0;
+    border-bottom:1px solid #334155;
+}
+.header{
+    color:var(--muted);
+    font-weight:600;
+    border-bottom:2px solid #334155;
+}
+.right{text-align:right}
+
+.total{
+    margin-top:16px;
+    padding-top:12px;
+    border-top:2px solid var(--accent);
+    font-weight:700;
+}
+
+.badge{
+    background:#020617;
+    border-radius:10px;
+    padding:6px 10px;
+    font-size:.85rem;
+    color:var(--muted);
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>⚡ Energieverbrauch</h1>
+    <a class="link" href="/energie/settings">⚙️ Einstellungen</a>
+    <a class="link" href="/">← zurück</a>
+</header>
+
+<div class="card">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap">
+    <h3 style="margin:0">Geräte</h3>
+    <span class="badge" id="priceBadge">Strompreis: -- €/kWh</span>
+</div>
+
+<div class="table header row">
+    <div>Gerät</div>
+    <div class="right">Aktuell</div>
+    <div class="right">Heute</div>
+    <div class="right">Gesamt</div>
+    <div class="right">€ Heute</div>
+    <div class="right">€ Gesamt</div>
+</div>
+
+<div id="energy-rows"></div>
+
+<div class="table total">
+    <div>Σ Gesamt</div>
+    <div class="right" id="sum-power">-- W</div>
+    <div class="right" id="sum-today">-- kWh</div>
+    <div class="right" id="sum-total">-- kWh</div>
+    <div class="right" id="sum-cost-today">-- €</div>
+    <div class="right" id="sum-cost-total">-- €</div>
+</div>
+
+</div>
+
+<script>
+const DEVICE_LABELS = {
+    heating: "🔥 Heizung",
+    light: "💡 Licht",
+    fan: "💨 Lüfter",
+    vent: "🌀 Ventilator",
+    irrigation: "🚿 Bewässerung",
+    humidifier: "💧 Luftbefeuchter",
+    dehumidifier: "🌵 Luftentfeuchter",
+    light2: "💡 Licht 2",
+    vent2: "🌀 Ventilator 2"
+};
+
+let POWER_PRICE = 0.45;
+
+async function loadPrice(){
+    const cfg = await fetch("/api/config").then(r=>r.json());
+    POWER_PRICE = parseFloat(cfg.POWER_PRICE ?? 0.45);
+
+    document.getElementById("priceBadge").textContent =
+        `Strompreis: ${POWER_PRICE.toFixed(2)} €/kWh`;
+}
+
+async function loadEnergy(){
+    const data = await fetch("/api/energy").then(r=>r.json());
+
+    const wrap = document.getElementById("energy-rows");
+    wrap.innerHTML = "";
+
+    let sumPower = 0;
+    let sumTotal = 0;
+    let sumToday = 0;
+
+    let sumCostToday = 0;
+    let sumCostTotal = 0;
+
+    const keys = Object.keys(data);
+    keys.sort((a,b)=>{
+        const A = Object.keys(DEVICE_LABELS).indexOf(a);
+        const B = Object.keys(DEVICE_LABELS).indexOf(b);
+        return (A<0?999:A) - (B<0?999:B);
+    });
+
+    for(const key of keys){
+        const e = data[key];
+
+        const power = Number(e.power ?? 0);
+        const total = Number(e.total ?? 0);
+        const today = Number(e.today ?? 0);
+
+        const costToday = today * POWER_PRICE;
+        const costTotal = total * POWER_PRICE;
+
+        sumPower += power;
+        sumTotal += total;
+        sumToday += today;
+
+        sumCostToday += costToday;
+        sumCostTotal += costTotal;
+
+        const row = document.createElement("div");
+        row.className = "table row";
+        row.innerHTML = `
+            <div>${DEVICE_LABELS[key] ?? key}</div>
+            <div class="right">${power.toFixed(1)} W</div>
+            <div class="right">${today.toFixed(3)} kWh</div>
+            <div class="right">${total.toFixed(3)} kWh</div>
+            <div class="right">${costToday.toFixed(2)} €</div>
+            <div class="right">${costTotal.toFixed(2)} €</div>
+        `;
+        wrap.appendChild(row);
+    }
+
+    document.getElementById("sum-power").textContent = sumPower.toFixed(1)+" W";
+    document.getElementById("sum-today").textContent = sumToday.toFixed(3)+" kWh";
+    document.getElementById("sum-total").textContent = sumTotal.toFixed(3)+" kWh";
+
+    document.getElementById("sum-cost-today").textContent = sumCostToday.toFixed(2)+" €";
+    document.getElementById("sum-cost-total").textContent = sumCostTotal.toFixed(2)+" €";
+}
+
+async function refresh(){
+    await loadPrice();
+    await loadEnergy();
+}
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+
+</body>
+</html>

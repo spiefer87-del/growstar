@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Watchdog</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+    --ok:#22c55e;
+    --warn:#f59e0b;
+    --err:#ef4444;
+}
+body{
+    margin:0;
+    padding:20px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui;
+}
+header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+h1{margin:0;font-size:1.6rem}
+a.back{color:var(--muted);text-decoration:none}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:14px;
+    margin-bottom:20px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+
+.card h3{
+    margin:0 0 8px;
+    font-size:.9rem;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+}
+
+.badge{
+    display:inline-block;
+    padding:5px 10px;
+    border-radius:999px;
+    font-size:.85rem;
+    font-weight:600;
+}
+
+.ok{background:rgba(34,197,94,.15); color:var(--ok)}
+.warn{background:rgba(245,158,11,.15); color:var(--warn)}
+.err{background:rgba(239,68,68,.15); color:var(--err)}
+
+.meta{
+    margin-top:10px;
+    font-size:.9rem;
+    color:var(--muted);
+}
+
+.logbox{
+    margin-top:10px;
+    white-space:pre-wrap;
+    font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size:.85rem;
+    line-height:1.4;
+    background:#020617;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:14px;
+    padding:14px;
+    max-height:60vh;
+    overflow:auto;
+}
+
+.row{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+}
+
+button{
+    border:none;
+    border-radius:10px;
+    padding:10px 12px;
+    cursor:pointer;
+    background:#334155;
+    color:var(--text);
+    font-weight:600;
+}
+button:hover{filter:brightness(1.1)}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🐶 Watchdog</h1>
+    <a href="/system" class="back">← zurück</a>
+</header>
+
+<div class="grid">
+
+    <div class="card">
+        <h3>🌡️ Temperatur Sensor</h3>
+        <div id="temp-badge" class="badge">...</div>
+        <div class="meta" id="temp-meta"></div>
+    </div>
+
+    <div class="card">
+        <h3>💧 Luftfeuchte Sensor</h3>
+        <div id="hum-badge" class="badge">...</div>
+        <div class="meta" id="hum-meta"></div>
+    </div>
+
+    <div class="card">
+        <h3>📡 MQTT</h3>
+        <div id="mqtt-badge" class="badge">...</div>
+        <div class="meta" id="mqtt-meta"></div>
+    </div>
+
+    <div class="card">
+        <h3>⚡ Energie</h3>
+        <div id="energy-badge" class="badge">...</div>
+        <div class="meta" id="energy-meta"></div>
+    </div>
+
+</div>
+
+<div class="card">
+    <div class="row">
+        <div>
+            <h3 style="margin:0">📜 Infolog</h3>
+            <div class="meta" id="time"></div>
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <select id="filter">
+                <option value="ALL">Alle</option>
+                <option value="INFO">INFO</option>
+                <option value="WARN">WARN</option>
+                <option value="ERROR">ERROR</option>
+            </select>
+
+            <button onclick="loadLog()">🔄</button>
+            <button onclick="clearLog()">🧹</button>
+            <button onclick="downloadLog()">⬇</button>
+        </div>
+    </div>
+
+    <div style="margin:8px 0">
+        <label>
+            <input type="checkbox" id="autoscroll" checked>
+            Auto Scroll
+        </label>
+    </div>
+
+    <div id="log" class="logbox">Lade Log...</div>
+</div>
+
+
+<script>
+
+let currentLevel = "ALL";
+
+document.getElementById("filter").addEventListener("change", e=>{
+    currentLevel = e.target.value;
+    loadLog();
+});
+
+function setBadge(id, ok, warn, err){
+    const el = document.getElementById(id);
+
+    if(err){
+        el.className="badge err";
+        el.textContent="FEHLER";
+    }else if(warn){
+        el.className="badge warn";
+        el.textContent="WARNUNG";
+    }else if(ok){
+        el.className="badge ok";
+        el.textContent="OK";
+    }else{
+        el.className="badge warn";
+        el.textContent="UNBEKANNT";
+    }
+}
+
+async function loadStatus(){
+    const s = await fetch("/api/watchdog/status").then(r=>r.json());
+
+    document.getElementById("time").textContent = "Stand: " + s.time;
+
+    setBadge("temp-badge", !s.temp.stale, s.temp.age > 10 && !s.temp.stale, s.temp.stale);
+    document.getElementById("temp-meta").textContent = `Letztes Update vor ${s.temp.age}s`;
+
+    setBadge("hum-badge", !s.hum.stale, s.hum.age > 10 && !s.hum.stale, s.hum.stale);
+    document.getElementById("hum-meta").textContent = `Letztes Update vor ${s.hum.age}s`;
+
+    setBadge("mqtt-badge", !s.mqtt.stale, s.mqtt.age > 10 && !s.mqtt.stale, s.mqtt.stale);
+    document.getElementById("mqtt-meta").textContent = `Letztes MQTT Signal vor ${s.mqtt.age}s`;
+
+    setBadge("energy-badge", !s.energy.stale, false, s.energy.stale);
+    document.getElementById("energy-meta").textContent = `${s.energy.devices} Geräte im Poll`;
+}
+
+async function loadLog(){
+    const data = await fetch(`/api/watchdog/log?lines=300&level=${currentLevel}`)
+        .then(r=>r.json());
+
+    const logEl = document.getElementById("log");
+    logEl.textContent = (data.lines || []).join("");
+
+    if(document.getElementById("autoscroll").checked){
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+}
+
+async function clearLog(){
+    if(!confirm("Log wirklich löschen?")) return;
+
+    await fetch("/api/watchdog/log/clear", {method:"POST"});
+    loadLog();
+}
+
+function downloadLog(){
+    window.location = "/api/watchdog/log/download";
+}
+
+loadStatus();
+loadLog();
+
+setInterval(loadStatus, 3000);
+setInterval(loadLog, 7000);
+
+</script>
+
+
+</body>
+</html>

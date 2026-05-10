@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Temperaturverlauf</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --accent:#22c55e;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+}
+body{
+    margin:0;
+    padding:14px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+}
+header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+}
+h1{margin:0;font-size:1.4rem}
+a.back{color:var(--muted);text-decoration:none}
+
+.range-bar{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:10px;
+}
+.range-bar button{
+    border:none;
+    padding:6px 12px;
+    border-radius:999px;
+    background:var(--card);
+    color:var(--text);
+    cursor:pointer;
+    font-size:.85rem;
+}
+.range-bar button.active{
+    background:var(--accent);
+    color:#022c22;
+    font-weight:600;
+}
+
+.card{
+    background:var(--card);
+    border-radius:14px;
+    padding:12px;
+}
+.chart-wrap{height:70vh}
+canvas{width:100%!important;height:100%!important}
+
+.stats{
+    display:flex;
+    justify-content:space-around;
+    padding-top:10px;
+    margin-top:8px;
+    border-top:1px solid rgba(255,255,255,.1);
+    font-size:.9rem;
+}
+.stats div{text-align:center}
+
+@media(max-width:700px){
+    .chart-wrap{height:75vh}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🌡️ Temperatur</h1>
+    <a href="/" class="back">← Dashboard</a>
+</header>
+
+<div class="range-bar">
+    <button onclick="setRange('1h',this)">1 h</button>
+    <button onclick="setRange('6h',this)">6 h</button>
+    <button onclick="setRange('24h',this)" class="active">24 h</button>
+    <button onclick="setRange('7d',this)">7 Tage</button>
+    <button id="toggleTarget" onclick="toggleTarget()">SOLL ausblenden</button>
+</div>
+
+<div class="card">
+    <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+    </div>
+    <div class="stats">
+        <div><strong>Min</strong><br><span id="min">--</span> °C</div>
+        <div><strong>Ø</strong><br><span id="avg">--</span> °C</div>
+        <div><strong>Max</strong><br><span id="max">--</span> °C</div>
+    </div>
+</div>
+
+<script>
+const RANGE_SECONDS={
+    "1h":3600,
+    "6h":21600,
+    "24h":86400,
+    "7d":604800
+};
+
+let currentRange="24h";
+let chart=null;
+let showTarget=true;
+
+/* 🔹 Downsample */
+function downsample(data,max){
+    if(data.length<=max) return data;
+    const step=Math.ceil(data.length/max);
+    return data.filter((_,i)=>i%step===0);
+}
+
+/* 🔹 Statistik */
+function updateStats(data){
+    const v=data.map(d=>d.temp).filter(n=>typeof n==="number");
+    if(!v.length) return;
+    min.textContent=Math.min(...v).toFixed(1);
+    max.textContent=Math.max(...v).toFixed(1);
+    avg.textContent=(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1);
+}
+
+/* 🔹 SOLL Toggle */
+function toggleTarget(){
+    showTarget=!showTarget;
+    toggleTargetBtn.textContent=showTarget
+        ? "SOLL ausblenden"
+        : "SOLL einblenden";
+    if(chart){
+        chart.data.datasets[1].hidden=!showTarget;
+        chart.update("none");
+    }
+}
+
+/* 🔹 Range */
+function setRange(r,btn){
+    currentRange=r;
+    document.querySelectorAll(".range-bar button")
+        .forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    load();
+}
+
+/* 🔹 Load */
+async function load(){
+    let data=await (await fetch(`/api/history?range=${currentRange}&type=temp`)).json();
+
+    if(currentRange==="6h") data=downsample(data,120);
+    else if(currentRange==="24h") data=downsample(data,100);
+    else if(currentRange==="7d") data=downsample(data,70);
+
+    updateStats(data);
+
+    const now=Date.now();
+    const xMin=now-RANGE_SECONDS[currentRange]*1000;
+
+    const temps=data.map(d=>({x:d.ts*1000,y:d.temp}));
+    const targets=data.map(d=>({x:d.ts*1000,y:d.target}));
+
+    let xScale;
+    if(currentRange==="1h"){
+        xScale={
+            type:"linear",
+            min:xMin,max:now,
+            ticks:{
+                stepSize:5*60*1000,
+                callback:v=>new Date(v).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})
+            }
+        };
+    } else if(currentRange==="6h" || currentRange==="24h"){
+        xScale={
+            type:"time",
+            min:xMin,max:now,
+            time:{unit:"hour"},
+            ticks:{
+                maxTicksLimit:8,
+                callback:v=>new Date(v).toLocaleTimeString("de-DE",{hour:"2-digit"})
+            }
+        };
+    } else {
+        xScale={
+            type:"time",
+            min:xMin,max:now,
+            time:{
+                unit:"day",
+                displayFormats:{day:"dd.MM"}
+            },
+            ticks:{maxTicksLimit:7}
+        };
+    }
+
+    if(!chart){
+        chart=new Chart(chartElem,{
+            type:"line",
+            data:{
+                datasets:[
+                    {label:"IST",data:temps,borderWidth:2,tension:.3},
+                    {
+                        label:"SOLL",
+                        data:targets,
+                        borderDash:[6,6],
+                        borderWidth:2,
+                        tension:.3,
+                        hidden:!showTarget
+                    }
+                ]
+            },
+            options:{
+                responsive:true,
+                animation:false,
+                scales:{x:xScale,y:{ticks:{color:"#94a3b8"}}},
+                plugins:{legend:{labels:{color:"#e5e7eb"}}}
+            }
+        });
+        return;
+    }
+
+    chart.data.datasets[0].data=temps;
+    chart.data.datasets[1].data=targets;
+    chart.data.datasets[1].hidden=!showTarget;
+    chart.options.scales.x=xScale;
+    chart.update("none");
+}
+
+const chartElem=document.getElementById("chart");
+const min=document.getElementById("min");
+const avg=document.getElementById("avg");
+const max=document.getElementById("max");
+const toggleTargetBtn=document.getElementById("toggleTarget");
+
+load();
+setInterval(load,60000);
+</script>
+
+</body>
+</html>

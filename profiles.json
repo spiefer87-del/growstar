@@ -1,0 +1,47 @@
+{
+  "active": "veg",
+  "profiles": {
+    "veg": {
+      "DAY_TEMP": 24.0,
+      "NIGHT_TEMP": 20.5,
+      "DAY_HUM": 55.0,
+      "NIGHT_HUM": 55.0,
+      "DAY_TEMP_TOL": 0.1,
+      "NIGHT_TEMP_TOL": 0.1,
+      "DAY_HUM_TOL": 5.0,
+      "NIGHT_HUM_TOL": 5.0,
+      "DAY_START_MIN": 330.0,
+      "NIGHT_START_MIN": 1350.0,
+      "RAMP_ENABLED": 1.0,
+      "RAMP_DURATION_MIN": 40.0
+    },
+    "bloom": {
+      "DAY_TEMP": 21.5,
+      "NIGHT_TEMP": 18.0,
+      "DAY_HUM": 44.0,
+      "NIGHT_HUM": 44.0,
+      "DAY_TEMP_TOL": 0.1,
+      "NIGHT_TEMP_TOL": 0.1,
+      "DAY_HUM_TOL": 1.0,
+      "NIGHT_HUM_TOL": 1.0,
+      "DAY_START_MIN": 330.0,
+      "NIGHT_START_MIN": 1050.0,
+      "RAMP_ENABLED": 1.0,
+      "RAMP_DURATION_MIN": 40.0
+    },
+    "dry": {
+      "DAY_TEMP": 22.0,
+      "NIGHT_TEMP": 18.0,
+      "DAY_HUM": 40.0,
+      "NIGHT_HUM": 45.0,
+      "DAY_TEMP_TOL": 1.0,
+      "NIGHT_TEMP_TOL": 1.0,
+      "DAY_HUM_TOL": 3.0,
+      "NIGHT_HUM_TOL": 3.0,
+      "DAY_START_MIN": 420,
+      "NIGHT_START_MIN": 1380,
+      "RAMP_ENABLED": 0,
+      "RAMP_DURATION_MIN": 0
+    }
+  }
+}

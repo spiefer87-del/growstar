@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Sensor Kalibrierung</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --accent: #22c55e;
+  --text: #e5e7eb;
+  --muted: #94a3b8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 16px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+a.back {
+  text-decoration: none;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.3);
+}
+
+.card h2 {
+  margin: 0 0 10px;
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.sub {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.offset-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.offset-row button {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: #334155;
+  color: var(--text);
+  font-size: 1.4rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.offset-row input {
+  width: 80px;
+  padding: 6px;
+  font-size: 1rem;
+  text-align: center;
+  border-radius: 10px;
+  border: none;
+}
+
+.saved {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--accent);
+  opacity: 0;
+  transition: opacity .3s ease;
+  margin-top: 6px;
+}
+.saved.show { opacity: 1; }
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>🧪 Sensor Kalibrierung</h1>
+  <a href="/system" class="back">← System</a>
+</header>
+
+<div class="grid">
+
+  <!-- TEMPERATUR -->
+  <div class="card">
+    <h2>Temperatur</h2>
+    <div class="value">RAW: <span id="temp_raw">--.-</span> °C</div>
+    <div class="sub">Korrigiert: <strong><span id="temp_corr">--.-</span> °C</strong></div>
+
+    <div class="offset-row">
+      <button onclick="changeOffset('TEMP_OFFSET', -0.1)">−</button>
+      <input id="TEMP_OFFSET" type="number" step="0.1">
+      <button onclick="changeOffset('TEMP_OFFSET', 0.1)">+</button>
+    </div>
+    <div class="saved" id="saved_temp">✓ gespeichert</div>
+  </div>
+
+  <!-- FEUCHTE -->
+  <div class="card">
+    <h2>Luftfeuchte</h2>
+    <div class="value">RAW: <span id="hum_raw">--.-</span> %</div>
+    <div class="sub">Korrigiert: <strong><span id="hum_corr">--.-</span> %</strong></div>
+
+    <div class="offset-row">
+      <button onclick="changeOffset('HUM_OFFSET', -0.1)">−</button>
+      <input id="HUM_OFFSET" type="number" step="0.1">
+      <button onclick="changeOffset('HUM_OFFSET', 0.1)">+</button>
+    </div>
+    <div class="saved" id="saved_hum">✓ gespeichert</div>
+  </div>
+
+</div>
+
+<script>
+async function loadState() {
+  const s = await (await fetch("/api/state")).json();
+
+  temp_raw.textContent = s.temp_raw?.toFixed(1) ?? "--";
+  temp_corr.textContent = s.temp?.toFixed(1) ?? "--";
+  hum_raw.textContent = s.hum_raw?.toFixed(1) ?? "--";
+  hum_corr.textContent = s.hum?.toFixed(1) ?? "--";
+
+  TEMP_OFFSET.value = s.TEMP_OFFSET ?? 0;
+  HUM_OFFSET.value = s.HUM_OFFSET ?? 0;
+}
+
+async function saveOffset(key, value) {
+  await fetch("/api/config", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ [key]: value })
+  });
+
+  const el = document.getElementById(
+    key === "TEMP_OFFSET" ? "saved_temp" : "saved_hum"
+  );
+  el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 1200);
+}
+
+function changeOffset(key, delta) {
+  const input = document.getElementById(key);
+  let v = parseFloat(input.value || 0);
+  v = Math.round((v + delta) * 10) / 10;
+  input.value = v;
+  saveOffset(key, v);
+}
+
+TEMP_OFFSET.onchange = () => saveOffset("TEMP_OFFSET", +TEMP_OFFSET.value);
+HUM_OFFSET.onchange = () => saveOffset("HUM_OFFSET", +HUM_OFFSET.value);
+
+loadState();
+setInterval(loadState, 3000);
+</script>
+
+</body>
+</html>

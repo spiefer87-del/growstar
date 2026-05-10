@@ -1,0 +1,155 @@
+{
+  "DAY_START_MIN": 330.0,
+  "NIGHT_START_MIN": 1350.0,
+  "DAY_TEMP": 24.0,
+  "DAY_TEMP_TOL": 0.1,
+  "DAY_HUM": 55.0,
+  "DAY_HUM_TOL": 5.0,
+  "NIGHT_TEMP": 20.5,
+  "NIGHT_TEMP_TOL": 0.1,
+  "NIGHT_HUM": 55.0,
+  "NIGHT_HUM_TOL": 5.0,
+  "MIN_TEMP": 12.0,
+  "MAX_TEMP": 30.0,
+  "MAX_HUM": 75.0,
+  "TEMP_OFFSET": 0.0,
+  "HUM_OFFSET": 0.0,
+  "RAMP_DURATION_MIN": 40.0,
+  "RAMP_ENABLED": 1.0,
+  "IP_HEATING": "192.168.178.84",
+  "RELAY_HEATING": 3,
+  "IP_FAN": "192.168.178.84",
+  "RELAY_FAN": 2,
+  "IP_LIGHT": "192.168.178.84",
+  "RELAY_LIGHT": 0,
+  "IP_VENT": "192.168.178.84",
+  "RELAY_VENT": 1,
+  "IP_IRRIGATION": "192.168.178.84",
+  "RELAY_IRRIGATION": 5,
+  "IP_HUMIDIFIER": "192.168.178.84",
+  "RELAY_HUMIDIFIER": 5,
+  "IP_DEHUMIDIFIER": "192.168.178.84",
+  "RELAY_DEHUMIDIFIER": 5,
+  "IP_LIGHT2": "192.168.178.84",
+  "RELAY_LIGHT2": 5,
+  "IP_VENT2": "192.168.178.84",
+  "RELAY_VENT2": 5,
+  "DASH_ENV": {
+    "profile": true,
+    "temp": true,
+    "hum": true,
+    "vpd": true,
+    "ph": false,
+    "ec": false,
+    "water_temp": false,
+    "light_level": false
+  },
+  "DASH_ENV_ORDER": {
+    "profile": 4,
+    "temp": 1,
+    "hum": 2,
+    "vpd": 3,
+    "ph": 5,
+    "ec": 6,
+    "water_temp": 7,
+    "light_level": 8
+  },
+  "DASH_DEVICE_ORDER": {
+    "heating": 1,
+    "fan": 6,
+    "light": 2,
+    "vent": 4,
+    "irrigation": 7,
+    "humidifier": 8,
+    "dehumidifier": 9,
+    "light2": 3,
+    "vent2": 5
+  },
+  "DASH_DEVICE": {
+    "heating": true,
+    "fan": true,
+    "light": true,
+    "vent": true,
+    "irrigation": false,
+    "humidifier": false,
+    "dehumidifier": false,
+    "light2": false,
+    "vent2": false
+  },
+  "DEVICE_MODES": {
+    "heating": "ENV",
+    "fan": "ON",
+    "light": "ENV",
+    "vent": "ON",
+    "irrigation": "OFF",
+    "humidifier": "OFF",
+    "dehumidifier": "OFF",
+    "light2": "OFF",
+    "vent2": "OFF"
+  },
+  "DEVICE_PARAMS": {
+    "fan": {
+      "start_min": 0,
+      "end_min": 0,
+      "interval_on": 300,
+      "interval_off": 900
+    },
+    "vent": {
+      "start_min": 0,
+      "end_min": 0,
+      "interval_on": 90,
+      "interval_off": 160
+    },
+    "heating": {},
+    "light": {}
+  },
+  "DEVICE_ENV_CONFIG": {
+    "fan": {
+      "use_temp": false,
+      "use_hum": true,
+      "logic": "OR",
+      "direction": "HIGH"
+    },
+    "vent": {
+      "use_temp": false,
+      "use_hum": false,
+      "logic": "OR",
+      "direction": "HIGH"
+    }
+  },
+  "ENERGY_RESET": {
+    "heating": 79.336,
+    "light": 172.547,
+    "fan": 0.0,
+    "vent": 0.981
+  },
+  "ENERGY_DAY_OFFSET": {
+    "heating": {
+      "day": "2026-05-10",
+      "offset": 296.658
+    },
+    "light": {
+      "day": "2026-05-10",
+      "offset": 399.187
+    },
+    "fan": {
+      "day": "2026-05-10",
+      "offset": 33.725
+    },
+    "vent": {
+      "day": "2026-05-10",
+      "offset": 6.108
+    }
+  },
+  "ENERGY_DAY_RESET_MIN": 330,
+  "ENERGY_LAST_DAY_RESET": "2026-05-10",
+  "POWER_PRICE": 0.43,
+  "PLANTS": [
+    {},
+    {},
+    {},
+    {},
+    {},
+    {}
+  ]
+}

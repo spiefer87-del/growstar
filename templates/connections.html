@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Verbindungen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --accent:#22c55e;
+    --danger:#ef4444;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+}
+
+body{
+    margin:0;
+    padding:20px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui;
+}
+
+header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+h1{margin:0;font-size:1.6rem}
+a.back{color:var(--muted);text-decoration:none}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+    gap:20px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+
+.card h2{
+    margin:0 0 14px;
+    font-size:.95rem;
+    color:var(--muted);
+    text-transform:uppercase;
+}
+
+.row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:10px;
+}
+
+label{font-size:.9rem}
+
+input,select{
+    background:#020617;
+    color:var(--text);
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:8px;
+    padding:6px 8px;
+    font-size:.9rem;
+    width:120px;
+    text-align:center;
+}
+
+.status{
+    font-size:.85rem;
+    padding:4px 8px;
+    border-radius:999px;
+}
+
+.ok{background:rgba(34,197,94,.15);color:#22c55e}
+.err{background:rgba(239,68,68,.15);color:#ef4444}
+
+button{
+    margin-top:10px;
+    width:100%;
+    padding:10px;
+    border:none;
+    border-radius:10px;
+    background:var(--accent);
+    color:#022c22;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.feedback{
+    margin-top:10px;
+    font-size:.85rem;
+    color:var(--accent);
+    display:none;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🔌 Verbindungen</h1>
+    <a href="/system" class="back">← zurück</a>
+</header>
+
+<div class="grid">
+
+<!-- ================= HEIZUNG ================= -->
+<div class="card">
+    <h2>🔥 Heizung</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_HEATING">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_HEATING"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_HEATING" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= LÜFTER ================= -->
+<div class="card">
+    <h2>💨 Lüfter</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_FAN">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_FAN"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_FAN" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= LICHT ================= -->
+<div class="card">
+    <h2>💡 Licht</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_LIGHT">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_LIGHT"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_LIGHT" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= VENT ================= -->
+<div class="card">
+    <h2>🌀 Ventilator</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_VENT">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_VENT"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_VENT" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= BEWÄSSERUNG ================= -->
+<div class="card">
+    <h2>🚿 Bewässerung</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_IRRIGATION">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_IRRIGATION"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_IRRIGATION" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= LUFTBEFEUCHTER ================= -->
+<div class="card">
+    <h2>💧 Luftbefeuchter</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_HUMIDIFIER">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_HUMIDIFIER"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_HUMIDIFIER" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= LUFTENTFEUCHTER ================= -->
+<div class="card">
+    <h2>🌵 Luftentfeuchter</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_DEHUMIDIFIER">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_DEHUMIDIFIER"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_DEHUMIDIFIER" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= LICHT 2 ================= -->
+<div class="card">
+    <h2>💡 Beleuchtung 2</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_LIGHT2">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_LIGHT2"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_LIGHT2" class="status">–</span>
+    </div>
+</div>
+
+<!-- ================= VENT 2 ================= -->
+<div class="card">
+    <h2>🌀 Ventilator 2</h2>
+
+    <div class="row">
+        <label>IP</label>
+        <input id="IP_VENT2">
+    </div>
+
+    <div class="row">
+        <label>Relay</label>
+        <select id="RELAY_VENT2"></select>
+    </div>
+
+    <div class="row">
+        <label>Status</label>
+        <span id="STATUS_VENT2" class="status">–</span>
+    </div>
+</div>
+
+</div>
+
+<button onclick="save()">💾 Einstellungen speichern</button>
+<div id="feedback" class="feedback">✔ Einstellungen gespeichert</div>
+
+<script>
+const RELAYS=[0,1,2,3,4,5];
+
+const DEVICES = [
+    "HEATING",
+    "FAN",
+    "LIGHT",
+    "VENT",
+    "IRRIGATION",
+    "HUMIDIFIER",
+    "DEHUMIDIFIER",
+    "LIGHT2",
+    "VENT2"
+];
+
+function fill(sel){
+    sel.innerHTML = "";
+    RELAYS.forEach(r=>{
+        const o=document.createElement("option");
+        o.value=r;
+        o.textContent=r;
+        sel.appendChild(o);
+    });
+}
+
+function showStatus(el, state){
+    if(state === true || state === false){
+        el.textContent="Verbunden";
+        el.className="status ok";
+    } else {
+        el.textContent="KEINE VERBINDUNG";
+        el.className="status err";
+    }
+}
+
+async function load(){
+    const cfg = await (await fetch("/api/config")).json();
+    const st  = await (await fetch("/api/state")).json();
+
+    // Inputs füllen
+    DEVICES.forEach(d=>{
+        const ipEl = document.getElementById("IP_"+d);
+        const rEl  = document.getElementById("RELAY_"+d);
+
+        if(ipEl) ipEl.value = cfg["IP_"+d] || "";
+        if(rEl){
+            fill(rEl);
+            rEl.value = cfg["RELAY_"+d] ?? 0;
+        }
+    });
+
+    // Status (kommt aus /api/state)
+    // -> hier nur anzeigen was existiert, sonst "keine Verbindung"
+    showStatus(STATUS_HEATING, st.heating_on);
+    showStatus(STATUS_FAN, st.fan_on);
+    showStatus(STATUS_LIGHT, st.light_on);
+    showStatus(STATUS_VENT, st.vent_on);
+
+    // neue Geräte: solange du im Backend noch keine *_on Variablen hast:
+    // wir zeigen erstmal "keine Verbindung" (später erweitern wir /api/state)
+    showStatus(STATUS_IRRIGATION, st.irrigation_on);
+    showStatus(STATUS_HUMIDIFIER, st.humidifier_on);
+    showStatus(STATUS_DEHUMIDIFIER, st.dehumidifier_on);
+    showStatus(STATUS_LIGHT2, st.light2_on);
+    showStatus(STATUS_VENT2, st.vent2_on);
+}
+
+async function save(){
+    if(!confirm("Bisherige Verbindungen überschreiben?")) return;
+
+    const data = {};
+
+    DEVICES.forEach(d=>{
+        const ipEl = document.getElementById("IP_"+d);
+        const rEl  = document.getElementById("RELAY_"+d);
+
+        if(ipEl) data["IP_"+d] = ipEl.value.trim();
+        if(rEl)  data["RELAY_"+d] = +rEl.value;
+    });
+
+    await fetch("/api/config",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify(data)
+    });
+
+    feedback.style.display="block";
+    setTimeout(()=>feedback.style.display="none",2000);
+
+    load();
+}
+
+load();
+</script>
+
+</body>
+</html>

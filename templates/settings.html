@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Profileinstellungen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root {
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+}
+
+body {
+    margin:0;
+    padding:20px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+a.back {
+    color:var(--muted);
+    text-decoration:none;
+    font-size:0.9rem;
+}
+
+h1 {
+    text-align:center;
+    margin-bottom:20px;
+}
+
+/* GRID */
+.grid {
+    display:grid;
+    gap:20px;
+    max-width:600px;
+    margin:auto;
+}
+
+/* KACHEL */
+.card {
+    background:var(--card);
+    border-radius:16px;
+    padding:20px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+
+.card h2 {
+    margin-top:0;
+    margin-bottom:14px;
+    text-align:center;
+    font-size:1rem;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.05em;
+}
+
+button {
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: none;
+    background: #334155;
+    color: #e5e7eb;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #475569;
+}
+
+/* INLINE ROW */
+.row-inline {
+    display:flex;
+    gap:12px;
+    justify-content:center;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+.field {
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+}
+
+.field label {
+    font-size:0.75rem;
+    color:var(--muted);
+    margin-bottom:4px;
+}
+
+/* INPUTS */
+.compact-input {
+    width:80px;
+    height:34px;
+    padding:4px;
+    font-size:0.9rem;
+    text-align:center;
+    border-radius:8px;
+    border:none;
+    box-sizing:border-box;
+}
+
+.compact-input:out-of-range {
+    outline: 2px solid #ef4444;
+}
+
+input[type="time"].compact-input {
+    appearance:none;
+    -webkit-appearance:none;
+}
+
+.num-control {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Buttons standardmäßig aus */
+.num-control button {
+    display: none;
+}
+
+.profile-btn {
+    padding: 8px 18px;
+    border-radius: 999px;
+    border: none;
+    background: #334155;
+    color: #e5e7eb;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s ease, transform .15s ease;
+}
+
+.profile-btn:hover {
+    background: #475569;
+}
+
+.profile-btn.active {
+    background: #22c55e;
+    color: #022c22;
+    transform: scale(1.05);
+    box-shadow: 0 0 0 2px rgba(34,197,94,.4);
+}
+
+/* Mobile */
+@media (max-width:1600px) {
+    .compact-input {
+        width:70px;
+        height:32px;
+        font-size:0.85rem;
+    }
+    .compact-input:out-of-range {
+        outline: 2px solid #ef4444;
+    }
+
+    .num-control button {
+        display: inline-flex;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: none;
+        background: #334155;
+        color: #e5e7eb;
+        font-size: 1.1rem;
+        font-weight: 700;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+
+    .num-control button:active {
+        background: #475569;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<a href="/" class="back">← zurück</a>
+<h1>⚙️ Profileinstellungen</h1>
+
+<div class="grid">
+
+<!-- ================= PRESETS ================= -->
+
+<div class="card">
+    <h2>🌱 Profile</h2>
+
+    <div class="row-inline">
+        <button class="profile-btn" data-profile="veg"
+                onclick="setProfile('veg')">Veg</button>
+
+        <button class="profile-btn" data-profile="bloom"
+                onclick="setProfile('bloom')">Bloom</button>
+
+        <button class="profile-btn" data-profile="dry"
+                onclick="setProfile('dry')">Dry</button>
+    </div>
+
+    <div class="hint" style="text-align:center;">
+        Aktives Profil wird hervorgehoben
+    </div>
+
+<div class="hint" style="text-align:center;">
+    Änderungen werden automatisch im aktiven Profil gespeichert
+    </div>
+</div>
+
+<!-- ================= ZEITEN ================= -->
+<div class="card">
+<h2>⏰ Zeiten</h2>
+
+<div class="row-inline">
+    <div class="field">
+        <label>Tag Start</label>
+        <input type="time" id="DAY_START_TIME" class="compact-input">
+    </div>
+    <div class="field">
+        <label>Nacht Start</label>
+        <input type="time" id="NIGHT_START_TIME" class="compact-input">
+    </div>
+</div>
+</div>
+
+<!-- ================= TEMPERATUR ================= -->
+<div class="card">
+<h2>🌡️ Temperatur</h2>
+
+<div class="row-inline">
+    <div class="field">
+        <label>Tag °C</label>
+        <div class="num-control">
+            <button type="button" onclick="step('DAY_TEMP', -0.1)">−</button>
+            <input type="number"
+                step="0.1"
+                id="DAY_TEMP"
+                class="compact-input">
+            <button type="button" onclick="step('DAY_TEMP', 0.1)">+</button>
+        </div>
+    </div>
+
+    <div class="field">
+        <label>± Tol</label>
+        <div class="num-control">
+            <button type="button" onclick="step('DAY_TEMP_TOL', -0.1)">−</button>
+            <input type="number"
+                step="0.1"
+                id="DAY_TEMP_TOL"
+                class="compact-input">
+            <button type="button" onclick="step('DAY_TEMP_TOL', 0.1)">+</button>
+        </div>
+    </div>
+</div>
+
+<div class="row-inline">
+    <div class="field">
+        <label>Nacht °C</label>
+        <div class="num-control">
+            <button type="button" onclick="step('NIGHT_TEMP', -0.1)">−</button>
+            <input type="number"
+                step="0.1"
+                id="NIGHT_TEMP"
+                class="compact-input">
+            <button type="button" onclick="step('NIGHT_TEMP', 0.1)">+</button>  
+        </div>
+    </div>
+    <div class="field">
+        <label>± Tol</label>
+        <div class="num-control">
+            <button type="button" onclick="step('NIGHT_TEMP_TOL', -0.1)">−</button>
+            <input type="number"
+                step="0.1"
+                id="NIGHT_TEMP_TOL"
+                class="compact-input">
+            <button type="button" onclick="step('NIGHT_TEMP_TOL', 0.1)">+</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ================= Luftfeuchtigkeit ================= -->
+<div class="card">
+<h2>💧 Luftfeuchtigkeit</h2>
+
+<div class="row-inline">
+    <div class="field">
+        <label>Tag %</label>
+        <div class="num-control">
+            <button type="button" onclick="step('DAY_HUM', -1)">−</button>
+            <input type="number"
+                step="0.1"
+                id="DAY_HUM"
+                class="compact-input">
+            <button type="button" onclick="step('DAY_HUM', 1)">+</button>
+        </div>
+    </div>
+
+    <div class="field">
+        <label>± Tol</label>
+        <div class="num-control">
+            <button type="button" onclick="step('DAY_HUM_TOL', -1)">−</button>
+            <input type="number
+                step="0.1"
+                id="DAY_HUM_TOL"
+                class="compact-input">
+            <button type="button" onclick="step('DAY_HUM_TOL', 1)">+</button>
+        </div>
+    </div>
+</div>
+
+<div class="row-inline">
+    <div class="field">
+        <label>Nacht %</label>
+        <div class="num-control">
+            <button type="button" onclick="step('NIGHT_HUM', -1)">−</button>
+            <input type="number"
+                step="0.1"
+                id="NIGHT_HUM"
+                class="compact-input">
+            <button type="button" onclick="step('NIGHT_HUM', 1)">+</button>  
+        </div>
+    </div>
+    <div class="field">
+        <label>± Tol</label>
+        <div class="num-control">
+            <button type="button" onclick="step('NIGHT_HUM_TOL', -1)">−</button>
+            <input type="number"
+                step="0.1"
+                id="NIGHT_HUM_TOL"
+                class="compact-input">
+            <button type="button" onclick="step('NIGHT_HUM_TOL', 1)">+</button>
+        </div>
+    </div>
+</div>
+</div>
+
+<!-- ================= RAMPE ================= -->
+<div class="card">
+<h2>⏱️ Rampe</h2>
+
+<div class="row-inline">
+    <div class="field">
+        <label>Aktiv</label>
+        <input type="checkbox" id="RAMP_ENABLED">
+    </div>
+    <div class="field">
+        <label>Dauer (min)</label>
+        <div class="num-control">
+            <button type="button" onclick="step('RAMP_DURATION_MIN', -5)">−</button>
+            <input type="number"
+                step="10"
+                id="RAMP_DURATION_MIN"
+                class="compact-input">
+            <button type="button" onclick="step('RAMP_DURATION_MIN', 5)">+</button>
+        </div>
+    </div>
+</div>
+</div>
+
+
+
+
+
+</div>
+
+<script>
+function minToTime(m){
+    const h = String(Math.floor(m/60)).padStart(2,"0");
+    const min = String(m%60).padStart(2,"0");
+    return `${h}:${min}`;
+}
+function timeToMin(t){
+    const [h,m] = t.split(":").map(Number);
+    return h*60+m;
+}
+
+async function load(){
+    const c = await (await fetch("/api/config")).json();
+
+    DAY_TEMP.value = c.DAY_TEMP;
+    DAY_TEMP_TOL.value = c.DAY_TEMP_TOL;
+    NIGHT_TEMP.value = c.NIGHT_TEMP;
+    NIGHT_TEMP_TOL.value = c.NIGHT_TEMP_TOL;
+
+    DAY_HUM.value = c.DAY_HUM;
+    DAY_HUM_TOL.value = c.DAY_HUM_TOL;
+    NIGHT_HUM.value = c.NIGHT_HUM;
+    NIGHT_HUM_TOL.value = c.NIGHT_HUM_TOL;
+
+    DAY_START_TIME.value = minToTime(c.DAY_START_MIN);
+    NIGHT_START_TIME.value = minToTime(c.NIGHT_START_MIN);
+
+    RAMP_ENABLED.checked = !!c.RAMP_ENABLED;
+    RAMP_DURATION_MIN.value = c.RAMP_DURATION_MIN;
+
+    highlightActiveProfile(c.ACTIVE_PROFILE);
+
+    applyLimits(c);
+}
+
+async function save(){
+    await fetch("/api/config", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            DAY_TEMP:Number(DAY_TEMP.value),
+            DAY_TEMP_TOL:Number(DAY_TEMP_TOL.value),
+            NIGHT_TEMP:Number(NIGHT_TEMP.value),
+            NIGHT_TEMP_TOL:Number(NIGHT_TEMP_TOL.value),
+            DAY_HUM:Number(DAY_HUM.value),
+            DAY_HUM_TOL:Number(DAY_HUM_TOL.value),
+            NIGHT_HUM:Number(NIGHT_HUM.value),
+            NIGHT_HUM_TOL:Number(NIGHT_HUM_TOL.value),
+            DAY_START_MIN:timeToMin(DAY_START_TIME.value),
+            NIGHT_START_MIN:timeToMin(NIGHT_START_TIME.value),
+            RAMP_ENABLED:RAMP_ENABLED.checked?1:0,
+            RAMP_DURATION_MIN:Number(RAMP_DURATION_MIN.value)
+        })
+    });
+}
+
+async function setProfile(name) {
+
+    const res = await fetch("/api/config");
+    const c = await res.json();
+
+    if (c.ACTIVE_PROFILE === name) {
+        return; // bereits aktiv → nichts tun
+    }
+
+    const ok = confirm(
+        "⚠️ Profil wirklich wechseln?\n\n" +
+        "• Aktives Profil wird geändert\n" +
+        "• Eine laufende Rampe wird beendet\n\n" +
+        "Fortfahren?"
+    );
+
+    if (!ok) return;
+
+    await fetch(`/api/profile/${name}`, { method: "POST" });
+    load();
+}
+
+
+function step(id, delta) {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    let v = parseFloat(el.value);
+    if (isNaN(v)) v = 0;
+
+    const min = el.min !== "" ? parseFloat(el.min) : -Infinity;
+    const max = el.max !== "" ? parseFloat(el.max) : Infinity;
+
+    v = Math.round((v + delta) * 10) / 10;
+
+    // 🔒 Begrenzen
+    if (v < min) v = min;
+    if (v > max) v = max;
+
+    el.value = v;
+    save();
+}
+
+function applyLimits(c) {
+    // 🌡️ Temperatur
+    DAY_TEMP.min = c.MIN_TEMP;
+    DAY_TEMP.max = c.MAX_TEMP;
+    NIGHT_TEMP.min = c.MIN_TEMP;
+    NIGHT_TEMP.max = c.MAX_TEMP;
+
+    DAY_TEMP_TOL.min = 0;
+    DAY_TEMP_TOL.max = 5;
+    NIGHT_TEMP_TOL.min = 0;
+    NIGHT_TEMP_TOL.max = 5;
+
+    // 💧 Luftfeuchtigkeit
+    DAY_HUM.min = 30;
+    DAY_HUM.max = c.MAX_HUM;
+
+    NIGHT_HUM.min = 30;
+    NIGHT_HUM.max = c.MAX_HUM;
+
+    DAY_HUM_TOL.min = 0.1;
+    DAY_HUM_TOL.max = 20;
+
+    NIGHT_HUM_TOL.min = 0.1;
+    NIGHT_HUM_TOL.max = 20;
+
+    // ⏱️ Rampe
+    RAMP_DURATION_MIN.min = 5;
+    RAMP_DURATION_MIN.max = 240;
+}
+
+function highlightActiveProfile(active) {
+    document.querySelectorAll(".profile-btn").forEach(btn => {
+        btn.classList.toggle(
+            "active",
+            btn.dataset.profile === active
+        );
+    });
+}
+
+
+document.querySelectorAll("input").forEach(i=>i.onchange=save);
+load();
+</script>
+
+</body>
+</html>
