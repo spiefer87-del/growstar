@@ -437,20 +437,19 @@ def resync_active_ramp():
     Aktualisiert Rampen-Zielwerte, wenn Sollwerte
     während einer aktiven Rampe geändert wurden.
     """
-    global ramp_start_temp, ramp_target_temp
 
-    if not ramp_active:
+    if not state.ramp_active:
         return
 
-    if current_profile == "TAG":
+    if state.current_profile == "TAG":
         # Abendrampe
-        ramp_target_temp = float(config["NIGHT_TEMP"])
+        state.ramp_target_temp = float(config["NIGHT_TEMP"])
     else:
         # Morgenrampe
-        ramp_target_temp = float(config["DAY_TEMP"])
+        state.ramp_target_temp = float(config["DAY_TEMP"])
 
     print(
-        f"🔁 RAMPE RESYNC → neues Ziel: {ramp_target_temp:.1f}°C"
+        f"🔁 RAMPE RESYNC → neues Ziel: {state.ramp_target_temp:.1f}°C"
     )
 
 
@@ -588,13 +587,13 @@ def get_ramped_target(base_target):
     if current_profile == "TAG":
         # Abendrampe → Ziel ist NACHT
         ramp_end = int(config["NIGHT_START_MIN"])
-        start_temp = ramp_start_temp
-        target_temp = float(config["NIGHT_TEMP"])
+        start_temp = state.ramp_start_temp
+        target_temp = state.ramp_target_temp
     else:
         # Morgenrampe → Ziel ist TAG
         ramp_end = int(config["DAY_START_MIN"])
-        start_temp = ramp_start_temp
-        target_temp = float(config["DAY_TEMP"])
+        start_temp = state.ramp_start_temp
+        target_temp = state.ramp_target_temp
 
     start_min = ramp_start_minute
 
