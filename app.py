@@ -309,18 +309,19 @@ def refresh_energy_state():
         "vent2":        ("IP_VENT2",        "RELAY_VENT2"),
     }
 
-    energy_state.clear()
-
-    for name, (ip_k, r_k) in ENERGY_DEVICES.items():
-        ip = config.get(ip_k)
-        relay = config.get(r_k)
-
-        if not ip or relay is None:
-            continue
-
-        e = get_shelly_energy(ip, relay, name)
-        if e:
-            energy_state[name] = e
+    with energy_lock:
+        energy_state.clear()
+    
+        for name, (ip_k, r_k) in ENERGY_DEVICES.items():
+            ip = config.get(ip_k)
+            relay = config.get(r_k)
+    
+            if not ip or relay is None:
+                continue
+    
+            e = get_shelly_energy(ip, relay, name)
+            if e:
+                energy_state[name] = e
 
 def get_shelly_relay_state(ip, relay, timeout=3):
     relay = int(relay)
@@ -348,7 +349,7 @@ def get_shelly_relay_state(ip, relay, timeout=3):
         return data["output"]
 
     except Exception:
-        return None
+        pass
 
     # ---------- Gen1 Fallback ----------
     try:
@@ -437,7 +438,12 @@ def resync_active_ramp():
     Aktualisiert Rampen-Zielwerte, wenn Sollwerte
     während einer aktiven Rampe geändert wurden.
     """
-
+    current_target = get_ramped_target(
+        state.live_state.get("temp_target")
+    )
+    
+    state.ramp_start_temp = current_target
+    
     if not state.ramp_active:
         return
 
@@ -839,7 +845,7 @@ def failsafe_check(device, ip_key, relay_key):
     if not ip or relay is None:
         return
 
-    should_on = live_state.get(device)
+    should_on = state.live_state.get(device)
     actual = get_shelly_relay_state(ip, relay)
 
     if actual is None:
@@ -865,8 +871,8 @@ def update_humidity_setpoint():
     else:
         base, tol = config["NIGHT_HUM"], config["NIGHT_HUM_TOL"]
 
-    live_state["hum_target"] = base
-    live_state["hum_tol"] = tol
+    state.live_state["hum_target"] = base
+    state.live_state["hum_tol"] = tol
 
 def update_temperature_setpoint():
     profile = get_profile()
@@ -881,8 +887,8 @@ def update_temperature_setpoint():
     target = get_ramped_target(base)
 
     # 📊 IMMER setzen – auch wenn Regelung deaktiviert
-    live_state["temp_target"] = target
-    live_state["temp_tol"] = tol
+    state.live_state["temp_target"] = target
+    state.live_state["temp_tol"] = tol
 
 def evaluate_env_conditions(device):
 
@@ -912,9 +918,9 @@ def evaluate_env_conditions(device):
 
     # ================= HUM =================
     if use_hum:
-        hum = live_state.get("hum")
-        target = live_state.get("hum_target")
-        tol = live_state.get("hum_tol")
+        hum = state.live_state.get("hum")
+        target = state.live_state.get("hum_target")
+        tol = state.live_state.get("hum_tol")
 
         if None not in (hum, target, tol):
 
@@ -1000,15 +1006,15 @@ def control_heating_env():
     Nutzt Profil + Rampen + Hysterese.
     """
 
-    temp = live_state.get("temp")
+    temp = state.live_state.get("temp")
     if temp is None:
         set_heating(False)
         return
 
     update_temperature_setpoint()
 
-    target = live_state.get("temp_target")
-    tol    = live_state.get("temp_tol")
+    target = state.live_state.get("temp_target")
+    tol    = state.live_state.get("temp_tol")
 
     if target is None or tol is None:
         return
@@ -1134,7 +1140,7 @@ def sync_relay(name, ip, relay, state_var, live_key):
     # nicht konfiguriert
     if not ip or relay is None:
         globals()[state_var] = None
-        live_state[live_key] = None
+        state.live_state[live_key] = None
         return
 
     state = get_shelly_relay_state(ip, relay)
@@ -1142,14 +1148,14 @@ def sync_relay(name, ip, relay, state_var, live_key):
     # ❌ FEHLER / KEINE VERBINDUNG
     if state is None:
         globals()[state_var] = None
-        live_state[live_key] = None
+        state.live_state[live_key] = None
 
         print(f"❌ {name}: KEINE VERBINDUNG (IP {ip}, Relay {relay})")
         return
 
     # ✅ OK
     globals()[state_var] = state
-    live_state[live_key] = state
+    state.live_state[live_key] = state
 
     print(f"✅ {name}: {'EIN' if state else 'AUS'} (IP {ip}, Relay {relay})")
 
