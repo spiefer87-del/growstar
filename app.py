@@ -19,7 +19,7 @@ from db import init_db, insert_measurement, init_diary_db, init_plants_table
 import presets
 from collections import deque
 
-from core.state import *
+import core.state as state
 from core.config import config
 from core.helpers import *
 
