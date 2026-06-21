@@ -21,99 +21,13 @@ from collections import deque
 
 from core.state import *
 from core.config import config
+from core.helpers import *
 
 init_db()
 init_diary_db()
 init_plants_table()
-CONFIG_FILE = "config.json"
 
 
-
-
-
-
-
-
-# =========================================
-# 🔧 DYNAMISCHE KONFIGURATION (Web-UI)
-# =========================================
-def load_config():
-    if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r") as f:
-            return json.load(f)
-    return {}
-
-config = load_config()
-
-# =========================================
-# 🧠 DEFAULT CONFIG (neue Architektur)
-# =========================================
-DEFAULT_CONFIG = {
-
-    # ================= PROFIL =================
-    "DAY_START_MIN": 360,
-    "NIGHT_START_MIN": 1320,
-
-    "DAY_TEMP": 24.0,
-    "DAY_TEMP_TOL": 1.0,
-    "DAY_HUM": 55.0,
-    "DAY_HUM_TOL": 5.0,
-
-    "NIGHT_TEMP": 20.0,
-    "NIGHT_TEMP_TOL": 1.0,
-    "NIGHT_HUM": 60.0,
-    "NIGHT_HUM_TOL": 5.0,
-
-    "MIN_TEMP": 12.0,
-    "MAX_TEMP": 30.0,
-    "MAX_HUM": 75.0,
-
-    "TEMP_OFFSET": 0.0,
-    "HUM_OFFSET": 0.0,
-
-    "RAMP_DURATION_MIN": 60,
-    "RAMP_ENABLED": 0,
-
-    # ================= DEVICE SYSTEM =================
-    "DEVICE_MODES": {
-        "fan":      {"mode": "ENV",  "params": {}},
-        "vent":     {"mode": "TIME", "params": {}},
-        "heating":  {"mode": "ENV",  "params": {}},
-        "light":    {"mode": "ENV",  "params": {}}
-    },
-
-    "DEVICE_ENV_CONFIG": {
-        "fan": {
-            "use_temp": False,
-            "use_hum": True,
-            "logic": "OR",
-            "direction": "HIGH"   # HIGH = bei zu hoher Temp/Hum an, LOW = bei zu niedriger Temp/Hum an
-        },
-        
-        "vent": {
-            "use_temp": False,
-            "use_hum": False,
-            "logic": "OR",
-            "direction": "HIGH"
-        }
-    },
-
-    # ================= ENERGY =================
-    "ENERGY_RESET": {},
-    "ENERGY_DAY_OFFSET": {},
-    "ENERGY_DAY_RESET_MIN": 0,
-    "ENERGY_LAST_DAY_RESET": None,
-
-    # ================= SYSTEM =================
-    "POWER_PRICE": 0.43,
-
-    # ================= PLANTS =================
-    "PLANTS": [{},{},{},{},{},{}]
-}
-
-# Fehlende Defaults ergänzen
-for k, v in DEFAULT_CONFIG.items():
-    config.setdefault(k, v)
 
 
 # =========================================
@@ -159,28 +73,6 @@ os.makedirs("logs", exist_ok=True)
 MQTT_LAST_MSG = 0   # timestamp letzter MQTT callback
 
 
-
-
-# =========================================
-# 🌱 HILFSFUNKTIONEN
-# =========================================
-
-def calculate_vpd(temp_c, humidity):
-    svp = 0.6108 * math.exp((17.27 * temp_c) / (temp_c + 237.3))
-    avp = svp * (humidity / 100.0)
-    return round(svp - avp, 3)
-
-def is_daytime():
-    hour = datetime.datetime.now().hour
-    return config["DAY_START"] <= hour < config["NIGHT_START"]
-
-def minutes_now():
-    now = datetime.datetime.now()
-    return now.hour * 60 + now.minute
-
-def save_config(cfg: dict):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(cfg, f, indent=2)
 
 def sensor_ok(last_time):
     return (time.time() - last_time) <= SENSOR_TIMEOUT
@@ -562,22 +454,9 @@ def resync_active_ramp():
     )
 
 
-def in_ramp_window(now_min, target_start, ramp_duration):
-    ramp_start = target_start - ramp_duration
-
-    if ramp_start >= 0:
-        return ramp_start <= now_min < target_start
-    else:
-        ramp_start += 1440
-        return now_min >= ramp_start or now_min < target_start
 
 
-def is_night(now_min, night_start, day_start):
-    # NACHT ist IMMER das Intervall zwischen night_start und day_start
-    if night_start < day_start:
-        return night_start <= now_min < day_start
-    else:
-        return now_min >= night_start or now_min < day_start
+
 
 
 def get_profile():
