@@ -62,3 +62,17 @@ last_hum = None
 last_ds_time = 0
 last_dht_time = 0
 last_db_write = 0
+
+current_profile = None
+
+# Rampe
+ramp_active = False
+ramp_start_minute = None     
+ramp_start_temp = None       
+ramp_target_temp = None      
+ramp_started_for_today = False
+morning_ramp_started_for_today = False
+
+# Sensor Stale-Flags
+temp_stale = False
+hum_stale = False
