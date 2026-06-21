@@ -486,23 +486,23 @@ def get_profile():
     # -------------------------------------------------
     if (
         config["RAMP_ENABLED"]
-        and not ramp_started_for_today
-        and current_profile == "TAG"
+        and not state.ramp_started_for_today
+        and state.current_profile == "TAG"
         and in_ramp_window(now_min, night_start, ramp_duration)
     ):
-        ramp_start_temp = float(config["DAY_TEMP"])
-        ramp_target_temp = float(config["NIGHT_TEMP"])
+        state.ramp_start_temp = float(config["DAY_TEMP"])
+        state.ramp_target_temp = float(config["NIGHT_TEMP"])
 
 
         ramp_start_minute = night_start - ramp_duration
         if ramp_start_minute < 0:
             ramp_start_minute += 1440
 
-        ramp_active = True
-        ramp_started_for_today = True
+        state.ramp_active = True
+        state.ramp_started_for_today = True
 
-        live_state["ramp_active"] = True
-        live_state["ramp_target"] = ramp_target_temp
+        state.live_state["ramp_active"] = True
+        state.live_state["ramp_target"] = ramp_target_temp
 
         sh = ramp_start_minute // 60
         sm = ramp_start_minute % 60
@@ -511,7 +511,7 @@ def get_profile():
 
         print(
             f"\n🌇 ABENDRAMPE START "
-            f"{ramp_start_temp:.1f}°C → {ramp_target_temp:.1f}°C "
+            f"{state.ramp_start_temp:.1f}°C → {state.ramp_target_temp:.1f}°C "
             f"(Start {sh:02d}:{sm:02d} | Ende {eh:02d}:{em:02d})\n"
         )
 
@@ -521,22 +521,22 @@ def get_profile():
     # -------------------------------------------------
     if (
         config["RAMP_ENABLED"]
-        and not morning_ramp_started_for_today
-        and current_profile == "NACHT"
+        and not state.morning_ramp_started_for_today
+        and state.current_profile == "NACHT"
         and in_ramp_window(now_min, day_start, ramp_duration)
     ):
-        ramp_start_temp = float(config["NIGHT_TEMP"])
-        ramp_target_temp = float(config["DAY_TEMP"])
+        state.ramp_start_temp = float(config["NIGHT_TEMP"])
+        state.ramp_target_temp = float(config["DAY_TEMP"])
 
         ramp_start_minute = day_start - ramp_duration
         if ramp_start_minute < 0:
             ramp_start_minute += 1440
 
-        ramp_active = True
-        morning_ramp_started_for_today = True
+        state.ramp_active = True
+        state.morning_ramp_started_for_today = True
 
-        live_state["ramp_active"] = True
-        live_state["ramp_target"] = ramp_target_temp
+        state.live_state["ramp_active"] = True
+        state.live_state["ramp_target"] = ramp_target_temp
 
         sh = ramp_start_minute // 60
         sm = ramp_start_minute % 60
@@ -545,31 +545,31 @@ def get_profile():
 
         print(
             f"\n🌅 MORGENRAMPE START "
-            f"{ramp_start_temp:.1f}°C → {ramp_target_temp:.1f}°C "
+            f"{state.ramp_start_temp:.1f}°C → {state.ramp_target_temp:.1f}°C "
             f"(Start {sh:02d}:{sm:02d} | Ende {eh:02d}:{em:02d})\n"
         )
 
     # -------------------------------------------------
     # 4️⃣ PROFILWECHSEL (Rampe NICHT neu starten!)
     # -------------------------------------------------
-    if new_profile != current_profile:
+    if new_profile != state.current_profile:
         print(f"\n⏰ PROFILWECHSEL → {new_profile}\n")
-        current_profile = new_profile
+        state.current_profile = new_profile
 
         if new_profile == "TAG":
-            ramp_started_for_today = False
-            ramp_active = False
-            ramp_start_minute = None
+            state.ramp_started_for_today = False
+            state.ramp_active = False
+            state.ramp_start_minute = None
 
         if new_profile == "NACHT":
-            morning_ramp_started_for_today = False
-            ramp_active = False
-            ramp_start_minute = None
+            state.morning_ramp_started_for_today = False
+            state.ramp_active = False
+            state.ramp_start_minute = None
 
     # -------------------------------------------------
     # 5️⃣ Live-State aktualisieren
     # -------------------------------------------------
-    live_state["profile"] = current_profile
+    state.live_state["profile"] = current_profile
 
     return current_profile
 
