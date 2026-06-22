@@ -451,9 +451,11 @@ def resync_active_ramp():
     if state.current_profile == "TAG":
         # Abendrampe
         state.ramp_target_temp = float(config["NIGHT_TEMP"])
+        state.live_state["ramp_target"] = state.ramp_target_temp
     else:
         # Morgenrampe
         state.ramp_target_temp = float(config["DAY_TEMP"])
+        state.live_state["ramp_target"] = state.ramp_target_temp
 
     print(
         f"🔁 RAMPE RESYNC → neues Ziel: {state.ramp_target_temp:.1f}°C"
