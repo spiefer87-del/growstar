@@ -2162,7 +2162,7 @@ def api_set_profile(name):
 
 @flask_app.route("/api/profile")
 def get_profile_api():
-    return {"active": ACTIVE_PROFILE}
+    return {"active": PROFILES.get("active")}
 
 # =========================================
 # 🐶 WATCHDOG + INFOLOG API
