@@ -483,7 +483,7 @@ def check_ramp_schedule():
         return
 
     if (
-        now_min == morning_start
+        abs(now_min - morning_start) <= 1
         and (
             state.last_ramp_trigger_day != today
             or state.last_ramp_trigger_type != "morning"
@@ -494,9 +494,11 @@ def check_ramp_schedule():
             float(config["DAY_TEMP"]),
             duration
         )
+        state.last_ramp_trigger_day = today
+        state.last_ramp_trigger_type = "morning"
 
     if (
-        now_min == evening_start
+        abs(now_min - evening_start) <= 1
         and (
             state.last_ramp_trigger_day != today
             or state.last_ramp_trigger_type != "evening"
@@ -507,6 +509,8 @@ def check_ramp_schedule():
             float(config["NIGHT_TEMP"]),
             duration
         )
+        state.last_ramp_trigger_day = today
+        state.last_ramp_trigger_type = "evening"
 
 
 def get_active_profile():
