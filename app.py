@@ -2319,7 +2319,7 @@ try:
                 vpd = calculate_vpd(temp_val, hum_val)
 
                 with state_lock:
-                    live_state["vpd"] = vpd
+                    state.live_state["vpd"] = vpd
 
                 try:
                     insert_measurement(
