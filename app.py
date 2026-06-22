@@ -24,6 +24,7 @@ from core.config import config
 from core.helpers import *
 from core.ramp import (
         start_ramp,
+        stop_ramp,
         update_ramp,
         get_ramped_target,
         resync_active_ramp,
@@ -980,8 +981,7 @@ def apply_profile(name):
     # 🔄 SCHRITT 4: Rampe zurücksetzen
     # =========================
     state.ramp_active = False
-    state.ramp_started_for_today = False
-    state.morning_ramp_started_for_today = False
+    stop_ramp()
 
     state.live_state["ramp_active"] = False
     state.live_state["ramp_target"] = None
@@ -1946,12 +1946,7 @@ def api_config():
     # 🛑 RAMP STOP IF DISABLED
     # =========================================
     if not config.get("RAMP_ENABLED", 0):
-        state.ramp_active = False
-        state.ramp_start_minute = None
-        state.ramp_start_temp = None
-        state.ramp_target_temp = None
-        state.ramp_started_for_today = False
-        state.morning_ramp_started_for_today = False
+        stop_ramp()
 
         state.live_state["ramp_active"] = False
         state.live_state["ramp_target"] = None
