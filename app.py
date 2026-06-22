@@ -440,37 +440,6 @@ def switch_shelly(ip, relay, state, timeout=3):
 # 🌡️ PROFIL & RAMPE
 # =========================================
 
-def resync_active_ramp():
-    """
-    Aktualisiert Rampen-Zielwerte, wenn Sollwerte
-    während einer aktiven Rampe geändert wurden.
-    """
-    current_target = get_ramped_target(
-        state.live_state.get("temp_target")
-    )
-    
-    state.ramp_start_temp = current_target
-    state.ramp_start_minute = minutes_now()
-    
-    if not state.ramp_active:
-        return
-
-    if state.current_profile == "TAG":
-        # Abendrampe
-        state.ramp_target_temp = float(config["NIGHT_TEMP"])
-        state.live_state["ramp_target"] = state.ramp_target_temp
-    else:
-        # Morgenrampe
-        state.ramp_target_temp = float(config["DAY_TEMP"])
-        state.live_state["ramp_target"] = state.ramp_target_temp
-
-    print(
-        f"🔁 RAMPE RESYNC → neues Ziel: {state.ramp_target_temp:.1f}°C"
-    )
-
-
-
-
 
 
 
