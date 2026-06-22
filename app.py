@@ -2,7 +2,7 @@
 # =========================================
 # 🌱 GROW BACKEND v3.5 Alpha – MQTT + REGELUNG + FLASK
 # =========================================
-#BUGS: - Rampenlogik kommt bei SOLLWertsänderung durcheinander (z.B. durch WebUI) → Rampenziel wird nicht aktualisiert, obwohl Rampe aktiv ist
+
 
 
 import json
