@@ -2149,7 +2149,7 @@ try:
         # 🔁 Rampen-Sollwert regelmäßig aktualisieren
         # =========================================
         if state.ramp_active:
-            update_ramp_target_only()
+            update_ramp()
 
         # =========================================
         # 🧊 SENSOR STALE LOGIK (niemals blockieren)
