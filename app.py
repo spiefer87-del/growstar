@@ -650,7 +650,7 @@ def set_heating(state, reason=""):
         return
 
     heating_on = state
-    live_state["heating"] = state
+    state.live_state["heating"] = state
     print(("🔥 HEIZUNG EIN " if state else "❄️ HEIZUNG AUS ") + reason)
 
 def set_fan(state, reason=""):
@@ -667,7 +667,7 @@ def set_fan(state, reason=""):
         return
 
     fan_on = state
-    live_state["fan"] = state
+    state.live_state["fan"] = state
     print(("💨 UMLUFT EIN " if state else "🛑 UMLUFT AUS ") + reason)
 
 def set_light(state, reason=""):
@@ -684,7 +684,7 @@ def set_light(state, reason=""):
         return
 
     light_on = state
-    live_state["light"] = state
+    state.live_state["light"] = state
     print(("💡 LICHT EIN " if state else "🛑 LICHT AUS ") + reason)
 
 def set_vent(state, reason=""):
@@ -701,7 +701,7 @@ def set_vent(state, reason=""):
         return
 
     vent_on = state
-    live_state["vent"] = state
+    state.live_state["vent"] = state
     print(("🌀 VENTILATOR EIN " if state else "🛑 VENTILATOR AUS ") + reason)
 
 def set_irrigation(state, reason=""):
@@ -717,7 +717,7 @@ def set_irrigation(state, reason=""):
     ):
         return
     irrigation_on = state
-    live_state["irrigation"] = state
+    state.live_state["irrigation"] = state
     print(("🚿 BEWÄSSERUNG EIN " if state else "🛑 BEWÄSSERUNG AUS ") + reason)
 
 def set_humidifier(state, reason=""):
@@ -733,7 +733,7 @@ def set_humidifier(state, reason=""):
     ):
         return
     humidifier_on = state
-    live_state["humidifier"] = state
+    state.live_state["humidifier"] = state
     print(("💧 LUFTBEFEUCHTER EIN " if state else "🛑 LUFTBEFEUCHTER AUS ") + reason)
 
 def set_dehumidifier(state, reason=""):
@@ -749,7 +749,7 @@ def set_dehumidifier(state, reason=""):
     ):
         return
     dehumidifier_on = state
-    live_state["dehumidifier"] = state
+    state.live_state["dehumidifier"] = state
     print(("💨 LUFTENTFEUCHTER EIN " if state else "🛑 LUFTENTFEUCHTER AUS ") + reason)
 
 def set_light2(state, reason=""):
@@ -765,7 +765,7 @@ def set_light2(state, reason=""):
     ):
         return
     light2_on = state
-    live_state["light2"] = state
+    state.live_state["light2"] = state
     print(("💡 LIGHT2 EIN " if state else "🛑 LIGHT2 AUS ") + reason)
 
 def set_vent2(state, reason=""):
@@ -781,7 +781,7 @@ def set_vent2(state, reason=""):
     ):
         return
     vent2_on = state
-    live_state["vent2"] = state
+    state.live_state["vent2"] = state
     print(("🌀 VENT2 EIN " if state else "🛑 VENT2 AUS ") + reason)
 
 # =========================================
@@ -905,9 +905,9 @@ def evaluate_env_conditions(device):
 
     # ================= TEMP =================
     if use_temp:
-        temp = live_state.get("temp")
-        target = live_state.get("temp_target")
-        tol = live_state.get("temp_tol")
+        temp = state.live_state.get("temp")
+        target = state.live_state.get("temp_target")
+        tol = state.live_state.get("temp_tol")
 
         if None not in (temp, target, tol):
 
@@ -1060,7 +1060,7 @@ def control_ventilator_env():
     Sollwerte kommen aus aktivem Profil.
     """
 
-    temp = live_state.get("temp")
+    temp = state.live_state.get("temp")
     if temp is None:
         set_vent(False)
         return
@@ -1210,8 +1210,8 @@ def on_message(client, userdata, msg):
             last_ds_temp = temp_raw
             last_ds_time = now
 
-            live_state["temp_raw"] = temp_raw
-            live_state["temp"] = temp
+            state.live_state["temp_raw"] = temp_raw
+            state.live_state["temp"] = temp
 
         # Optional debug
         # print(f"🌡️ TEMP {temp:.2f}°C")
@@ -1233,8 +1233,8 @@ def on_message(client, userdata, msg):
             last_hum = hum_raw
             last_dht_time = now
 
-            live_state["hum_raw"] = hum_raw
-            live_state["hum"] = hum
+            state.live_state["hum_raw"] = hum_raw
+            state.live_state["hum"] = hum
 
         # Optional debug
         # print(f"💧 HUM {hum:.2f}%")
@@ -1816,17 +1816,17 @@ def api_state():
     return jsonify({
 
         # ================= SENSOR =================
-        "temp_raw": live_state.get("temp_raw"),
-        "temp": live_state.get("temp"),
-        "hum_raw": live_state.get("hum_raw"),
-        "hum": live_state.get("hum"),
+        "temp_raw": state.live_state.get("temp_raw"),
+        "temp": state.live_state.get("temp"),
+        "hum_raw": state.live_state.get("hum_raw"),
+        "hum": state.live_state.get("hum"),
 
-        "temp_target": live_state.get("temp_target"),
-        "temp_tol": live_state.get("temp_tol"),
-        "hum_target": live_state.get("hum_target"),
-        "hum_tol": live_state.get("hum_tol"),
+        "temp_target": state.live_state.get("temp_target"),
+        "temp_tol": state.live_state.get("temp_tol"),
+        "hum_target": state.live_state.get("hum_target"),
+        "hum_tol": state.live_state.get("hum_tol"),
 
-        "vpd": live_state.get("vpd"),
+        "vpd": state.live_state.get("vpd"),
 
         # ================= PROFILE =================
         "profile": state.current_profile,
