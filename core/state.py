@@ -71,6 +71,8 @@ ramp_start_ts = None
 ramp_end_ts = None
 ramp_start_temp = None
 ramp_target_temp = None
+last_ramp_trigger_day = None
+last_ramp_trigger_type = None
 
 # Sensor Stale-Flags
 temp_stale = False
