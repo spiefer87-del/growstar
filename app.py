@@ -22,7 +22,13 @@ from collections import deque
 import core.state as state
 from core.config import config
 from core.helpers import *
-
+from core.ramp import (
+    start_ramp,
+    update_ramp,
+    get_ramped_target,
+    resync_active_ramp,
+    update_ramp_duration
+)
 init_db()
 init_diary_db()
 init_plants_table()
