@@ -91,20 +91,19 @@ def mark_stale_sensors():
     - wenn stale → Werte auf None + Regelung stoppen
     - wenn wieder ok → automatisch wieder aktivieren
     """
-    global temp_stale, hum_stale
 
     now = time.time()
 
     # =========================
     # 🌡️ TEMP
     # =========================
-    temp_age = now - last_ds_time
+    temp_age = now - state.last_ds_time
 
     if temp_age > SENSOR_TIMEOUT:
         # Sensor ist stale
-        if not temp_stale:
+        if not state.temp_stale:
             print(f"⚠️ TEMP SENSOR STALE ({int(temp_age)}s ohne Daten)")
-        temp_stale = True
+        state.temp_stale = True
 
         state.live_state["temp"] = None
         state.live_state["temp_raw"] = None
@@ -115,19 +114,19 @@ def mark_stale_sensors():
 
     else:
         # Sensor wieder ok
-        if temp_stale:
+        if state.temp_stale:
             print("✅ TEMP SENSOR wieder da")
-        temp_stale = False
+        state.temp_stale = False
 
     # =========================
     # 💧 HUM
     # =========================
-    hum_age = now - last_dht_time
+    hum_age = now - state.last_dht_time
 
     if hum_age > SENSOR_TIMEOUT:
-        if not hum_stale:
+        if not state.hum_stale:
             print(f"⚠️ HUM SENSOR STALE ({int(hum_age)}s ohne Daten)")
-        hum_stale = True
+        state.hum_stale = True
 
         state.live_state["hum"] = None
         state.live_state["hum_raw"] = None
@@ -137,9 +136,9 @@ def mark_stale_sensors():
         set_fan(False, "(HUM SENSOR STALE)")
 
     else:
-        if hum_stale:
+        if state.hum_stale:
             print("✅ HUM SENSOR wieder da")
-        hum_stale = False
+        state.hum_stale = False
 
     # =========================
     # 🌱 VPD neu berechnen sobald beide ok
