@@ -465,15 +465,49 @@ def get_profile():
 
 def check_ramp_schedule():
 
+    if not config.get("RAMP_ENABLED", 0):
+        return
+
     now_min = minutes_now()
+    today = datetime.date.today().isoformat()
 
     day_start = int(config["DAY_START_MIN"])
     night_start = int(config["NIGHT_START_MIN"])
-
     duration = int(config["RAMP_DURATION_MIN"])
 
     evening_start = (night_start - duration) % 1440
     morning_start = (day_start - duration) % 1440
+
+    # Bereits aktiv?
+    if state.ramp_active:
+        return
+
+    if (
+        now_min == morning_start
+        and (
+            state.last_ramp_trigger_day != today
+            or state.last_ramp_trigger_type != "morning"
+        )
+    ):
+        start_ramp(
+            float(config["NIGHT_TEMP"]),
+            float(config["DAY_TEMP"]),
+            duration
+        )
+
+    if (
+        now_min == evening_start
+        and (
+            state.last_ramp_trigger_day != today
+            or state.last_ramp_trigger_type != "evening"
+        )
+    ):
+        start_ramp(
+            float(config["DAY_TEMP"]),
+            float(config["NIGHT_TEMP"]),
+            duration
+        )
+
 
 def get_active_profile():
     return PROFILES.get("active")
@@ -1685,10 +1719,10 @@ def api_state():
         "ramp_active": bool(state.ramp_active and config.get("RAMP_ENABLED", 0)),
 
         # ================= DEVICES =================
-        "heating_on": heating_on,
-        "fan_on": fan_on,
-        "light_on": light_on,
-        "vent_on": vent_on,
+        "heating_on": state.heating_on,
+        "fan_on": state.fan_on,
+        "light_on": state.light_on,
+        "vent_on": state.vent_on,
 
         # Modi
         "heating_mode": get_device_mode("heating"),
@@ -2140,13 +2174,13 @@ try:
         # =========================================
         update_temperature_setpoint()
         update_humidity_setpoint()
-
+        check_ramp_schedule()
         # =========================================
         # 🔁 Rampen-Sollwert regelmäßig aktualisieren
         # =========================================
         if state.ramp_active:
             update_ramp()
-
+        
         # =========================================
         # 🧊 SENSOR STALE LOGIK (niemals blockieren)
         # =========================================
@@ -2160,8 +2194,8 @@ try:
         # =========================================
         # 📊 VPD + DB Logging (entkoppelt von MQTT)
         # =========================================
-        if now - last_db_write >= DB_INTERVAL:
-            last_db_write = now
+        if now - state.last_db_write >= DB_INTERVAL:
+            state.last_db_write = now
 
             with state_lock:
 
