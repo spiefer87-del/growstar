@@ -1143,10 +1143,10 @@ def sync_relay(name, ip, relay, state_var, live_key):
         state.live_state[live_key] = None
         return
 
-    state = get_shelly_relay_state(ip, relay)
+    relay_state = get_shelly_relay_state(ip, relay)
 
     # ❌ FEHLER / KEINE VERBINDUNG
-    if state is None:
+    if relay_state is None:
         globals()[state_var] = None
         state.live_state[live_key] = None
 
