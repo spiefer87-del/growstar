@@ -98,9 +98,9 @@ def mark_stale_sensors():
             print(f"⚠️ TEMP SENSOR STALE ({int(temp_age)}s ohne Daten)")
         temp_stale = True
 
-        live_state["temp"] = None
-        live_state["temp_raw"] = None
-        live_state["vpd"] = None
+        state.live_state["temp"] = None
+        state.live_state["temp_raw"] = None
+        state.live_state["vpd"] = None
 
         # Sicherheitsaktion
         set_heating(False, "(TEMP SENSOR STALE)")
@@ -121,9 +121,9 @@ def mark_stale_sensors():
             print(f"⚠️ HUM SENSOR STALE ({int(hum_age)}s ohne Daten)")
         hum_stale = True
 
-        live_state["hum"] = None
-        live_state["hum_raw"] = None
-        live_state["vpd"] = None
+        state.live_state["hum"] = None
+        state.live_state["hum_raw"] = None
+        state.live_state["vpd"] = None
 
         # Sicherheitsaktion
         set_fan(False, "(HUM SENSOR STALE)")
@@ -137,12 +137,12 @@ def mark_stale_sensors():
     # 🌱 VPD neu berechnen sobald beide ok
     # =========================
     if (
-        live_state.get("temp") is not None
-        and live_state.get("hum") is not None
+        state.live_state.get("temp") is not None
+        and state.live_state.get("hum") is not None
     ):
-        live_state["vpd"] = calculate_vpd(
-            live_state["temp"],
-            live_state["hum"]
+        state.live_state["vpd"] = calculate_vpd(
+            state.live_state["temp"],
+            state.live_state["hum"]
         )
 
 def do_energy_day_reset():
@@ -1155,10 +1155,10 @@ def sync_relay(name, ip, relay, state_var, live_key):
         return
 
     # ✅ OK
-    globals()[state_var] = state
-    state.live_state[live_key] = state
+    globals()[state_var] = relay_state
+    state.live_state[live_key] = relay_state
 
-    print(f"✅ {name}: {'EIN' if state else 'AUS'} (IP {ip}, Relay {relay})")
+    print(f"✅ {name}: {'EIN' if relay_state else 'AUS'} (IP {ip}, Relay {relay})")
 
 
 sync_relay("🔥 Heizung", config["IP_HEATING"], config["RELAY_HEATING"], "heating_on", "heating")
