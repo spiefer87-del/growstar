@@ -604,6 +604,10 @@ def get_ramped_target(base_target):
 
     # Zeitdifferenz zyklisch korrekt
     total = (ramp_end - start_min) % 1440
+    
+    if total <= 0:
+        return target_temp
+    
     elapsed = (now_min - start_min) % 1440
 
     if elapsed <= 0:
@@ -1692,7 +1696,7 @@ def api_energy_reset_total_all():
         del config["ENERGY_RESET"]["_all"]
 
     save_config(config)
-    refresh_energy_state
+    refresh_energy_state()
     print("🧹 ENERGY: Manueller Total-Reset ALL")
 
     return {"status": "ok"}
