@@ -443,6 +443,7 @@ def resync_active_ramp():
     )
     
     state.ramp_start_temp = current_target
+    state.ramp_start_minute = minutes_now()
     
     if not state.ramp_active:
         return
