@@ -484,153 +484,149 @@ def get_active_profile():
 # =========================================
 # 🔥 AKTOREN
 # =========================================
-def set_heating(state, reason=""):
-    global heating_on
+def set_heating(enabled, reason=""):
 
-    if state == heating_on:
+    if enabled == state.heating_on:
         return
 
     if not switch_shelly(
         config.get("IP_HEATING"),
         config.get("RELAY_HEATING"),
-        state
+        enabled
     ):
         return
 
-    heating_on = state
-    state.live_state["heating"] = state
-    print(("🔥 HEIZUNG EIN " if state else "❄️ HEIZUNG AUS ") + reason)
+    state.heating_on = enabled
+    state.live_state["heating"] = enabled
+    print(("🔥 HEIZUNG EIN " if enabled else "❄️ HEIZUNG AUS ") + reason)
 
-def set_fan(state, reason=""):
-    global fan_on
+def set_fan(enabled, reason=""):
 
-    if state == fan_on:
+    if enabled == state.fan_on:
         return
     
     if not switch_shelly(
         config.get("IP_FAN"),
         config.get("RELAY_FAN"),
-        state
+        enabled
     ):
         return
 
-    fan_on = state
-    state.live_state["fan"] = state
-    print(("💨 UMLUFT EIN " if state else "🛑 UMLUFT AUS ") + reason)
+    state.fan_on = enabled
+    state.live_state["fan"] = enabled
+    print(("💨 UMLUFT EIN " if enabled else "🛑 UMLUFT AUS ") + reason)
 
-def set_light(state, reason=""):
-    global light_on
+def set_light(enabled, reason=""):
 
-    if state == light_on:
+    if enabled == state.light_on:
         return
     
     if not switch_shelly(
         config.get("IP_LIGHT"),
         config.get("RELAY_LIGHT"),
-        state
+        enabled
     ):
         return
 
-    light_on = state
-    state.live_state["light"] = state
-    print(("💡 LICHT EIN " if state else "🛑 LICHT AUS ") + reason)
+    state.light_on = enabled
+    state.live_state["light"] = enabled
+    print(("💡 LICHT EIN " if enabled else "🛑 LICHT AUS ") + reason)
 
-def set_vent(state, reason=""):
-    global vent_on
+def set_vent(enabled, reason=""):
 
-    if state == vent_on:
+    if enabled == state.vent_on:
         return
     
     if not switch_shelly(
         config.get("IP_VENT"),
         config.get("RELAY_VENT"),
-        state
+        enabled
     ):
         return
 
-    vent_on = state
-    state.live_state["vent"] = state
-    print(("🌀 VENTILATOR EIN " if state else "🛑 VENTILATOR AUS ") + reason)
+    state.vent_on = enabled
+    state.live_state["vent"] = enabled
+    print(("🌀 VENTILATOR EIN " if enabled else "🛑 VENTILATOR AUS ") + reason)
 
-def set_irrigation(state, reason=""):
-    global irrigation_on
+def set_irrigation(enabled, reason=""):
 
-    if state == irrigation_on:
+    if enabled == state.irrigation_on:
         return
     
     if not switch_shelly(
         config.get("IP_IRRIGATION"),
         config.get("RELAY_IRRIGATION"),
-        state
+        enabled
     ):
         return
-    irrigation_on = state
-    state.live_state["irrigation"] = state
-    print(("🚿 BEWÄSSERUNG EIN " if state else "🛑 BEWÄSSERUNG AUS ") + reason)
+            
+    state.irrigation_on = enabled
+    state.live_state["irrigation"] = enabled
+    print(("🚿 BEWÄSSERUNG EIN " if enabled else "🛑 BEWÄSSERUNG AUS ") + reason)
 
-def set_humidifier(state, reason=""):
-    global humidifier_on
+def set_humidifier(enabled, reason=""):
 
-    if state == humidifier_on:
+    if enabled == state.humidifier_on:
         return
     
     if not switch_shelly(
         config.get("IP_HUMIDIFIER"),
         config.get("RELAY_HUMIDIFIER"),
-        state
+        enabled
     ):
         return
-    humidifier_on = state
-    state.live_state["humidifier"] = state
-    print(("💧 LUFTBEFEUCHTER EIN " if state else "🛑 LUFTBEFEUCHTER AUS ") + reason)
+            
+    state.humidifier_on = enabled
+    state.live_state["humidifier"] = enabled
+    print(("💧 LUFTBEFEUCHTER EIN " if enabled else "🛑 LUFTBEFEUCHTER AUS ") + reason)
 
-def set_dehumidifier(state, reason=""):
-    global dehumidifier_on
+def set_dehumidifier(enabled, reason=""):
 
-    if state == dehumidifier_on:
+    if enabled == state.dehumidifier_on:
         return
     
     if not switch_shelly(
         config.get("IP_DEHUMIDIFIER"),
         config.get("RELAY_DEHUMIDIFIER"),
-        state
+        enabled
     ):
         return
-    dehumidifier_on = state
-    state.live_state["dehumidifier"] = state
-    print(("💨 LUFTENTFEUCHTER EIN " if state else "🛑 LUFTENTFEUCHTER AUS ") + reason)
+            
+    state.dehumidifier_on = enabled
+    state.live_state["dehumidifier"] = enabled
+    print(("💨 LUFTENTFEUCHTER EIN " if enabled else "🛑 LUFTENTFEUCHTER AUS ") + reason)
 
-def set_light2(state, reason=""):
-    global light2_on
+def set_light2(enabled, reason=""):
 
-    if state == light2_on:
+    if enabled == state.light2_on:
         return
     
     if not switch_shelly(
         config.get("IP_LIGHT2"),
         config.get("RELAY_LIGHT2"),
-        state
+        enabled
     ):
         return
-    light2_on = state
-    state.live_state["light2"] = state
-    print(("💡 LIGHT2 EIN " if state else "🛑 LIGHT2 AUS ") + reason)
+            
+    state.light2_on = enabled
+    state.live_state["light2"] = enabled
+    print(("💡 LIGHT2 EIN " if enabled else "🛑 LIGHT2 AUS ") + reason)
 
-def set_vent2(state, reason=""):
-    global vent2_on
+def set_vent2(enabled, reason=""):
 
-    if state == vent2_on:
+    if enabled == state.vent2_on:
         return
     
     if not switch_shelly(
         config.get("IP_VENT2"),
         config.get("RELAY_VENT2"),
-        state
+        enabled
     ):
         return
-    vent2_on = state
-    state.live_state["vent2"] = state
-    print(("🌀 VENT2 EIN " if state else "🛑 VENT2 AUS ") + reason)
+            
+    state.vent2_on = enabled
+    state.live_state["vent2"] = enabled
+    print(("🌀 VENT2 EIN " if enabled else "🛑 VENT2 AUS ") + reason)
 
 # =========================================
 # 🔌 DEVICE SETTER MAPPING
