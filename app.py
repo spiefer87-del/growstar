@@ -991,7 +991,7 @@ def apply_profile(name):
 def sync_relay(name, ip, relay, state_var, live_key):
     # nicht konfiguriert
     if not ip or relay is None:
-        globals()[state_var] = None
+        setattr(state, state_var, None)
         state.live_state[live_key] = None
         return
 
@@ -999,14 +999,14 @@ def sync_relay(name, ip, relay, state_var, live_key):
 
     # ❌ FEHLER / KEINE VERBINDUNG
     if relay_state is None:
-        globals()[state_var] = None
+        setattr(state, state_var, None)
         state.live_state[live_key] = None
 
         print(f"❌ {name}: KEINE VERBINDUNG (IP {ip}, Relay {relay})")
         return
 
     # ✅ OK
-    globals()[state_var] = relay_state
+    setattr(state, state_var, relay_state)
     state.live_state[live_key] = relay_state
 
     print(f"✅ {name}: {'EIN' if relay_state else 'AUS'} (IP {ip}, Relay {relay})")
