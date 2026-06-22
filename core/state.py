@@ -67,11 +67,10 @@ current_profile = None
 
 # Rampe
 ramp_active = False
-ramp_start_minute = None     
-ramp_start_temp = None       
-ramp_target_temp = None      
-ramp_started_for_today = False
-morning_ramp_started_for_today = False
+ramp_start_ts = None
+ramp_end_ts = None
+ramp_start_temp = None
+ramp_target_temp = None
 
 # Sensor Stale-Flags
 temp_stale = False
