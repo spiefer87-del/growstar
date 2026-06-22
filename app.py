@@ -2300,8 +2300,8 @@ try:
 
         # Snapshot (threadsafe)
         with state_lock:
-            temp_val = live_state.get("temp")
-            hum_val = live_state.get("hum")
+            temp_val = state.live_state.get("temp")
+            hum_val = state.live_state.get("hum")
 
         # =========================================
         # 📊 VPD + DB Logging (entkoppelt von MQTT)
@@ -2312,8 +2312,8 @@ try:
             with state_lock:
 
                 # Targets können None sein, ist OK
-                tt = live_state.get("temp_target")
-                ht = live_state.get("hum_target")
+                tt = state.live_state.get("temp_target")
+                ht = state.live_state.get("hum_target")
 
             if temp_val is not None and hum_val is not None:
                 vpd = calculate_vpd(temp_val, hum_val)
