@@ -449,171 +449,35 @@ def get_profile():
 
     day_start = int(config["DAY_START_MIN"])
     night_start = int(config["NIGHT_START_MIN"])
-    ramp_duration = int(config["RAMP_DURATION_MIN"])
 
-
-
-    # -------------------------------------------------
-    # 1️⃣ Profil bestimmen (KORREKT über Mitternacht)
-    # -------------------------------------------------
     if is_night(now_min, night_start, day_start):
-        new_profile = "NACHT"
+        profile = "NACHT"
     else:
-        new_profile = "TAG"
+        profile = "TAG"
 
-    # -------------------------------------------------
-    # 2️⃣ ABENDRAMPE (TAG → NACHT)
-    #     läuft VOR night_start
-    # -------------------------------------------------
-    if (
-        config["RAMP_ENABLED"]
-        and not state.ramp_started_for_today
-        and state.current_profile == "TAG"
-        and in_ramp_window(now_min, night_start, ramp_duration)
-    ):
-        state.ramp_start_temp = float(config["DAY_TEMP"])
-        state.ramp_target_temp = float(config["NIGHT_TEMP"])
+    if profile != state.current_profile:
+        state.current_profile = profile
 
+    state.live_state["profile"] = profile
 
-        state.ramp_start_minute = night_start - ramp_duration
-        if state.ramp_start_minute < 0:
-            state.ramp_start_minute += 1440
+    return profile
 
-        state.ramp_active = True
-        state.ramp_started_for_today = True
+def check_ramp_schedule():
 
-        state.live_state["ramp_active"] = True
-        state.live_state["ramp_target"] = state.ramp_target_temp
+    now_min = minutes_now()
 
-        sh = state.ramp_start_minute // 60
-        sm = state.ramp_start_minute % 60
-        eh = night_start // 60
-        em = night_start % 60
+    day_start = int(config["DAY_START_MIN"])
+    night_start = int(config["NIGHT_START_MIN"])
 
-        print(
-            f"\n🌇 ABENDRAMPE START "
-            f"{state.ramp_start_temp:.1f}°C → {state.ramp_target_temp:.1f}°C "
-            f"(Start {sh:02d}:{sm:02d} | Ende {eh:02d}:{em:02d})\n"
-        )
+    duration = int(config["RAMP_DURATION_MIN"])
 
-    # -------------------------------------------------
-    # 3️⃣ MORGENRAMPE (NACHT → TAG)
-    #     läuft VOR day_start
-    # -------------------------------------------------
-    if (
-        config["RAMP_ENABLED"]
-        and not state.morning_ramp_started_for_today
-        and state.current_profile == "NACHT"
-        and in_ramp_window(now_min, day_start, ramp_duration)
-    ):
-        state.ramp_start_temp = float(config["NIGHT_TEMP"])
-        state.ramp_target_temp = float(config["DAY_TEMP"])
-
-        state.ramp_start_minute = day_start - ramp_duration
-        if state.ramp_start_minute < 0:
-            state.ramp_start_minute += 1440
-
-        state.ramp_active = True
-        state.morning_ramp_started_for_today = True
-
-        state.live_state["ramp_active"] = True
-        state.live_state["ramp_target"] = state.ramp_target_temp
-
-        sh = state.ramp_start_minute // 60
-        sm = state.ramp_start_minute % 60
-        eh = day_start // 60
-        em = day_start % 60
-
-        print(
-            f"\n🌅 MORGENRAMPE START "
-            f"{state.ramp_start_temp:.1f}°C → {state.ramp_target_temp:.1f}°C "
-            f"(Start {sh:02d}:{sm:02d} | Ende {eh:02d}:{em:02d})\n"
-        )
-
-    # -------------------------------------------------
-    # 4️⃣ PROFILWECHSEL (Rampe NICHT neu starten!)
-    # -------------------------------------------------
-    if new_profile != state.current_profile:
-        print(f"\n⏰ PROFILWECHSEL → {new_profile}\n")
-        state.current_profile = new_profile
-
-        if new_profile == "TAG":
-            state.ramp_started_for_today = False
-            state.ramp_active = False
-            state.ramp_start_minute = None
-
-        if new_profile == "NACHT":
-            state.morning_ramp_started_for_today = False
-            state.ramp_active = False
-            state.ramp_start_minute = None
-
-    # -------------------------------------------------
-    # 5️⃣ Live-State aktualisieren
-    # -------------------------------------------------
-    state.live_state["profile"] = state.current_profile
-
-    return state.current_profile
+    evening_start = (night_start - duration) % 1440
+    morning_start = (day_start - duration) % 1440
 
 def get_active_profile():
     return PROFILES.get("active")
 
 
-def get_ramped_target(base_target):
-    if not config["RAMP_ENABLED"] or not state.ramp_active:
-        return base_target
-
-    now_min = minutes_now()
-
-    # Zielzeit bestimmen (abhängig von Profil)
-    if state.current_profile == "TAG":
-        # Abendrampe → Ziel ist NACHT
-        ramp_end = int(config["NIGHT_START_MIN"])
-        start_temp = state.ramp_start_temp
-        target_temp = state.ramp_target_temp
-    else:
-        # Morgenrampe → Ziel ist TAG
-        ramp_end = int(config["DAY_START_MIN"])
-        start_temp = state.ramp_start_temp
-        target_temp = state.ramp_target_temp
-
-    start_min = state.ramp_start_minute
-
-    # Zeitdifferenz zyklisch korrekt
-    total = (ramp_end - start_min) % 1440
-    
-    if total <= 0:
-        return target_temp
-    
-    elapsed = (now_min - start_min) % 1440
-
-    if elapsed <= 0:
-        return start_temp
-    if elapsed >= total:
-        return target_temp
-
-    progress = elapsed / total
-
-    return round(
-        start_temp + progress * (target_temp - start_temp),
-        2
-    )
-
-
-def update_ramp_target_only():
-    if state.current_profile is None:
-        return
-
-    if state.current_profile == "TAG":
-        base = config["DAY_TEMP"]
-        tol = config["DAY_TEMP_TOL"]
-    else:
-        base = config["NIGHT_TEMP"]
-        tol = config["NIGHT_TEMP_TOL"]
-
-    target = get_ramped_target(base)
-
-    state.live_state["temp_target"] = target
-    state.live_state["temp_tol"] = tol
 
 
 # =========================================
@@ -867,7 +731,16 @@ def update_temperature_setpoint():
         base = float(config["NIGHT_TEMP"])
         tol  = float(config["NIGHT_TEMP_TOL"])
 
-    target = get_ramped_target(base)
+    target = base
+
+    if state.ramp_active:
+
+        ramp_target = get_ramped_target()
+
+        if ramp_target is not None:
+            target = ramp_target
+
+    update_ramp()
 
     # 📊 IMMER setzen – auch wenn Regelung deaktiviert
     state.live_state["temp_target"] = target
@@ -2058,8 +1931,16 @@ def api_config():
         "RAMP_DURATION_MIN"
     }
 
-    if state.ramp_active and any(k in data for k in RAMP_RELEVANT_KEYS):
-        resync_active_ramp()
+    if state.ramp_active:
+
+        if "RAMP_DURATION_MIN" in data:
+            update_ramp_duration()
+        
+        if (
+            "DAY_TEMP" in data
+            or "NIGHT_TEMP" in data
+                ):
+            resync_active_ramp()
 
     # =========================================
     # 🛑 RAMP STOP IF DISABLED
