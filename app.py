@@ -97,7 +97,7 @@ def mark_stale_sensors():
     # =========================
     # 🌡️ TEMP
     # =========================
-    temp_age = now - state.last_ds_time
+    temp_age = now - state._time
 
     if temp_age > SENSOR_TIMEOUT:
         # Sensor ist stale
@@ -1096,8 +1096,8 @@ def on_message(client, userdata, msg):
         temp = round(temp_raw + float(config.get("TEMP_OFFSET", 0.0)), 2)
 
         with state_lock:
-            last_ds_temp = temp_raw
-            last_ds_time = now
+            state.last_ds_temp = temp_raw
+            state.last_ds_time = now
 
             state.live_state["temp_raw"] = temp_raw
             state.live_state["temp"] = temp
@@ -1119,8 +1119,8 @@ def on_message(client, userdata, msg):
         hum = round(hum_raw + float(config.get("HUM_OFFSET", 0.0)), 2)
 
         with state_lock:
-            last_hum = hum_raw
-            last_dht_time = now
+            state.last_hum = hum_raw
+            state.last_dht_time = now
 
             state.live_state["hum_raw"] = hum_raw
             state.live_state["hum"] = hum
@@ -1281,7 +1281,7 @@ def watchdog_loop():
             # 🌡️ TEMP stale?
             # -------------------------
             with state_lock:
-                ds_age = now - last_ds_time
+                ds_age = now - state.last_ds_time
                 dht_age = now - last_dht_time
 
             if ds_age > SENSOR_TIMEOUT:
