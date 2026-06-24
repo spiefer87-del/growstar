@@ -42,3 +42,9 @@ def minute_distance(a, b):
         (a - b) % 1440,
         (b - a) % 1440
     )
+
+def in_time_window(now_min, start, end):
+    if start < end:
+        return start <= now_min < end
+    else:
+        return now_min >= start or now_min < end
