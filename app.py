@@ -774,8 +774,6 @@ def update_temperature_setpoint():
         if ramp_target is not None:
             target = ramp_target
 
-    update_ramp()
-
     # 📊 IMMER setzen – auch wenn Regelung deaktiviert
     state.live_state["temp_target"] = target
     state.live_state["temp_tol"] = tol
