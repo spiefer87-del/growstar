@@ -97,7 +97,7 @@ def mark_stale_sensors():
     # =========================
     # 🌡️ TEMP
     # =========================
-    temp_age = now - state._time
+    temp_age = now - state.last_ds_time
 
     if temp_age > SENSOR_TIMEOUT:
         # Sensor ist stale
@@ -1279,7 +1279,7 @@ def watchdog_loop():
             # -------------------------
             with state_lock:
                 ds_age = now - state.last_ds_time
-                dht_age = now - last_dht_time
+                dht_age = now - state.last_dht_time
 
             if ds_age > SENSOR_TIMEOUT:
                 # nicht spammen -> max alle 60s
