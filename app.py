@@ -727,6 +727,9 @@ def failsafe_check(device, ip_key, relay_key):
         return
 
     should_on = state.live_state.get(device)
+    if should_on is None:
+        return
+            
     actual = get_shelly_relay_state(ip, relay)
 
     if actual is None:
@@ -1736,7 +1739,11 @@ def api_state():
         # ================= SENSOR HEALTH =================
         "temp_ok": not state.temp_stale,
         "hum_ok": not state.hum_stale,
-        "temp_age": int(time.time() - state.last_ds_time),
+        "temp_age": (
+            int(time.time() - state.last_ds_time)
+            if state.last_ds_time
+            else None
+        ),
         "hum_age": int(time.time() - state.last_dht_time),
 
         # optional Debug
