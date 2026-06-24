@@ -1298,7 +1298,7 @@ def watchdog_loop():
                     log_event(f"TEMP Sensor stale: {int(ds_age)}s keine Daten", "WARN")
                     last_warn_temp = now
 
-            if dht_age > SENSOR_TIMEOUT:
+            if state.last_dht_time and dht_age > SENSOR_TIMEOUT:
                 if now - last_warn_hum > 60:
                     log_event(f"HUM Sensor stale: {int(dht_age)}s keine Daten", "WARN")
                     last_warn_hum = now
