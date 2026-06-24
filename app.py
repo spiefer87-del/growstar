@@ -1736,8 +1736,8 @@ def api_state():
         "energy": energy_state,
 
         # ================= SENSOR HEALTH =================
-        "temp_ok": not temp_stale,
-        "hum_ok": not hum_stale,
+        "temp_ok": not state.temp_stale,
+        "hum_ok": not state.hum_stale,
         "temp_age": int(time.time() - state.last_ds_time),
         "hum_age": int(time.time() - state.last_dht_time),
 
