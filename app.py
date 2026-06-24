@@ -94,10 +94,13 @@ def mark_stale_sensors():
 
     now = time.time()
 
+    with state_lock:
+        temp_age = now - state.last_ds_time
+        hum_age = now - state.last_dht_time
+
     # =========================
     # 🌡️ TEMP
     # =========================
-    temp_age = now - state.last_ds_time
 
     if temp_age > SENSOR_TIMEOUT:
         # Sensor ist stale
@@ -121,7 +124,6 @@ def mark_stale_sensors():
     # =========================
     # 💧 HUM
     # =========================
-    hum_age = now - state.last_dht_time
 
     if hum_age > SENSOR_TIMEOUT:
         if not state.hum_stale:
@@ -503,7 +505,7 @@ def check_ramp_schedule():
         state.last_ramp_trigger_type = "morning"
 
     if (
-        minute_distance(now_min - evening_start) <= 1
+        minute_distance(now_min, evening_start) <= 1
         and (
             state.last_ramp_trigger_day != today
             or state.last_ramp_trigger_type != "evening"
@@ -1290,7 +1292,7 @@ def watchdog_loop():
                 ds_age = now - state.last_ds_time
                 dht_age = now - state.last_dht_time
 
-            if ds_age > SENSOR_TIMEOUT:
+            if state.last_ds_time and ds_age > SENSOR_TIMEOUT:
                 # nicht spammen -> max alle 60s
                 if now - last_warn_temp > 60:
                     log_event(f"TEMP Sensor stale: {int(ds_age)}s keine Daten", "WARN")
@@ -1969,14 +1971,6 @@ def api_config():
         except:
             config[key] = value
 
-    # =========================================
-    # 🔁 RAMP RESYNC
-    # =========================================
-    RAMP_RELEVANT_KEYS = {
-        "DAY_TEMP",
-        "NIGHT_TEMP",
-        "RAMP_DURATION_MIN"
-    }
 
     if state.ramp_active:
 
