@@ -1069,8 +1069,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
         client.subscribe([(TOPIC_DS, 0), (TOPIC_DHT, 0)])
 
 def on_message(client, userdata, msg):
-    global last_ds_time, last_dht_time
-    global last_ds_temp, last_hum
+
     global MQTT_LAST_MSG
     
     MQTT_LAST_MSG = time.time()
@@ -1739,8 +1738,8 @@ def api_state():
         # ================= SENSOR HEALTH =================
         "temp_ok": not temp_stale,
         "hum_ok": not hum_stale,
-        "temp_age": int(time.time() - last_ds_time),
-        "hum_age": int(time.time() - last_dht_time),
+        "temp_age": int(time.time() - state.last_ds_time),
+        "hum_age": int(time.time() - state.last_dht_time),
 
         # optional Debug
         "device_modes": config.get("DEVICE_MODES", {})
@@ -2120,8 +2119,8 @@ def api_watchdog_status():
     now = time.time()
 
     with state_lock:
-        ds_age = now - last_ds_time if last_ds_time else 999999
-        dht_age = now - last_dht_time if last_dht_time else 999999
+        ds_age = now - state.last_ds_time if state.last_ds_time else 999999
+        dht_age = now - state.last_dht_time if state.last_dht_time else 999999
 
     with energy_lock:
         ecount = len(energy_state)
