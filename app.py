@@ -461,7 +461,13 @@ def get_profile():
     state.live_state["profile"] = profile
 
     return profile
-
+        
+def minute_distance(a, b):
+    return min(
+        (a - b) % 1440,
+        (b - a) % 1440
+    )
+        
 def check_ramp_schedule():
 
     if not config.get("RAMP_ENABLED", 0):
@@ -482,7 +488,7 @@ def check_ramp_schedule():
         return
 
     if (
-        abs(now_min - morning_start) <= 1
+        minute_distance(now_min, morning_start) <= 1
         and (
             state.last_ramp_trigger_day != today
             or state.last_ramp_trigger_type != "morning"
@@ -497,7 +503,7 @@ def check_ramp_schedule():
         state.last_ramp_trigger_type = "morning"
 
     if (
-        abs(now_min - evening_start) <= 1
+        minute_distance(now_min - evening_start) <= 1
         and (
             state.last_ramp_trigger_day != today
             or state.last_ramp_trigger_type != "evening"
@@ -1744,7 +1750,11 @@ def api_state():
             if state.last_ds_time
             else None
         ),
-        "hum_age": int(time.time() - state.last_dht_time),
+        "hum_age": (
+            int(time.time() - state.last_dht_time)
+            if state.last_dht_time
+            else None
+        ),
 
         # optional Debug
         "device_modes": config.get("DEVICE_MODES", {})
