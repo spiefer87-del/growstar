@@ -36,3 +36,9 @@ def in_ramp_window(now_min, target_start, ramp_duration):
 
 def sensor_ok(last_time):
     return (time.time() - last_time) <= SENSOR_TIMEOUT
+
+def minute_distance(a, b):
+    return min(
+        (a - b) % 1440,
+        (b - a) % 1440
+    )
