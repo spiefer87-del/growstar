@@ -10,10 +10,6 @@ def calculate_vpd(temp_c, humidity):
     avp = svp * (humidity / 100.0)
     return round(svp - avp, 3)
 
-def is_daytime():
-    hour = datetime.datetime.now().hour
-    return config["DAY_START"] <= hour < config["NIGHT_START"]
-
 def minutes_now():
     now = datetime.datetime.now()
     return now.hour * 60 + now.minute
@@ -33,9 +29,6 @@ def in_ramp_window(now_min, target_start, ramp_duration):
     else:
         ramp_start += 1440
         return now_min >= ramp_start or now_min < target_start
-
-def sensor_ok(last_time):
-    return (time.time() - last_time) <= SENSOR_TIMEOUT
 
 def minute_distance(a, b):
     return min(
