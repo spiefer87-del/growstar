@@ -61,6 +61,12 @@ from core.actuators import (
             set_vent2,
         )
 
+from core.control import (
+            update_temperature_setpoint,
+            update_humidity_setpoint,
+            control_device,
+        )
+
 init_db()
 init_diary_db()
 init_plants_table()
