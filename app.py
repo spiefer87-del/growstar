@@ -31,6 +31,15 @@ from core.ramp import (
         update_ramp_duration
     )
 
+from core.profile import (
+        get_profile,
+        check_ramp_schedule,
+        apply_profile,
+        load_profiles,
+        save_profiles,
+        PROFILES
+    )
+
 init_db()
 init_diary_db()
 init_plants_table()
