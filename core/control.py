@@ -1,5 +1,20 @@
 #core/control.py
 
+import time
+
+import core.state as state
+
+from core.config import config
+from core.profile import get_profile
+from core.ramp import get_ramped_target
+from core.helpers import minutes_now, in_time_window
+from core.actuators import (
+    set_device,
+    set_heating,
+    set_fan,
+    set_vent,
+)
+
 # =========================================
 # 🌡️ REGELLOGIK
 # =========================================
