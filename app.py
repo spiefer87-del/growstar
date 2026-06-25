@@ -20,7 +20,7 @@ import presets
 from collections import deque
 
 import core.state as state
-from core.config import config
+from core.config import config, safe_config
 
 from core.helpers import (
         calculate_vpd,
