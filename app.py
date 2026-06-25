@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # =========================================
-# 🌱 GROW BACKEND v3.5 Alpha – MQTT + REGELUNG + FLASK
+# 🌱 GROW BACKEND v3.6 Alpha – MQTT + REGELUNG + FLASK
 # =========================================
-
-
 
 import json
 import time
@@ -47,6 +45,21 @@ from core.profile import (
         save_profiles,
         PROFILES
     )
+
+from core.actuators import (
+            switch_shelly,
+            get_shelly_relay_state,
+            set_device,
+            set_heating,
+            set_fan,
+            set_light,
+            set_vent,
+            set_irrigation,
+            set_humidifier,
+            set_dehumidifier,
+            set_light2,
+            set_vent2,
+        )
 
 init_db()
 init_diary_db()
