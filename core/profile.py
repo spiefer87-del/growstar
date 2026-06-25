@@ -19,6 +19,9 @@ def get_profile():
 
 PROFILE_FILE = "profiles.json"
 
+def get_active_profile():
+    return PROFILES.get("active")
+
 def load_profiles():
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, "r") as f:
@@ -60,3 +63,53 @@ def apply_profile(name):
     print(f"🔁 Profilwechsel → Rampe zurückgesetzt ({name})")
 
     return True
+
+def check_ramp_schedule():
+
+    if not config.get("RAMP_ENABLED", 0):
+        return
+
+    now_min = minutes_now()
+    today = datetime.date.today().isoformat()
+
+    day_start = int(config["DAY_START_MIN"])
+    night_start = int(config["NIGHT_START_MIN"])
+    duration = int(config["RAMP_DURATION_MIN"])
+
+    evening_start = (night_start - duration) % 1440
+    morning_start = (day_start - duration) % 1440
+
+    # Bereits aktiv?
+    if state.ramp_active:
+        return
+
+    if (
+        minute_distance(now_min, morning_start) <= 1
+        and (
+            state.last_ramp_trigger_day != today
+            or state.last_ramp_trigger_type != "morning"
+        )
+    ):
+        start_ramp(
+            float(config["NIGHT_TEMP"]),
+            float(config["DAY_TEMP"]),
+            duration
+        )
+        state.last_ramp_trigger_day = today
+        state.last_ramp_trigger_type = "morning"
+
+    if (
+        minute_distance(now_min, evening_start) <= 1
+        and (
+            state.last_ramp_trigger_day != today
+            or state.last_ramp_trigger_type != "evening"
+        )
+    ):
+        start_ramp(
+            float(config["DAY_TEMP"]),
+            float(config["NIGHT_TEMP"]),
+            duration
+        )
+        state.last_ramp_trigger_day = today
+        state.last_ramp_trigger_type = "evening"
+
