@@ -82,9 +82,6 @@ MQTT_LAST_MSG = 0   # timestamp letzter MQTT callback
 
 
 
-def sensor_ok(last_time):
-    return (time.time() - last_time) <= SENSOR_TIMEOUT
-
 def mark_stale_sensors():
     """
     Macht Sensor-Timeouts stabil:
@@ -714,18 +711,6 @@ def control_time_mode(device):
 
     set_device(device, in_time_window(now_min, start, end))
 
-
-def in_time_window(now_min, start, end):
-    if start < end:
-        return start <= now_min < end
-    else:
-        return now_min >= start or now_min < end
-
-
-
-
-
-
 def failsafe_check(device, ip_key, relay_key):
 
     ip = config.get(ip_key)
@@ -858,7 +843,7 @@ def control_device(device):
     if mode == "TIME":
         start = int(params.get("start_min", 0))
         end   = int(params.get("end_min", 0))
-        should_run = in_time_window(now_min, start, end)
+        should_run = _window(now_min, start, end)
         set_device(device, should_run)
         return
 
@@ -894,7 +879,7 @@ def control_light_profile():
     night_start = int(config.get("NIGHT_START_MIN", 1320))
 
     # Licht an = Tageszeit
-    light_on = in_time_window(now_min, day_start, night_start)
+    light_on = _window(now_min, day_start, night_start)
 
     set_device("light", light_on)
 
