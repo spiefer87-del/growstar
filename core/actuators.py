@@ -1,5 +1,10 @@
 #core/actuators.py
 
+import requests
+
+import core.state as state
+from core.config import config
+
 def switch_shelly(ip, relay, state, timeout=3):
     relay = int(relay)
 
@@ -242,7 +247,10 @@ DEVICE_SETTERS = {
     "heating": set_heating,
     "light": set_light,
     "light2": set_light2,
-    "vent2": set_vent2
+    "vent2": set_vent2,
+    "irrigation": set_irrigation,
+    "humidifier": set_humidifier,
+    "dehumidifier": set_dehumidifier,
 }
 
 def set_device(device, state):
