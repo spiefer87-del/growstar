@@ -385,31 +385,6 @@ def get_today_kwh(device_key, raw_total_kwh):
     return max(0.0, float(raw_total_kwh) - offset)
 
 
-
-
-    
-
-
-
-
-
-
-# =========================================
-# 🔌 GENERIC DEVICE CONTROL SYSTEM
-# =========================================
-
-def get_device_mode(device):
-    modes = config.setdefault("DEVICE_MODES", {})
-    return modes.get(device, "OFF")
-
-
-def get_device_params(device):
-    params = config.setdefault("DEVICE_PARAMS", {})
-    return params.setdefault(device, {})
-
-
-
-
 def control_time_mode(device):
     params = get_device_params(device)
     now_min = minutes_now()
@@ -440,10 +415,6 @@ def failsafe_check(device, ip_key, relay_key):
     if actual != should_on:
         print(f"🛡️ FAILSAFE {device}: korrigiere Zustand")
         switch_shelly(ip, relay, should_on)
-
-
-
-
 
 
 def sync_relay(name, ip, relay, state_var, live_key):
