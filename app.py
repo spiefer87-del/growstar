@@ -767,7 +767,7 @@ def control_device(device):
     if mode == "TIME":
         start = int(params.get("start_min", 0))
         end   = int(params.get("end_min", 0))
-        should_run = _window(now_min, start, end)
+        should_run = in_time_window(now_min, start, end)
         set_device(device, should_run)
         return
 
@@ -803,7 +803,7 @@ def control_light_profile():
     night_start = int(config.get("NIGHT_START_MIN", 1320))
 
     # Licht an = Tageszeit
-    light_on = _window(now_min, day_start, night_start)
+    light_on = in_time_window(now_min, day_start, night_start)
 
     set_device("light", light_on)
 
