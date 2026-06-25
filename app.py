@@ -461,11 +461,6 @@ def get_profile():
 
     return profile
         
-def minute_distance(a, b):
-    return min(
-        (a - b) % 1440,
-        (b - a) % 1440
-    )
         
 def check_ramp_schedule():
 
