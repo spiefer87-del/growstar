@@ -26,7 +26,6 @@ from core.helpers import (
         calculate_vpd,
         minutes_now,
         is_night,
-        in_ramp_window,
         minute_distance,
         in_time_window,
     )
