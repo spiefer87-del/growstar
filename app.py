@@ -37,12 +37,12 @@ from core.ramp import (
         update_ramp,
         get_ramped_target,
         resync_active_ramp,
+        check_ramp_schedule,
         update_ramp_duration
     )
 
 from core.profile import (
-        get_profile,
-        check_ramp_schedule,
+        get_profile,        
         apply_profile,
         load_profiles,
         save_profiles,
