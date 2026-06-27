@@ -11,10 +11,7 @@ from core.helpers import (
     minute_distance
 )
 
-from core.ramp import (
-    start_ramp,
-    stop_ramp
-)
+
 
 def get_profile():
 
@@ -53,7 +50,7 @@ def save_profiles(p):
 PROFILES = load_profiles()
 
 def apply_profile(name):
-
+    from core.ramp import stop_ramp
 
     if name not in PROFILES["profiles"]:
         return False
