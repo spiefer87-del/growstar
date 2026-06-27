@@ -1,9 +1,9 @@
 {
-  "active": "veg",
+  "active": "bloom",
   "profiles": {
     "veg": {
       "DAY_TEMP": 24.0,
-      "NIGHT_TEMP": 20.5,
+      "NIGHT_TEMP": 20.0,
       "DAY_HUM": 55.0,
       "NIGHT_HUM": 55.0,
       "DAY_TEMP_TOL": 0.1,
@@ -16,10 +16,10 @@
       "RAMP_DURATION_MIN": 40.0
     },
     "bloom": {
-      "DAY_TEMP": 21.5,
-      "NIGHT_TEMP": 18.0,
-      "DAY_HUM": 44.0,
-      "NIGHT_HUM": 44.0,
+      "DAY_TEMP": 27.0,
+      "NIGHT_TEMP": 24.7,
+      "DAY_HUM": 50.0,
+      "NIGHT_HUM": 50.0,
       "DAY_TEMP_TOL": 0.1,
       "NIGHT_TEMP_TOL": 0.1,
       "DAY_HUM_TOL": 1.0,
