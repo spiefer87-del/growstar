@@ -72,6 +72,8 @@ from core.devices import (
             get_device_params,
         )
 
+from core.routes.dashboard import register as register_dashboard_routes
+
 init_db()
 init_diary_db()
 init_plants_table()
@@ -718,77 +720,8 @@ def watchdog_loop():
 # =========================================
 flask_app = Flask(__name__)
 
-@flask_app.route("/")
-def dashboard():
-    return render_template("dashboard.html")
+register_dashboard_routes(flask_app)
 
-@flask_app.route("/settings")
-def settings():
-    return render_template("settings.html", config=config)
-
-@flask_app.route("/sensoren")
-def sensoren_page():
-    return render_template("sensoren.html")
-
-@flask_app.route("/diagrams")
-def diagrams_page():
-    return render_template("diagrams.html")
-
-@flask_app.route("/temperature")
-def temperature_page():
-    return render_template("temperature.html")
-
-@flask_app.route("/humidity")
-def humidity_page():
-    return render_template("humidity.html")
-
-@flask_app.route("/vpd")
-def vpd_page():
-    return render_template("vpd.html")
-
-@flask_app.route("/ventilator")
-def ventilator_page():
-    return render_template("ventilator.html")
-
-@flask_app.route("/heizung")
-def heizung_page():
-    return render_template("heizung.html")
-
-@flask_app.route("/licht")
-def licht_page():
-    return render_template("licht.html")
-
-@flask_app.route("/abluft")
-def abluft_page():
-    return render_template("abluft.html")
-
-@flask_app.route("/system")
-def system_page():
-    return render_template("system.html")
-
-@flask_app.route("/design")
-def design_page():
-    return render_template("design.html")
-
-@flask_app.route("/energie")
-def energie_page():
-    return render_template("energie.html")
-
-@flask_app.route("/pflanzendaten")
-def pflanzendaten_page():
-    return render_template("pflanzendaten.html")
-
-@flask_app.route("/energie/settings")
-def energie_settings_page():
-    return render_template("energie_settings.html")
-
-@flask_app.route("/connections")
-def connections_page():
-    return render_template("connections.html")
-
-@flask_app.route("/tagebuch")
-def tagebuch_page():
-    return render_template("tagebuch.html")
 
 
 @flask_app.route("/api/diagrams/export")
