@@ -77,6 +77,7 @@ from routes.state import register as register_state_routes
 from routes.plants import register as register_plants_routes
 from routes.diary import register as register_diary_routes
 from routes.diagrams import register as register_diagrams_routes
+from routes.energy import register as register_energy_routes
 
 init_db()
 init_diary_db()
@@ -732,93 +733,13 @@ register_state_routes(
 register_plants_routes(flask_app)
 register_diary_routes(flask_app)
 register_diagrams_routes(flask_app)
+register_energy_routes(
+    flask_app,
+    energy_state,
+    energy_lock,
+    refresh_energy_state
+)
 
-# =========================================
-# ⚡ ENERGY RESET ENDPOINTS (TOTAL + TODAY)
-# =========================================
-
-@flask_app.route("/api/energy")
-def api_energy():
-    with energy_lock:
-        return jsonify(energy_state)
-
-@flask_app.route("/api/energy/reset_total/<device>", methods=["POST"])
-def api_energy_reset_total_device(device):
-    config.setdefault("ENERGY_RESET", {})
-
-    # Reset = Offset auf aktuellen Rohwert setzen
-    # (machen wir sofort im Polling, aber hier markieren wir es)
-    config["ENERGY_RESET"][device] = None
-
-    save_config(config)
-    refresh_energy_state()
-    return {"status": "ok", "device": device, "mode": "total"}
-
-@flask_app.route("/api/energy/reset_today/<device>", methods=["POST"])
-def api_energy_reset_today_device(device):
-    config.setdefault("ENERGY_DAY_OFFSET", {})
-
-    # Tagesoffset wird direkt neu gesetzt (im Polling)
-    config["ENERGY_DAY_OFFSET"][device] = None
-
-    save_config(config)
-    refresh_energy_state()
-    return {"status": "ok", "device": device, "mode": "today"}
-
-
-@flask_app.route("/api/energy/reset_total_all", methods=["POST"])
-def api_energy_reset_total_all():
-    config.setdefault("ENERGY_RESET", {})
-
-    # aktuelles energy_state Snapshot holen
-    with energy_lock:
-        snapshot = dict(energy_state)
-
-    # offsets setzen
-    for dev, e in snapshot.items():
-        raw = float(e.get("raw_total", 0.0))
-        config["ENERGY_RESET"][dev] = raw
-
-    # optional: _all kannst du löschen oder ignorieren
-    if "_all" in config["ENERGY_RESET"]:
-        del config["ENERGY_RESET"]["_all"]
-
-    save_config(config)
-    refresh_energy_state()
-    print("🧹 ENERGY: Manueller Total-Reset ALL")
-
-    return {"status": "ok"}
-
-
-@flask_app.route("/api/energy/reset_today_all", methods=["POST"])
-def api_energy_reset_today_all():
-    today_str = datetime.date.today().isoformat()
-
-    config.setdefault("ENERGY_DAY_OFFSET", {})
-
-    # aktuelles energy_state Snapshot holen
-    with energy_lock:
-        snapshot = dict(energy_state)
-
-    # offsets setzen
-    for dev, e in snapshot.items():
-        raw = float(e.get("raw_total", 0.0))
-
-        config["ENERGY_DAY_OFFSET"][dev] = {
-            "day": today_str,
-            "offset": raw
-        }
-
-    # optional: auch "last reset" setzen, damit Auto Reset heute nicht nochmal feuert
-    config["ENERGY_LAST_DAY_RESET"] = today_str
-
-    save_config(config)
-    refresh_energy_state()
-    print("🧹 ENERGY: Manueller Today-Reset ALL")
-
-    return {"status": "ok"}
-
-     
 
 # =========================================
 # 🔌 DEVICE MODE API
