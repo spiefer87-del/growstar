@@ -1389,9 +1389,7 @@ def get_profile_api():
 # 🐶 WATCHDOG + INFOLOG API
 # =========================================
 
-@flask_app.route("/watchdog")
-def watchdog_page():
-    return render_template("watchdog.html")
+
 
 @flask_app.route("/api/watchdog/log")
 def api_watchdog_log():
