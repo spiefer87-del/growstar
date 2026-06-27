@@ -14,7 +14,10 @@ from core.actuators import (
     set_fan,
     set_vent,
 )
-
+from core.devices import (
+    get_device_mode,
+    get_device_params,
+)
 # =========================================
 # 🌡️ REGELLOGIK
 # =========================================
