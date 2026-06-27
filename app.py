@@ -68,9 +68,9 @@ from core.control import (
         )
 
 from core.devices import (
-    get_device_mode,
-    get_device_params,
-)
+            get_device_mode,
+            get_device_params,
+        )
 
 init_db()
 init_diary_db()
