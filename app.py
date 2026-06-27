@@ -67,6 +67,11 @@ from core.control import (
             control_device,
         )
 
+from core.devices import (
+    get_device_mode,
+    get_device_params,
+)
+
 init_db()
 init_diary_db()
 init_plants_table()
