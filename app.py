@@ -76,6 +76,7 @@ from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
 from routes.history import register as register_history_routes
 from routes.plants import register as register_plants_routes
+from routes.diary import register as register_diary_routes
 
 init_db()
 init_diary_db()
@@ -730,7 +731,7 @@ register_state_routes(
 )
 register_history_routes(flask_app)
 register_plants_routes(flask_app)
-
+register_diary_routes(flask_app)
 
 
 @flask_app.route("/api/diagrams/export")
@@ -833,99 +834,7 @@ def api_energy_reset_today_all():
 
     return {"status": "ok"}
 
-
-
-# =========================================
-# 📔 DIARY ENDPOINTS
-# =========================================
-
-@flask_app.route("/api/diary", methods=["GET", "POST"])
-def api_diary():
-
-    if request.method == "GET":
-        db = sqlite3.connect("data.db")
-        c = db.cursor()
-
-        c.execute("""
-            SELECT id, ts, plant, action, ph, ec, amount, note
-            FROM diary_entries
-            ORDER BY ts DESC
-            LIMIT 500
-        """)
-
-        rows = c.fetchall()
-        db.close()
-
-        entries = []
-        for r in rows:
-            entries.append({
-                "id": r[0],
-                "ts": r[1],
-                "plant": r[2],
-                "action": r[3],
-                "ph": r[4],
-                "ec": r[5],
-                "amount": r[6],
-                "note": r[7]
-            })
-
-        return jsonify(entries)
-
-    # POST
-    data = request.json or {}
-
-    ts = int(time.time())
-    plant = data.get("plant")
-    action = str(data.get("action", "")).strip()
-    note = str(data.get("note", "")).strip()
-
-    ph = data.get("ph")
-    ec = data.get("ec")
-    amount = data.get("amount")
-
-    # sanitize
-    try: plant = int(plant) if plant is not None else None
-    except: plant = None
-
-    try: ph = float(ph) if ph not in [None, ""] else None
-    except: ph = None
-
-    try: ec = float(ec) if ec not in [None, ""] else None
-    except: ec = None
-
-    try: amount = float(amount) if amount not in [None, ""] else None
-    except: amount = None
-
-    db = sqlite3.connect("data.db")
-    c = db.cursor()
-
-    c.execute("""
-        INSERT INTO diary_entries (ts, plant, action, ph, ec, amount, note)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (ts, plant, action, ph, ec, amount, note))
-
-    db.commit()
-    db.close()
-
-    return jsonify({"status": "ok"})
-
-@flask_app.route("/api/diary/<int:entry_id>", methods=["DELETE"])
-def api_diary_delete(entry_id):
-
-    db = sqlite3.connect("data.db")
-    c = db.cursor()
-
-    c.execute("DELETE FROM diary_entries WHERE id = ?", (entry_id,))
-    db.commit()
-    db.close()
-
-    return jsonify({"status": "ok"})
-
-
-
-
-
-            
+     
 
 # =========================================
 # 🔌 DEVICE MODE API
