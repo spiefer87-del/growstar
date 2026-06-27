@@ -1005,31 +1005,6 @@ def api_config():
         "config": config
     })
 
-@flask_app.route("/api/reset_history", methods=["POST"])
-def api_reset_history():
-    try:
-        db = sqlite3.connect("data.db")
-        c = db.cursor()
-
-        # 🔥 ALLE Diagramm-Daten löschen
-        c.execute("DELETE FROM temp_history")
-
-        db.commit()
-        db.close()
-
-        print("🧹 Diagramm-Historie zurückgesetzt")
-
-        return jsonify({
-            "status": "ok",
-            "message": "Diagramm-Historie gelöscht"
-        })
-
-    except Exception as e:
-        print("❌ Reset Fehler:", e)
-        return jsonify({
-            "status": "error",
-            "message": str(e)
-        }), 500
 
 @flask_app.route("/api/profile/<name>", methods=["POST"])
 def api_set_profile(name):
