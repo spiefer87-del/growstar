@@ -72,7 +72,7 @@ from core.devices import (
             get_device_params,
         )
 
-from core.routes.dashboard import register as register_dashboard_routes
+from routes.dashboard import register as register_dashboard_routes
 
 init_db()
 init_diary_db()
