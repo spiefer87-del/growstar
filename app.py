@@ -75,6 +75,7 @@ from core.devices import (
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
 from routes.history import register as register_history_routes
+from routes.plants import register as register_plants_routes
 
 init_db()
 init_diary_db()
@@ -728,6 +729,7 @@ register_state_routes(
     lambda: energy_state
 )
 register_history_routes(flask_app)
+register_plants_routes(flask_app)
 
 
 
@@ -744,123 +746,6 @@ def import_diagrams():
     with open("data.db","wb") as f:
         f.write(request.data)
     return {"status":"ok"}
-
-# =========================================
-# Pflanzenprofile Endpunkte
-# =========================================
-# =========================================
-# 🌿 PLANT DATA (6 Pflanzen)
-# =========================================
-
-
-@flask_app.route("/api/plants")
-def api_plants():
-    """
-    Liefert nur ID + Name für Tagebuch Filter
-    """
-    db = sqlite3.connect("data.db")
-    c = db.cursor()
-    c.execute("SELECT id, name FROM plants ORDER BY id ASC")
-    rows = c.fetchall()
-    db.close()
-
-    plants = {}
-    for r in rows:
-        pid = str(r[0])
-        nm = (r[1] or "").strip()
-        plants[pid] = nm if nm else f"Pflanze {pid}"
-
-    # Fallback
-    for i in range(1, 7):
-        plants.setdefault(str(i), f"Pflanze {i}")
-
-    return jsonify(plants)
-
-
-@flask_app.route("/api/plants/data")
-def api_plants_data():
-    """
-    Liefert alle Daten für alle 6 Pflanzen
-    """
-    db = sqlite3.connect("data.db")
-    c = db.cursor()
-    c.execute("""
-        SELECT id, name, sativa, indica, seed_date, flower_days, flower_start
-        FROM plants
-        ORDER BY id ASC
-    """)
-    rows = c.fetchall()
-    db.close()
-
-    out = []
-    for r in rows:
-        out.append({
-            "id": r[0],
-            "name": r[1] or f"Pflanze {r[0]}",
-            "sativa": r[2],
-            "indica": r[3],
-            "seed_date": r[4],
-            "flower_days": r[5],
-            "flower_start": r[6]
-        })
-
-    return jsonify(out)
-
-
-@flask_app.route("/api/plants/data", methods=["POST"])
-def api_plants_data_save():
-    """
-    Speichert alle 6 Pflanzen in einem Rutsch
-    """
-    data = request.json or {}
-    plants = data.get("plants", [])
-
-    if not isinstance(plants, list):
-        return {"status": "error", "message": "plants must be a list"}, 400
-
-    db = sqlite3.connect("data.db")
-    c = db.cursor()
-
-    for p in plants:
-        try:
-            pid = int(p.get("id"))
-        except:
-            continue
-
-        if pid < 1 or pid > 6:
-            continue
-
-        name = str(p.get("name") or "").strip()
-        if name == "":
-            name = f"Pflanze {pid}"
-
-        def to_int(x):
-            if x is None or x == "":
-                return None
-            return int(float(x))
-
-        def to_date(x):
-            x = (x or "").strip()
-            return x if x else None
-
-        sativa = to_int(p.get("sativa"))
-        indica = to_int(p.get("indica"))
-        seed_date = to_date(p.get("seed_date"))
-        flower_days = to_int(p.get("flower_days"))
-        flower_start = to_date(p.get("flower_start"))
-
-        c.execute("""
-            UPDATE plants
-            SET name=?, sativa=?, indica=?, seed_date=?, flower_days=?, flower_start=?
-            WHERE id=?
-        """, (name, sativa, indica, seed_date, flower_days, flower_start, pid))
-
-    db.commit()
-    db.close()
-
-    return {"status": "ok"}
-
-
 
 
 # =========================================
