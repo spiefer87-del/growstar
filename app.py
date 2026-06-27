@@ -77,6 +77,7 @@ from routes.state import register as register_state_routes
 from routes.history import register as register_history_routes
 from routes.plants import register as register_plants_routes
 from routes.diary import register as register_diary_routes
+from routes.diagrams import register as register_diagrams_routes
 
 init_db()
 init_diary_db()
@@ -732,22 +733,7 @@ register_state_routes(
 register_history_routes(flask_app)
 register_plants_routes(flask_app)
 register_diary_routes(flask_app)
-
-
-@flask_app.route("/api/diagrams/export")
-def export_diagrams():
-    return send_file(
-        "data.db",
-        as_attachment=True,
-        download_name="grow_diagrams.db"
-    )
-
-@flask_app.route("/api/diagrams/import", methods=["POST"])
-def import_diagrams():
-    with open("data.db","wb") as f:
-        f.write(request.data)
-    return {"status":"ok"}
-
+register_diagrams_routes(flask_app)
 
 # =========================================
 # ⚡ ENERGY RESET ENDPOINTS (TOTAL + TODAY)
