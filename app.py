@@ -78,13 +78,11 @@ from routes.plants import register as register_plants_routes
 from routes.diary import register as register_diary_routes
 from routes.diagrams import register as register_diagrams_routes
 from routes.energy import register as register_energy_routes
+from routes.device import register as register_device_routes
 
 init_db()
 init_diary_db()
 init_plants_table()
-
-
-
 
 # =========================================
 # 📡 MQTT
@@ -119,7 +117,6 @@ SENSOR_TIMEOUT = 120      # ab wann stale / ungültig
 DB_INTERVAL = 30          # Sekunden zwischen DB-Einträgen (5min)
 
 
-
 # =========================================
 # Globale Konstanten
 # =========================================
@@ -127,7 +124,6 @@ LOG_FILE = "logs/infolog.txt"
 os.makedirs("logs", exist_ok=True)
 
 MQTT_LAST_MSG = 0   # timestamp letzter MQTT callback
-
 
 
 def mark_stale_sensors():
@@ -739,56 +735,7 @@ register_energy_routes(
     energy_lock,
     refresh_energy_state
 )
-
-
-# =========================================
-# 🔌 DEVICE MODE API
-# =========================================
-
-@flask_app.route("/api/device/<device>", methods=["GET", "POST"])
-def api_device(device):
-
-    config.setdefault("DEVICE_MODES", {})
-    config.setdefault("DEVICE_PARAMS", {})
-
-    if request.method == "GET":
-        return jsonify({
-            "mode": config["DEVICE_MODES"].get(device, "OFF"),
-            "params": config["DEVICE_PARAMS"].get(device, {})
-        })
-
-    # POST
-    data = request.json or {}
-
-    mode = data.get("mode")
-    params = data.get("params", {})
-
-    if mode:
-        config["DEVICE_MODES"][device] = mode
-
-    config["DEVICE_PARAMS"].setdefault(device, {}).update(params)
-
-    save_config(config)
-
-    return {"status": "ok"}
-
-@flask_app.route("/api/device/mode/<device>", methods=["POST"])
-def api_set_device_mode(device):
-    data = request.json or {}
-
-    config.setdefault("DEVICE_MODES", {})
-    config.setdefault("DEVICE_ENV_CONFIG", {})
-
-    if "DEVICE_MODES" in data:
-        config["DEVICE_MODES"][device] = data["DEVICE_MODES"][device]
-
-    if "DEVICE_ENV_CONFIG" in data:
-        config["DEVICE_ENV_CONFIG"][device] = data["DEVICE_ENV_CONFIG"][device]
-
-    save_config(config)
-
-    return {"status":"ok"}
-
+register_device_routes(flask_app)
 
 @flask_app.route("/api/config", methods=["GET", "POST"])
 def api_config():
