@@ -93,3 +93,28 @@ def register(app):
         db.close()
 
         return jsonify(data)
+
+    @app.route("/api/reset_history", methods=["POST"])
+    def api_reset_history():
+        try:
+            db = sqlite3.connect("data.db")
+            c = db.cursor()
+    
+            c.execute("DELETE FROM temp_history")
+    
+            db.commit()
+            db.close()
+    
+            print("🧹 Diagramm-Historie zurückgesetzt")
+    
+            return jsonify({
+                "status": "ok",
+                "message": "Diagramm-Historie gelöscht"
+            })
+    
+        except Exception as e:
+            print("❌ Reset Fehler:", e)
+            return jsonify({
+                "status": "error",
+                "message": str(e)
+            }), 500
