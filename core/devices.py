@@ -1,4 +1,5 @@
 #core/devices.py
+from core.config import config
 
 # =========================================
 # 🔌 GENERIC DEVICE CONTROL SYSTEM
