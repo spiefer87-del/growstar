@@ -74,7 +74,6 @@ from core.devices import (
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
-from routes.history import register as register_history_routes
 from routes.plants import register as register_plants_routes
 from routes.diary import register as register_diary_routes
 from routes.diagrams import register as register_diagrams_routes
@@ -730,7 +729,6 @@ register_state_routes(
     flask_app,
     lambda: energy_state
 )
-register_history_routes(flask_app)
 register_plants_routes(flask_app)
 register_diary_routes(flask_app)
 register_diagrams_routes(flask_app)
