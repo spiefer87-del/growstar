@@ -74,6 +74,7 @@ from core.devices import (
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
+from routes.history import register as register_history_routes
 
 init_db()
 init_diary_db()
@@ -726,6 +727,7 @@ register_state_routes(
     flask_app,
     lambda: energy_state
 )
+register_history_routes(flask_app)
 
 
 
@@ -1037,83 +1039,8 @@ def api_diary_delete(entry_id):
 
 
 
-@flask_app.route("/api/history")
-def api_history():
-    range_map = {
-        "1h": 1 * 3600,
-        "6h": 6 * 3600,
-        "24h": 24 * 3600,
-        "7d": 7 * 24 * 3600,
-    }
 
-    range_key = request.args.get("range", "24h")
-    data_type = request.args.get("type", "temp")
-
-    seconds = range_map.get(range_key, 24 * 3600)
-    since = int(time.time()) - seconds
-
-    db = sqlite3.connect("data.db")
-    c = db.cursor()
-
-    # -----------------------------
-    # TEMP
-    # -----------------------------
-    if data_type == "temp":
-        c.execute("""
-            SELECT ts, temp, temp_target
-            FROM temp_history
-            WHERE ts >= ?
-            ORDER BY ts ASC
-        """, (since,))
-
-        rows = c.fetchall()
-        data = [
-            {"ts": r[0], "temp": r[1], "target": r[2]}
-            for r in rows
-            if r[1] is not None
-        ]
-
-    # -----------------------------
-    # HUMIDITY
-    # -----------------------------
-    elif data_type == "hum":
-        c.execute("""
-            SELECT ts, hum, hum_target
-            FROM temp_history
-            WHERE ts >= ?
-            ORDER BY ts ASC
-        """, (since,))
-
-        rows = c.fetchall()
-        data = [
-            {"ts": r[0], "hum": r[1], "target": r[2]}
-            for r in rows
-            if r[1] is not None
-        ]
-
-    # -----------------------------
-    # VPD
-    # -----------------------------
-    elif data_type == "vpd":
-        c.execute("""
-            SELECT ts, vpd
-            FROM temp_history
-            WHERE ts >= ?
-            ORDER BY ts ASC
-        """, (since,))
-
-        rows = c.fetchall()
-        data = [
-            {"ts": r[0], "vpd": r[1]}
-            for r in rows
-            if r[1] is not None
-        ]
-
-    else:
-        data = []
-
-    db.close()
-    return jsonify(data)
+            
 
 # =========================================
 # 🔌 DEVICE MODE API
