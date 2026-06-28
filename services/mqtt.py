@@ -8,7 +8,7 @@ import core.context as ctx
 
 from core.config import config
 
-from services.sensors import (
+from services.sensor import (
         update_temperature,
         update_humidity,
     )
