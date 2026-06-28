@@ -2,6 +2,8 @@ from flask import jsonify
 import time
 
 import core.state as state
+import core.context as ctx
+
 from core.config import config
 from core.devices import get_device_mode
 
