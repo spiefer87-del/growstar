@@ -81,6 +81,7 @@ from services.sensor import (
 
 from threads.mqtt import mqtt_thread
 from threads.shelly import shelly_background_loop
+from threads.main import main_loop
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
@@ -173,95 +174,11 @@ threading.Thread(target=mqtt_thread, daemon=True).start()
 print("📡 MQTT Sensor Thread läuft")
 threading.Thread(target=watchdog_loop, daemon=True).start()
 log_event("Watchdog Thread gestartet")
+threading.Thread(target=main_loop, daemon=True).start()
+print("🧠 Main Control Thread gestartet")
 
 print("🌱 Grow-Backend läuft")
 
-# =========================================
-# 🛡️ FAILSAFE LOOP (Main)
-# =========================================
-try:
-    while True:
-        now = time.time()
 
-        # =========================================
-        # 🎯 Sollwerte aktualisieren (immer, auch ohne Sensorwerte
-        # =========================================
-        update_temperature_setpoint()
-        update_humidity_setpoint()
-        check_ramp_schedule()
-        # =========================================
-        # 🔁 Rampen-Sollwert regelmäßig aktualisieren
-        # =========================================
-        if state.ramp_active:
-            update_ramp()
-        
-        # =========================================
-        # 🧊 SENSOR STALE LOGIK (niemals blockieren)
-        # =========================================
-        mark_stale_sensors()
-
-        # Snapshot (threadsafe)
-        with ctx.state_lock:
-            temp_val = state.live_state.get("temp")
-            hum_val = state.live_state.get("hum")
-
-        # =========================================
-        # 📊 VPD + DB Logging (entkoppelt von MQTT)
-        # =========================================
-        if now - state.last_db_write >= DB_INTERVAL:
-            state.last_db_write = now
-
-            with ctx.state_lock:
-
-                # Targets können None sein, ist OK
-                tt = state.live_state.get("temp_target")
-                ht = state.live_state.get("hum_target")
-
-            if temp_val is not None and hum_val is not None:
-                vpd = calculate_vpd(temp_val, hum_val)
-
-                with ctx.state_lock:
-                    state.live_state["vpd"] = vpd
-
-                try:
-                    insert_measurement(
-                        temp=temp_val,
-                        temp_target=tt,
-                        hum=hum_val,
-                        hum_target=ht,
-                        vpd=vpd
-                    )
-                except Exception as e:
-                    print("❌ DB insert_measurement Fehler:", e)
-
-
-        # =========================================
-        # 🌡️ Regelung (nur wenn Werte existieren)
-        # =========================================
-    
-
-
-        # =========================================
-        # 💡 Licht + Ventilator laufen unabhängig
-        # =========================================
-        control_device("fan")
-        control_device("vent")
-        control_device("heating")
-        control_device("light")
-
-
-        # =========================================
-        # 🛡️ SHELLY FAILSAFE (korrigiert manuelle Eingriffe)
-        # =========================================
-        
-
-        time.sleep(2)
-
-finally:
-    print("\n🛑 Programm beendet – Aktoren AUS")
-    set_heating(False, "(Shutdown)")
-    set_fan(False, "(Shutdown)")
-    set_vent(False, "(Shutdown)")
-    # set_light(False, "(Shutdown)")
 
 
