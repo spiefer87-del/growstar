@@ -3,20 +3,13 @@ import os
 import time
 
 from flask import jsonify, request, send_file
+
+import core.state as state
 import core.context as ctx
 
+from core.constants import SENSOR_TIMEOUT
 
-def register(
-    app,
-    LOG_FILE,
-    log_event,
-    state,
-    state_lock,
-    energy_state,
-    energy_lock,
-    MQTT_LAST_MSG,
-    SENSOR_TIMEOUT
-):
+def register(app):
 
     @app.route("/api/watchdog/log")
     def api_watchdog_log():
@@ -24,11 +17,11 @@ def register(
         lines = int(request.args.get("lines", 300))
         level = request.args.get("level", "ALL")
 
-        if not os.path.exists(LOG_FILE):
+        if not os.path.exists(ctx.LOG_FILE):
             return jsonify({"lines": []})
 
         try:
-            with open(LOG_FILE, "r") as f:
+            with open(ctx.LOG_FILE, "r") as f:
                 all_lines = f.readlines()
 
             filtered = []
@@ -56,7 +49,7 @@ def register(
 
         try:
 
-            open(LOG_FILE, "w").close()
+            open(ctx.LOG_FILE, "w").close()
 
             log_event("Log wurde manuell geleert")
 
@@ -72,11 +65,11 @@ def register(
     @app.route("/api/watchdog/log/download")
     def api_watchdog_log_download():
 
-        if not os.path.exists(LOG_FILE):
+        if not os.path.exists(ctx.LOG_FILE):
             return {"error": "Kein Log vorhanden"}, 404
 
         return send_file(
-            LOG_FILE,
+            ctx.LOG_FILE,
             as_attachment=True,
             download_name="infolog.txt"
         )
@@ -86,7 +79,7 @@ def register(
 
         now = time.time()
 
-        with state_lock:
+        with ctx.state_lock:
 
             ds_age = (
                 now - state.last_ds_time
@@ -100,10 +93,14 @@ def register(
                 else 999999
             )
 
-        with energy_lock:
+        with ctx.energy_lock:
             ecount = len(energy_state)
 
-        mqtt_age = now - MQTT_LAST_MSG() if MQTT_LAST_MSG() else 999999
+        mqtt_age = (
+            now - ctx.MQTT_LAST_MSG
+            if ctx.MQTT_LAST_MSG
+            else 999999
+        )
 
         return jsonify({
 
