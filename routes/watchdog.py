@@ -8,6 +8,7 @@ import core.state as state
 import core.context as ctx
 
 from core.constants import SENSOR_TIMEOUT
+from services.watchdog import log_event
 
 def register(app):
 
