@@ -1,4 +1,18 @@
+# core/constants.py
+
+# Sensoren
+SENSOR_WARN = 30
 SENSOR_TIMEOUT = 120
+
+# Datenbank
+DB_INTERVAL = 30
+
+# Shelly
+ENERGY_INTERVAL = 30
+FAILSAFE_INTERVAL = 30
+
+# MQTT
+MQTT_KEEPALIVE = 30
 
 ENERGY_DEVICES = {
     "heating": ("IP_HEATING", "RELAY_HEATING"),
