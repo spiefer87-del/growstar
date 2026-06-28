@@ -8,7 +8,7 @@ from core.config import config
 from core.devices import get_device_mode
 
 
-def register(app, get_energy_state):
+def register(app):
 
     @app.route("/api/state")
     def api_state():
@@ -46,7 +46,7 @@ def register(app, get_energy_state):
             "vent_mode": get_device_mode("vent"),
 
             # ================= ENERGY =================
-            "energy": get_energy_state(),
+            "energy": ctx.energy_state,
 
             # ================= SENSOR HEALTH =================
             "temp_ok": not state.temp_stale,
