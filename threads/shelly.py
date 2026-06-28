@@ -11,7 +11,6 @@ from services.energy import (
 )
 
 from services.shelly import run_failsafe
-)
 
 
 ENERGY_INTERVAL = 30
