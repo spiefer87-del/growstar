@@ -10,7 +10,7 @@ def register(app):
     @app.route("/api/energy")
     def api_energy():
         with ctx.energy_lock:
-            return jsonify(energy_state)
+            return jsonify(ctx.energy_state)
 
     @app.route("/api/energy/reset_total/<device>", methods=["POST"])
     def api_energy_reset_total_device(device):
@@ -48,7 +48,7 @@ def register(app):
         config.setdefault("ENERGY_RESET", {})
 
         with ctx.energy_lock:
-            snapshot = dict(energy_state)
+            snapshot = dict(ctx.energy_state)
 
         for dev, e in snapshot.items():
             raw = float(e.get("raw_total", 0.0))
@@ -73,7 +73,7 @@ def register(app):
         config.setdefault("ENERGY_DAY_OFFSET", {})
 
         with ctx.energy_lock:
-            snapshot = dict(energy_state)
+            snapshot = dict(ctx.energy_state)
 
         for dev, e in snapshot.items():
 
