@@ -721,8 +721,6 @@ register_diary_routes(flask_app)
 register_diagrams_routes(flask_app)
 register_energy_routes(
     flask_app,
-    ctx.energy_state,
-    ctx.energy_lock,
     refresh_energy_state
 )
 register_device_routes(flask_app)
