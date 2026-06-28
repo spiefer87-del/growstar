@@ -121,20 +121,6 @@ def get_shelly_energy(ip, relay, device_key, timeout=3):
 
 def refresh_energy_state():
 
-    ENERGY_DEVICES = {
-        "heating": ("IP_HEATING", "RELAY_HEATING"),
-        "light":   ("IP_LIGHT",   "RELAY_LIGHT"),
-        "fan":     ("IP_FAN",     "RELAY_FAN"),
-        "vent":    ("IP_VENT",    "RELAY_VENT"),
-
-        # falls vorhanden:
-        "irrigation":   ("IP_IRRIGATION",   "RELAY_IRRIGATION"),
-        "humidifier":   ("IP_HUMIDIFIER",   "RELAY_HUMIDIFIER"),
-        "dehumidifier": ("IP_DEHUMIDIFIER", "RELAY_DEHUMIDIFIER"),
-        "light2":       ("IP_LIGHT2",       "RELAY_LIGHT2"),
-        "vent2":        ("IP_VENT2",        "RELAY_VENT2"),
-    }
-
     with ctx.energy_lock:
         ctx.energy_state.clear()
     
