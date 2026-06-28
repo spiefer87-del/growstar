@@ -716,10 +716,7 @@ register_state_routes(flask_app)
 register_plants_routes(flask_app)
 register_diary_routes(flask_app)
 register_diagrams_routes(flask_app)
-register_energy_routes(
-    flask_app,
-    refresh_energy_state
-)
+register_energy_routes(flask_app)
 register_device_routes(flask_app)
 register_config_routes(flask_app)
 register_profile_routes(flask_app)
