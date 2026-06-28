@@ -94,7 +94,9 @@ def register(app):
             )
 
         with ctx.energy_lock:
-            ecount = len(energy_state)
+            energy = dict(ctx.energy_state)
+        
+        ecount = len(energy)
 
         mqtt_age = (
             now - ctx.MQTT_LAST_MSG
