@@ -95,15 +95,7 @@ init_diary_db()
 init_plants_table()
 
 
-# =========================================
-# 🔌 SHELLYS
-# =========================================
-# =========================================
-# 🔌 SHELLY (4-RELAY GERÄT)
-# =========================================
-SENSOR_WARN = 30          # ab wann Warnung
-SENSOR_TIMEOUT = 120      # ab wann stale / ungültig
-DB_INTERVAL = 30          # Sekunden zwischen DB-Einträgen (5min)
+
 
 
 # =========================================
