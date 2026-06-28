@@ -727,13 +727,8 @@ register_config_routes(flask_app)
 register_profile_routes(flask_app)
 register_watchdog_routes(
     flask_app,
-    ctx.LOG_FILE,
     log_event,
     state,
-    ctx.state_lock,
-    ctx.energy_state,
-    ctx.energy_lock,
-    lambda: ctx.MQTT_LAST_MSG,
     SENSOR_TIMEOUT
 )
 
