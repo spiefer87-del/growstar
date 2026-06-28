@@ -75,13 +75,16 @@ from core.devices import (
         )
 
 from services.energy import (
-    get_shelly_energy,
-    refresh_energy_state,
-    get_today_kwh,
-    do_energy_day_reset,
-)
+            get_shelly_energy,
+            refresh_energy_state,
+            get_today_kwh,
+            do_energy_day_reset,
+        )
 
-from services.watchdog import log_event
+from services.watchdog import (
+            log_event,
+            watchdog_loop,
+        )
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
@@ -481,61 +484,6 @@ def mqtt_sensor_thread():
 
         print("🔁 MQTT Thread reconnect in 5s...")
         time.sleep(5)
-
-
-# =========================================
-# 🐶 WATCHDOG THREAD
-# =========================================
-
-WATCHDOG_INTERVAL = 5  # Sekunden
-
-def watchdog_loop():
-    last_warn_temp = 0
-    last_warn_hum = 0
-    last_warn_energy = 0
-
-    while True:
-        try:
-            now = time.time()
-
-            # -------------------------
-            # 🌡️ TEMP stale?
-            # -------------------------
-            with ctx.state_lock:
-                ds_age = now - state.last_ds_time
-                dht_age = now - state.last_dht_time
-
-            if state.last_ds_time and ds_age > SENSOR_TIMEOUT:
-                # nicht spammen -> max alle 60s
-                if now - last_warn_temp > 60:
-                    log_event(f"TEMP Sensor stale: {int(ds_age)}s keine Daten", "WARN")
-                    last_warn_temp = now
-
-            if state.last_dht_time and dht_age > SENSOR_TIMEOUT:
-                if now - last_warn_hum > 60:
-                    log_event(f"HUM Sensor stale: {int(dht_age)}s keine Daten", "WARN")
-                    last_warn_hum = now
-
-            # -------------------------
-            # ⚡ Energy stale?
-            # -------------------------
-            with ctx.energy_lock:
-                snapshot = dict(ctx.energy_state)
-
-            # Wenn wir z.B. keine Daten haben
-            if not snapshot:
-                if now - last_warn_energy > 60:
-                    log_event("ENERGY: keine Daten (ctx.energy_state leer)", "WARN")
-                    last_warn_energy = now
-
-            # Optional: check ob Werte alt sind
-            # (wenn du später timestamp in energy_state speicherst)
-
-        except Exception as e:
-            log_event(f"Watchdog Fehler: {e}", "ERROR")
-
-        time.sleep(WATCHDOG_INTERVAL)
-
 
 
 # =========================================
