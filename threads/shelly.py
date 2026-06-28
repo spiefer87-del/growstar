@@ -4,16 +4,13 @@ import time
 import core.context as ctx
 
 from core.config import config, save_config
-from core.constants import ENERGY_DEVICES
 
 from services.energy import (
     refresh_energy_state,
     do_energy_day_reset,
 )
 
-from services.shelly import (
-    failsafe_check,
-    run_failsafe,
+from services.shelly import run_failsafe
 )
 
 
