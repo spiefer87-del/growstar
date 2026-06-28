@@ -81,6 +81,8 @@ from services.energy import (
     do_energy_day_reset,
 )
 
+from services.watchdog import log_event
+
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
 from routes.plants import register as register_plants_routes
@@ -196,24 +198,6 @@ def mark_stale_sensors():
             state.live_state["hum"]
         )
 
-
-
-# =========================================
-# 📝 INFOLOG (Watchdog / Systemlog)
-# =========================================
-
-
-infolog_lock = threading.Lock()
-
-def log_event(msg, level="INFO"):
-    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    line = f"[{ts}] {level}: {msg}\n"
-
-    try:
-        with open(ctx.LOG_FILE, "a") as f:
-            f.write(line)
-    except Exception as e:
-        print("❌ Log write error:", e)
 
 
 
