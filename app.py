@@ -5,22 +5,18 @@
 
 
 import time
-import datetime
+
 import threading
 import os
 from flask import Flask
-from db import init_db, insert_measurement, init_diary_db, init_plants_table
+from db import init_db, init_diary_db, init_plants_table
 
-import core.state as state
-import core.context as ctx
+
 
 from core.config import config, save_config
 
 from core.helpers import (
-        calculate_vpd,
         minutes_now,
-        is_night,
-        minute_distance,
         in_time_window,
     )
 
