@@ -1,9 +1,11 @@
+import datetime
+
+import core.context as ctx
+
 from flask import jsonify
 
 from core.config import config, save_config
-
-import datetime
-import core.context as ctx
+from services.energy import refresh_energy_state
 
 def register(app):
 
