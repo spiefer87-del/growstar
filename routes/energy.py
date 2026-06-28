@@ -5,11 +5,11 @@ from core.config import config, save_config
 import datetime
 import core.context as ctx
 
-def register(app, energy_state, energy_lock, refresh_energy_state):
+def register(app:
 
     @app.route("/api/energy")
     def api_energy():
-        with energy_lock:
+        with ctx.energy_lock:
             return jsonify(energy_state)
 
     @app.route("/api/energy/reset_total/<device>", methods=["POST"])
@@ -47,7 +47,7 @@ def register(app, energy_state, energy_lock, refresh_energy_state):
 
         config.setdefault("ENERGY_RESET", {})
 
-        with energy_lock:
+        with ctx.energy_lock:
             snapshot = dict(energy_state)
 
         for dev, e in snapshot.items():
@@ -72,7 +72,7 @@ def register(app, energy_state, energy_lock, refresh_energy_state):
 
         config.setdefault("ENERGY_DAY_OFFSET", {})
 
-        with energy_lock:
+        with ctx.energy_lock:
             snapshot = dict(energy_state)
 
         for dev, e in snapshot.items():
