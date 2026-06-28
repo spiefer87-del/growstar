@@ -86,6 +86,12 @@ from services.watchdog import (
             watchdog_loop,
         )
 
+from services.shelly import (
+            shelly_set,
+            failsafe_check,
+            sync_relay,
+        )
+
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
 from routes.plants import register as register_plants_routes
@@ -210,15 +216,6 @@ def mark_stale_sensors():
 # 🔌 SHELLY-FUNKTIONEN
 # =========================================
 
-def shelly_set(ip, relay, state):
-    try:
-        url = f"http://{ip}/relay/{relay}?turn={'on' if state else 'off'}"
-        requests.get(url, timeout=3)
-        return True
-    except Exception as e:
-        print(f"❌ Shelly SET Fehler {ip} R{relay}:", e)
-        return False
-
 
 
 def control_time_mode(device):
@@ -230,51 +227,6 @@ def control_time_mode(device):
 
     set_device(device, in_time_window(now_min, start, end))
 
-def failsafe_check(device, ip_key, relay_key):
-
-    ip = config.get(ip_key)
-    relay = config.get(relay_key)
-
-    if not ip or relay is None:
-        return
-
-    should_on = state.live_state.get(device)
-    if should_on is None:
-        return
-            
-    actual = get_shelly_relay_state(ip, relay)
-
-    if actual is None:
-        print(f"🚨 FAILSAFE {device}: Shelly nicht erreichbar")
-        return
-
-    if actual != should_on:
-        print(f"🛡️ FAILSAFE {device}: korrigiere Zustand")
-        switch_shelly(ip, relay, should_on)
-
-
-def sync_relay(name, ip, relay, state_var, live_key):
-    # nicht konfiguriert
-    if not ip or relay is None:
-        setattr(state, state_var, None)
-        state.live_state[live_key] = None
-        return
-
-    relay_state = get_shelly_relay_state(ip, relay)
-
-    # ❌ FEHLER / KEINE VERBINDUNG
-    if relay_state is None:
-        setattr(state, state_var, None)
-        state.live_state[live_key] = None
-
-        print(f"❌ {name}: KEINE VERBINDUNG (IP {ip}, Relay {relay})")
-        return
-
-    # ✅ OK
-    setattr(state, state_var, relay_state)
-    state.live_state[live_key] = relay_state
-
-    print(f"✅ {name}: {'EIN' if relay_state else 'AUS'} (IP {ip}, Relay {relay})")
 
 
 sync_relay("🔥 Heizung", config["IP_HEATING"], config["RELAY_HEATING"], "heating_on", "heating")
