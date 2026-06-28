@@ -8,6 +8,11 @@ import core.context as ctx
 
 from core.config import config
 
+from services.sensors import (
+        update_temperature,
+        update_humidity,
+    )
+
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
@@ -44,23 +49,10 @@ def on_message(client, userdata, msg):
     if msg.topic == TOPIC_DS and "temp" in data:
 
         try:
-            temp_raw = float(data["temp"])
+            update_temperature(float(data["temp"]))
         except Exception:
             return
-
-        temp = round(
-            temp_raw + float(config.get("TEMP_OFFSET", 0.0)),
-            2
-        )
-
-        with ctx.state_lock:
-
-            state.last_ds_temp = temp_raw
-            state.last_ds_time = now
-
-            state.live_state["temp_raw"] = temp_raw
-            state.live_state["temp"] = temp
-
+    
         return
 
     # =========================
@@ -70,22 +62,11 @@ def on_message(client, userdata, msg):
     if msg.topic == TOPIC_DHT and "hum" in data:
 
         try:
-            hum_raw = float(data["hum"])
+            update_humidity(float(data["hum"]))
         except Exception:
             return
-
-        hum = round(
-            hum_raw + float(config.get("HUM_OFFSET", 0.0)),
-            2
-        )
-
-        with ctx.state_lock:
-
-            state.last_hum = hum_raw
-            state.last_dht_time = now
-
-            state.live_state["hum_raw"] = hum_raw
-            state.live_state["hum"] = hum
+    
+        return
 
 
 def create_client():
