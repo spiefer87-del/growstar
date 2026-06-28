@@ -7,7 +7,7 @@ from core.config import config, save_config
 from core.constants import ENERGY_DEVICES
 
 from services.energy import (
-    get_shelly_energy,
+    refresh_energy_state,
     do_energy_day_reset,
 )
 
@@ -77,32 +77,9 @@ def shelly_background_loop():
             if now - ctx.last_energy_poll >= ENERGY_INTERVAL:
 
                 ctx.last_energy_poll = now
-
-                tmp = {}
-
+            
                 with ctx.shelly_lock:
-
-                    for name, (ip_key, relay_key) in ENERGY_DEVICES.items():
-
-                        ip = config.get(ip_key)
-                        relay = config.get(relay_key)
-
-                        if not ip or relay is None:
-                            continue
-
-                        energy = get_shelly_energy(
-                            ip,
-                            relay,
-                            name,
-                            timeout=2
-                        )
-
-                        if energy:
-                            tmp[name] = energy
-
-                with ctx.energy_lock:
-                    ctx.energy_state.clear()
-                    ctx.energy_state.update(tmp)
+                    refresh_energy_state()
 
             # =========================================
             # 📅 AUTO DAY RESET
