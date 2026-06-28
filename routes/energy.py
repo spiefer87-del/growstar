@@ -5,7 +5,7 @@ from core.config import config, save_config
 import datetime
 import core.context as ctx
 
-def register(app:
+def register(app):
 
     @app.route("/api/energy")
     def api_energy():
