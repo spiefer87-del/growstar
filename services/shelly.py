@@ -8,6 +8,27 @@ from core.actuators import (
     get_shelly_relay_state,
 )
 
+FAILSAFE_DEVICES = [
+    ("heating", "IP_HEATING", "RELAY_HEATING"),
+    ("fan", "IP_FAN", "RELAY_FAN"),
+    ("light", "IP_LIGHT", "RELAY_LIGHT"),
+    ("vent", "IP_VENT", "RELAY_VENT"),
+    # ("irrigation", "IP_IRRIGATION", "RELAY_IRRIGATION"),
+    # ("humidifier", "IP_HUMIDIFIER", "RELAY_HUMIDIFIER"),
+    # ("dehumidifier", "IP_DEHUMIDIFIER", "RELAY_DEHUMIDIFIER"),
+    # ("light2", "IP_LIGHT2", "RELAY_LIGHT2"),
+    # ("vent2", "IP_VENT2", "RELAY_VENT2"),
+]
+
+def run_failsafe():
+
+    for device, ip_key, relay_key in FAILSAFE_DEVICES:
+        failsafe_check(
+            device,
+            ip_key,
+            relay_key
+        )
+
 def shelly_set(ip, relay, on):
 
     try:
