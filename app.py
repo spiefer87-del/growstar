@@ -3,7 +3,6 @@
 # 🌱 GROW BACKEND v3.6 Alpha – MQTT + REGELUNG + FLASK
 # =========================================
 
-
 import time
 
 import threading
@@ -11,24 +10,7 @@ import os
 from flask import Flask
 from db import init_db, init_diary_db, init_plants_table
 
-
-
 from core.config import config, save_config
-
-from core.helpers import (
-        minutes_now,
-        in_time_window,
-    )
-
-from core.ramp import (
-        start_ramp,
-        stop_ramp,
-        update_ramp,
-        get_ramped_target,
-        resync_active_ramp,
-        check_ramp_schedule,
-        update_ramp_duration
-    )
 
 from core.profile import (
         get_profile,        
@@ -53,27 +35,12 @@ from core.actuators import (
             set_vent2,
         )
 
-from core.control import (
-            update_temperature_setpoint,
-            update_humidity_setpoint,
-            control_device,
-        )
-
-from core.devices import (
-            get_device_mode,
-            get_device_params,
-        )
-
 from services.watchdog import (
             log_event,
             watchdog_loop,
         )
 
 from services.shelly import sync_relay
-
-from services.sensor import (
-    mark_stale_sensors,
-)
 
 from threads.mqtt import mqtt_thread
 from threads.shelly import shelly_background_loop
@@ -95,9 +62,6 @@ init_diary_db()
 init_plants_table()
 
 
-
-
-
 # =========================================
 # Globale Konstanten
 # =========================================
@@ -107,8 +71,6 @@ os.makedirs("logs", exist_ok=True)
 # =========================================
 # 🔌 SHELLY-FUNKTIONEN
 # =========================================
-
-
 
 sync_relay("🔥 Heizung", config["IP_HEATING"], config["RELAY_HEATING"], "heating_on", "heating")
 sync_relay("💨 Lüfter",  config["IP_FAN"],     config["RELAY_FAN"],     "fan_on",     "fan")
@@ -168,5 +130,3 @@ finally:
     set_heating(False, "(Shutdown)")
     set_fan(False, "(Shutdown)")
     set_vent(False, "(Shutdown)")
-
-
