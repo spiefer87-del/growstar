@@ -13,6 +13,7 @@ from services.energy import (
 
 from services.shelly import (
     failsafe_check,
+    run_failsafe,
 )
 
 
@@ -37,38 +38,7 @@ def shelly_background_loop():
                 ctx.last_failsafe_poll = now
 
                 with ctx.shelly_lock:
-
-                    failsafe_check(
-                        "heating",
-                        "IP_HEATING",
-                        "RELAY_HEATING"
-                    )
-
-                    failsafe_check(
-                        "fan",
-                        "IP_FAN",
-                        "RELAY_FAN"
-                    )
-
-                    failsafe_check(
-                        "light",
-                        "IP_LIGHT",
-                        "RELAY_LIGHT"
-                    )
-
-                    failsafe_check(
-                        "vent",
-                        "IP_VENT",
-                        "RELAY_VENT"
-                    )
-
-                    # später aktivieren
-                    # failsafe_check(...)
-                    # irrigation
-                    # humidifier
-                    # dehumidifier
-                    # light2
-                    # vent2
+                    run_failsafe()
 
             # =========================================
             # ⚡ ENERGY POLLING
