@@ -5,16 +5,11 @@
 
 
 import time
-import math
 import datetime
 import threading
-import requests
-import sqlite3
 import os
-from flask import Flask, request, jsonify, render_template, send_file
+from flask import Flask
 from db import init_db, insert_measurement, init_diary_db, init_plants_table
-import presets
-from collections import deque
 
 import core.state as state
 import core.context as ctx
@@ -73,29 +68,16 @@ from core.devices import (
             get_device_params,
         )
 
-from services.energy import (
-            get_shelly_energy,
-            refresh_energy_state,
-            get_today_kwh,
-            do_energy_day_reset,
-        )
-
 from services.watchdog import (
             log_event,
             watchdog_loop,
         )
 
-from services.shelly import (
-            shelly_set,
-            failsafe_check,
-            sync_relay,
-        )
+from services.shelly import sync_relay
 
-from services.mqtt import (
-            create_client,
-            MQTT_BROKER,
-            MQTT_PORT,
-        )
+from services.sensors import (
+    mark_stale_sensors,
+)
 
 from threads.mqtt import mqtt_thread
 from threads.shelly import shelly_background_loop
@@ -116,9 +98,6 @@ init_diary_db()
 init_plants_table()
 
 
-
-
-
 # =========================================
 # 🔌 SHELLYS
 # =========================================
@@ -135,83 +114,6 @@ DB_INTERVAL = 30          # Sekunden zwischen DB-Einträgen (5min)
 # =========================================
 
 os.makedirs("logs", exist_ok=True)
-
-
-
-
-def mark_stale_sensors():
-    """
-    Macht Sensor-Timeouts stabil:
-    - wenn stale → Werte auf None + Regelung stoppen
-    - wenn wieder ok → automatisch wieder aktivieren
-    """
-
-    now = time.time()
-
-    with ctx.state_lock:
-        temp_age = now - state.last_ds_time
-        hum_age = now - state.last_dht_time
-
-    # =========================
-    # 🌡️ TEMP
-    # =========================
-
-    if temp_age > SENSOR_TIMEOUT:
-        # Sensor ist stale
-        if not state.temp_stale:
-            print(f"⚠️ TEMP SENSOR STALE ({int(temp_age)}s ohne Daten)")
-        state.temp_stale = True
-
-        state.live_state["temp"] = None
-        state.live_state["temp_raw"] = None
-        state.live_state["vpd"] = None
-
-        # Sicherheitsaktion
-        set_heating(False, "(TEMP SENSOR STALE)")
-
-    else:
-        # Sensor wieder ok
-        if state.temp_stale:
-            print("✅ TEMP SENSOR wieder da")
-        state.temp_stale = False
-
-    # =========================
-    # 💧 HUM
-    # =========================
-
-    if hum_age > SENSOR_TIMEOUT:
-        if not state.hum_stale:
-            print(f"⚠️ HUM SENSOR STALE ({int(hum_age)}s ohne Daten)")
-        state.hum_stale = True
-
-        state.live_state["hum"] = None
-        state.live_state["hum_raw"] = None
-        state.live_state["vpd"] = None
-
-        # Sicherheitsaktion
-        set_fan(False, "(HUM SENSOR STALE)")
-
-    else:
-        if state.hum_stale:
-            print("✅ HUM SENSOR wieder da")
-        state.hum_stale = False
-
-    # =========================
-    # 🌱 VPD neu berechnen sobald beide ok
-    # =========================
-    if (
-        state.live_state.get("temp") is not None
-        and state.live_state.get("hum") is not None
-    ):
-        state.live_state["vpd"] = calculate_vpd(
-            state.live_state["temp"],
-            state.live_state["hum"]
-        )
-
-
-
-
-
 
 # =========================================
 # 🔌 SHELLY-FUNKTIONEN
