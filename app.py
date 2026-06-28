@@ -179,6 +179,17 @@ print("🧠 Main Control Thread gestartet")
 
 print("🌱 Grow-Backend läuft")
 
+try:
 
+    while True:
+        time.sleep(60)
+
+finally:
+
+    print("🛑 Programm beendet")
+
+    set_heating(False, "(Shutdown)")
+    set_fan(False, "(Shutdown)")
+    set_vent(False, "(Shutdown)")
 
 
