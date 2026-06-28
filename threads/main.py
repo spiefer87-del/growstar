@@ -20,7 +20,7 @@ from core.ramp import (
     update_ramp,
 )
 
-from services.sensors import (
+from services.sensor import (
     mark_stale_sensors,
 )
 
