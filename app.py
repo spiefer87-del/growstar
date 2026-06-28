@@ -10,30 +10,13 @@ import os
 from flask import Flask
 from db import init_db, init_diary_db, init_plants_table
 
-from core.config import config, save_config
-
-from core.profile import (
-        get_profile,        
-        apply_profile,
-        load_profiles,
-        save_profiles,
-        PROFILES
-    )
+from core.config import config
 
 from core.actuators import (
-            switch_shelly,
-            get_shelly_relay_state,
-            set_device,
-            set_heating,
-            set_fan,
-            set_light,
-            set_vent,
-            set_irrigation,
-            set_humidifier,
-            set_dehumidifier,
-            set_light2,
-            set_vent2,
-        )
+    set_heating,
+    set_fan,
+    set_vent,
+)
 
 from services.watchdog import (
             log_event,
