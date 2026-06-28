@@ -568,12 +568,7 @@ register_energy_routes(flask_app)
 register_device_routes(flask_app)
 register_config_routes(flask_app)
 register_profile_routes(flask_app)
-register_watchdog_routes(
-    flask_app,
-    log_event,
-    state,
-    SENSOR_TIMEOUT
-)
+register_watchdog_routes(flask_app)
 
 
 
