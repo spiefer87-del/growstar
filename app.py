@@ -3,13 +3,12 @@
 # 🌱 GROW BACKEND v3.6 Alpha – MQTT + REGELUNG + FLASK
 # =========================================
 
-import json
+
 import time
 import math
 import datetime
 import threading
 import requests
-import paho.mqtt.client as mqtt
 import sqlite3
 import os
 from flask import Flask, request, jsonify, render_template, send_file
@@ -92,6 +91,12 @@ from services.shelly import (
             sync_relay,
         )
 
+from services.mqtt import (
+            create_client,
+            MQTT_BROKER,
+            MQTT_PORT,
+        )
+
 from threads.mqtt import mqtt_thread
 from threads.shelly import shelly_background_loop
 
@@ -110,13 +115,6 @@ init_db()
 init_diary_db()
 init_plants_table()
 
-# =========================================
-# 📡 MQTT
-# =========================================
-MQTT_BROKER = "localhost"
-MQTT_PORT = 1883
-TOPIC_DS = "sensor/ds18b20"
-TOPIC_DHT = "sensor/dht22"
 
 
 
@@ -242,73 +240,6 @@ sync_relay("🌵 Luftentfeuchter", config["IP_DEHUMIDIFIER"], config["RELAY_DEHU
 sync_relay("💡 Licht 2", config["IP_LIGHT2"], config["RELAY_LIGHT2"], "light2_on", "light2")
 sync_relay("🌀 Ventilator 2", config["IP_VENT2"], config["RELAY_VENT2"], "vent2_on", "vent2")
 
-# =========================================
-# 📡 MQTT CALLBACKS (paho-mqtt 2.x)
-# =========================================
-
-def on_connect(client, userdata, flags, reason_code, properties):
-    if reason_code == 0:
-        print("✅ MQTT verbunden")
-        client.subscribe([(TOPIC_DS, 0), (TOPIC_DHT, 0)])
-
-def on_message(client, userdata, msg):
-    
-    ctx.MQTT_LAST_MSG = time.time()
-
-
-    try:
-        data = json.loads(msg.payload.decode())
-    except Exception as e:
-        print("❌ MQTT JSON Fehler:", e)
-        return
-
-    now = time.time()
-
-    # =========================
-    # 🌡️ TEMPERATUR
-    # =========================
-    if msg.topic == TOPIC_DS and "temp" in data:
-        try:
-            temp_raw = float(data["temp"])
-        except:
-            return
-
-        temp = round(temp_raw + float(config.get("TEMP_OFFSET", 0.0)), 2)
-
-        with ctx.state_lock:
-            state.last_ds_temp = temp_raw
-            state.last_ds_time = now
-
-            state.live_state["temp_raw"] = temp_raw
-            state.live_state["temp"] = temp
-
-        # Optional debug
-        # print(f"🌡️ TEMP {temp:.2f}°C")
-
-        return
-
-    # =========================
-    # 💧 HUMIDITY
-    # =========================
-    if msg.topic == TOPIC_DHT and "hum" in data:
-        try:
-            hum_raw = float(data["hum"])
-        except:
-            return
-
-        hum = round(hum_raw + float(config.get("HUM_OFFSET", 0.0)), 2)
-
-        with ctx.state_lock:
-            state.last_hum = hum_raw
-            state.last_dht_time = now
-
-            state.live_state["hum_raw"] = hum_raw
-            state.live_state["hum"] = hum
-
-        # Optional debug
-        # print(f"💧 HUM {hum:.2f}%")
-
-        return
     
 # =========================================
 # 🌐 FLASK WEB-UI
