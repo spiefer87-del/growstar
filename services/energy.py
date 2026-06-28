@@ -3,6 +3,7 @@ import requests
 
 import core.context as ctx
 
+from core.constants import ENERGY_DEVICES
 from core.config import config, save_config
 
 def do_energy_day_reset():
