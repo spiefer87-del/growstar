@@ -93,6 +93,7 @@ from services.shelly import (
         )
 
 from threads.mqtt import mqtt_thread
+from threads.shelly import shelly_background_loop
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
