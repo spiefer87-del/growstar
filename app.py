@@ -122,17 +122,6 @@ os.makedirs("logs", exist_ok=True)
 
 
 
-def control_time_mode(device):
-    params = get_device_params(device)
-    now_min = minutes_now()
-
-    start = int(params.get("start_min", 0))
-    end   = int(params.get("end_min", 0))
-
-    set_device(device, in_time_window(now_min, start, end))
-
-
-
 sync_relay("🔥 Heizung", config["IP_HEATING"], config["RELAY_HEATING"], "heating_on", "heating")
 sync_relay("💨 Lüfter",  config["IP_FAN"],     config["RELAY_FAN"],     "fan_on",     "fan")
 sync_relay("💡 Licht",   config["IP_LIGHT"],   config["RELAY_LIGHT"],   "light_on",   "light")
