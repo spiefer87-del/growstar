@@ -712,9 +712,7 @@ def watchdog_loop():
 flask_app = Flask(__name__)
 
 register_dashboard_routes(flask_app)
-register_state_routes(
-    flask_app,
-)
+register_state_routes(flask_app)
 register_plants_routes(flask_app)
 register_diary_routes(flask_app)
 register_diagrams_routes(flask_app)
