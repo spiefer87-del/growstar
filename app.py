@@ -75,7 +75,7 @@ from services.watchdog import (
 
 from services.shelly import sync_relay
 
-from services.sensors import (
+from services.sensor import (
     mark_stale_sensors,
 )
 
