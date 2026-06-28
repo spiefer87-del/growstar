@@ -3,7 +3,7 @@ from flask import jsonify
 from core.config import config, save_config
 
 import datetime
-
+import core.context as ctx
 
 def register(app, energy_state, energy_lock, refresh_energy_state):
 
