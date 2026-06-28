@@ -80,6 +80,7 @@ from routes.diagrams import register as register_diagrams_routes
 from routes.energy import register as register_energy_routes
 from routes.device import register as register_device_routes
 from routes.config import register as register_config_routes
+from routes.profile import register as register_profile_routes
 
 init_db()
 init_diary_db()
@@ -738,20 +739,8 @@ register_energy_routes(
 )
 register_device_routes(flask_app)
 register_config_routes(flask_app)
+register_profile_routes(flask_app)
 
-
-@flask_app.route("/api/profile/<name>", methods=["POST"])
-def api_set_profile(name):
-    ok = apply_profile(name)
-    if not ok:
-        return {"error": "unknown profile"}, 404
-
-    return {"status": "ok", "active": name}
-
-
-@flask_app.route("/api/profile")
-def get_profile_api():
-    return {"active": PROFILES.get("active")}
 
 # =========================================
 # 🐶 WATCHDOG + INFOLOG API
