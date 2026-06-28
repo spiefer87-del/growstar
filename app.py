@@ -79,6 +79,7 @@ from routes.diary import register as register_diary_routes
 from routes.diagrams import register as register_diagrams_routes
 from routes.energy import register as register_energy_routes
 from routes.device import register as register_device_routes
+from routes.config import register as register_config_routes
 
 init_db()
 init_diary_db()
@@ -736,140 +737,7 @@ register_energy_routes(
     refresh_energy_state
 )
 register_device_routes(flask_app)
-
-@flask_app.route("/api/config", methods=["GET", "POST"])
-def api_config():
-
-    if request.method == "GET":
-        return jsonify({
-            **config,
-            "ACTIVE_PROFILE": PROFILES.get("active")
-        })
-
-    data = request.json or {}
-
-    # =========================================
-    # 🔧 CONFIG UPDATE
-    # =========================================
-    for key, value in data.items():
-
-        # =========================
-        # 🎨 DASHBOARD
-        # =========================
-        if key.startswith("DASH_"):
-            config[key] = value
-            continue
-
-        # =========================
-        # 🔌 DEVICE MODES (MERGE!)
-        # =========================
-        if key == "DEVICE_MODES":
-            config.setdefault("DEVICE_MODES", {})
-            config["DEVICE_MODES"].update(value)
-            continue
-
-        if key == "DEVICE_PARAMS":
-            config.setdefault("DEVICE_PARAMS", {})
-            for dev, params in value.items():
-                config["DEVICE_PARAMS"].setdefault(dev, {})
-                config["DEVICE_PARAMS"][dev].update(params)
-            continue
-
-        if key == "DEVICE_ENV_CONFIG":
-            config.setdefault("DEVICE_ENV_CONFIG", {})
-            for dev, env in value.items():
-                config["DEVICE_ENV_CONFIG"].setdefault(dev, {})
-                config["DEVICE_ENV_CONFIG"][dev].update(env)
-            continue
-
-        # =========================
-        # 🌐 IP STRINGS
-        # =========================
-        if key.startswith("IP_"):
-            config[key] = str(value).strip()
-            continue
-
-        # =========================
-        # 🔌 RELAYS
-        # =========================
-        if key.startswith("RELAY_"):
-            try:
-                config[key] = int(value)
-            except:
-                pass
-            continue
-
-        # =========================
-        # 🔢 INT SPECIAL
-        # =========================
-        if key in ["ENERGY_DAY_RESET_MIN"]:
-            try:
-                config[key] = int(value)
-            except:
-                pass
-            continue
-
-        # =========================
-        # 🔢 FLOAT FALLBACK
-        # =========================
-        try:
-            config[key] = float(value)
-        except:
-            config[key] = value
-
-
-    if state.ramp_active:
-
-        if "RAMP_DURATION_MIN" in data:
-            update_ramp_duration()
-        
-        if (
-            "DAY_TEMP" in data
-            or "NIGHT_TEMP" in data
-                ):
-            resync_active_ramp()
-
-    # =========================================
-    # 🛑 RAMP STOP IF DISABLED
-    # =========================================
-    if not config.get("RAMP_ENABLED", 0):
-        stop_ramp()
-
-        state.live_state["ramp_active"] = False
-        state.live_state["ramp_target"] = None
-
-    # =========================================
-    # 💾 SAVE CONFIG
-    # =========================================
-    save_config(config)
-
-    # =========================================
-    # 🔒 MIRROR INTO ACTIVE PROFILE
-    # =========================================
-    active = PROFILES.get("active")
-
-    DESIGN_KEYS = {
-        "DASH_ENV",
-        "DASH_ENV_ORDER",
-        "DASH_DEVICE_ORDER",
-        "DEVICE_MODES",
-        "DEVICE_PARAMS",
-        "DEVICE_ENV_CONFIG"
-    }
-
-    if active and active in PROFILES.get("profiles", {}):
-        profile = PROFILES["profiles"][active]
-
-        for k in profile.keys():
-            if k in config and k not in DESIGN_KEYS:
-                profile[k] = config[k]
-
-        save_profiles(PROFILES)
-
-    return jsonify({
-        "status": "ok",
-        "config": config
-    })
+register_config_routes(flask_app)
 
 
 @flask_app.route("/api/profile/<name>", methods=["POST"])
