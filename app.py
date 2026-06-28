@@ -18,6 +18,8 @@ import presets
 from collections import deque
 
 import core.state as state
+import core.context as ctx
+
 from core.config import config, save_config
 
 from core.helpers import (
@@ -95,18 +97,7 @@ MQTT_PORT = 1883
 TOPIC_DS = "sensor/ds18b20"
 TOPIC_DHT = "sensor/dht22"
 
-# =========================================
-# 🧵 THREAD STATE
-# =========================================
-energy_state = {}
-energy_lock = threading.Lock()
 
-shelly_lock = threading.Lock()
-
-state_lock = threading.Lock()
-
-last_energy_poll = 0
-last_failsafe_poll = 0
 
 
 # =========================================
@@ -123,10 +114,10 @@ DB_INTERVAL = 30          # Sekunden zwischen DB-Einträgen (5min)
 # =========================================
 # Globale Konstanten
 # =========================================
-LOG_FILE = "logs/infolog.txt"
+
 os.makedirs("logs", exist_ok=True)
 
-MQTT_LAST_MSG = 0   # timestamp letzter MQTT callback
+
 
 
 def mark_stale_sensors():
@@ -138,7 +129,7 @@ def mark_stale_sensors():
 
     now = time.time()
 
-    with state_lock:
+    with ctx.state_lock:
         temp_age = now - state.last_ds_time
         hum_age = now - state.last_dht_time
 
@@ -207,8 +198,8 @@ def do_energy_day_reset():
 
     config.setdefault("ENERGY_DAY_OFFSET", {})
 
-    with energy_lock:
-        snapshot = dict(energy_state)
+    with ctx.energy_lock:
+        snapshot = dict(ctx.energy_state)
 
     if not snapshot:
         print("⚠️ ENERGY: Auto-Tagesreset übersprungen (keine Daten)")
@@ -240,7 +231,7 @@ def log_event(msg, level="INFO"):
     line = f"[{ts}] {level}: {msg}\n"
 
     try:
-        with open(LOG_FILE, "a") as f:
+        with open(ctx.LOG_FILE, "a") as f:
             f.write(line)
     except Exception as e:
         print("❌ Log write error:", e)
@@ -346,7 +337,6 @@ def get_shelly_energy(ip, relay, device_key, timeout=3):
         return None
 
 def refresh_energy_state():
-    global energy_state
 
     ENERGY_DEVICES = {
         "heating": ("IP_HEATING", "RELAY_HEATING"),
@@ -362,8 +352,8 @@ def refresh_energy_state():
         "vent2":        ("IP_VENT2",        "RELAY_VENT2"),
     }
 
-    with energy_lock:
-        energy_state.clear()
+    with ctx.energy_lock:
+        ctx.energy_state.clear()
     
         for name, (ip_k, r_k) in ENERGY_DEVICES.items():
             ip = config.get(ip_k)
@@ -374,7 +364,7 @@ def refresh_energy_state():
     
             e = get_shelly_energy(ip, relay, name)
             if e:
-                energy_state[name] = e
+                ctx.energy_state[name] = e
 
 
 def get_today_kwh(device_key, raw_total_kwh):
@@ -472,10 +462,8 @@ def on_connect(client, userdata, flags, reason_code, properties):
         client.subscribe([(TOPIC_DS, 0), (TOPIC_DHT, 0)])
 
 def on_message(client, userdata, msg):
-
-    global MQTT_LAST_MSG
     
-    MQTT_LAST_MSG = time.time()
+    ctx.MQTT_LAST_MSG = time.time()
 
 
     try:
@@ -497,7 +485,7 @@ def on_message(client, userdata, msg):
 
         temp = round(temp_raw + float(config.get("TEMP_OFFSET", 0.0)), 2)
 
-        with state_lock:
+        with ctx.state_lock:
             state.last_ds_temp = temp_raw
             state.last_ds_time = now
 
@@ -520,7 +508,7 @@ def on_message(client, userdata, msg):
 
         hum = round(hum_raw + float(config.get("HUM_OFFSET", 0.0)), 2)
 
-        with state_lock:
+        with ctx.state_lock:
             state.last_hum = hum_raw
             state.last_dht_time = now
 
@@ -537,7 +525,6 @@ def on_message(client, userdata, msg):
 # =========================================
 
 def shelly_background_loop():
-    global last_energy_poll, last_failsafe_poll
 
     ENERGY_INTERVAL = 30     # Sekunden
     FAILSAFE_INTERVAL = 30   # Sekunden
@@ -556,10 +543,10 @@ def shelly_background_loop():
             # =========================================
             # 🛡️ FAILSAFE (Shelly Relay Sync)
             # =========================================
-            if now - last_failsafe_poll >= FAILSAFE_INTERVAL:
-                last_failsafe_poll = now
+            if now - ctx.last_failsafe_poll >= FAILSAFE_INTERVAL:
+                ctx.last_failsafe_poll = now
 
-                with shelly_lock:
+                with ctx.shelly_lock:
                     failsafe_check("heating", "IP_HEATING", "RELAY_HEATING")
                     failsafe_check("fan", "IP_FAN", "RELAY_FAN")
                     failsafe_check("light", "IP_LIGHT", "RELAY_LIGHT")
@@ -573,13 +560,13 @@ def shelly_background_loop():
             # =========================================
             # ⚡ ENERGY POLLING
             # =========================================
-            if now - last_energy_poll >= ENERGY_INTERVAL:
-                last_energy_poll = now
+            if now - ctx.last_energy_poll >= ENERGY_INTERVAL:
+                ctx.last_energy_poll = now
 
                 tmp = {}
 
                 # config sicher lesen
-                with shelly_lock:
+                with ctx.shelly_lock:
                     for name, (ip_k, r_k) in ENERGY_DEVICES.items():
                         ip = config.get(ip_k)
                         relay = config.get(r_k)
@@ -592,9 +579,9 @@ def shelly_background_loop():
                             tmp[name] = e
 
                 # atomar übernehmen
-                with energy_lock:
-                    energy_state.clear()
-                    energy_state.update(tmp)
+                with ctx.energy_lock:
+                    ctx.energy_state.clear()
+                    ctx.energy_state.update(tmp)
 
             # =========================================
             # 📅 AUTO TAGESRESET (sauber)
@@ -614,7 +601,7 @@ def shelly_background_loop():
 
                 print(f"📅 AUTO RESET ausgelöst ({now.hour:02d}:{now.minute:02d})")
 
-                with shelly_lock:
+                with ctx.shelly_lock:
                     do_energy_day_reset()
 
                 # WICHTIG: Sofort merken, dass wir heute resettet haben
@@ -682,7 +669,7 @@ def watchdog_loop():
             # -------------------------
             # 🌡️ TEMP stale?
             # -------------------------
-            with state_lock:
+            with ctx.state_lock:
                 ds_age = now - state.last_ds_time
                 dht_age = now - state.last_dht_time
 
@@ -700,13 +687,13 @@ def watchdog_loop():
             # -------------------------
             # ⚡ Energy stale?
             # -------------------------
-            with energy_lock:
-                snapshot = dict(energy_state)
+            with ctx.energy_lock:
+                snapshot = dict(ctx.energy_state)
 
             # Wenn wir z.B. keine Daten haben
             if not snapshot:
                 if now - last_warn_energy > 60:
-                    log_event("ENERGY: keine Daten (energy_state leer)", "WARN")
+                    log_event("ENERGY: keine Daten (ctx.energy_state leer)", "WARN")
                     last_warn_energy = now
 
             # Optional: check ob Werte alt sind
@@ -727,15 +714,15 @@ flask_app = Flask(__name__)
 register_dashboard_routes(flask_app)
 register_state_routes(
     flask_app,
-    lambda: energy_state
+    lambda: ctx.energy_state
 )
 register_plants_routes(flask_app)
 register_diary_routes(flask_app)
 register_diagrams_routes(flask_app)
 register_energy_routes(
     flask_app,
-    energy_state,
-    energy_lock,
+    ctx.energy_state,
+    ctx.energy_lock,
     refresh_energy_state
 )
 register_device_routes(flask_app)
@@ -743,13 +730,13 @@ register_config_routes(flask_app)
 register_profile_routes(flask_app)
 register_watchdog_routes(
     flask_app,
-    LOG_FILE,
+    ctx.LOG_FILE,
     log_event,
     state,
-    state_lock,
-    energy_state,
-    energy_lock,
-    lambda: MQTT_LAST_MSG,
+    ctx.state_lock,
+    ctx.energy_state,
+    ctx.energy_lock,
+    lambda: ctx.MQTT_LAST_MSG,
     SENSOR_TIMEOUT
 )
 
@@ -795,7 +782,7 @@ try:
         mark_stale_sensors()
 
         # Snapshot (threadsafe)
-        with state_lock:
+        with ctx.state_lock:
             temp_val = state.live_state.get("temp")
             hum_val = state.live_state.get("hum")
 
@@ -805,7 +792,7 @@ try:
         if now - state.last_db_write >= DB_INTERVAL:
             state.last_db_write = now
 
-            with state_lock:
+            with ctx.state_lock:
 
                 # Targets können None sein, ist OK
                 tt = state.live_state.get("temp_target")
@@ -814,7 +801,7 @@ try:
             if temp_val is not None and hum_val is not None:
                 vpd = calculate_vpd(temp_val, hum_val)
 
-                with state_lock:
+                with ctx.state_lock:
                     state.live_state["vpd"] = vpd
 
                 try:
