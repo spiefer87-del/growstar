@@ -92,6 +92,8 @@ from services.shelly import (
             sync_relay,
         )
 
+from threads.mqtt import mqtt_thread
+
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
 from routes.plants import register as register_plants_routes
@@ -403,39 +405,6 @@ def shelly_background_loop():
 
         time.sleep(1)
     
-# =========================================
-# 📡 MQTT SENSOR THREAD
-# =========================================
-
-def mqtt_sensor_thread():
-    """
-    Läuft dauerhaft im Hintergrund.
-    MQTT darf disconnecten → reconnectet automatisch.
-    Mainloop läuft IMMER weiter.
-    """
-
-    while True:
-        try:
-            print("📡 MQTT Thread startet...")
-
-            client = mqtt.Client(
-                client_id="grow-backend",
-                callback_api_version=mqtt.CallbackAPIVersion.VERSION2
-            )
-
-            client.on_connect = on_connect
-            client.on_message = on_message
-
-            client.connect(MQTT_BROKER, MQTT_PORT, keepalive=30)
-
-            # wichtig: loop_forever blockiert NUR diesen Thread
-            client.loop_forever(retry_first_connection=True)
-
-        except Exception as e:
-            print("❌ MQTT Thread Fehler:", e)
-
-        print("🔁 MQTT Thread reconnect in 5s...")
-        time.sleep(5)
 
 
 # =========================================
@@ -464,7 +433,7 @@ threading.Thread(target=run_flask, daemon=True).start()
 print("🌐 Flask Webserver gestartet")
 threading.Thread(target=shelly_background_loop, daemon=True).start()
 print("🧵 Shelly Background Thread gestartet")
-threading.Thread(target=mqtt_sensor_thread, daemon=True).start()
+threading.Thread(target=mqtt_thread, daemon=True).start()
 print("📡 MQTT Sensor Thread läuft")
 threading.Thread(target=watchdog_loop, daemon=True).start()
 log_event("Watchdog Thread gestartet")
