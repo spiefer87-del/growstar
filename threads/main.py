@@ -34,10 +34,6 @@ def main_loop():
         # =========================================
         # Sollwerte aktualisieren
         # =========================================
-
-        update_temperature_setpoint()
-        update_humidity_setpoint()
-
         check_ramp_schedule()
 
         # =========================================
@@ -47,6 +43,9 @@ def main_loop():
         if state.ramp_active:
             update_ramp()
 
+        update_temperature_setpoint()
+        update_humidity_setpoint()
+        
         # =========================================
         # Sensor Health
         # =========================================
