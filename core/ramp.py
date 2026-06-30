@@ -106,6 +106,7 @@ def update_ramp():
     if now < state.ramp_end_ts:
         return
 
+    state.live_state["temp_target"] = state.ramp_target_temp
     state.ramp_active = False
 
     state.live_state["ramp_active"] = False
