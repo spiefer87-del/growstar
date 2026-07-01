@@ -93,28 +93,16 @@ def get_ramped_target():
 # =========================================
 
 def update_ramp():
-    """
-    Beendet die Rampe automatisch,
-    sobald die Zielzeit erreicht ist.
-    """
 
     if not state.ramp_active:
         return
 
-    now = time.time()
-
-    if now < state.ramp_end_ts:
+    if time.time() < state.ramp_end_ts:
         return
 
-    stop_ramp()
-    state.live_state["temp_target"] = state.ramp_target_temp
-    state.live_state["ramp_active"] = False
-    state.live_state["ramp_target"] = None
+    print(f"✅ RAMPE ENDE ({state.ramp_target_temp:.1f}°C)")
 
-    print(
-        f"✅ RAMPE ENDE "
-        f"({state.ramp_target_temp:.1f}°C)"
-    )
+    stop_ramp()
 
 
 # =========================================
