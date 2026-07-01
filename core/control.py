@@ -57,11 +57,13 @@ def update_temperature_setpoint():
     state.live_state["temp_target"] = target
     state.live_state["temp_tol"] = tol
     print(
-        f"{time.strftime('%H:%M:%S')} | "
-        f"profile={profile} "
-        f"ramp={state.ramp_active} "
-        f"base={base} "
-        f"target={target}"
+        f"{time.strftime('%H:%M:%S')} "
+        f"({minutes_now()} min) | "
+        f"profile={profile} | "
+        f"ramp={state.ramp_active} | "
+        f"ramp_target={state.ramp_target_temp} | "
+        f"base={base:.2f} | "
+        f"target={target:.2f}"
     )
 
 def evaluate_env_conditions(device):
