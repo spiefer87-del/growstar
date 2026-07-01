@@ -26,6 +26,11 @@ def get_profile():
         profile = "TAG"
 
     if profile != state.current_profile:
+        print(
+            f"🔄 Profilwechsel: "
+            f"{state.current_profile} -> {profile} "
+            f"({minutes_now()} min)"
+        )
         state.current_profile = profile
 
     state.live_state["profile"] = profile
