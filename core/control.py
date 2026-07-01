@@ -56,6 +56,13 @@ def update_temperature_setpoint():
     # 📊 IMMER setzen – auch wenn Regelung deaktiviert
     state.live_state["temp_target"] = target
     state.live_state["temp_tol"] = tol
+    print(
+        f"{time.strftime('%H:%M:%S')} | "
+        f"profile={profile} "
+        f"ramp={state.ramp_active} "
+        f"base={base} "
+        f"target={target}"
+    )
 
 def evaluate_env_conditions(device):
 
