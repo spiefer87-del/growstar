@@ -271,7 +271,8 @@ def check_ramp_schedule():
         start_ramp(
             float(config["NIGHT_TEMP"]),
             float(config["DAY_TEMP"]),
-            duration
+            duration,
+            day_start
         )
         state.last_ramp_trigger_day = today
         state.last_ramp_trigger_type = "morning"
@@ -286,7 +287,8 @@ def check_ramp_schedule():
         start_ramp(
             float(config["DAY_TEMP"]),
             float(config["NIGHT_TEMP"]),
-            duration
+            duration,
+            night_start
         )
         state.last_ramp_trigger_day = today
         state.last_ramp_trigger_type = "evening"
