@@ -18,24 +18,27 @@ from core.profile import get_profile
 # 🌡️ RAMPE STARTEN
 # =========================================
 
-def start_ramp(start_temp, target_temp, duration_min):
+def start_ramp(start_temp, target_temp, duration_min, end_min):
     """
     Startet eine neue lineare Temperatur-Rampe.
     """
 
-    now = time.time()
+    now = datetime.datetime.now()
 
-    state.ramp_active = True
+    end_dt = now.replace(
+        hour=end_min // 60,
+        minute=end_min % 60,
+        second=0,
+        microsecond=0,
+    )
 
-    state.ramp_start_ts = now
-    state.ramp_end_ts = now + (float(duration_min) * 60)
+    # Sicherheit falls wir bereits hinter der Uhrzeit sind
+    if end_dt <= now:
+        end_dt += datetime.timedelta(days=1)
 
-    state.ramp_start_temp = float(start_temp)
-    state.ramp_target_temp = float(target_temp)
-
-    state.live_state["ramp_active"] = True
-    state.live_state["ramp_target"] = float(target_temp)
-
+    state.ramp_start_ts = time.time()
+    state.ramp_end_ts = end_dt.timestamp()
+    
     print(
         f"🌡️ RAMPE START "
         f"{start_temp:.1f}°C → {target_temp:.1f}°C "
