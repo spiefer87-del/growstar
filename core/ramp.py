@@ -259,7 +259,7 @@ def check_ramp_schedule():
         return
 
     if (
-        minute_distance(now_min, morning_start) <= 1
+        now_min == morning_start
         and (
             state.last_ramp_trigger_day != today
             or state.last_ramp_trigger_type != "morning"
@@ -274,7 +274,7 @@ def check_ramp_schedule():
         state.last_ramp_trigger_type = "morning"
 
     if (
-        minute_distance(now_min, evening_start) <= 1
+        now_min == evening_start
         and (
             state.last_ramp_trigger_day != today
             or state.last_ramp_trigger_type != "evening"
