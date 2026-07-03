@@ -98,6 +98,6 @@ def register(app):
     def watchdog_page():
         return render_template("watchdog.html")
     
-    @app.route("/shelly")
-    def shelly():    
-        return render_template("shelly.html")
+    @app.route("/devices")
+    def devices():    
+        return render_template("devices.html")
