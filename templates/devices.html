@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
@@ -13,8 +14,12 @@
     --card:#1e293b;
     --text:#e5e7eb;
     --muted:#94a3b8;
-    --green:#22c55e;
-    --red:#ef4444;
+    --accent:#22c55e;
+    --border:rgba(255,255,255,.08);
+}
+
+*{
+    box-sizing:border-box;
 }
 
 body{
@@ -22,17 +27,22 @@ body{
     padding:16px;
     background:var(--bg);
     color:var(--text);
-    font-family:system-ui,sans-serif;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
 }
 
 header{
     display:flex;
     justify-content:space-between;
     align-items:center;
-    margin-bottom:20px;
+    margin-bottom:24px;
 }
 
-a{
+header h1{
+    margin:0;
+    font-size:1.5rem;
+}
+
+header a{
     color:var(--muted);
     text-decoration:none;
 }
@@ -41,93 +51,249 @@ a{
     margin-bottom:24px;
 }
 
+.section-title{
+    margin-bottom:12px;
+    font-size:1.1rem;
+    font-weight:600;
+}
+
 .card{
+
     background:var(--card);
+
     border-radius:16px;
+
     padding:18px;
-    margin-top:12px;
+
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
 }
 
 .device{
+
     display:flex;
+
     justify-content:space-between;
+
     align-items:center;
-    padding:12px 0;
-    border-bottom:1px solid rgba(255,255,255,.08);
+
+    padding:14px 0;
+
+    border-bottom:1px solid var(--border);
 }
 
 .device:last-child{
+
     border-bottom:none;
 }
 
+.name{
+
+    font-size:1rem;
+
+    font-weight:600;
+}
+
+.info{
+
+    margin-top:4px;
+
+    color:var(--muted);
+
+    font-size:.85rem;
+}
+
 .badge{
-    padding:4px 10px;
+
+    padding:6px 12px;
+
     border-radius:20px;
-    font-size:13px;
+
+    font-size:.8rem;
+
+    font-weight:bold;
 }
 
 .online{
+
     background:#22c55e;
     color:white;
 }
 
 .offline{
+
     background:#ef4444;
     color:white;
 }
 
 .empty{
+
     text-align:center;
+
     color:var(--muted);
-    padding:20px;
+
+    padding:30px;
+}
+
+.button{
+
+    margin-top:18px;
+
+    width:100%;
+
+    padding:14px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:var(--accent);
+
+    color:white;
+
+    font-size:1rem;
+
+    cursor:pointer;
+}
+
+.button:hover{
+
+    opacity:.9;
 }
 
 </style>
+
 </head>
 
 <body>
 
 <header>
-<h2>🛜 Geräte</h2>
-<a href="/system">← Zurück</a>
+
+<h1>🛜 Geräte</h1>
+
+<a href="/system">← System</a>
+
 </header>
 
+
+<!-- Gateways -->
+
 <div class="section">
 
-<h3>Gateways</h3>
+<div class="section-title">
+
+Gateways
+
+</div>
+
+<div class="card">
+
+<div class="device">
+
+<div>
+
+<div class="name">
+
+Noch keine Gateways
+
+</div>
+
+<div class="info">
+
+Später erscheinen hier Shelly Gateways
+
+</div>
+
+</div>
+
+<span class="badge offline">
+
+Offline
+
+</span>
+
+</div>
+
+<button class="button">
+
+🔍 Geräte suchen
+
+</button>
+
+</div>
+
+</div>
+
+
+
+<!-- Sensoren -->
+
+<div class="section">
+
+<div class="section-title">
+
+Sensoren
+
+</div>
 
 <div class="card">
 
 <div class="empty">
-Noch keine Gateways eingerichtet.
-</div>
+
+Keine Sensoren gefunden.
 
 </div>
 
 </div>
+
+</div>
+
+
+
+<!-- Aktoren -->
 
 <div class="section">
 
-<h3>Sensoren</h3>
+<div class="section-title">
+
+Aktoren
+
+</div>
 
 <div class="card">
 
 <div class="empty">
-Noch keine Sensoren gefunden.
-</div>
+
+Keine Aktoren vorhanden.
 
 </div>
 
 </div>
+
+</div>
+
+
+
+<!-- Informationen -->
 
 <div class="section">
 
-<h3>Aktoren</h3>
+<div class="section-title">
+
+Entwicklung
+
+</div>
 
 <div class="card">
 
-<div class="empty">
-Noch keine Aktoren vorhanden.
+<div style="line-height:1.8">
+
+✔ Geräteverwaltung vorbereitet<br>
+✔ Gateways vorbereitet<br>
+✔ Sensorverwaltung vorbereitet<br>
+⏳ Shelly Discovery<br>
+⏳ BLU H&T<br>
+⏳ Automatische Erkennung
+
 </div>
 
 </div>
