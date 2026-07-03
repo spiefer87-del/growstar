@@ -5,13 +5,10 @@ import datetime
 
 import core.state as state
 
-from core.config import config, save_config
-from core.helpers import (
-    minutes_now,
-    minute_distance,
-    in_time_window,
-)
-from core.profile import get_profile
+from core.config import config
+from core.helpers import minutes_now
+
+
 
 
 # =========================================
