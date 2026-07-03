@@ -1,8 +1,16 @@
 from core.hardware.manager import manager
 from core.hardware.scanner import scanner
 
+from core.hardware.shelly.discovery import ShellyDiscovery
+
 
 class HardwareService:
+
+    def __init__(self):
+
+        scanner.register(
+            ShellyDiscovery()
+        )
 
     def gateways(self):
 
@@ -16,22 +24,16 @@ class HardwareService:
 
         return manager.actuators_list()
 
-    def refresh(self):
-
-        """
-        Wird später alle Hardware aktualisieren.
-        """
-        pass
-
     def scan_gateways(self):
-    
+
         scanner.scan_gateways()
 
     def scan_ble(self):
 
-        """
-        Über vorhandene Gateways nach BLE-Geräten suchen.
-        """
+        pass
+
+    def refresh(self):
+
         pass
 
 
