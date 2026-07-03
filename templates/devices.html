@@ -462,5 +462,54 @@ Hardware Manager
 
 </div>
 
+<script>
+
+document
+.getElementById("scan-gateway")
+.addEventListener("click", scanGateways);
+
+
+async function scanGateways(){
+
+    const btn = document.getElementById("scan-gateway");
+
+    btn.disabled = true;
+
+    btn.innerText = "Suche...";
+
+    try{
+
+        const response = await fetch(
+            "/api/hardware/scan",
+            {
+                method:"POST"
+            }
+        );
+
+        const data = await response.json();
+
+        console.log(data);
+
+        alert(
+            data.gateways + " Gateway(s) gefunden."
+        );
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        alert("Hardware Scan fehlgeschlagen.");
+
+    }
+
+    btn.disabled = false;
+
+    btn.innerText = "Gateway suchen";
+
+}
+
+</script>
 </body>
 </html>
