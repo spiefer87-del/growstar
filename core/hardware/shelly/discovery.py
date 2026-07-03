@@ -1,4 +1,4 @@
-from core.devices.manager import manager
+from core.hardware.manager import manager
 
 from .gateway import ShellyGateway
 
