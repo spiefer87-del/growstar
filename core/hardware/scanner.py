@@ -1,15 +1,18 @@
-from .registry import registry
-
-
 class HardwareScanner:
+
+    def __init__(self):
+
+        self.scanners = []
+
+    def register(self, scanner):
+
+        self.scanners.append(scanner)
 
     def scan_gateways(self):
 
-        print("HardwareScanner")
-        print(registry.gateway_scanners_list())
+        print(f"{len(self.scanners)} Gateway-Scanner registriert")
 
-
-        for scanner in registry.gateway_scanners_list():
+        for scanner in self.scanners:
 
             scanner.scan()
 
