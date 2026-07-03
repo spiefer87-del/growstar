@@ -24,10 +24,7 @@ class HardwareService:
 
     def scan_gateways(self):
 
-        """
-        Netzwerk nach Gateways durchsuchen.
-        """
-        pass
+        scanner.scan_gateways()
 
     def scan_ble(self):
 
