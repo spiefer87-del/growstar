@@ -26,7 +26,13 @@ class HardwareService:
 
     def scan_gateways(self):
 
-        scanner.scan_gateways()
+        gateways = scanner.scan_gateways()
+
+        for gateway in gateways:
+
+            manager.add_gateway(gateway)
+
+        return len(gateways)
 
     def scan_ble(self):
 
