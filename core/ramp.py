@@ -7,6 +7,7 @@ import core.state as state
 
 from core.config import config
 from core.helpers import minutes_now
+from core.profile import get_profile
 
 
 def get_ramp_end_timestamp(end_min):
@@ -52,7 +53,7 @@ def _restart_ramp(current_temp, target_temp, end_min):
 # 🌡️ RAMPE STARTEN
 # =========================================
 
-def start_ramp(start_temp, target_temp, duration_min, end_min):
+def start_ramp(start_temp, target_temp, end_min):
 
     now = time.time()
 
@@ -134,9 +135,9 @@ def update_ramp():
     if time.time() < state.ramp_end_ts:
         return
 
-    target = state.ramp_target_temp
-
-    print(f"✅ RAMPE ENDE ({target:.1f}°C)")
+    print(
+        f"✅ RAMPE ENDE ({state.ramp_target_temp:.1f}°C)"
+    )
     
     stop_ramp()
 
@@ -217,7 +218,6 @@ def stop_ramp():
 
     state.live_state["ramp_active"] = False
     state.live_state["ramp_target"] = None
-    state.live_state["temp_target"] = None
 
     print("🛑 RAMPE GESTOPPT")
 
@@ -261,7 +261,6 @@ def check_ramp_schedule():
         start_ramp(
             float(config["NIGHT_TEMP"]),
             float(config["DAY_TEMP"]),
-            int(config["RAMP_DURATION_MIN"]),
             day_start,
         )
 
@@ -281,7 +280,6 @@ def check_ramp_schedule():
         start_ramp(
             float(config["DAY_TEMP"]),
             float(config["NIGHT_TEMP"]),
-            int(config["RAMP_DURATION_MIN"]),
             night_start,
         )
 
