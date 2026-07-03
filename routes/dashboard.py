@@ -1,4 +1,5 @@
 from flask import render_template
+from services.hardware import hardware
 
 
 def register(app):
@@ -100,4 +101,7 @@ def register(app):
     
     @app.route("/devices")
     def devices():    
-        return render_template("devices.html")
+        return render_template(
+            "devices.html",
+            devices=hardware.devices()
+        )
