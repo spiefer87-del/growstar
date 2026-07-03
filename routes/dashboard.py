@@ -104,21 +104,8 @@ def register(app):
     
     @app.route("/devices")
     def devices():
-
-        # Demo nur erzeugen, wenn noch keine Geräte vorhanden
-        if not manager.all():
-    
-            demo = Device()
-    
-            demo.id = "demo"
-            demo.name = "Shelly Plug S"
-            demo.model = "SNPL-00112EU"
-            demo.ip = "192.168.178.60"
-            demo.online = True
-    
-            manager.add(demo)
     
         return render_template(
             "devices.html",
-            devices=manager.all()
+            devices=hardware.devices()
         )
