@@ -2,31 +2,47 @@ import requests
 
 
 class ShellyAPI:
-    def __init__(self, host, timeout=5):
-        self.host = host
-        self.timeout = timeout
 
-    def call(self, method, params=None):
-        url = f"http://{self.host}/rpc/{method}"
+    def __init__(self, ip):
+
+        self.ip = ip
+
+    def rpc(self, method, params=None, timeout=5):
+
+        url = f"http://{self.ip}/rpc/{method}"
 
         try:
+
             if params:
-                r = requests.post(url, json=params, timeout=self.timeout)
+                response = requests.post(
+                    url,
+                    json=params,
+                    timeout=timeout
+                )
             else:
-                r = requests.get(url, timeout=self.timeout)
+                response = requests.get(
+                    url,
+                    timeout=timeout
+                )
 
-            r.raise_for_status()
-            return r.json()
+            response.raise_for_status()
 
-        except requests.RequestException as e:
-            print(f"[Shelly] RPC Fehler {self.host}: {e}")
+            return response.json()
+
+        except Exception as e:
+
+            print(f"[Shelly] {self.ip}: {e}")
+
             return None
 
-    def get_device_info(self):
-        return self.call("Shelly.GetDeviceInfo")
+    def device_info(self):
 
-    def get_config(self):
-        return self.call("Shelly.GetConfig")
+        return self.rpc("Shelly.GetDeviceInfo")
 
-    def get_status(self):
-        return self.call("Shelly.GetStatus")
+    def config(self):
+
+        return self.rpc("Shelly.GetConfig")
+
+    def status(self):
+
+        return self.rpc("Shelly.GetStatus")
