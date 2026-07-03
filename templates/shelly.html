@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Shelly</title>
+
+<style>
+
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+    --green:#22c55e;
+}
+
+body{
+
+    margin:0;
+    padding:16px;
+
+    background:var(--bg);
+    color:var(--text);
+
+    font-family:system-ui;
+}
+
+header{
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    margin-bottom:20px;
+}
+
+a{
+
+    color:var(--muted);
+    text-decoration:none;
+}
+
+.card{
+
+    background:var(--card);
+
+    border-radius:14px;
+
+    padding:18px;
+
+    margin-bottom:16px;
+}
+
+.status{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    margin:8px 0;
+}
+
+.badge{
+
+    background:var(--green);
+
+    color:white;
+
+    border-radius:20px;
+
+    padding:3px 10px;
+
+    font-size:13px;
+}
+
+.device{
+
+    border-top:1px solid rgba(255,255,255,.08);
+
+    margin-top:10px;
+
+    padding-top:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<h2>🛜 Shelly</h2>
+
+<a href="/system">← Zurück</a>
+
+</header>
+
+
+<div class="card">
+
+<h3>Gateway</h3>
+
+<div class="status">
+
+<span>Status</span>
+
+<span class="badge">Nicht verbunden</span>
+
+</div>
+
+<div class="status">
+
+<span>IP</span>
+
+<span>—</span>
+
+</div>
+
+<div class="status">
+
+<span>Firmware</span>
+
+<span>—</span>
+
+</div>
+
+<div class="status">
+
+<span>Bluetooth</span>
+
+<span>—</span>
+
+</div>
+
+</div>
+
+
+
+<div class="card">
+
+<h3>BLU Geräte</h3>
+
+<div class="device">
+
+Noch keine Geräte gefunden.
+
+</div>
+
+</div>
+
+</body>
+</html>
