@@ -1,9 +1,8 @@
 from typing import Dict
-
 from .models import Device
 
 
-class DeviceManager:
+class HardwareManager:
 
     def __init__(self):
 
@@ -29,5 +28,9 @@ class DeviceManager:
 
         self.devices.clear()
 
+    def count(self):
 
-manager = DeviceManager()
+        return len(self.devices)
+
+
+manager = HardwareManager()
