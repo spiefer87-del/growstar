@@ -1,4 +1,5 @@
 from core.hardware.manager import manager
+from core.hardware.scanner import scanner
 
 
 class HardwareService:
