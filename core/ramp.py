@@ -25,6 +25,29 @@ def get_ramp_end_timestamp(end_min):
 
     return end_dt.timestamp()
 
+def _restart_ramp(current_temp, target_temp, end_min):
+    """
+    Startet eine bereits laufende Rampe
+    mit neuem Startwert neu.
+
+    Die Ziel-Uhrzeit bleibt erhalten.
+    """
+
+    state.ramp_start_ts = time.time()
+    state.ramp_end_ts = get_ramp_end_timestamp(end_min)
+
+    state.ramp_start_temp = float(current_temp)
+    state.ramp_target_temp = float(target_temp)
+
+    state.live_state["ramp_target"] = float(target_temp)
+
+    print(
+        f"🔁 RAMPE UPDATE "
+        f"{current_temp:.2f}°C → {target_temp:.2f}°C "
+        f"Ende "
+        f"{datetime.datetime.fromtimestamp(state.ramp_end_ts).strftime('%H:%M')}"
+    )
+
 # =========================================
 # 🌡️ RAMPE STARTEN
 # =========================================
@@ -135,19 +158,16 @@ def resync_active_ramp():
     profile = get_profile()
 
     if profile == "TAG":
-        new_target = float(config["DAY_TEMP"])
+        target = float(config["DAY_TEMP"])
+        end_min = int(config["DAY_START_MIN"])
     else:
-        new_target = float(config["NIGHT_TEMP"])
+        target = float(config["NIGHT_TEMP"])
+        end_min = int(config["NIGHT_START_MIN"])
 
-    state.ramp_start_ts = time.time()
-    state.ramp_start_temp = current
-    state.ramp_target_temp = new_target
-
-    state.live_state["ramp_target"] = new_target
-
-    print(
-        f"🔁 RAMPE RESYNC "
-        f"{current:.2f}°C → {new_target:.2f}°C"
+    _restart_ramp(
+        current,
+        target,
+        end_min,
     )
 
 
@@ -160,6 +180,11 @@ def update_ramp_duration():
     if not state.ramp_active:
         return
 
+    current = get_ramped_target()
+
+    if current is None:
+        return
+
     profile = get_profile()
 
     if profile == "TAG":
@@ -167,18 +192,10 @@ def update_ramp_duration():
     else:
         end_min = int(config["NIGHT_START_MIN"])
 
-    current = get_ramped_target()
-
-    if current is None:
-        return
-
-    state.ramp_start_ts = time.time()
-    state.ramp_start_temp = current
-    state.ramp_end_ts = get_ramp_end_timestamp(end_min)
-
-    print(
-        f"⏱️ RAMPE DAUER UPDATE "
-        f"Ende {datetime.datetime.fromtimestamp(state.ramp_end_ts).strftime('%H:%M')}"
+    _restart_ramp(
+        current,
+        state.ramp_target_temp,
+        end_min,
     )
 
 # =========================================
