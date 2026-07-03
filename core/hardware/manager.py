@@ -1,36 +1,52 @@
-from typing import Dict
-from .models import Device
-
-
 class HardwareManager:
 
     def __init__(self):
 
-        self.devices: Dict[str, Device] = {}
+        self.gateways = {}
 
-    def add(self, device: Device):
+        self.devices = {}
+
+        self.actuators = {}
+
+    # ---------- Gateways ----------
+
+    def add_gateway(self, gateway):
+
+        self.gateways[gateway.id] = gateway
+
+    def gateways_list(self):
+
+        return list(self.gateways.values())
+
+    # ---------- Geräte ----------
+
+    def add_device(self, device):
 
         self.devices[device.id] = device
 
-    def remove(self, device_id):
-
-        self.devices.pop(device_id, None)
-
-    def get(self, device_id):
-
-        return self.devices.get(device_id)
-
-    def all(self):
+    def devices_list(self):
 
         return list(self.devices.values())
 
+    # ---------- Aktoren ----------
+
+    def add_actuator(self, actuator):
+
+        self.actuators[actuator.id] = actuator
+
+    def actuators_list(self):
+
+        return list(self.actuators.values())
+
+    # ---------- Allgemein ----------
+
     def clear(self):
+
+        self.gateways.clear()
 
         self.devices.clear()
 
-    def count(self):
-
-        return len(self.devices)
+        self.actuators.clear()
 
 
 manager = HardwareManager()
