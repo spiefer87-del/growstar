@@ -101,6 +101,8 @@ def register(app):
     
     @app.route("/devices")
     def devices():
+
+        hardware.scan_gateways()
     
         return render_template(
             "devices.html",
