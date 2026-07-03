@@ -1,31 +1,27 @@
+from .mdns import ShellyMDNS
+from .network import ShellyNetwork
+
+
 class ShellyDiscovery:
 
-    def scan(self):
+    def __init__(self):
 
-        print(">>> Shelly Discovery")
+        self.mdns = ShellyMDNS()
+
+        self.network = ShellyNetwork()
+
+    def scan(self):
 
         gateways = []
 
         gateways.extend(
-            self.scan_mdns()
+            self.mdns.scan()
         )
 
         if not gateways:
 
             gateways.extend(
-                self.scan_network()
+                self.network.scan()
             )
 
         return gateways
-
-    def scan_mdns(self):
-
-        print("  -> mDNS Suche")
-
-        return []
-
-    def scan_network(self):
-
-        print("  -> Netzwerk Scan")
-
-        return []
