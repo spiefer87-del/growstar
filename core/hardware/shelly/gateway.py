@@ -1,4 +1,4 @@
-from core.devices.models import Device
+from core.hardware.models import Device
 
 from .api import ShellyAPI
 
