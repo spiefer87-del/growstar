@@ -1,26 +1,365 @@
-{% if devices %}
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Hardware</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+
+*,
+*::before,
+*::after{
+    box-sizing:border-box;
+}
+
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --accent:#22c55e;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+
+    --online:#16a34a;
+    --offline:#475569;
+}
+
+body{
+
+    margin:0;
+    padding:20px;
+
+    background:var(--bg);
+    color:var(--text);
+
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+}
+
+header{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:25px;
+}
+
+header h1{
+
+    margin:0;
+}
+
+.back{
+
+    text-decoration:none;
+
+    color:var(--muted);
+}
+
+h3{
+
+    margin:30px 0 12px;
+
+    color:var(--muted);
+
+    text-transform:uppercase;
+
+    letter-spacing:.08em;
+
+    font-size:.9rem;
+}
+
+.grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+
+    gap:18px;
+}
+
+.card{
+
+    background:var(--card);
+
+    border-radius:16px;
+
+    padding:20px;
+
+    box-shadow:0 10px 30px rgba(0,0,0,.30);
+}
+
+.card h2{
+
+    margin:0;
+
+    font-size:1rem;
+}
+
+.card .sub{
+
+    margin-top:6px;
+
+    color:var(--muted);
+
+    font-size:.85rem;
+}
+
+.button{
+
+    width:100%;
+
+    margin-top:18px;
+
+    padding:14px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:var(--accent);
+
+    color:white;
+
+    font-size:15px;
+
+    cursor:pointer;
+}
+
+.button:hover{
+
+    opacity:.9;
+}
+
+.badge{
+
+    display:inline-block;
+
+    margin-top:10px;
+
+    padding:6px 12px;
+
+    border-radius:999px;
+
+    font-size:.8rem;
+
+    font-weight:bold;
+}
+
+.online{
+
+    background:var(--online);
+}
+
+.offline{
+
+    background:var(--offline);
+}
+
+.debug{
+
+    display:grid;
+
+    grid-template-columns:repeat(2,1fr);
+
+    gap:12px;
+}
+
+.debug-value{
+
+    font-size:1.8rem;
+
+    font-weight:bold;
+}
+
+.empty{
+
+    color:var(--muted);
+
+    margin-top:10px;
+}
+
+@media(max-width:600px){
+
+    body{
+
+        padding:12px;
+    }
+
+    .grid{
+
+        grid-template-columns:1fr;
+    }
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+<h1>🛜 Hardware</h1>
+
+<a class="back" href="/system">← System</a>
+
+</header>
+
+
+
+
+
+<h3>Gateways</h3>
+
+<div class="grid">
+
+<div class="card">
+
+<h2>➕ Gateway hinzufügen</h2>
+
+<div class="sub">
+
+Verbinde ein Shelly Gateway oder später weitere Systeme.
+
+</div>
+
+<button id="scan-gateway" class="button">
+    Gateway suchen
+</button>
+
+</div>
+
+
+{% for gateway in gateways %}
+
+<div class="card">
+
+<h2>{{ gateway.name or gateway.model }}</h2>
+
+<div class="sub">
+
+{{ gateway.ip }}
+
+</div>
+
+{% if gateway.online %}
+
+<div class="badge online">
+
+Online
+
+</div>
+
+{% else %}
+
+<div class="badge offline">
+
+Offline
+
+</div>
+
+{% endif %}
+
+<div class="sub">
+
+Firmware {{ gateway.firmware }}
+
+</div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+
+
+
+
+
+<h3>Bluetooth Geräte</h3>
+
+<div class="grid">
+
+<div class="card">
+
+<h2>🔎 BLE Scan</h2>
+
+<div class="sub">
+
+Suche BLU Geräte über vorhandene Gateways.
+
+</div>
+
+<button id="scan-ble" class="button">
+    BLE Scan starten
+</button>
+
+</div>
+
 
 {% for device in devices %}
 
-<div class="device">
+<div class="card">
 
-    <div>
+<h2>{{ device.name }}</h2>
 
-        <div class="name">
-            {{ device.name or device.model }}
-        </div>
+<div class="sub">
 
-        <div class="info">
-            {{ device.ip }}
-        </div>
+{{ device.model }}
 
-    </div>
+</div>
 
-    {% if device.online %}
-        <span class="badge online">Online</span>
-    {% else %}
-        <span class="badge offline">Offline</span>
-    {% endif %}
+{% if device.online %}
+
+<div class="badge online">
+
+Verbunden
+
+</div>
+
+{% else %}
+
+<div class="badge offline">
+
+Nicht verbunden
+
+</div>
+
+{% endif %}
+
+</div>
+
+{% endfor %}
+
+</div>
+
+
+
+
+
+
+<h3>Aktoren</h3>
+
+<div class="grid">
+
+{% if actuators %}
+
+{% for actuator in actuators %}
+
+<div class="card">
+
+<h2>{{ actuator.name }}</h2>
+
+<div class="sub">
+
+{{ actuator.model }}
+
+</div>
 
 </div>
 
@@ -28,10 +367,100 @@
 
 {% else %}
 
-<div class="empty">
+<div class="card">
 
-Noch keine Geräte gefunden.
+<h2>Keine Aktoren</h2>
+
+<div class="sub">
+
+Zurzeit sind keine Aktoren vorhanden.
+
+</div>
 
 </div>
 
 {% endif %}
+
+</div>
+
+
+
+
+
+
+<h3>Hardware Status</h3>
+
+<div class="grid">
+
+<div class="card debug">
+
+<div>
+
+<div class="debug-value">
+
+{{ gateways|length }}
+
+</div>
+
+<div class="sub">
+
+Gateways
+
+</div>
+
+</div>
+
+<div>
+
+<div class="debug-value">
+
+{{ devices|length }}
+
+</div>
+
+<div class="sub">
+
+Bluetooth Geräte
+
+</div>
+
+</div>
+
+<div>
+
+<div class="debug-value">
+
+{{ actuators|length }}
+
+</div>
+
+<div class="sub">
+
+Aktoren
+
+</div>
+
+</div>
+
+<div>
+
+<div class="debug-value">
+
+Growstar
+
+</div>
+
+<div class="sub">
+
+Hardware Manager
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>
