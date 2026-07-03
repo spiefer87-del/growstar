@@ -5,18 +5,20 @@ class ShellyDiscovery:
 
     def __init__(self):
 
-        self.gateways = []
+        self.devices = {}
 
-    def add_gateway(self, ip):
+    def add(self, ip):
 
         gateway = ShellyGateway(ip)
 
-        if gateway.read_device_info():
+        if gateway.refresh():
 
-            self.gateways.append(gateway)
-
-            print(f"Gateway gefunden: {gateway.model}")
+            self.devices[ip] = gateway
 
             return gateway
 
         return None
+
+    def all(self):
+
+        return list(self.devices.values())
