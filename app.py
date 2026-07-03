@@ -39,6 +39,7 @@ from routes.device import register as register_device_routes
 from routes.config import register as register_config_routes
 from routes.profile import register as register_profile_routes
 from routes.watchdog import register as register_watchdog_routes
+from routes.hardware import register as register_hardware_routes
 
 init_db()
 init_diary_db()
@@ -81,6 +82,7 @@ register_device_routes(flask_app)
 register_config_routes(flask_app)
 register_profile_routes(flask_app)
 register_watchdog_routes(flask_app)
+register_hardware_routes(flask_app)
 
 
 
