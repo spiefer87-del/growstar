@@ -7,16 +7,21 @@ class ShellyDiscovery:
     def __init__(self):
 
         self.mdns = ShellyMDNS()
-
         self.network = ShellyNetwork()
 
     def scan(self):
 
+        print(">>> Shelly Discovery")
+
         gateways = []
 
-        gateways.extend(
-            self.mdns.scan()
-        )
+        for device in self.mdns.scan():
+
+            if "shelly" in device["name"].lower():
+
+                print(f"✔ Shelly erkannt: {device['ip']}")
+
+                gateways.append(device)
 
         if not gateways:
 
