@@ -8,37 +8,36 @@ class ShellyGateway:
         self.ip = ip
         self.api = ShellyAPI(ip)
 
-        self.model = None
-        self.firmware = None
+        self.online = False
 
-    def read_device_info(self):
+        self.name = ""
+        self.model = ""
+        self.mac = ""
+        self.firmware = ""
 
-        data = self.api.rpc("Shelly.GetDeviceInfo")
+        self.bluetooth = False
 
-        if not data:
+    def refresh(self):
+
+        info = self.api.get_device_info()
+
+        if not info:
+            self.online = False
             return False
 
-        self.model = data.get("model")
-        self.firmware = data.get("fw_id")
+        self.online = True
 
-        return True
+        self.name = info.get("name", "")
+        self.model = info.get("model", "")
+        self.mac = info.get("mac", "")
+        self.firmware = info.get("fw_id", "")
 
-    def read_config(self):
+        config = self.api.get_config()
 
-        return self.api.rpc("Shelly.GetConfig")
+        if config:
 
-    def enable_ble(self):
+            ble = config.get("ble", {})
 
-        config = self.read_config()
-
-        if not config:
-            return False
-
-        print("BLE-Konfiguration gelesen")
-
-        #
-        # Hier ergänzen wir später die RPC-Aufrufe,
-        # sobald wir die genaue Firmware kennen.
-        #
+            self.bluetooth = ble.get("enable", False)
 
         return True
