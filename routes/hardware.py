@@ -8,11 +8,16 @@ def register(app):
     @app.post("/api/hardware/scan")
     def hardware_scan():
 
-        print(">>> Hardware Scan angefordert")
-
-        hardware.scan_gateways()
+        found = hardware.scan_gateways()
 
         return jsonify({
+
             "success": True,
-            "gateways": len(hardware.gateways())
+
+            "found": found,
+
+            "gateways": len(
+                hardware.gateways()
+            )
+
         })
