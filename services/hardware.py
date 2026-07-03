@@ -1,28 +1,40 @@
 from core.hardware.manager import manager
-from core.hardware.shelly.discovery import ShellyDiscovery
 
 
 class HardwareService:
 
-    def __init__(self):
+    def gateways(self):
 
-        self.discovery = ShellyDiscovery()
-
-    def scan(self):
-
-        #
-        # Hier suchen wir später
-        #
-
-        pass
+        return manager.gateways_list()
 
     def devices(self):
 
-        return manager.all()
+        return manager.devices_list()
 
-    def count(self):
+    def actuators(self):
 
-        return manager.count()
+        return manager.actuators_list()
+
+    def refresh(self):
+
+        """
+        Wird später alle Hardware aktualisieren.
+        """
+        pass
+
+    def scan_gateways(self):
+
+        """
+        Netzwerk nach Gateways durchsuchen.
+        """
+        pass
+
+    def scan_ble(self):
+
+        """
+        Über vorhandene Gateways nach BLE-Geräten suchen.
+        """
+        pass
 
 
 hardware = HardwareService()
