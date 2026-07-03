@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Geräte</title>
+
+<style>
+
+:root{
+    --bg:#0f172a;
+    --card:#1e293b;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+    --green:#22c55e;
+    --red:#ef4444;
+}
+
+body{
+    margin:0;
+    padding:16px;
+    background:var(--bg);
+    color:var(--text);
+    font-family:system-ui,sans-serif;
+}
+
+header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:20px;
+}
+
+a{
+    color:var(--muted);
+    text-decoration:none;
+}
+
+.section{
+    margin-bottom:24px;
+}
+
+.card{
+    background:var(--card);
+    border-radius:16px;
+    padding:18px;
+    margin-top:12px;
+}
+
+.device{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 0;
+    border-bottom:1px solid rgba(255,255,255,.08);
+}
+
+.device:last-child{
+    border-bottom:none;
+}
+
+.badge{
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:13px;
+}
+
+.online{
+    background:#22c55e;
+    color:white;
+}
+
+.offline{
+    background:#ef4444;
+    color:white;
+}
+
+.empty{
+    text-align:center;
+    color:var(--muted);
+    padding:20px;
+}
+
+</style>
+</head>
+
+<body>
+
+<header>
+<h2>🛜 Geräte</h2>
+<a href="/system">← Zurück</a>
+</header>
+
+<div class="section">
+
+<h3>Gateways</h3>
+
+<div class="card">
+
+<div class="empty">
+Noch keine Gateways eingerichtet.
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<h3>Sensoren</h3>
+
+<div class="card">
+
+<div class="empty">
+Noch keine Sensoren gefunden.
+</div>
+
+</div>
+
+</div>
+
+<div class="section">
+
+<h3>Aktoren</h3>
+
+<div class="card">
+
+<div class="empty">
+Noch keine Aktoren vorhanden.
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>
