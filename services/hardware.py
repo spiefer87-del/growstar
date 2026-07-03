@@ -18,19 +18,3 @@ class HardwareService:
 
 
 hardware = HardwareService()
-
-from core.hardware.models import Device
-
-    demo = Device()
-    
-    demo.id = "demo"
-    
-    demo.name = "Shelly Plug S"
-    
-    demo.model = "SNPL-00112EU"
-    
-    demo.ip = "192.168.178.60"
-    
-    demo.online = True
-    
-    manager.add(demo)
