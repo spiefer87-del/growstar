@@ -8,6 +8,29 @@ from core.actuators import (
     get_shelly_relay_state,
 )
 
+from core.shelly.discovery import ShellyDiscovery
+
+class ShellyService:
+
+    def __init__(self):
+
+        self.discovery = ShellyDiscovery()
+
+    def add_gateway(self, ip):
+
+        gateway = self.discovery.add(ip)
+
+        if gateway:
+
+            print(f"[Shelly] {gateway.model} gefunden")
+
+        return gateway
+
+    def gateways(self):
+
+        return self.discovery.all()
+
+
 FAILSAFE_DEVICES = [
     ("heating", "IP_HEATING", "RELAY_HEATING"),
     ("fan", "IP_FAN", "RELAY_FAN"),
