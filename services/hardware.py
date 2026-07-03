@@ -8,13 +8,21 @@ class HardwareService:
 
         self.discovery = ShellyDiscovery()
 
-    def discover_shelly(self, ip):
+    def scan(self):
 
-        return self.discovery.add(ip)
+        #
+        # Hier suchen wir später
+        #
+
+        pass
 
     def devices(self):
 
         return manager.all()
+
+    def count(self):
+
+        return manager.count()
 
 
 hardware = HardwareService()
