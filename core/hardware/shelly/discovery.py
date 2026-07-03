@@ -1,18 +1,11 @@
-from core.hardware.manager import manager
+from core.hardware.registry import registry
 
-from .gateway import ShellyGateway
-
+registry.register_gateway_scanner(
+    ShellyDiscovery()
+)
 
 class ShellyDiscovery:
 
-    def add(self, ip):
+    def scan(self):
 
-        gateway = ShellyGateway(ip)
-
-        if gateway.refresh():
-
-            manager.add(gateway)
-
-            return gateway
-
-        return None
+        print("Shelly Discovery gestartet")
