@@ -116,48 +116,31 @@ def update_ramp():
 # =========================================
 
 def resync_active_ramp():
-    """
-    Wird aufgerufen wenn DAY_TEMP
-    oder NIGHT_TEMP während einer
-    laufenden Rampe geändert wurden.
-
-    Laufzeit bleibt identisch.
-    Aktueller Rampenwert bleibt erhalten.
-    """
 
     if not state.ramp_active:
         return
-
-    now = time.time()
 
     current = get_ramped_target()
 
     if current is None:
         return
 
-    remaining = state.ramp_end_ts - now
+    profile = get_profile()
 
-    if remaining <= 0:
-        return
-
-    if state.current_profile == "TAG":
-        new_target = float(config["NIGHT_TEMP"])
-    else:
+    if profile == "TAG":
         new_target = float(config["DAY_TEMP"])
+    else:
+        new_target = float(config["NIGHT_TEMP"])
 
-    state.ramp_start_ts = now
+    state.ramp_start_ts = time.time()
     state.ramp_start_temp = current
-
     state.ramp_target_temp = new_target
-
-    state.ramp_end_ts = now + remaining
 
     state.live_state["ramp_target"] = new_target
 
     print(
         f"🔁 RAMPE RESYNC "
-        f"{current:.1f}°C → {new_target:.1f}°C "
-        f"(Rest {remaining/60:.1f}min)"
+        f"{current:.2f}°C → {new_target:.2f}°C"
     )
 
 
@@ -166,62 +149,32 @@ def resync_active_ramp():
 # =========================================
 
 def update_ramp_duration():
-    """
-    Wenn RAMP_DURATION_MIN geändert wird,
-    wird die verbleibende Rampenzeit
-    proportional neu berechnet.
-
-    Der aktuelle Rampenwert springt dabei nicht.
-    """
 
     if not state.ramp_active:
         return
 
-    now = time.time()
+    current = get_ramped_target()
 
-    old_duration = (
-        state.ramp_end_ts -
-        state.ramp_start_ts
-    )
-
-    if old_duration <= 0:
+    if current is None:
         return
 
-    progress = (
-        (now - state.ramp_start_ts)
-        / old_duration
+    profile = get_profile()
+
+    if profile == "TAG":
+        end_min = int(config["DAY_START_MIN"])
+    else:
+        end_min = int(config["NIGHT_START_MIN"])
+
+    duration = int(config["RAMP_DURATION_MIN"])
+
+    start_ramp(
+        current,
+        state.ramp_target_temp,
+        duration,
+        end_min,
     )
 
-    progress = max(
-        0.0,
-        min(1.0, progress)
-    )
-
-    new_duration = (
-        float(config["RAMP_DURATION_MIN"])
-        * 60
-    )
-
-    remaining_fraction = (
-        1.0 - progress
-    )
-
-    remaining_seconds = (
-        new_duration
-        * remaining_fraction
-    )
-
-    state.ramp_end_ts = (
-        now
-        + remaining_seconds
-    )
-
-    print(
-        f"⏱️ RAMPE DAUER UPDATE "
-        f"neu={new_duration/60:.0f}min "
-        f"rest={remaining_seconds/60:.1f}min"
-    )
-
+    print("⏱️ Rampendauer aktualisiert")
 
 # =========================================
 # 🛑 RAMPE STOPPEN
