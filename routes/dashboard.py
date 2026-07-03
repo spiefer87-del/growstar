@@ -1,6 +1,9 @@
 from flask import render_template
 from services.hardware import hardware
 
+from core.hardware.manager import manager
+from core.hardware.models import Device
+
 
 def register(app):
 
@@ -100,8 +103,22 @@ def register(app):
         return render_template("watchdog.html")
     
     @app.route("/devices")
-    def devices():    
+    def devices():
+
+        # Demo nur erzeugen, wenn noch keine Geräte vorhanden
+        if not manager.all():
+    
+            demo = Device()
+    
+            demo.id = "demo"
+            demo.name = "Shelly Plug S"
+            demo.model = "SNPL-00112EU"
+            demo.ip = "192.168.178.60"
+            demo.online = True
+    
+            manager.add(demo)
+    
         return render_template(
             "devices.html",
-            devices=hardware.devices()
+            devices=manager.all()
         )
