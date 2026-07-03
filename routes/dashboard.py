@@ -1,9 +1,6 @@
 from flask import render_template
 from services.hardware import hardware
 
-from core.hardware.manager import manager
-from core.hardware.models import Device
-
 
 def register(app):
 
@@ -107,5 +104,7 @@ def register(app):
     
         return render_template(
             "devices.html",
-            devices=hardware.devices()
+            gateways=hardware.gateways(),
+            devices=hardware.devices(),
+            actuators=hardware.actuators(),
         )
