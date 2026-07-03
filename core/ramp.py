@@ -104,8 +104,10 @@ def update_ramp():
     if time.time() < state.ramp_end_ts:
         return
 
-    print(f"✅ RAMPE ENDE ({state.ramp_target_temp:.1f}°C)")
+    target = state.ramp_target_temp
 
+    print(f"✅ RAMPE ENDE ({target:.1f}°C)")
+    
     stop_ramp()
 
 
@@ -240,6 +242,7 @@ def stop_ramp():
 
     state.live_state["ramp_active"] = False
     state.live_state["ramp_target"] = None
+    state.live_state["temp_target"] = None
 
     print("🛑 RAMPE GESTOPPT")
 
