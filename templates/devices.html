@@ -1,304 +1,37 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
+{% if devices %}
 
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>Geräte</title>
-
-<style>
-
-:root{
-    --bg:#0f172a;
-    --card:#1e293b;
-    --text:#e5e7eb;
-    --muted:#94a3b8;
-    --accent:#22c55e;
-    --border:rgba(255,255,255,.08);
-}
-
-*{
-    box-sizing:border-box;
-}
-
-body{
-    margin:0;
-    padding:16px;
-    background:var(--bg);
-    color:var(--text);
-    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
-}
-
-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:24px;
-}
-
-header h1{
-    margin:0;
-    font-size:1.5rem;
-}
-
-header a{
-    color:var(--muted);
-    text-decoration:none;
-}
-
-.section{
-    margin-bottom:24px;
-}
-
-.section-title{
-    margin-bottom:12px;
-    font-size:1.1rem;
-    font-weight:600;
-}
-
-.card{
-
-    background:var(--card);
-
-    border-radius:16px;
-
-    padding:18px;
-
-    box-shadow:0 8px 24px rgba(0,0,0,.25);
-}
-
-.device{
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    padding:14px 0;
-
-    border-bottom:1px solid var(--border);
-}
-
-.device:last-child{
-
-    border-bottom:none;
-}
-
-.name{
-
-    font-size:1rem;
-
-    font-weight:600;
-}
-
-.info{
-
-    margin-top:4px;
-
-    color:var(--muted);
-
-    font-size:.85rem;
-}
-
-.badge{
-
-    padding:6px 12px;
-
-    border-radius:20px;
-
-    font-size:.8rem;
-
-    font-weight:bold;
-}
-
-.online{
-
-    background:#22c55e;
-    color:white;
-}
-
-.offline{
-
-    background:#ef4444;
-    color:white;
-}
-
-.empty{
-
-    text-align:center;
-
-    color:var(--muted);
-
-    padding:30px;
-}
-
-.button{
-
-    margin-top:18px;
-
-    width:100%;
-
-    padding:14px;
-
-    border:none;
-
-    border-radius:12px;
-
-    background:var(--accent);
-
-    color:white;
-
-    font-size:1rem;
-
-    cursor:pointer;
-}
-
-.button:hover{
-
-    opacity:.9;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<header>
-
-<h1>🛜 Geräte</h1>
-
-<a href="/system">← System</a>
-
-</header>
-
-
-<!-- Gateways -->
-
-<div class="section">
-
-<div class="section-title">
-
-Gateways
-
-</div>
-
-<div class="card">
+{% for device in devices %}
 
 <div class="device">
 
-<div>
+    <div>
 
-<div class="name">
+        <div class="name">
+            {{ device.name or device.model }}
+        </div>
 
-Noch keine Gateways
+        <div class="info">
+            {{ device.ip }}
+        </div>
 
-</div>
+    </div>
 
-<div class="info">
-
-Später erscheinen hier Shelly Gateways
-
-</div>
-
-</div>
-
-<span class="badge offline">
-
-Offline
-
-</span>
+    {% if device.online %}
+        <span class="badge online">Online</span>
+    {% else %}
+        <span class="badge offline">Offline</span>
+    {% endif %}
 
 </div>
 
-<button class="button">
+{% endfor %}
 
-🔍 Geräte suchen
-
-</button>
-
-</div>
-
-</div>
-
-
-
-<!-- Sensoren -->
-
-<div class="section">
-
-<div class="section-title">
-
-Sensoren
-
-</div>
-
-<div class="card">
+{% else %}
 
 <div class="empty">
 
-Keine Sensoren gefunden.
+Noch keine Geräte gefunden.
 
 </div>
 
-</div>
-
-</div>
-
-
-
-<!-- Aktoren -->
-
-<div class="section">
-
-<div class="section-title">
-
-Aktoren
-
-</div>
-
-<div class="card">
-
-<div class="empty">
-
-Keine Aktoren vorhanden.
-
-</div>
-
-</div>
-
-</div>
-
-
-
-<!-- Informationen -->
-
-<div class="section">
-
-<div class="section-title">
-
-Entwicklung
-
-</div>
-
-<div class="card">
-
-<div style="line-height:1.8">
-
-✔ Geräteverwaltung vorbereitet<br>
-✔ Gateways vorbereitet<br>
-✔ Sensorverwaltung vorbereitet<br>
-⏳ Shelly Discovery<br>
-⏳ BLU H&T<br>
-⏳ Automatische Erkennung
-
-</div>
-
-</div>
-
-</div>
-
-</body>
-</html>
+{% endif %}
