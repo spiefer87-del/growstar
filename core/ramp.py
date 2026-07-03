@@ -246,9 +246,23 @@ def stop_ramp():
 
     print("🛑 RAMPE GESTOPPT")
 
+def get_morning_ramp_start():
+    day_start = int(config["DAY_START_MIN"])
+    duration = int(config["RAMP_DURATION_MIN"])
+    return (day_start - duration) % 1440
+
+
+def get_evening_ramp_start():
+    night_start = int(config["NIGHT_START_MIN"])
+    duration = int(config["RAMP_DURATION_MIN"])
+    return (night_start - duration) % 1440
+
 def check_ramp_schedule():
 
     if not config.get("RAMP_ENABLED", 0):
+        return
+
+    if state.ramp_active:
         return
 
     now_min = minutes_now()
@@ -256,15 +270,11 @@ def check_ramp_schedule():
 
     day_start = int(config["DAY_START_MIN"])
     night_start = int(config["NIGHT_START_MIN"])
-    duration = int(config["RAMP_DURATION_MIN"])
 
-    evening_start = (night_start - duration) % 1440
-    morning_start = (day_start - duration) % 1440
+    morning_start = get_morning_ramp_start()
+    evening_start = get_evening_ramp_start()
 
-    # Bereits aktiv?
-    if state.ramp_active:
-        return
-
+    # 🌅 Morgenrampe
     if (
         now_min == morning_start
         and (
@@ -272,15 +282,19 @@ def check_ramp_schedule():
             or state.last_ramp_trigger_type != "morning"
         )
     ):
+
         start_ramp(
             float(config["NIGHT_TEMP"]),
             float(config["DAY_TEMP"]),
-            duration,
-            day_start
+            int(config["RAMP_DURATION_MIN"]),
+            day_start,
         )
+
         state.last_ramp_trigger_day = today
         state.last_ramp_trigger_type = "morning"
+        return
 
+    # 🌙 Abendrampe
     if (
         now_min == evening_start
         and (
@@ -288,12 +302,13 @@ def check_ramp_schedule():
             or state.last_ramp_trigger_type != "evening"
         )
     ):
+
         start_ramp(
             float(config["DAY_TEMP"]),
             float(config["NIGHT_TEMP"]),
-            duration,
-            night_start
+            int(config["RAMP_DURATION_MIN"]),
+            night_start,
         )
+
         state.last_ramp_trigger_day = today
         state.last_ramp_trigger_type = "evening"
-
