@@ -9,7 +9,21 @@ from core.config import config
 from core.helpers import minutes_now
 
 
+def get_ramp_end_timestamp(end_min):
 
+    now = datetime.datetime.now()
+
+    end_dt = now.replace(
+        hour=end_min // 60,
+        minute=end_min % 60,
+        second=0,
+        microsecond=0,
+    )
+
+    if end_dt <= now:
+        end_dt += datetime.timedelta(days=1)
+
+    return end_dt.timestamp()
 
 # =========================================
 # 🌡️ RAMPE STARTEN
@@ -19,21 +33,13 @@ def start_ramp(start_temp, target_temp, duration_min, end_min):
 
     now = time.time()
 
-    end_dt = datetime.datetime.now().replace(
-        hour=end_min // 60,
-        minute=end_min % 60,
-        second=0,
-        microsecond=0,
-    )
-
-    if end_dt.timestamp() <= now:
-        end_dt += datetime.timedelta(days=1)
+    
 
     state.ramp_active = True
 
     state.ramp_start_ts = now
-    state.ramp_end_ts = end_dt.timestamp()
-
+    
+    state.ramp_end_ts = get_ramp_end_timestamp(end_min)
     state.ramp_start_temp = float(start_temp)
     state.ramp_target_temp = float(target_temp)
 
@@ -43,7 +49,8 @@ def start_ramp(start_temp, target_temp, duration_min, end_min):
     print(
         f"🌡️ RAMPE START "
         f"{start_temp:.1f}°C → {target_temp:.1f}°C "
-        f"Ende {end_dt.strftime('%H:%M')}"
+        f"Ende "
+        f"{datetime.datetime.fromtimestamp(state.ramp_end_ts).strftime('%H:%M')}"
     )
 
 
@@ -153,11 +160,6 @@ def update_ramp_duration():
     if not state.ramp_active:
         return
 
-    current = get_ramped_target()
-
-    if current is None:
-        return
-
     profile = get_profile()
 
     if profile == "TAG":
@@ -165,16 +167,19 @@ def update_ramp_duration():
     else:
         end_min = int(config["NIGHT_START_MIN"])
 
-    duration = int(config["RAMP_DURATION_MIN"])
+    current = get_ramped_target()
 
-    start_ramp(
-        current,
-        state.ramp_target_temp,
-        duration,
-        end_min,
+    if current is None:
+        return
+
+    state.ramp_start_ts = time.time()
+    state.ramp_start_temp = current
+    state.ramp_end_ts = get_ramp_end_timestamp(end_min)
+
+    print(
+        f"⏱️ RAMPE DAUER UPDATE "
+        f"Ende {datetime.datetime.fromtimestamp(state.ramp_end_ts).strftime('%H:%M')}"
     )
-
-    print("⏱️ Rampendauer aktualisiert")
 
 # =========================================
 # 🛑 RAMPE STOPPEN
