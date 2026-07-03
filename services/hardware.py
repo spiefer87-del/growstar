@@ -24,8 +24,6 @@ class HardwareService:
         pass
 
     def scan_gateways(self):
-
-        print("HardwareService.scan_gateways()")
     
         scanner.scan_gateways()
 
