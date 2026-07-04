@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>{{ gateway.name }}</title>
+
+<style>
+
+:root{
+
+    --bg:#0f172a;
+    --card:#1e293b;
+    --accent:#22c55e;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+
+}
+
+body{
+
+    margin:0;
+    padding:20px;
+
+    background:var(--bg);
+
+    color:var(--text);
+
+    font-family:system-ui;
+
+}
+
+a{
+
+    color:var(--muted);
+
+    text-decoration:none;
+
+}
+
+.card{
+
+    background:var(--card);
+
+    border-radius:18px;
+
+    padding:24px;
+
+    margin-top:20px;
+
+}
+
+.grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+
+    gap:16px;
+
+}
+
+.value{
+
+    font-size:1.3rem;
+
+    font-weight:bold;
+
+    margin-top:8px;
+
+}
+
+.sub{
+
+    color:var(--muted);
+
+    margin-top:4px;
+
+}
+
+button{
+
+    width:100%;
+
+    padding:14px;
+
+    margin-top:12px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:#22c55e;
+
+    color:white;
+
+    font-size:1rem;
+
+    cursor:pointer;
+
+}
+
+.badge{
+
+    display:inline-block;
+
+    padding:6px 14px;
+
+    border-radius:999px;
+
+    background:#16a34a;
+
+    margin-top:8px;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<a href="/devices">← Hardware</a>
+
+<h1>{{ gateway.name }}</h1>
+
+<div class="sub">
+
+{{ gateway.ip }}
+
+</div>
+
+
+<div class="card">
+
+<h2>Status</h2>
+
+<div class="grid">
+
+<div>
+
+<div class="sub">Status</div>
+
+<div class="value">
+
+{% if gateway.online %}
+
+<span class="badge">Online</span>
+
+{% else %}
+
+Offline
+
+{% endif %}
+
+</div>
+
+</div>
+
+<div>
+
+<div class="sub">Firmware</div>
+
+<div class="value">
+
+{{ gateway.firmware }}
+
+</div>
+
+</div>
+
+<div>
+
+<div class="sub">RSSI</div>
+
+<div class="value">
+
+{{ gateway.rssi }} dBm
+
+</div>
+
+</div>
+
+<div>
+
+<div class="sub">Uptime</div>
+
+<div class="value">
+
+{{ gateway.uptime }}
+
+</div>
+
+</div>
+
+<div>
+
+<div class="sub">Modell</div>
+
+<div class="value">
+
+{{ gateway.model }}
+
+</div>
+
+</div>
+
+<div>
+
+<div class="sub">MAC</div>
+
+<div class="value">
+
+{{ gateway.mac }}
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<div class="card">
+
+<h2>Gateway Aktionen</h2>
+
+<button>Gateway aktualisieren</button>
+
+<button>Bluetooth Scan</button>
+
+<button>Relais testen</button>
+
+<button>Neustarten</button>
+
+</div>
+
+
+
+<div class="card">
+
+<h2>Bluetooth Geräte</h2>
+
+<p>Noch keine Geräte gefunden.</p>
+
+<button>BLE Scan starten</button>
+
+</div>
+
+</body>
+</html>
