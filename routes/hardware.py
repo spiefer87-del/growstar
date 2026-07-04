@@ -94,3 +94,24 @@ def register(app):
         return jsonify({
             "success": bool(ok)
         })
+
+    @app.get("/api/hardware/<gateway_id>/methods")
+    def hardware_methods(gateway_id):
+    
+        methods = hardware.list_gateway_methods(
+            gateway_id
+        )
+    
+        if methods is None:
+    
+            return jsonify({
+                "success": False
+            }), 404
+    
+        return jsonify({
+    
+            "success": True,
+    
+            "methods": methods
+    
+        })
