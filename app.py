@@ -28,6 +28,7 @@ from services.shelly import sync_relay
 from threads.mqtt import mqtt_thread
 from threads.shelly import shelly_background_loop
 from threads.main import main_loop
+from threads.hardware import hardware_loop
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
@@ -100,6 +101,8 @@ threading.Thread(target=watchdog_loop, daemon=True).start()
 log_event("Watchdog Thread gestartet")
 threading.Thread(target=main_loop, daemon=True).start()
 print("🧠 Main Control Thread gestartet")
+threading.Thread(target=hardware_loop, daemon=True).start()
+print("🧠 Hardware Thread gestartet")
 
 print("🌱 Grow-Backend läuft")
 
