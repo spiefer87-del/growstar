@@ -7,30 +7,29 @@ class ShellyAPI:
 
         self.base = f"http://{ip}/rpc"
 
-    def call(self, method, params=None, timeout=3):
-
-        url = f"{self.base}/{method}"
+    def call(self, method, params=None):
 
         try:
 
-            r = requests.post(
-                url,
+            response = requests.post(
+                f"{self.base}/{method}",
                 json=params or {},
-                timeout=timeout
+                timeout=5
             )
 
-            r.raise_for_status()
+            response.raise_for_status()
 
-            return r.json()
+            return response.json()
+
+        except Exception as e:
+
+            print("RPC Fehler:", e)
+
+            return None
+
 
     def list_methods(self):
 
         return self.call(
             "Shelly.ListMethods"
         )
-
-        except Exception as e:
-
-            print(f"RPC Fehler: {e}")
-
-            return None
