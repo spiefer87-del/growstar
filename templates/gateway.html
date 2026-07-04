@@ -234,6 +234,10 @@ button{
     🔴 Bluetooth deaktivieren
 </button>
 
+<button id="methods-btn">
+    RPC Methoden anzeigen
+</button>
+
 <button>Relais testen</button>
 
 <button>Neustarten</button>
@@ -291,6 +295,29 @@ document
     );
 
     loadGateway();
+
+}
+
+document
+.getElementById("methods-btn")
+.addEventListener(
+    "click",
+    listMethods
+);
+
+async function listMethods(){
+
+    const response = await fetch(
+
+        "/api/hardware/" +
+        gatewayId +
+        "/methods"
+
+    );
+
+    const data = await response.json();
+
+    console.log(data);
 
 }
 
