@@ -20,15 +20,14 @@ class ShellyDiscovery:
 
             if "shelly" in device["name"].lower():
         
-                gateway = ShellyGateway(
-                    device["ip"]
-                )
-        
+                gateway = ShellyGateway(device["ip"])
+
                 gateway.id = device["ip"]
-        
-                gateway.name = device["name"]
-        
-                gateways.append(gateway)
+                
+                # Holt jetzt Modell, Firmware, MAC usw. per RPC
+                if gateway.refresh():
+                
+                    gateways.append(gateway)
 
         if not gateways:
 
