@@ -30,21 +30,25 @@ class Gateway(HardwareDevice):
     def to_dict(self):
 
         data = super().to_dict()
-
+    
         data.update({
-
+    
             "ip": self.ip,
-
+    
             "mac": self.mac,
-
+    
             "firmware": self.firmware,
-
+    
             "bluetooth": self.bluetooth,
-
+    
+            "bluetooth_enabled": self.bluetooth_enabled,
+    
+            "bluetooth_scanning": self.bluetooth_scanning,
+    
             "rssi": self.rssi,
-
+    
             "uptime": self.uptime
-
+    
         })
-
+    
         return data
