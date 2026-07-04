@@ -307,20 +307,19 @@ document
 
 async function listMethods(){
 
-    console.log("Button wurde geklickt");
-
     const response = await fetch(
         "/api/hardware/" + gatewayId + "/methods"
     );
 
-    console.log(response);
-
     const data = await response.json();
 
-    console.log(data);
+    const methods = data.methods.methods;
+
+    alert(
+        methods.join("\n")
+    );
 
 }
-
 
 async function refreshGateway(){
 
