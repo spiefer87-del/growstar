@@ -12,21 +12,37 @@ class HardwareService:
             ShellyDiscovery()
         )
 
-    def gateway(self, gateway_id):
-
-        return manager.gateway(gateway_id)
+    # ------------------------
+    # Gateway
+    # ------------------------
 
     def gateways(self):
 
         return manager.gateways_list()
 
+    def gateway(self, gateway_id):
+
+        return manager.gateway(gateway_id)
+
+    # ------------------------
+    # Devices
+    # ------------------------
+
     def devices(self):
 
         return manager.devices_list()
 
+    # ------------------------
+    # Aktoren
+    # ------------------------
+
     def actuators(self):
 
         return manager.actuators_list()
+
+    # ------------------------
+    # Gateway Scan
+    # ------------------------
 
     def scan_gateways(self):
 
@@ -38,31 +54,41 @@ class HardwareService:
 
         return len(gateways)
 
+    # ------------------------
+    # BLE
+    # ------------------------
+
     def scan_ble(self):
 
         pass
 
+    # ------------------------
+    # Refresh
+    # ------------------------
+
     def refresh_gateway(self, gateway_id):
 
         gateway = self.gateway(gateway_id)
-    
+
         if gateway is None:
             return None
-    
+
         gateway.refresh()
-    
+
         return gateway
-    
+
     def refresh(self):
 
         for gateway in self.gateways():
-    
+
             try:
-    
-                gateway.refresh()
-    
+
+                self.refresh_gateway(
+                    gateway.id
+                )
+
             except Exception as e:
-    
+
                 print(e)
 
 
