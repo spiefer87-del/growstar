@@ -123,12 +123,10 @@ button{
 
 <a href="/devices">← Hardware</a>
 
-<h1>{{ gateway.name }}</h1>
+<h1 id="gateway-name">{{ gateway.name }}</h1>
 
-<div class="sub">
-
+<div class="sub" id="gateway-ip">
 {{ gateway.ip }}
-
 </div>
 
 
@@ -142,16 +140,12 @@ button{
 
 <div class="sub">Status</div>
 
-<div class="value">
+<div class="value" id="gateway-online">
 
 {% if gateway.online %}
-
 <span class="badge">Online</span>
-
 {% else %}
-
 Offline
-
 {% endif %}
 
 </div>
@@ -162,7 +156,7 @@ Offline
 
 <div class="sub">Firmware</div>
 
-<div class="value">
+<div class="value" id="gateway-firmware">
 
 {{ gateway.firmware }}
 
@@ -174,7 +168,7 @@ Offline
 
 <div class="sub">RSSI</div>
 
-<div class="value">
+<div class="value" id="gateway-rssi">
 
 {{ gateway.rssi }} dBm
 
@@ -186,7 +180,7 @@ Offline
 
 <div class="sub">Uptime</div>
 
-<div class="value">
+<div class="value" id="gateway-uptime">
 
 {{ gateway.uptime }}
 
@@ -198,7 +192,7 @@ Offline
 
 <div class="sub">Modell</div>
 
-<div class="value">
+<div class="value" id="gateway-model">
 
 {{ gateway.model }}
 
@@ -210,7 +204,7 @@ Offline
 
 <div class="sub">MAC</div>
 
-<div class="value">
+<div class="value" id="gateway-mac">
 
 {{ gateway.mac }}
 
@@ -277,11 +271,64 @@ async function refreshGateway(){
 
     if(data.success){
 
-        location.reload();
+        updateGateway(data.gateway);
+    
+    }
+
+}
+
+function updateGateway(gateway){
+
+    document.getElementById("gateway-name").textContent =
+        gateway.name;
+
+    document.getElementById("gateway-ip").textContent =
+        gateway.ip;
+
+    document.getElementById("gateway-firmware").textContent =
+        gateway.firmware;
+
+    document.getElementById("gateway-rssi").textContent =
+        gateway.rssi + " dBm";
+
+    document.getElementById("gateway-uptime").textContent =
+        gateway.uptime;
+
+    document.getElementById("gateway-model").textContent =
+        gateway.model;
+
+    document.getElementById("gateway-mac").textContent =
+        gateway.mac;
+
+    document.getElementById("gateway-online").innerHTML =
+        gateway.online
+            ? '<span class="badge">Online</span>'
+            : 'Offline';
+
+}
+
+async function loadGateway(){
+
+    const response = await fetch("/api/hardware");
+
+    const data = await response.json();
+
+    const gateway = data.gateways.find(
+        g => g.id === gatewayId
+    );
+
+    if(gateway){
+
+        updateGateway(gateway);
 
     }
 
 }
+
+loadGateway();
+
+setInterval(loadGateway,5000);
+
 </script>
 </body>
 </html>
