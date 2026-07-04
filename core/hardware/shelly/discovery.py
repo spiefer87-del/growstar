@@ -1,5 +1,6 @@
 from .mdns import ShellyMDNS
 from .network import ShellyNetwork
+from .gateway import ShellyGateway
 
 
 class ShellyDiscovery:
@@ -18,10 +19,16 @@ class ShellyDiscovery:
         for device in self.mdns.scan():
 
             if "shelly" in device["name"].lower():
-
-                print(f"✔ Shelly erkannt: {device['ip']}")
-
-                gateways.append(device)
+        
+                gateway = ShellyGateway(
+                    device["ip"]
+                )
+        
+                gateway.id = device["ip"]
+        
+                gateway.name = device["name"]
+        
+                gateways.append(gateway)
 
         if not gateways:
 
