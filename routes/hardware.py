@@ -76,3 +76,21 @@ def register(app):
             "gateway": gateway.to_dict()
         
         })
+
+    @app.post("/api/hardware/<gateway_id>/bluetooth/enable")
+    def enable_bt(gateway_id):
+    
+        ok = hardware.enable_bluetooth(gateway_id)
+    
+        return jsonify({
+            "success": bool(ok)
+        })
+
+    @app.post("/api/hardware/<gateway_id>/bluetooth/disable")
+    def disable_bt(gateway_id):
+    
+        ok = hardware.disable_bluetooth(gateway_id)
+    
+        return jsonify({
+            "success": bool(ok)
+        })
