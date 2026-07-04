@@ -102,10 +102,12 @@ class ShellyGateway(Gateway):
                 "config": {
                     "enable": True
                 }
-            )
+            }
+    
+        )
     
     def disable_bluetooth(self):
-    
+
         return self.api.call(
     
             "Bluetooth.SetConfig",
@@ -114,4 +116,6 @@ class ShellyGateway(Gateway):
                 "config": {
                     "enable": False
                 }
-            )
+            }
+    
+        )
