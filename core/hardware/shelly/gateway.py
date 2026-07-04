@@ -54,6 +54,59 @@ class ShellyGateway(Gateway):
 
         self.firmware = info.get("fw_id", "")
 
+        methods = self.list_methods()
+
+        if methods:
+        
+            self.methods = methods.get(
+                "methods",
+                []
+            )
+        
+            self.capabilities = {
+        
+                "ble":
+                    self.supports(
+                        "BLE.GetStatus"
+                    ),
+        
+                "ble_config":
+                    self.supports(
+                        "BLE.SetConfig"
+                    ),
+        
+                "ble_pairing":
+                    self.supports(
+                        "BLE.StartPairing"
+                    ),
+        
+                "bthome":
+                    self.supports(
+                        "BTHome.GetStatus"
+                    ),
+        
+                "bthome_discovery":
+                    self.supports(
+                        "BTHome.StartDeviceDiscovery"
+                    ),
+        
+                "matter":
+                    self.supports(
+                        "Matter.GetStatus"
+                    ),
+        
+                "knx":
+                    self.supports(
+                        "KNX.GetStatus"
+                    ),
+        
+                "scripts":
+                    self.supports(
+                        "Script.List"
+                    )
+        
+            }
+
         # --------------------------
         # Status laden
         # --------------------------
