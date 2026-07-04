@@ -12,6 +12,10 @@ class HardwareService:
             ShellyDiscovery()
         )
 
+    def gateway(self, gateway_id):
+
+        return manager.gateway(gateway_id)
+
     def gateways(self):
 
         return manager.gateways_list()
@@ -38,6 +42,17 @@ class HardwareService:
 
         pass
 
+    def refresh_gateway(self, gateway_id):
+
+        gateway = self.gateway(gateway_id)
+    
+        if gateway is None:
+            return None
+    
+        gateway.refresh()
+    
+        return gateway
+    
     def refresh(self):
 
         for gateway in self.gateways():
