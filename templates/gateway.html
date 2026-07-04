@@ -307,13 +307,13 @@ document
 
 async function listMethods(){
 
+    console.log("Button wurde geklickt");
+
     const response = await fetch(
-
-        "/api/hardware/" +
-        gatewayId +
-        "/methods"
-
+        "/api/hardware/" + gatewayId + "/methods"
     );
+
+    console.log(response);
 
     const data = await response.json();
 
