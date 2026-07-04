@@ -258,6 +258,42 @@ document
 .getElementById("refresh-btn")
 .addEventListener("click", refreshGateway);
 
+document
+.getElementById("bt-enable")
+.onclick = async ()=>{
+
+    await fetch(
+
+        "/api/hardware/" +
+        gatewayId +
+        "/bluetooth/enable",
+
+        {method:"POST"}
+
+    );
+
+    loadGateway();
+
+}
+
+document
+.getElementById("bt-disable")
+.onclick = async ()=>{
+
+    await fetch(
+
+        "/api/hardware/" +
+        gatewayId +
+        "/bluetooth/disable",
+
+        {method:"POST"}
+
+    );
+
+    loadGateway();
+
+}
+
 
 async function refreshGateway(){
 
