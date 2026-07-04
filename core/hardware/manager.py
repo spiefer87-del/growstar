@@ -18,6 +18,10 @@ class HardwareManager:
 
         return list(self.gateways.values())
 
+    def gateway(self, gateway_id):
+
+        return self.gateways.get(gateway_id)
+
     # ---------- Geräte ----------
 
     def add_device(self, device):
