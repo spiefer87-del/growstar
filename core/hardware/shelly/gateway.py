@@ -87,3 +87,31 @@ class ShellyGateway(Gateway):
         return self.api.call(
             "Shelly.GetStatus"
         )
+
+    # --------------------------
+    # Bluetooth Setup
+    # --------------------------
+
+    def enable_bluetooth(self):
+
+        return self.api.call(
+    
+            "Bluetooth.SetConfig",
+    
+            {
+                "config": {
+                    "enable": True
+                }
+            )
+    
+    def disable_bluetooth(self):
+    
+        return self.api.call(
+    
+            "Bluetooth.SetConfig",
+    
+            {
+                "config": {
+                    "enable": False
+                }
+            )
