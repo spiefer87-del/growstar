@@ -79,16 +79,18 @@ class HardwareService:
 
     def refresh(self):
 
+        print("Hardware Refresh")
+    
         for gateway in self.gateways():
-
+    
             try:
-
+    
                 self.refresh_gateway(
                     gateway.id
                 )
-
+    
             except Exception as e:
-
+    
                 print(e)
 
 
