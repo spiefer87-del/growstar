@@ -340,23 +340,57 @@ document
 async function listMethods(){
 
     const response = await fetch(
-
-        "/api/hardware/" +
-        gatewayId +
-        "/methods"
-
+        "/api/hardware/" + gatewayId + "/methods"
     );
 
     const data = await response.json();
 
     const methods = data.methods.methods;
 
+    const groups = {};
+
+    methods.forEach(method=>{
+
+        const parts = method.split(".");
+
+        const group = parts[0];
+
+        const name = parts.slice(1).join(".");
+
+        if(!groups[group]){
+
+            groups[group] = [];
+
+        }
+
+        groups[group].push(name);
+
+    });
+
+    let text = "";
+
+    Object.keys(groups)
+        .sort()
+        .forEach(group=>{
+
+            text += group + "\n";
+            text += "────────────────────────\n";
+
+            groups[group]
+                .sort()
+                .forEach(name=>{
+
+                    text += "• " + name + "\n";
+
+                });
+
+            text += "\n";
+
+        });
+
     showDialog(
-
         "RPC Methoden",
-
-        methods.join("\n")
-
+        text
     );
 
 }
