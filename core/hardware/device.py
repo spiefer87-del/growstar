@@ -17,3 +17,21 @@ class HardwareDevice:
     online: bool = False
 
     properties: dict = field(default_factory=dict)
+
+    def to_dict(self):
+
+        return {
+
+            "id": self.id,
+
+            "name": self.name,
+
+            "manufacturer": self.manufacturer,
+
+            "model": self.model,
+
+            "type": self.type,
+
+            "online": self.online
+
+        }
