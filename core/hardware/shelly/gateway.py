@@ -22,14 +22,33 @@ class ShellyGateway(Gateway):
         self.uptime = None
 
 
-    # --------------------------
-    # Gerät aktualisieren
-    # --------------------------
+    
 
     # --------------------------
     # Gerät aktualisieren
     # --------------------------
+    def build_capabilities(self):
 
+        self.capabilities = {
+    
+            "ble": self.supports("BLE.GetStatus"),
+    
+            "ble_config": self.supports("BLE.SetConfig"),
+    
+            "ble_pairing": self.supports("BLE.StartPairing"),
+    
+            "bthome": self.supports("BTHome.GetStatus"),
+    
+            "bthome_discovery": self.supports("BTHome.StartDeviceDiscovery"),
+    
+            "matter": self.supports("Matter.GetStatus"),
+    
+            "knx": self.supports("KNX.GetStatus"),
+    
+            "scripts": self.supports("Script.List")
+    
+        }
+    
     def refresh(self):
 
         info = self.api.call("Shelly.GetDeviceInfo")
@@ -54,58 +73,18 @@ class ShellyGateway(Gateway):
 
         self.firmware = info.get("fw_id", "")
 
-        methods = self.list_methods()
+        if not self.methods:
 
-        if methods:
+            methods = self.list_methods()
         
-            self.methods = methods.get(
-                "methods",
-                []
-            )
+            if methods:
         
-            self.capabilities = {
+                self.methods = methods.get(
+                    "methods",
+                    []
+                )
         
-                "ble":
-                    self.supports(
-                        "BLE.GetStatus"
-                    ),
-        
-                "ble_config":
-                    self.supports(
-                        "BLE.SetConfig"
-                    ),
-        
-                "ble_pairing":
-                    self.supports(
-                        "BLE.StartPairing"
-                    ),
-        
-                "bthome":
-                    self.supports(
-                        "BTHome.GetStatus"
-                    ),
-        
-                "bthome_discovery":
-                    self.supports(
-                        "BTHome.StartDeviceDiscovery"
-                    ),
-        
-                "matter":
-                    self.supports(
-                        "Matter.GetStatus"
-                    ),
-        
-                "knx":
-                    self.supports(
-                        "KNX.GetStatus"
-                    ),
-        
-                "scripts":
-                    self.supports(
-                        "Script.List"
-                    )
-        
-            }
+                self.build_capabilities()
 
         # --------------------------
         # Status laden
