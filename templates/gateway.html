@@ -255,6 +255,38 @@ button{
 <button>BLE Scan starten</button>
 
 </div>
+
+<div
+id="dialog"
+class="dialog">
+
+    <div class="dialog-card">
+
+        <div
+        id="dialog-title"
+        class="dialog-title">
+
+        </div>
+
+        <div
+        id="dialog-content"
+        class="dialog-content">
+
+        </div>
+
+        <button
+        id="dialog-close"
+        class="dialog-close">
+
+            Schließen
+
+        </button>
+
+    </div>
+
+</div>
+
+    
 <script>
 const gatewayId = "{{ gateway_id }}";
 
@@ -308,15 +340,23 @@ document
 async function listMethods(){
 
     const response = await fetch(
-        "/api/hardware/" + gatewayId + "/methods"
+
+        "/api/hardware/" +
+        gatewayId +
+        "/methods"
+
     );
 
     const data = await response.json();
 
     const methods = data.methods.methods;
 
-    alert(
+    showDialog(
+
+        "RPC Methoden",
+
         methods.join("\n")
+
     );
 
 }
@@ -381,6 +421,33 @@ function updateGateway(gateway){
 
 }
 
+function showDialog(title, text){
+
+    document.getElementById("dialog-title")
+        .textContent = title;
+
+    document.getElementById("dialog-content")
+        .textContent = text;
+
+    document.getElementById("dialog")
+        .style.display = "flex";
+
+}
+
+function closeDialog(){
+
+    document.getElementById("dialog")
+        .style.display = "none";
+
+}
+
+document
+.getElementById("dialog-close")
+.addEventListener(
+    "click",
+    closeDialog
+);
+    
 async function loadGateway(){
 
     const response = await fetch(
