@@ -526,6 +526,20 @@ async function scanGateways(){
 
 }
 
+
+async function loadHardware(){
+
+    const data = await fetch("/api/hardware")
+        .then(r => r.json());
+
+    console.log(data);
+
+}
+
+loadHardware();
+
+setInterval(loadHardware,5000);
+
 </script>
 </body>
 </html>
