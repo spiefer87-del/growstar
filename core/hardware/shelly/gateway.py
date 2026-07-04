@@ -119,3 +119,7 @@ class ShellyGateway(Gateway):
             }
     
         )
+
+    def list_methods(self):
+
+        return self.api.list_methods()
