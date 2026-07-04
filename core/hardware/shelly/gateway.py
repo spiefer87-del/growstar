@@ -96,7 +96,7 @@ class ShellyGateway(Gateway):
 
         return self.api.call(
     
-            "Bluetooth.SetConfig",
+            "BLE.SetConfig",
     
             {
                 "config": {
@@ -110,7 +110,7 @@ class ShellyGateway(Gateway):
 
         return self.api.call(
     
-            "Bluetooth.SetConfig",
+            "BLE.SetConfig",
     
             {
                 "config": {
