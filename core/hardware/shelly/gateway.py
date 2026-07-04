@@ -26,6 +26,10 @@ class ShellyGateway(Gateway):
     # Gerät aktualisieren
     # --------------------------
 
+    # --------------------------
+    # Gerät aktualisieren
+    # --------------------------
+
     def refresh(self):
 
         info = self.api.call("Shelly.GetDeviceInfo")
@@ -50,33 +54,45 @@ class ShellyGateway(Gateway):
 
         self.firmware = info.get("fw_id", "")
 
-        # ← HIER kommt Schritt 3 ins Spiel
+        # --------------------------
+        # Status laden
+        # --------------------------
+
         status = self.get_status()
 
         if status:
-        
-            ble = status.get("ble", {})
-            bthome = status.get("bthome", {})
-        
-            # Dieses Gateway besitzt Bluetooth
-            self.bluetooth = (
-                "ble" in status or
-                "bthome" in status
-            )
-        
-            errors = bthome.get("errors", [])
-        
-            self.bluetooth_enabled = (
-                "bluetooth_disabled" not in errors
-            )
-        
+
             wifi = status.get("wifi", {})
+
             self.rssi = wifi.get("rssi")
+
+            self.uptime = status.get(
+                "sys",
+                {}
+            ).get("uptime")
+
+        # --------------------------
+        # BLE Konfiguration laden
+        # --------------------------
+
+        ble = self.get_ble_config()
+
+        if ble:
         
-            self.uptime = status.get("sys", {}).get("uptime")
+            self.bluetooth = True
+        
+            self.bluetooth_enabled = ble.get(
+                "enable",
+                False
+            )
+        
+        else:
+        
+            self.bluetooth = False
+        
+            self.bluetooth_enabled = False
 
         return True
-
 
     # --------------------------
     # Shelly Status
