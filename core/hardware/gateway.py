@@ -25,23 +25,13 @@ class Gateway(HardwareDevice):
 
     def to_dict(self):
 
-        return {
+        data = super().to_dict()
 
-            "id": self.id,
-
-            "name": self.name,
-
-            "type": self.type,
-
-            "manufacturer": self.manufacturer,
-
-            "model": self.model,
+        data.update({
 
             "ip": self.ip,
 
             "mac": self.mac,
-
-            "online": self.online,
 
             "firmware": self.firmware,
 
@@ -51,4 +41,6 @@ class Gateway(HardwareDevice):
 
             "uptime": self.uptime
 
-        }
+        })
+
+        return data
