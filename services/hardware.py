@@ -104,5 +104,12 @@ class HardwareService:
 
     def disable_bluetooth(self, gateway_id):
 
+        gateway = manager.gateway(gateway_id)
+    
+        if gateway is None:
+            return False
+    
+        return gateway.disable_bluetooth()
+
 
 hardware = HardwareService()
