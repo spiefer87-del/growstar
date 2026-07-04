@@ -1,5 +1,6 @@
 from core.hardware.gateway import Gateway
 from .api import ShellyAPI
+from .models import MODEL_NAMES
 
 
 class ShellyGateway(Gateway):
@@ -29,9 +30,12 @@ class ShellyGateway(Gateway):
 
         self.id = self.ip
 
-        self.name = info.get("name") or info.get("model") or self.ip
-
         self.model = info.get("model", "")
+
+        self.name = MODEL_NAMES.get(
+            self.model,
+            self.model
+        )
 
         self.mac = info.get("mac", "")
 
