@@ -148,6 +148,22 @@ button{
 
 <div>
 
+    <div class="sub">
+        Bluetooth
+    </div>
+
+    <div
+        class="value"
+        id="gateway-bluetooth">
+
+        --
+
+    </div>
+
+</div>
+
+<div>
+
 <div class="sub">Firmware</div>
 
 <div class="value" id="gateway-firmware">
@@ -288,6 +304,12 @@ function updateGateway(gateway){
         gateway.online
             ? '<span class="badge">Online</span>'
             : 'Offline';
+
+    document.getElementById("gateway-bluetooth").innerHTML =
+
+        gateway.bluetooth_enabled
+            ? '<span class="badge">🟢 Aktiv</span>'
+            : '<span class="badge" style="background:#dc2626">🔴 Deaktiviert</span>';
 
 }
 
