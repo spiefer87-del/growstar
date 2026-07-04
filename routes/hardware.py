@@ -39,6 +39,25 @@ def register(app):
 
         })
 
+    @app.get("/api/hardware/<gateway_id>")
+    def hardware_gateway(gateway_id):
+    
+        gateway = hardware.gateway(gateway_id)
+    
+        if gateway is None:
+    
+            return jsonify({
+                "success": False
+            }), 404
+    
+        return jsonify({
+    
+            "success": True,
+    
+            "gateway": gateway.to_dict()
+    
+        })
+    
     @app.post("/api/hardware/<gateway_id>/refresh")
     def refresh_gateway(gateway_id):
         
