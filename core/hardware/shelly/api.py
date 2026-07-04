@@ -5,8 +5,6 @@ class ShellyAPI:
 
     def __init__(self, ip):
 
-        self.ip = ip
-
         self.base = f"http://{ip}/rpc"
 
     def call(self, method, params=None, timeout=3):
@@ -15,18 +13,18 @@ class ShellyAPI:
 
         try:
 
-            response = requests.post(
+            r = requests.post(
                 url,
                 json=params or {},
                 timeout=timeout
             )
 
-            response.raise_for_status()
+            r.raise_for_status()
 
-            return response.json()
+            return r.json()
 
         except Exception as e:
 
-            print(f"Shelly RPC Fehler {self.ip}: {e}")
+            print(f"RPC Fehler: {e}")
 
             return None
