@@ -230,7 +230,7 @@ button{
 
 </div>
 <script>
-const gatewayId = "{{ gateway.id }}";
+const gatewayId = "{{ gateway_id }}";
 
 document
 .getElementById("refresh-btn")
@@ -270,13 +270,13 @@ function updateGateway(gateway){
         gateway.ip;
 
     document.getElementById("gateway-firmware").textContent =
-        gateway.firmware;
+        gateway.firmware || "--";
 
     document.getElementById("gateway-rssi").textContent =
-        gateway.rssi + " dBm";
+        (gateway.rssi ?? "--") + " dBm";
 
     document.getElementById("gateway-uptime").textContent =
-        gateway.uptime;
+        gateway.uptime ?? "--";
 
     document.getElementById("gateway-model").textContent =
         gateway.model;
@@ -293,17 +293,15 @@ function updateGateway(gateway){
 
 async function loadGateway(){
 
-    const response = await fetch("/api/hardware");
+    const response = await fetch(
+        "/api/hardware/" + gatewayId
+    );
 
     const data = await response.json();
 
-    const gateway = data.gateways.find(
-        g => g.id === gatewayId
-    );
+    if(data.success){
 
-    if(gateway){
-
-        updateGateway(gateway);
+        updateGateway(data.gateway);
 
     }
 
