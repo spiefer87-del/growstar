@@ -1,4 +1,5 @@
 from core.hardware.gateway import Gateway
+
 from .api import ShellyAPI
 from .models import MODEL_NAMES
 
@@ -17,6 +18,14 @@ class ShellyGateway(Gateway):
 
         self.bluetooth = False
 
+        self.rssi = None
+        self.uptime = None
+
+
+    # --------------------------
+    # Gerät aktualisieren
+    # --------------------------
+
     def refresh(self):
 
         info = self.api.call("Shelly.GetDeviceInfo")
@@ -27,16 +36,6 @@ class ShellyGateway(Gateway):
             return False
 
         self.online = True
-
-        status = self.get_status()
-
-        if status:
-        
-            wifi = status.get("wifi", {})
-        
-            self.rssi = wifi.get("rssi")
-        
-            self.uptime = status.get("sys", {}).get("uptime")
 
         self.id = self.ip
 
@@ -51,4 +50,26 @@ class ShellyGateway(Gateway):
 
         self.firmware = info.get("fw_id", "")
 
+        # ← HIER kommt Schritt 3 ins Spiel
+        status = self.get_status()
+
+        if status:
+
+            wifi = status.get("wifi", {})
+
+            self.rssi = wifi.get("rssi")
+
+            self.uptime = status.get("sys", {}).get("uptime")
+
         return True
+
+
+    # --------------------------
+    # Shelly Status
+    # --------------------------
+
+    def get_status(self):
+
+        return self.api.call(
+            "Shelly.GetStatus"
+        )
