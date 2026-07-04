@@ -235,16 +235,19 @@ Verbinde ein Shelly Gateway oder später weitere Systeme.
 
 
 {% for gateway in gateways %}
+<a href="/devices/{{ gateway.id }}" class="card-link">
+    
+    <div class="card">
+    
+    <h2>{{ gateway.name or gateway.model }}</h2>
+    
+    <div class="sub">
+    
+    {{ gateway.ip }}
+    
+    </div>
 
-<div class="card">
-
-<h2>{{ gateway.name or gateway.model }}</h2>
-
-<div class="sub">
-
-{{ gateway.ip }}
-
-</div>
+</a>
 
 {% if gateway.online %}
 
