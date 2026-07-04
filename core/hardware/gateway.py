@@ -18,6 +18,10 @@ class Gateway(HardwareDevice):
 
         self.bluetooth = False
 
+        self.bluetooth_enabled = False
+        
+        self.bluetooth_scanning = False
+
         self.rssi = None
 
         self.uptime = None
