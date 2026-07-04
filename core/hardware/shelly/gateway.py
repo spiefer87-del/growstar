@@ -116,31 +116,33 @@ class ShellyGateway(Gateway):
 
     def enable_bluetooth(self):
 
-        return self.api.call(
-    
+        result = self.api.call(
             "BLE.SetConfig",
-    
             {
                 "config": {
                     "enable": True
                 }
             }
-    
         )
+    
+        self.refresh()
+    
+        return result
     
     def disable_bluetooth(self):
 
-        return self.api.call(
-    
+        result = self.api.call(
             "BLE.SetConfig",
-    
             {
                 "config": {
                     "enable": False
                 }
             }
-    
         )
+    
+        self.refresh()
+    
+        return result
 
     def list_methods(self):
 
