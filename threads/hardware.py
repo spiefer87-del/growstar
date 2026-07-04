@@ -1,20 +1,14 @@
 import time
 
-from core.hardware.manager import manager
+from services.hardware import hardware
 
 
 def hardware_loop():
 
+    print("Hardware Thread gestartet")
+
     while True:
 
-        for gateway in manager.gateways_list():
-
-            try:
-
-                gateway.refresh()
-
-            except Exception as e:
-
-                print(e)
+        hardware.refresh()
 
         time.sleep(30)
