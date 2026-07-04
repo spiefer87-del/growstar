@@ -108,12 +108,7 @@ def register(app):
     @app.route("/devices/<gateway_id>")
     def gateway_page(gateway_id):
     
-        gateway = manager.gateway(gateway_id)
-    
-        if gateway is None:
-            abort(404)
-    
         return render_template(
             "gateway.html",
-            gateway=gateway
+            gateway_id=gateway_id
         )
