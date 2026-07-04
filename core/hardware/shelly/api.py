@@ -23,6 +23,12 @@ class ShellyAPI:
 
             return r.json()
 
+    def list_methods(self):
+
+        return self.call(
+            "Shelly.ListMethods"
+        )
+
         except Exception as e:
 
             print(f"RPC Fehler: {e}")
