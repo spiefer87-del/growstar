@@ -93,5 +93,16 @@ class HardwareService:
     
                 print(e)
 
+    def enable_bluetooth(self, gateway_id):
+    
+        gateway = manager.gateway(gateway_id)
+    
+        if gateway is None:
+            return False
+    
+        return gateway.enable_bluetooth()
+
+    def disable_bluetooth(self, gateway_id):
+
 
 hardware = HardwareService()
