@@ -53,6 +53,18 @@ class ShellyGateway(Gateway):
         # ← HIER kommt Schritt 3 ins Spiel
         status = self.get_status()
 
+        ble = status.get("ble", {})
+
+        bthome = status.get("bthome", {})
+        
+        self.bluetooth = True
+        
+        errors = bthome.get("errors", [])
+        
+        self.bluetooth_enabled = (
+            "bluetooth_disabled" not in errors
+        )
+
         if status:
 
             wifi = status.get("wifi", {})
