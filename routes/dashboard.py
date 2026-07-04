@@ -103,15 +103,7 @@ def register(app):
     
     @app.route("/devices")
     def devices():
-
-        hardware.scan_gateways()
-    
-        return render_template(
-            "devices.html",
-            gateways=hardware.gateways(),
-            devices=hardware.devices(),
-            actuators=hardware.actuators(),
-        )
+        return render_template("devices.html")
 
     @app.route("/devices/<gateway_id>")
     def gateway_page(gateway_id):
