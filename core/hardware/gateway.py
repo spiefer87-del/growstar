@@ -26,6 +26,10 @@ class Gateway(HardwareDevice):
 
         self.uptime = None
 
+        self.methods = []
+
+        self.capabilities = {}
+
 
     def to_dict(self):
 
@@ -47,8 +51,17 @@ class Gateway(HardwareDevice):
     
             "rssi": self.rssi,
     
-            "uptime": self.uptime
+            "uptime": self.uptime,
+
+            "methods": self.methods,
+
+            "capabilities": self.capabilities
+
     
         })
     
         return data
+
+    def supports(self, method):
+
+        return method in self.methods
