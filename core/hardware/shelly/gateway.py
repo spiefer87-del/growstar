@@ -88,6 +88,12 @@ class ShellyGateway(Gateway):
             "Shelly.GetStatus"
         )
 
+    def get_ble_config(self):
+
+        return self.api.call(
+            "BLE.GetConfig"
+        )
+
     # --------------------------
     # Bluetooth Setup
     # --------------------------
