@@ -1,5 +1,7 @@
 from core.hardware.gateway import Gateway
 
+from .api import ShellyAPI
+
 
 class ShellyGateway(Gateway):
 
@@ -9,8 +11,28 @@ class ShellyGateway(Gateway):
 
         self.ip = ip
 
-        self.manufacturer = "Shelly"
+        self.api = ShellyAPI(ip)
 
-        self.bluetooth = True
+        self.bluetooth = False
+
+def refresh(self):
+
+    info = self.api.call("Shelly.GetDeviceInfo")
+
+    if not info:
 
         self.online = False
+
+        return False
+
+    self.online = True
+
+    self.name = info.get("name") or info.get("model")
+
+    self.model = info.get("model")
+
+    self.mac = info.get("mac")
+
+    self.firmware = info.get("fw_id")
+
+    return True
