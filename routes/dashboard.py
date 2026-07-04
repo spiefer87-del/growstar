@@ -1,5 +1,7 @@
 from flask import render_template
 from services.hardware import hardware
+from flask import abort
+from core.hardware.manager import manager
 
 
 def register(app):
@@ -109,4 +111,17 @@ def register(app):
             gateways=hardware.gateways(),
             devices=hardware.devices(),
             actuators=hardware.actuators(),
+        )
+
+    @app.route("/devices/<gateway_id>")
+    def gateway_page(gateway_id):
+    
+        gateway = manager.gateway(gateway_id)
+    
+        if gateway is None:
+            abort(404)
+    
+        return render_template(
+            "gateway.html",
+            gateway=gateway
         )
