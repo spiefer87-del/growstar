@@ -53,6 +53,8 @@ class ShellyGateway(Gateway):
         # ← HIER kommt Schritt 3 ins Spiel
         status = self.get_status()
 
+        print(status)
+
         if status:
 
             wifi = status.get("wifi", {})
