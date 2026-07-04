@@ -40,7 +40,15 @@ class HardwareService:
 
     def refresh(self):
 
-        pass
+        for gateway in self.gateways():
+    
+            try:
+    
+                gateway.refresh()
+    
+            except Exception as e:
+    
+                print(e)
 
 
 hardware = HardwareService()
