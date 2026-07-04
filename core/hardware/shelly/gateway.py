@@ -28,6 +28,16 @@ class ShellyGateway(Gateway):
 
         self.online = True
 
+        status = self.get_status()
+
+        if status:
+        
+            wifi = status.get("wifi", {})
+        
+            self.rssi = wifi.get("rssi")
+        
+            self.uptime = status.get("sys", {}).get("uptime")
+
         self.id = self.ip
 
         self.model = info.get("model", "")
