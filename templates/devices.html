@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
+
 <meta charset="UTF-8">
-<title>Hardware</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Hardware</title>
 
 <style>
 
@@ -14,6 +16,7 @@
 }
 
 :root{
+
     --bg:#0f172a;
     --card:#1e293b;
     --accent:#22c55e;
@@ -22,6 +25,7 @@
 
     --online:#16a34a;
     --offline:#475569;
+
 }
 
 body{
@@ -30,9 +34,11 @@ body{
     padding:20px;
 
     background:var(--bg);
+
     color:var(--text);
 
     font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+
 }
 
 header{
@@ -44,23 +50,26 @@ header{
     align-items:center;
 
     margin-bottom:25px;
+
 }
 
 header h1{
 
     margin:0;
+
 }
 
 .back{
 
+    color:var(--muted);
+
     text-decoration:none;
 
-    color:var(--muted);
 }
 
 h3{
 
-    margin:30px 0 12px;
+    margin:32px 0 14px;
 
     color:var(--muted);
 
@@ -69,15 +78,17 @@ h3{
     letter-spacing:.08em;
 
     font-size:.9rem;
+
 }
 
 .grid{
 
     display:grid;
 
-    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
 
     gap:18px;
+
 }
 
 .card{
@@ -89,6 +100,15 @@ h3{
     padding:20px;
 
     box-shadow:0 10px 30px rgba(0,0,0,.30);
+
+}
+
+.card-link{
+
+    color:inherit;
+
+    text-decoration:none;
+
 }
 
 .card h2{
@@ -96,15 +116,17 @@ h3{
     margin:0;
 
     font-size:1rem;
+
 }
 
-.card .sub{
+.sub{
 
     margin-top:6px;
 
     color:var(--muted);
 
     font-size:.85rem;
+
 }
 
 .button{
@@ -123,21 +145,23 @@ h3{
 
     color:white;
 
+    cursor:pointer;
+
     font-size:15px;
 
-    cursor:pointer;
 }
 
 .button:hover{
 
     opacity:.9;
+
 }
 
 .badge{
 
     display:inline-block;
 
-    margin-top:10px;
+    margin-top:12px;
 
     padding:6px 12px;
 
@@ -146,16 +170,19 @@ h3{
     font-size:.8rem;
 
     font-weight:bold;
+
 }
 
 .online{
 
     background:var(--online);
+
 }
 
 .offline{
 
     background:var(--offline);
+
 }
 
 .debug{
@@ -164,7 +191,8 @@ h3{
 
     grid-template-columns:repeat(2,1fr);
 
-    gap:12px;
+    gap:16px;
+
 }
 
 .debug-value{
@@ -172,13 +200,7 @@ h3{
     font-size:1.8rem;
 
     font-weight:bold;
-}
 
-.empty{
-
-    color:var(--muted);
-
-    margin-top:10px;
 }
 
 @media(max-width:600px){
@@ -186,11 +208,7 @@ h3{
     body{
 
         padding:12px;
-    }
 
-    .grid{
-
-        grid-template-columns:1fr;
     }
 
 }
@@ -205,17 +223,19 @@ h3{
 
 <h1>🛜 Hardware</h1>
 
-<a class="back" href="/system">← System</a>
+<a class="back" href="/system">
+
+← System
+
+</a>
 
 </header>
 
 
 
-
-
 <h3>Gateways</h3>
 
-<div class="grid">
+<div class="grid" id="gateway-grid">
 
 <div class="card">
 
@@ -223,183 +243,41 @@ h3{
 
 <div class="sub">
 
-Verbinde ein Shelly Gateway oder später weitere Systeme.
+Suche automatisch nach Shelly Gateways.
 
 </div>
 
-<button id="scan-gateway" class="button">
-    Gateway suchen
+<button
+id="scan-gateway"
+class="button">
+
+Gateway suchen
+
 </button>
 
 </div>
 
-
-{% for gateway in gateways %}
-<a href="/devices/{{ gateway.id }}" class="card-link">
-    
-    <div class="card">
-    
-    <h2>{{ gateway.name or gateway.model }}</h2>
-    
-    <div class="sub">
-    
-    {{ gateway.ip }}
-    
-    </div>
-
-</a>
-
-{% if gateway.online %}
-
-<div class="badge online">
-
-Online
-
 </div>
-
-{% else %}
-
-<div class="badge offline">
-
-Offline
-
-</div>
-
-{% endif %}
-
-<div class="sub">
-
-Firmware {{ gateway.firmware }}
-
-</div>
-
-<div class="sub">
-
-RSSI {{ gateway.rssi }} dBm
-
-</div>
-
-<div class="sub">
-
-Uptime {{ gateway.uptime }}
-
-</div>
-
-</div>
-
-{% endfor %}
-
-</div>
-
-
-
 
 
 
 <h3>Bluetooth Geräte</h3>
 
-<div class="grid">
-
-<div class="card">
-
-<h2>🔎 BLE Scan</h2>
-
-<div class="sub">
-
-Suche BLU Geräte über vorhandene Gateways.
+<div
+class="grid"
+id="device-grid">
 
 </div>
-
-<button id="scan-ble" class="button">
-    BLE Scan starten
-</button>
-
-</div>
-
-
-{% for device in devices %}
-
-<div class="card">
-
-<h2>{{ device.name }}</h2>
-
-<div class="sub">
-
-{{ device.model }}
-
-</div>
-
-{% if device.online %}
-
-<div class="badge online">
-
-Verbunden
-
-</div>
-
-{% else %}
-
-<div class="badge offline">
-
-Nicht verbunden
-
-</div>
-
-{% endif %}
-
-</div>
-
-{% endfor %}
-
-</div>
-
-
-
 
 
 
 <h3>Aktoren</h3>
 
-<div class="grid">
-
-{% if actuators %}
-
-{% for actuator in actuators %}
-
-<div class="card">
-
-<h2>{{ actuator.name }}</h2>
-
-<div class="sub">
-
-{{ actuator.model }}
+<div
+class="grid"
+id="actuator-grid">
 
 </div>
-
-</div>
-
-{% endfor %}
-
-{% else %}
-
-<div class="card">
-
-<h2>Keine Aktoren</h2>
-
-<div class="sub">
-
-Zurzeit sind keine Aktoren vorhanden.
-
-</div>
-
-</div>
-
-{% endif %}
-
-</div>
-
-
-
 
 
 
@@ -407,13 +285,17 @@ Zurzeit sind keine Aktoren vorhanden.
 
 <div class="grid">
 
-<div class="card debug">
+<div class="card">
+
+<div class="debug">
 
 <div>
 
-<div class="debug-value">
+<div
+id="gateway-count"
+class="debug-value">
 
-{{ gateways|length }}
+0
 
 </div>
 
@@ -427,9 +309,11 @@ Gateways
 
 <div>
 
-<div class="debug-value">
+<div
+id="device-count"
+class="debug-value">
 
-{{ devices|length }}
+0
 
 </div>
 
@@ -443,9 +327,11 @@ Bluetooth Geräte
 
 <div>
 
-<div class="debug-value">
+<div
+id="actuator-count"
+class="debug-value">
 
-{{ actuators|length }}
+0
 
 </div>
 
@@ -477,19 +363,16 @@ Hardware Manager
 
 </div>
 
+</div>
+
+
+
 <script>
-
-document
-.getElementById("scan-gateway")
-.addEventListener("click", scanGateways);
-
-
 async function scanGateways(){
 
     const btn = document.getElementById("scan-gateway");
 
     btn.disabled = true;
-
     btn.innerText = "Suche...";
 
     try{
@@ -503,12 +386,11 @@ async function scanGateways(){
 
         const data = await response.json();
 
-        console.log(data);
-
         alert(
-            data.found +
-            " neues Gateway gefunden."
+            data.found + " Gateway(s) gefunden."
         );
+
+        loadHardware();
 
     }
 
@@ -516,30 +398,240 @@ async function scanGateways(){
 
         console.error(err);
 
-        alert("Hardware Scan fehlgeschlagen.");
+        alert("Gateway Scan fehlgeschlagen.");
 
     }
 
     btn.disabled = false;
-
     btn.innerText = "Gateway suchen";
 
 }
 
 
+
 async function loadHardware(){
 
-    const data = await fetch("/api/hardware")
-        .then(r => r.json());
+    try{
 
-    console.log(data);
+        const response = await fetch("/api/hardware");
+
+        const data = await response.json();
+
+        renderGateways(data.gateways);
+
+        renderDevices(data.devices);
+
+        renderActuators(data.actuators);
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+    }
 
 }
+
+
+
+function renderGateways(gateways){
+
+    const grid =
+        document.getElementById("gateway-grid");
+
+    // erste Karte behalten
+    const firstCard = grid.firstElementChild;
+
+    grid.innerHTML = "";
+
+    grid.appendChild(firstCard);
+
+    gateways.forEach(gateway=>{
+
+        const card = document.createElement("a");
+
+        card.href = "/devices/" + gateway.id;
+
+        card.className = "card-link";
+
+        card.innerHTML = `
+
+            <div class="card">
+
+                <h2>${gateway.name}</h2>
+
+                <div class="sub">
+
+                    ${gateway.ip}
+
+                </div>
+
+                <div class="badge ${gateway.online ? "online":"offline"}">
+
+                    ${gateway.online ? "Online":"Offline"}
+
+                </div>
+
+                <div class="sub">
+
+                    Firmware ${gateway.firmware}
+
+                </div>
+
+                <div class="sub">
+
+                    RSSI ${gateway.rssi ?? "--"} dBm
+
+                </div>
+
+                <div class="sub">
+
+                    Uptime ${gateway.uptime ?? "--"}
+
+                </div>
+
+            </div>
+
+        `;
+
+        grid.appendChild(card);
+
+    });
+
+    document.getElementById("gateway-count")
+        .textContent = gateways.length;
+
+}
+
+
+
+function renderDevices(devices){
+
+    const grid =
+        document.getElementById("device-grid");
+
+    grid.innerHTML = "";
+
+    if(devices.length===0){
+
+        grid.innerHTML = `
+
+            <div class="card">
+
+                <h2>Noch keine Bluetooth Geräte</h2>
+
+                <div class="sub">
+
+                    Starte später einen BLE Scan.
+
+                </div>
+
+            </div>
+
+        `;
+
+    }
+
+    devices.forEach(device=>{
+
+        grid.innerHTML += `
+
+            <div class="card">
+
+                <h2>${device.name}</h2>
+
+                <div class="sub">
+
+                    ${device.model}
+
+                </div>
+
+                <div class="badge ${device.online ? "online":"offline"}">
+
+                    ${device.online ? "Verbunden":"Offline"}
+
+                </div>
+
+            </div>
+
+        `;
+
+    });
+
+    document.getElementById("device-count")
+        .textContent = devices.length;
+
+}
+
+
+
+function renderActuators(actuators){
+
+    const grid =
+        document.getElementById("actuator-grid");
+
+    grid.innerHTML = "";
+
+    if(actuators.length===0){
+
+        grid.innerHTML = `
+
+            <div class="card">
+
+                <h2>Keine Aktoren</h2>
+
+                <div class="sub">
+
+                    Zurzeit sind keine Aktoren vorhanden.
+
+                </div>
+
+            </div>
+
+        `;
+
+    }
+
+    actuators.forEach(actuator=>{
+
+        grid.innerHTML += `
+
+            <div class="card">
+
+                <h2>${actuator.name}</h2>
+
+                <div class="sub">
+
+                    ${actuator.model}
+
+                </div>
+
+            </div>
+
+        `;
+
+    });
+
+    document.getElementById("actuator-count")
+        .textContent = actuators.length;
+
+}
+
+
+
+document
+.getElementById("scan-gateway")
+.addEventListener(
+    "click",
+    scanGateways
+);
 
 loadHardware();
 
 setInterval(loadHardware,5000);
 
 </script>
+
 </body>
 </html>
