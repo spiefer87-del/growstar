@@ -21,3 +21,16 @@ def register(app):
             )
 
         })
+
+    @app.route("/devices/<gateway_id>")
+    def gateway_details(gateway_id):
+    
+        gateway = manager.gateway(gateway_id)
+    
+        if not gateway:
+            abort(404)
+    
+        return render_template(
+            "gateway.html",
+            gateway=gateway
+        )
