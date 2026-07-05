@@ -30,23 +30,40 @@ class ShellyGateway(Gateway):
     def build_capabilities(self):
 
         self.capabilities = {
-    
+
+            # Bluetooth
             "ble": self.supports("BLE.GetStatus"),
-    
             "ble_config": self.supports("BLE.SetConfig"),
-    
             "ble_pairing": self.supports("BLE.StartPairing"),
-    
+        
+            # BTHome
             "bthome": self.supports("BTHome.GetStatus"),
-    
             "bthome_discovery": self.supports("BTHome.StartDeviceDiscovery"),
-    
+            "bthome_learning": self.supports("BTHomeControl.StartLearning"),
+        
+            # Matter
             "matter": self.supports("Matter.GetStatus"),
-    
+        
+            # KNX
             "knx": self.supports("KNX.GetStatus"),
-    
-            "scripts": self.supports("Script.List")
-    
+        
+            # Scripts
+            "scripts": self.supports("Script.List"),
+        
+            # Scheduler
+            "schedule": self.supports("Schedule.List"),
+        
+            # WLAN
+            "wifi_scan": self.supports("Wifi.Scan"),
+        
+            # OTA
+            "ota": self.supports("OTA.Update"),
+        
+            # Switch
+            "switch": self.supports("Switch.Toggle"),
+        
+            # Cloud
+            "cloud": self.supports("Cloud.GetStatus")
         }
     
     def refresh(self):
