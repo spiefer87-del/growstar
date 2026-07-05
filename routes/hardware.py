@@ -123,40 +123,57 @@ def register(app):
             gateway_id
         )
     
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "BLE Scan konnte nicht gestartet werden.",
+                "result": None
+            })
+    
         return jsonify({
-    
-            "success": result is not None,
-    
+            "success": True,
             "result": result
-    
         })
-
+    
+    
     @app.get("/api/hardware/<gateway_id>/ble/status")
     def ble_status(gateway_id):
     
-        status = hardware.ble_status(
+        status = hardware.get_ble_status(
             gateway_id
         )
     
+        if status is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "BLE Status konnte nicht geladen werden.",
+                "status": None
+            })
+    
         return jsonify({
-    
-            "success": status is not None,
-    
+            "success": True,
             "status": status
-    
         })
-
+    
+    
     @app.get("/api/hardware/<gateway_id>/ble/objects")
     def ble_objects(gateway_id):
     
-        objects = hardware.ble_objects(
+        objects = hardware.get_ble_objects(
             gateway_id
         )
     
+        if objects is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "BLE Objekte konnten nicht geladen werden.",
+                "objects": None
+            })
+    
         return jsonify({
-    
-            "success": objects is not None,
-    
+            "success": True,
             "objects": objects
-    
         })
