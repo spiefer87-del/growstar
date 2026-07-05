@@ -539,20 +539,12 @@ async function startBleScan(){
 
         const statusData = await statusResponse.json();
 
-        const objectsResponse = await fetch(
-            "/api/hardware/" +
-            gatewayId +
-            "/ble/objects"
-        );
-
-        const objectsData = await objectsResponse.json();
-
         showDialog(
             "BLE Scan Ergebnis",
             JSON.stringify(
                 {
                     status: statusData,
-                    objects: objectsData
+                    message: "Scan beendet. Geräte-Events bauen wir als nächsten Schritt ein."
                 },
                 null,
                 2
@@ -573,7 +565,6 @@ async function startBleScan(){
     }
 
 }
-
 //
 // ----------------------------------------------------
 // Initialisierung
