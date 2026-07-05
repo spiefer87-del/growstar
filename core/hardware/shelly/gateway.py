@@ -164,6 +164,17 @@ class ShellyGateway(Gateway):
     # --------------------------
     
     def start_device_discovery(self):
+
+        print("Gateway:", self.name)
+
+        print("Methoden:", self.methods)
+    
+        print(
+            "Discovery:",
+            self.supports(
+                "BTHome.StartDeviceDiscovery"
+            )
+        )
     
         if not self.supports(
             "BTHome.StartDeviceDiscovery"
