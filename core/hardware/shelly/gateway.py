@@ -165,10 +165,6 @@ class ShellyGateway(Gateway):
     
     def start_device_discovery(self):
 
-        status = gateway.get_bthome_status()
-
-        print(status)
-
         if not self.supports(
             "BTHome.StartDeviceDiscovery"
         ):
