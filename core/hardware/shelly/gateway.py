@@ -165,16 +165,20 @@ class ShellyGateway(Gateway):
     
     def start_device_discovery(self):
 
-        print("Discovery supported:",
-              self.supports("BTHome.StartDeviceDiscovery"))
+        status = gateway.get_bthome_status()
+
+        print(status)
+
+        if not self.supports(
+            "BTHome.StartDeviceDiscovery"
+        ):
+            return None
     
-        result = self.api.call(
+        self.api.call(
             "BTHome.StartDeviceDiscovery"
         )
     
-        print("RPC Result:", result)
-    
-        return result
+        return self.get_bthome_status()
 
     def get_bthome_status(self):
 
