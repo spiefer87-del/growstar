@@ -472,43 +472,91 @@ async function listMethods(){
 // ----------------------------------------------------
 // BLE Scan
 // ----------------------------------------------------
+function wait(ms){
+
+    return new Promise(
+        resolve => setTimeout(
+            resolve,
+            ms
+        )
+    );
+
+}
 
 async function startBleScan(){
 
     try{
 
-        const response = await fetch(
-
-            "/api/hardware/" +
-
-            gatewayId +
-
-            "/ble/scan",
-
-            {
-
-                method:"POST"
-
-            }
-
+        showDialog(
+            "BLE Scan",
+            "Scan wird gestartet..."
         );
 
-        const data = await response.json();
+        const scanResponse = await fetch(
+            "/api/hardware/" +
+            gatewayId +
+            "/ble/scan",
+            {
+                method:"POST"
+            }
+        );
+
+        const scanData = await scanResponse.json();
+
+        if(!scanData.success){
+
+            showDialog(
+                "BLE Scan",
+                JSON.stringify(
+                    scanData,
+                    null,
+                    2
+                )
+            );
+
+            return;
+        }
+
+        const duration =
+            scanData.result?.discovery?.duration || 30;
 
         showDialog(
-
             "BLE Scan",
+            "Scan läuft...\n\nDauer: " +
+            duration +
+            " Sekunden\n\nBitte warten."
+        );
 
+        await wait(
+            (duration + 2) * 1000
+        );
+
+        const statusResponse = await fetch(
+            "/api/hardware/" +
+            gatewayId +
+            "/ble/status"
+        );
+
+        const statusData = await statusResponse.json();
+
+        const objectsResponse = await fetch(
+            "/api/hardware/" +
+            gatewayId +
+            "/ble/objects"
+        );
+
+        const objectsData = await objectsResponse.json();
+
+        showDialog(
+            "BLE Scan Ergebnis",
             JSON.stringify(
-
-                data,
-
+                {
+                    status: statusData,
+                    objects: objectsData
+                },
                 null,
-
                 2
-
             )
-
         );
 
     }
@@ -516,6 +564,11 @@ async function startBleScan(){
     catch(err){
 
         console.error(err);
+
+        showDialog(
+            "BLE Scan Fehler",
+            String(err)
+        );
 
     }
 
