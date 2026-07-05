@@ -48,6 +48,8 @@ class Gateway(HardwareDevice):
             "bluetooth_enabled": self.bluetooth_enabled,
     
             "bluetooth_scanning": self.bluetooth_scanning,
+
+            "bluetooth_scan": self.bluetooth_scan,
     
             "rssi": self.rssi,
     
