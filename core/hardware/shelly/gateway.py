@@ -160,6 +160,45 @@ class ShellyGateway(Gateway):
         )
 
     # --------------------------
+    # BTHome Discovery
+    # --------------------------
+    
+    def start_device_discovery(self):
+    
+        if not self.supports(
+            "BTHome.StartDeviceDiscovery"
+        ):
+            return None
+    
+        self.bluetooth_scanning = True
+    
+        return self.api.call(
+            "BTHome.StartDeviceDiscovery"
+        )
+
+    def get_bthome_status(self):
+
+        if not self.supports(
+            "BTHome.GetStatus"
+        ):
+            return None
+    
+        return self.api.call(
+            "BTHome.GetStatus"
+        )
+
+    def get_bthome_objects(self):
+
+        if not self.supports(
+            "BTHome.GetObjectInfos"
+        ):
+            return None
+    
+        return self.api.call(
+            "BTHome.GetObjectInfos"
+        )
+
+    # --------------------------
     # Bluetooth Setup
     # --------------------------
 
