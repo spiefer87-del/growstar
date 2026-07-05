@@ -120,5 +120,41 @@ class HardwareService:
     
         return gateway.list_methods()
 
+    def start_ble_scan(self, gateway_id):
+
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return None
+    
+        return gateway.start_device_discovery()
+
+    def ble_status(self, gateway_id):
+
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return None
+    
+        return gateway.get_bthome_status()
+
+    def ble_objects(self, gateway_id):
+
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return None
+    
+        return gateway.get_bthome_objects()
+
 
 hardware = HardwareService()
