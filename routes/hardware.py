@@ -115,3 +115,48 @@ def register(app):
             "methods": methods
     
         })
+
+    @app.post("/api/hardware/<gateway_id>/ble/scan")
+    def ble_scan(gateway_id):
+    
+        result = hardware.start_ble_scan(
+            gateway_id
+        )
+    
+        return jsonify({
+    
+            "success": result is not None,
+    
+            "result": result
+    
+        })
+
+    @app.get("/api/hardware/<gateway_id>/ble/status")
+    def ble_status(gateway_id):
+    
+        status = hardware.ble_status(
+            gateway_id
+        )
+    
+        return jsonify({
+    
+            "success": status is not None,
+    
+            "status": status
+    
+        })
+
+    @app.get("/api/hardware/<gateway_id>/ble/objects")
+    def ble_objects(gateway_id):
+    
+        objects = hardware.ble_objects(
+            gateway_id
+        )
+    
+        return jsonify({
+    
+            "success": objects is not None,
+    
+            "objects": objects
+    
+        })
