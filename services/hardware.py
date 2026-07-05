@@ -131,9 +131,10 @@ class HardwareService:
             return None
     
         return gateway.start_device_discovery()
-
-    def ble_status(self, gateway_id):
-
+    
+    
+    def get_ble_status(self, gateway_id):
+    
         gateway = manager.gateway(
             gateway_id
         )
@@ -143,9 +144,10 @@ class HardwareService:
             return None
     
         return gateway.get_bthome_status()
-
-    def ble_objects(self, gateway_id):
-
+    
+    
+    def get_ble_objects(self, gateway_id):
+    
         gateway = manager.gateway(
             gateway_id
         )
@@ -153,6 +155,8 @@ class HardwareService:
         if gateway is None:
     
             return None
+    
+        return gateway.get_bthome_objects()
     
         return gateway.get_bthome_objects()
 
