@@ -17,6 +17,7 @@ class ShellyGateway(Gateway):
         self.manufacturer = "Shelly"
 
         self.bluetooth = False
+        self.bluetooth_scan = {}
 
         self.rssi = None
         self.uptime = None
@@ -174,7 +175,17 @@ class ShellyGateway(Gateway):
             "BTHome.StartDeviceDiscovery"
         )
     
-        return self.get_bthome_status()
+        status = self.get_bthome_status()
+    
+        if status:
+    
+            self.bluetooth_scan = status
+    
+            self.bluetooth_scanning = (
+                "discovery" in status
+            )
+    
+        return status
 
     def get_bthome_status(self):
 
@@ -183,9 +194,23 @@ class ShellyGateway(Gateway):
         ):
             return None
     
-        return self.api.call(
+        status = self.api.call(
             "BTHome.GetStatus"
         )
+    
+        if status:
+    
+            self.bluetooth_scan = status
+    
+            self.bluetooth_scanning = (
+                "discovery" in status
+            )
+    
+        else:
+    
+            self.bluetooth_scanning = False
+    
+        return status
 
     def get_bthome_objects(self):
 
@@ -197,7 +222,6 @@ class ShellyGateway(Gateway):
         return self.api.call(
             "BTHome.GetObjectInfos"
         )
-
     # --------------------------
     # Bluetooth Setup
     # --------------------------
