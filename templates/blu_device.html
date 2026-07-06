@@ -3,139 +3,691 @@
 
 <head>
 
-    <meta charset="UTF-8">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Bluetooth Gerät</title>
+<title>Bluetooth Gerät</title>
 
-    <link
-        rel="stylesheet"
-        href="/static/css/dialog.css">
+<link
+    rel="stylesheet"
+    href="/static/css/dialog.css">
+
+<style>
+
+*,
+*::before,
+*::after{
+    box-sizing:border-box;
+}
+
+:root{
+
+    --bg:#0f172a;
+    --card:#1e293b;
+    --card-soft:#263449;
+    --accent:#22c55e;
+    --text:#e5e7eb;
+    --muted:#94a3b8;
+
+    --online:#16a34a;
+    --offline:#475569;
+    --warning:#f59e0b;
+
+}
+
+body{
+
+    margin:0;
+    padding:20px;
+
+    background:var(--bg);
+
+    color:var(--text);
+
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+
+}
+
+header{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    margin-bottom:25px;
+
+}
+
+header h1{
+
+    margin:0;
+
+    font-size:1.6rem;
+
+}
+
+.back{
+
+    color:var(--muted);
+
+    text-decoration:none;
+
+}
+
+.back:hover{
+
+    color:var(--text);
+
+}
+
+.grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+
+    gap:18px;
+
+    margin-bottom:22px;
+
+}
+
+.card{
+
+    background:var(--card);
+
+    border-radius:16px;
+
+    padding:20px;
+
+    box-shadow:0 10px 30px rgba(0,0,0,.30);
+
+}
+
+.card h2{
+
+    margin:0 0 16px;
+
+    font-size:1rem;
+
+    color:var(--muted);
+
+    text-transform:uppercase;
+
+    letter-spacing:.08em;
+
+}
+
+.row{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    gap:16px;
+
+    padding:9px 0;
+
+    border-bottom:1px solid rgba(255,255,255,.06);
+
+}
+
+.row:last-child{
+
+    border-bottom:none;
+
+}
+
+.label{
+
+    color:var(--muted);
+
+    font-size:.9rem;
+
+}
+
+.value{
+
+    text-align:right;
+
+    font-weight:600;
+
+    word-break:break-word;
+
+}
+
+.badge{
+
+    display:inline-block;
+
+    padding:6px 12px;
+
+    border-radius:999px;
+
+    font-size:.8rem;
+
+    font-weight:bold;
+
+}
+
+.online{
+
+    background:var(--online);
+
+}
+
+.offline{
+
+    background:var(--offline);
+
+}
+
+.hero{
+
+    display:grid;
+
+    grid-template-columns:1fr auto;
+
+    gap:16px;
+
+    align-items:center;
+
+    margin-bottom:22px;
+
+    background:linear-gradient(
+        135deg,
+        rgba(34,197,94,.20),
+        rgba(30,41,59,.95)
+    );
+
+    border-radius:20px;
+
+    padding:24px;
+
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+
+}
+
+.hero-title{
+
+    margin:0;
+
+    font-size:1.9rem;
+
+}
+
+.hero-sub{
+
+    margin-top:8px;
+
+    color:var(--muted);
+
+}
+
+.hero-icon{
+
+    font-size:3rem;
+
+}
+
+.sensor-grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+
+    gap:18px;
+
+    margin-bottom:22px;
+
+}
+
+.sensor-card{
+
+    background:var(--card-soft);
+
+    border-radius:16px;
+
+    padding:20px;
+
+    box-shadow:0 10px 25px rgba(0,0,0,.20);
+
+}
+
+.sensor-label{
+
+    color:var(--muted);
+
+    font-size:.85rem;
+
+    margin-bottom:8px;
+
+}
+
+.sensor-value{
+
+    font-size:1.8rem;
+
+    font-weight:bold;
+
+}
+
+.actions{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+
+    gap:14px;
+
+}
+
+button{
+
+    width:100%;
+
+    padding:14px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:var(--accent);
+
+    color:white;
+
+    cursor:pointer;
+
+    font-size:15px;
+
+    font-weight:600;
+
+}
+
+button:hover{
+
+    opacity:.9;
+
+}
+
+button.secondary{
+
+    background:#334155;
+
+}
+
+.raw-hint{
+
+    margin-top:10px;
+
+    color:var(--muted);
+
+    font-size:.85rem;
+
+}
+
+@media(max-width:600px){
+
+    body{
+
+        padding:12px;
+
+    }
+
+    .hero{
+
+        grid-template-columns:1fr;
+
+    }
+
+    .hero-icon{
+
+        display:none;
+
+    }
+
+    .row{
+
+        flex-direction:column;
+
+        gap:4px;
+
+    }
+
+    .value{
+
+        text-align:left;
+
+    }
+
+}
+
+</style>
 
 </head>
 
 <body>
 
-    <div class="page">
+<header>
 
-        <a href="/devices">
-            ← Zurück zu Geräte
-        </a>
+    <a
+        class="back"
+        href="/devices">
 
-        <h1 id="device-name">
+        ← Zurück zu Geräte
+
+    </a>
+
+</header>
+
+
+
+<section class="hero">
+
+    <div>
+
+        <h1
+            id="device-name"
+            class="hero-title">
+
             Bluetooth Gerät
+
         </h1>
 
-        <div class="card">
+        <div class="hero-sub">
 
-            <h2>Status</h2>
+            <span id="device-model">
+                --
+            </span>
 
-            <p>
-                <strong>Modell:</strong>
-                <span id="device-model">--</span>
-            </p>
+            ·
 
-            <p>
-                <strong>Hersteller:</strong>
-                <span id="device-manufacturer">--</span>
-            </p>
-
-            <p>
-                <strong>Typ:</strong>
-                <span id="device-type">--</span>
-            </p>
-
-            <p>
-                <strong>Status:</strong>
-                <span id="device-online">--</span>
-            </p>
-
-        </div>
-
-        <div class="card">
-
-            <h2>Bluetooth Informationen</h2>
-
-            <p>
-                <strong>Adresse:</strong>
-                <span id="device-addr">--</span>
-            </p>
-
-            <p>
-                <strong>RSSI:</strong>
-                <span id="device-rssi">--</span>
-            </p>
-
-            <p>
-                <strong>Verschlüsselt:</strong>
-                <span id="device-encrypted">--</span>
-            </p>
-
-            <p>
-                <strong>Model ID:</strong>
-                <span id="device-model-id">--</span>
-            </p>
-
-            <p>
-                <strong>Gateway:</strong>
-                <span id="device-gateway">--</span>
-            </p>
-
-        </div>
-
-        <div class="card">
-
-            <h2>Sensorwerte</h2>
-
-            <p>
-                <strong>Temperatur:</strong>
-                <span id="device-temperature">--</span>
-            </p>
-
-            <p>
-                <strong>Luftfeuchtigkeit:</strong>
-                <span id="device-humidity">--</span>
-            </p>
-
-            <p>
-                <strong>Batterie:</strong>
-                <span id="device-battery">--</span>
-            </p>
-
-            <p>
-                <strong>Letztes Signal:</strong>
-                <span id="device-last-seen">--</span>
-            </p>
-
-        </div>
-
-        <div class="card">
-
-            <h2>Aktionen</h2>
-
-            <button id="refresh-btn">
-                Gerät aktualisieren
-            </button>
-
-            <button id="gateway-btn">
-                Gateway öffnen
-            </button>
-
-            <button id="raw-btn">
-                Rohdaten anzeigen
-            </button>
+            <span id="device-online">
+                --
+            </span>
 
         </div>
 
     </div>
 
-    {% include "components/dialog.html" %}
+    <div class="hero-icon">
 
-    <script>
-        const deviceId = "{{ device_id }}";
-    </script>
+        🌡️
 
-    <script src="/static/js/dialog.js"></script>
-    <script src="/static/js/blu_device.js"></script>
+    </div>
+
+</section>
+
+
+
+<section class="sensor-grid">
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            Temperatur
+        </div>
+
+        <div
+            id="device-temperature"
+            class="sensor-value">
+
+            --
+
+        </div>
+
+    </div>
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            Luftfeuchtigkeit
+        </div>
+
+        <div
+            id="device-humidity"
+            class="sensor-value">
+
+            --
+
+        </div>
+
+    </div>
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            Batterie
+        </div>
+
+        <div
+            id="device-battery"
+            class="sensor-value">
+
+            --
+
+        </div>
+
+    </div>
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            RSSI
+        </div>
+
+        <div
+            id="device-rssi"
+            class="sensor-value">
+
+            --
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<section class="grid">
+
+    <div class="card">
+
+        <h2>Status</h2>
+
+        <div class="row">
+
+            <div class="label">
+                Hersteller
+            </div>
+
+            <div
+                id="device-manufacturer"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="label">
+                Modell
+            </div>
+
+            <div
+                id="device-model-detail"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="label">
+                Typ
+            </div>
+
+            <div
+                id="device-type"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="label">
+                Letztes Signal
+            </div>
+
+            <div
+                id="device-last-seen"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <div class="card">
+
+        <h2>Bluetooth Informationen</h2>
+
+        <div class="row">
+
+            <div class="label">
+                Adresse
+            </div>
+
+            <div
+                id="device-addr"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="label">
+                Verschlüsselt
+            </div>
+
+            <div
+                id="device-encrypted"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="label">
+                Model ID
+            </div>
+
+            <div
+                id="device-model-id"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="label">
+                Gateway
+            </div>
+
+            <div
+                id="device-gateway"
+                class="value">
+
+                --
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+
+<section class="card">
+
+    <h2>Aktionen</h2>
+
+    <div class="actions">
+
+        <button id="refresh-btn">
+            Gerät aktualisieren
+        </button>
+
+        <button
+            id="gateway-btn"
+            class="secondary">
+
+            Gateway öffnen
+
+        </button>
+
+        <button
+            id="raw-btn"
+            class="secondary">
+
+            Rohdaten anzeigen
+
+        </button>
+
+    </div>
+
+    <div class="raw-hint">
+
+        Temperatur, Luftfeuchtigkeit und Batterie erscheinen, sobald wir die laufenden BTHome-Sensordaten auswerten.
+
+    </div>
+
+</section>
+
+
+
+{% include "components/dialog.html" %}
+
+<script>
+
+const deviceId = "{{ device_id }}";
+
+</script>
+
+<script src="/static/js/dialog.js"></script>
+<script src="/static/js/blu_device.js"></script>
 
 </body>
 
