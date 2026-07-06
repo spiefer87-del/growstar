@@ -458,36 +458,107 @@ class ShellyGateway(Gateway):
 
     def get_bthome_device_known_objects(self, key):
 
-            if key is None:
-    
-                return None
-    
-            if isinstance(
-                key,
-                int
-            ):
-    
-                device_id = key
-    
-            else:
-    
-                try:
-    
-                    device_id = int(
-                        str(key).split(":")[1]
-                    )
-    
-                except Exception:
-    
-                    return None
-    
-            return self.api.call(
-                "BTHomeDevice.GetKnownObjects",
-                {
-                    "id": device_id
-                }
+        if not self.supports(
+            "BTHomeDevice.GetKnownObjects"
+        ):
+
+            return None
+
+        device_id = self._bthome_component_id(
+            key
+        )
+
+        if device_id is None:
+
+            return None
+
+        return self.api.call(
+            "BTHomeDevice.GetKnownObjects",
+            {
+                "id": device_id
+            }
+        )
+        
+    def _bthome_component_id(self, key):
+
+        if key is None:
+
+            return None
+
+        if isinstance(
+            key,
+            int
+        ):
+
+            return key
+
+        try:
+
+            text = str(
+                key
             )
 
+            if ":" in text:
+
+                text = text.split(
+                    ":"
+                )[-1]
+
+            return int(
+                text
+            )
+
+        except Exception:
+
+            return None
+
+
+    def get_bthome_device_status(self, key):
+
+        if not self.supports(
+            "BTHomeDevice.GetStatus"
+        ):
+
+            return None
+
+        device_id = self._bthome_component_id(
+            key
+        )
+
+        if device_id is None:
+
+            return None
+
+        return self.api.call(
+            "BTHomeDevice.GetStatus",
+            {
+                "id": device_id
+            }
+        )
+
+
+    def get_bthome_device_config(self, key):
+
+        if not self.supports(
+            "BTHomeDevice.GetConfig"
+        ):
+
+            return None
+
+        device_id = self._bthome_component_id(
+            key
+        )
+
+        if device_id is None:
+
+            return None
+
+        return self.api.call(
+            "BTHomeDevice.GetConfig",
+            {
+                "id": device_id
+            }
+        )
     # --------------------------
     # BTHome Sensor Setup
     # --------------------------
