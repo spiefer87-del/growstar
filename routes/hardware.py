@@ -135,6 +135,26 @@ def register(app):
             "success": True,
             "result": result
         })
+
+    @app.get("/api/hardware/<gateway_id>/ble/discovered")
+    def ble_discovered(gateway_id):
+    
+        result = hardware.get_ble_scan_result(
+            gateway_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "BLE Scan Ergebnis konnte nicht geladen werden.",
+                "result": None
+            })
+    
+        return jsonify({
+            "success": True,
+            "result": result
+        })
     
     
     @app.get("/api/hardware/<gateway_id>/ble/status")
