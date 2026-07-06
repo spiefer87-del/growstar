@@ -62,6 +62,18 @@ class HardwareService:
 
         pass
 
+    def get_ble_scan_result(self, gateway_id):
+
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return None
+    
+        return gateway.get_ble_scan_result()
+
     # ------------------------
     # Refresh
     # ------------------------
