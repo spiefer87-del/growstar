@@ -506,7 +506,7 @@ async function startBleScan(){
         if(!scanData.success){
 
             showDialog(
-                "BLE Scan",
+                "BLE Scan Fehler",
                 JSON.stringify(
                     scanData,
                     null,
@@ -518,13 +518,15 @@ async function startBleScan(){
         }
 
         const duration =
-            scanData.result?.duration || 30;
+            scanData.result?.duration ||
+            scanData.result?.result?.duration ||
+            30;
 
         showDialog(
             "BLE Scan",
             "Scan läuft...\n\nDauer: " +
             duration +
-            " Sekunden\n\nBitte warten."
+            " Sekunden\n\nBitte den BLU Sensor in den Pairing-Modus versetzen."
         );
 
         await wait(
@@ -537,13 +539,16 @@ async function startBleScan(){
             "/ble/discovered"
         );
 
+        const resultData = await resultResponse.json();
+
         let addData = null;
 
         if(
             resultData.success &&
+            resultData.result &&
             resultData.result.device_count > 0
         ){
-        
+
             const addResponse = await fetch(
                 "/api/hardware/" +
                 gatewayId +
@@ -552,11 +557,11 @@ async function startBleScan(){
                     method:"POST"
                 }
             );
-        
+
             addData = await addResponse.json();
-        
+
         }
-        
+
         showDialog(
             "BLE Scan Ergebnis",
             JSON.stringify(
@@ -568,6 +573,7 @@ async function startBleScan(){
                 2
             )
         );
+
     }
 
     catch(err){
