@@ -406,6 +406,78 @@ class ShellyGateway(Gateway):
             "discovered": self.bluetooth_discovered
     
         }
+
+    def add_bthome_device(self, event):
+
+        device_data = event.get(
+            "device",
+            {}
+        )
+    
+        addr = device_data.get(
+            "addr"
+        )
+    
+        if not addr:
+    
+            return None
+    
+        name = device_data.get(
+            "local_name",
+            "Shelly BLU"
+        )
+    
+        mfdata = device_data.get(
+            "shelly_mfdata",
+            {}
+        )
+    
+        result = self.api.call(
+            "BTHome.AddDevice",
+            {
+                "config": {
+                    "addr": addr,
+                    "name": name,
+                    "meta": {
+                        "manufacturer": "Shelly",
+                        "model_id": mfdata.get(
+                            "model_id"
+                        ),
+                        "local_name": name
+                    }
+                }
+            }
+        )
+    
+        print(
+            "BTHome.AddDevice Result:",
+            result
+        )
+    
+        return result
+
+    def get_bthome_device_known_objects(self, key):
+
+        if not key:
+    
+            return None
+    
+        try:
+    
+            device_id = int(
+                key.split(":")[1]
+            )
+    
+        except Exception:
+    
+            return None
+    
+        return self.api.call(
+            "BTHomeDevice.GetKnownObjects",
+            {
+                "id": device_id
+            }
+        )
     # --------------------------
     # Bluetooth Setup
     # --------------------------
