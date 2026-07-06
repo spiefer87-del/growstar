@@ -322,7 +322,7 @@ class ShellyGateway(Gateway):
     
     
     def _handle_bthome_event(self, raw):
-    
+
         try:
     
             data = json.loads(
@@ -344,7 +344,6 @@ class ShellyGateway(Gateway):
             data
         )
     
-        # Liste begrenzen, damit sie nicht endlos wächst
         self.bluetooth_events = self.bluetooth_events[-100:]
     
         if data.get("method") != "NotifyEvent":
@@ -363,33 +362,49 @@ class ShellyGateway(Gateway):
     
         for event in events:
     
-            event_text = json.dumps(
-                event
-            ).lower()
+            component = event.get(
+                "component"
+            )
+    
+            event_name = event.get(
+                "event"
+            )
     
             if (
-                "device_discovered" in event_text
-                or "discovered" in event_text
-                or "bthome" in event_text
+                component == "bthome"
+                and event_name == "device_discovered"
             ):
     
                 self.bluetooth_discovered.append(
                     event
                 )
     
-            if "discovery_done" in event_text:
+            if (
+                component == "bthome"
+                and event_name == "discovery_done"
+            ):
     
                 self.bluetooth_scan_finished = True
+    
                 self.bluetooth_scanning = False
     
     
     def get_ble_scan_result(self):
-    
+
         return {
+    
             "scanning": self.bluetooth_scanning,
+    
             "finished": self.bluetooth_scan_finished,
+    
+            "device_count": len(
+                self.bluetooth_discovered
+            ),
+    
             "events": self.bluetooth_events,
+    
             "discovered": self.bluetooth_discovered
+    
         }
     # --------------------------
     # Bluetooth Setup
