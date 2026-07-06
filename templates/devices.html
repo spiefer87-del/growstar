@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
 
 <meta charset="UTF-8">
@@ -19,6 +20,7 @@
 
     --bg:#0f172a;
     --card:#1e293b;
+    --card-hover:#263449;
     --accent:#22c55e;
     --text:#e5e7eb;
     --muted:#94a3b8;
@@ -101,6 +103,11 @@ h3{
 
     box-shadow:0 10px 30px rgba(0,0,0,.30);
 
+    transition:
+        transform .15s ease,
+        background .15s ease,
+        opacity .15s ease;
+
 }
 
 .card-link{
@@ -108,6 +115,22 @@ h3{
     color:inherit;
 
     text-decoration:none;
+
+    display:block;
+
+}
+
+.card-link .card{
+
+    cursor:pointer;
+
+}
+
+.card-link:hover .card{
+
+    background:var(--card-hover);
+
+    transform:translateY(-2px);
 
 }
 
@@ -126,6 +149,8 @@ h3{
     color:var(--muted);
 
     font-size:.85rem;
+
+    word-break:break-word;
 
 }
 
@@ -154,6 +179,14 @@ h3{
 .button:hover{
 
     opacity:.9;
+
+}
+
+.button:disabled{
+
+    opacity:.6;
+
+    cursor:not-allowed;
 
 }
 
@@ -200,6 +233,18 @@ h3{
     font-size:1.8rem;
 
     font-weight:bold;
+
+}
+
+.device-meta{
+
+    margin-top:12px;
+
+}
+
+.device-meta .sub{
+
+    margin-top:4px;
 
 }
 
@@ -368,6 +413,26 @@ Hardware Manager
 
 
 <script>
+
+function escapeHtml(value){
+
+    if(value === null || value === undefined){
+
+        return "";
+
+    }
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+}
+
+
+
 async function scanGateways(){
 
     const btn = document.getElementById("scan-gateway");
@@ -413,15 +478,23 @@ async function loadHardware(){
 
     try{
 
-        const response = await fetch("/api/hardware");
+        const response = await fetch(
+            "/api/hardware"
+        );
 
         const data = await response.json();
 
-        renderGateways(data.gateways);
+        renderGateways(
+            data.gateways || []
+        );
 
-        renderDevices(data.devices);
+        renderDevices(
+            data.devices || []
+        );
 
-        renderActuators(data.actuators);
+        renderActuators(
+            data.actuators || []
+        );
 
     }
 
@@ -440,18 +513,28 @@ function renderGateways(gateways){
     const grid =
         document.getElementById("gateway-grid");
 
-    // erste Karte behalten
-    const firstCard = grid.firstElementChild;
+    const firstCard =
+        grid.firstElementChild;
 
     grid.innerHTML = "";
 
-    grid.appendChild(firstCard);
+    if(firstCard){
+
+        grid.appendChild(
+            firstCard
+        );
+
+    }
 
     gateways.forEach(gateway=>{
 
         const card = document.createElement("a");
 
-        card.href = "/devices/" + gateway.id;
+        card.href =
+            "/devices/" +
+            encodeURIComponent(
+                gateway.id
+            );
 
         card.className = "card-link";
 
@@ -459,11 +542,11 @@ function renderGateways(gateways){
 
             <div class="card">
 
-                <h2>${gateway.name}</h2>
+                <h2>${escapeHtml(gateway.name)}</h2>
 
                 <div class="sub">
 
-                    ${gateway.ip}
+                    ${escapeHtml(gateway.ip)}
 
                 </div>
 
@@ -475,7 +558,7 @@ function renderGateways(gateways){
 
                 <div class="sub">
 
-                    Firmware ${gateway.firmware}
+                    Firmware ${escapeHtml(gateway.firmware || "--")}
 
                 </div>
 
@@ -495,7 +578,9 @@ function renderGateways(gateways){
 
         `;
 
-        grid.appendChild(card);
+        grid.appendChild(
+            card
+        );
 
     });
 
@@ -513,7 +598,7 @@ function renderDevices(devices){
 
     grid.innerHTML = "";
 
-    if(devices.length===0){
+    if(devices.length === 0){
 
         grid.innerHTML = `
 
@@ -535,15 +620,28 @@ function renderDevices(devices){
 
     devices.forEach(device=>{
 
-        grid.innerHTML += `
+        const props =
+            device.properties || {};
+
+        const card = document.createElement("a");
+
+        card.href =
+            "/devices/blu/" +
+            encodeURIComponent(
+                device.id
+            );
+
+        card.className = "card-link";
+
+        card.innerHTML = `
 
             <div class="card">
 
-                <h2>${device.name}</h2>
+                <h2>${escapeHtml(device.name)}</h2>
 
                 <div class="sub">
 
-                    ${device.model}
+                    ${escapeHtml(device.model)}
 
                 </div>
 
@@ -553,9 +651,35 @@ function renderDevices(devices){
 
                 </div>
 
+                <div class="device-meta">
+
+                    <div class="sub">
+
+                        Adresse ${escapeHtml(props.addr || "--")}
+
+                    </div>
+
+                    <div class="sub">
+
+                        RSSI ${props.rssi ?? "--"} dBm
+
+                    </div>
+
+                    <div class="sub">
+
+                        Gateway ${escapeHtml(props.gateway_ip || props.gateway_id || "--")}
+
+                    </div>
+
+                </div>
+
             </div>
 
         `;
+
+        grid.appendChild(
+            card
+        );
 
     });
 
@@ -573,7 +697,7 @@ function renderActuators(actuators){
 
     grid.innerHTML = "";
 
-    if(actuators.length===0){
+    if(actuators.length === 0){
 
         grid.innerHTML = `
 
@@ -599,11 +723,11 @@ function renderActuators(actuators){
 
             <div class="card">
 
-                <h2>${actuator.name}</h2>
+                <h2>${escapeHtml(actuator.name)}</h2>
 
                 <div class="sub">
 
-                    ${actuator.model}
+                    ${escapeHtml(actuator.model)}
 
                 </div>
 
@@ -629,7 +753,10 @@ document
 
 loadHardware();
 
-setInterval(loadHardware,5000);
+setInterval(
+    loadHardware,
+    5000
+);
 
 </script>
 
