@@ -176,28 +176,41 @@ class ShellyGateway(Gateway):
     # BTHome Discovery
     # --------------------------
     
-    def start_device_discovery(self):
+    def start_device_discovery(self, duration=30):
 
         if not self.supports(
             "BTHome.StartDeviceDiscovery"
         ):
             return None
     
+        self.bluetooth_events = []
+        self.bluetooth_discovered = []
+        self.bluetooth_scan_finished = False
+        self.bluetooth_scanning = True
+    
+        listener = threading.Thread(
+            target=self._listen_bthome_events,
+            args=(duration + 5,),
+            daemon=True
+        )
+    
+        listener.start()
+    
+        time.sleep(0.5)
+    
         self.api.call(
-            "BTHome.StartDeviceDiscovery"
+            "BTHome.StartDeviceDiscovery",
+            {
+                "duration": duration
+            }
         )
     
         status = self.get_bthome_status()
     
-        if status:
-    
-            self.bluetooth_scan = status
-    
-            self.bluetooth_scanning = (
-                "discovery" in status
-            )
-    
-        return status
+        return {
+            "status": status,
+            "duration": duration
+        }
 
     def get_bthome_status(self):
 
@@ -234,6 +247,150 @@ class ShellyGateway(Gateway):
         return self.api.call(
             "BTHome.GetObjectInfos"
         )
+
+    def _listen_bthome_events(self, duration=35):
+
+        if websocket is None:
+    
+            print(
+                "WebSocket Modul fehlt. Installiere: sudo apt install python3-websocket"
+            )
+    
+            return
+    
+        end_time = time.time() + duration
+    
+        try:
+    
+            ws = websocket.create_connection(
+                f"ws://{self.ip}/rpc",
+                timeout=5
+            )
+    
+            ws.settimeout(1)
+    
+            # Wichtig:
+            # Mindestens eine Anfrage mit src senden,
+            # damit Shelly Notifications schickt.
+            ws.send(
+                json.dumps({
+                    "id": 1,
+                    "src": "growstar",
+                    "method": "Shelly.GetStatus"
+                })
+            )
+    
+            print(
+                "BLE WebSocket Listener gestartet:",
+                self.ip
+            )
+    
+            while time.time() < end_time:
+    
+                try:
+    
+                    raw = ws.recv()
+    
+                except Exception:
+    
+                    continue
+    
+                if not raw:
+    
+                    continue
+    
+                self._handle_bthome_event(
+                    raw
+                )
+    
+            ws.close()
+    
+        except Exception as e:
+    
+            print(
+                "BLE WebSocket Fehler:",
+                e
+            )
+    
+        self.bluetooth_scanning = False
+        self.bluetooth_scan_finished = True
+    
+        print(
+            "BLE WebSocket Listener beendet:",
+            self.ip
+        )
+    
+    
+    def _handle_bthome_event(self, raw):
+    
+        try:
+    
+            data = json.loads(
+                raw
+            )
+    
+        except Exception:
+    
+            data = {
+                "raw": raw
+            }
+    
+        print(
+            "BLE Event:",
+            data
+        )
+    
+        self.bluetooth_events.append(
+            data
+        )
+    
+        # Liste begrenzen, damit sie nicht endlos wächst
+        self.bluetooth_events = self.bluetooth_events[-100:]
+    
+        if data.get("method") != "NotifyEvent":
+    
+            return
+    
+        params = data.get(
+            "params",
+            {}
+        )
+    
+        events = params.get(
+            "events",
+            []
+        )
+    
+        for event in events:
+    
+            event_text = json.dumps(
+                event
+            ).lower()
+    
+            if (
+                "device_discovered" in event_text
+                or "discovered" in event_text
+                or "bthome" in event_text
+            ):
+    
+                self.bluetooth_discovered.append(
+                    event
+                )
+    
+            if "discovery_done" in event_text:
+    
+                self.bluetooth_scan_finished = True
+                self.bluetooth_scanning = False
+    
+    
+    def get_ble_scan_result(self):
+    
+        return {
+            "scanning": self.bluetooth_scanning,
+            "finished": self.bluetooth_scan_finished,
+            "events": self.bluetooth_events,
+            "discovered": self.bluetooth_discovered
+        }
     # --------------------------
     # Bluetooth Setup
     # --------------------------
