@@ -77,6 +77,52 @@ class HardwareService:
     
         return gateway.get_ble_scan_result()
 
+    def register_discovered_ble_devices(self, gateway_id):
+
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return None
+    
+        registered = []
+    
+        for event in gateway.bluetooth_discovered:
+    
+            result = gateway.add_bthome_device(
+                event
+            )
+    
+            known_objects = None
+    
+            if result and result.get("key"):
+    
+                known_objects = gateway.get_bthome_device_known_objects(
+                    result.get("key")
+                )
+    
+            registered.append({
+    
+                "event": event,
+    
+                "result": result,
+    
+                "known_objects": known_objects
+    
+            })
+    
+        return {
+    
+            "count": len(
+                registered
+            ),
+    
+            "devices": registered
+    
+        }
+
     # ------------------------
     # Refresh
     # ------------------------
