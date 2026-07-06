@@ -222,6 +222,53 @@ function renderBluetoothDevice(device){
 // ----------------------------------------------------
 // Aktionen
 // ----------------------------------------------------
+async function setupSensors(){
+
+    try{
+
+        showDialog(
+            "Sensorwerte",
+            "Sensorwerte werden eingerichtet...\n\nBitte den BLU H&T kurz aufwecken."
+        );
+
+        const response = await fetch(
+            "/api/hardware/device/" +
+            encodeURIComponent(
+                deviceId
+            ) +
+            "/setup-sensors",
+            {
+                method:"POST"
+            }
+        );
+
+        const data = await response.json();
+
+        showDialog(
+            "Sensorwerte Einrichtung",
+            JSON.stringify(
+                data,
+                null,
+                2
+            )
+        );
+
+        loadBluetoothDevice();
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        showDialog(
+            "Sensorwerte Fehler",
+            String(err)
+        );
+
+    }
+
+}
 
 function openGateway(){
 
@@ -312,6 +359,13 @@ function bindButtons(){
     ?.addEventListener(
         "click",
         showRawData
+    );
+
+    document
+    .getElementById("setup-sensors-btn")
+    ?.addEventListener(
+        "click",
+        setupSensors
     );
 
 }
