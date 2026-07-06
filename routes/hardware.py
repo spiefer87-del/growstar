@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify, request
 
 from services.hardware import hardware
 
@@ -62,6 +62,49 @@ def register(app):
     def hardware_device_setup_sensors(device_id):
     
         result = hardware.setup_ble_sensor(
+            device_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "Gerät nicht gefunden."
+            }), 404
+    
+        return jsonify(result)
+
+    @app.post("/api/hardware/device/<device_id>/pair")
+    def hardware_device_pair(device_id):
+    
+        data = request.get_json(
+            silent=True
+        ) or {}
+    
+        gateway_id = data.get(
+            "gateway_id",
+            "192.168.178.91"
+        )
+    
+        result = hardware.pair_ble_device(
+            device_id,
+            gateway_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "Gerät nicht gefunden."
+            }), 404
+    
+        return jsonify(result)
+    
+    
+    @app.post("/api/hardware/device/<device_id>/unpair")
+    def hardware_device_unpair(device_id):
+    
+        result = hardware.unpair_ble_device(
             device_id
         )
     
