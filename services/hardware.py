@@ -30,10 +30,19 @@ class HardwareService:
     # ------------------------
     # Devices
     # ------------------------
-
     def devices(self):
 
         return manager.devices_list()
+
+    def device(self, device_id):
+
+        for device in self.devices():
+    
+            if device.id == device_id:
+    
+                return device
+    
+        return None
 
     # ------------------------
     # Aktoren
