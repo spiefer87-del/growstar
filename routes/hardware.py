@@ -151,6 +151,22 @@ def register(app):
             "device": device.to_dict()
         })
 
+    @app.post("/api/hardware/device/<device_id>/read-values")
+    def hardware_device_read_values(device_id):
+    
+        result = hardware.read_ble_sensor_values(
+            device_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "Gerät nicht gefunden."
+            }), 404
+    
+        return jsonify(result)
+
     @app.post("/api/hardware/<gateway_id>/ble/scan")
     def ble_scan(gateway_id):
     
