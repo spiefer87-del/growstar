@@ -217,3 +217,23 @@ def register(app):
             "success": True,
             "result": result
         })
+
+    @app.post("/api/hardware/<gateway_id>/ble/register-discovered")
+    def ble_register_discovered(gateway_id):
+    
+        result = hardware.register_discovered_ble_devices(
+            gateway_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "Gateway nicht gefunden.",
+                "result": None
+            }), 404
+    
+        return jsonify({
+            "success": True,
+            "result": result
+        })
