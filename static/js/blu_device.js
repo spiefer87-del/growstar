@@ -2,6 +2,67 @@ let currentDevice = null;
 
 
 // ----------------------------------------------------
+// Helfer
+// ----------------------------------------------------
+
+function setText(id, value){
+
+    const element =
+        document.getElementById(id);
+
+    if(!element){
+
+        console.warn(
+            "Element nicht gefunden:",
+            id
+        );
+
+        return;
+
+    }
+
+    element.textContent =
+        value ?? "--";
+
+}
+
+
+function setHtml(id, value){
+
+    const element =
+        document.getElementById(id);
+
+    if(!element){
+
+        console.warn(
+            "Element nicht gefunden:",
+            id
+        );
+
+        return;
+
+    }
+
+    element.innerHTML =
+        value ?? "--";
+
+}
+
+
+function formatLastSeen(value){
+
+    if(!value){
+        return "--";
+    }
+
+    return new Date(
+        value * 1000
+    ).toLocaleString();
+
+}
+
+
+// ----------------------------------------------------
 // Gerät laden
 // ----------------------------------------------------
 
@@ -30,6 +91,7 @@ async function loadBluetoothDevice(){
             );
 
             return;
+
         }
 
         currentDevice = data.device;
@@ -63,96 +125,96 @@ function renderBluetoothDevice(device){
     const props =
         device.properties || {};
 
-    document
-    .getElementById("device-name")
-    .textContent =
-        device.name || "Bluetooth Gerät";
+    setText(
+        "device-name",
+        device.name || "Bluetooth Gerät"
+    );
 
-    document
-    .getElementById("device-model")
-    .textContent =
-        device.model || "--";
+    setText(
+        "device-model",
+        device.model || "--"
+    );
 
-    document
-    .getElementById("device-model-detail")
-    .textContent =
-        device.model || "--";
+    setText(
+        "device-model-detail",
+        device.model || "--"
+    );
 
-    document
-    .getElementById("device-manufacturer")
-    .textContent =
-        device.manufacturer || "--";
+    setText(
+        "device-manufacturer",
+        device.manufacturer || "--"
+    );
 
-    document
-    .getElementById("device-type")
-    .textContent =
-        device.type || "--";
+    setText(
+        "device-type",
+        device.type || "--"
+    );
 
-    document
-    .getElementById("device-online")
-    .innerHTML =
+    setHtml(
+        "device-online",
         device.online
-        ? '<span class="badge">Verbunden</span>'
-        : "Offline";
+        ? '<span class="badge online">Verbunden</span>'
+        : '<span class="badge offline">Offline</span>'
+    );
 
-    document
-    .getElementById("device-addr")
-    .textContent =
-        props.addr || "--";
+    setText(
+        "device-addr",
+        props.addr || "--"
+    );
 
-    document
-    .getElementById("device-rssi")
-    .textContent =
+    setText(
+        "device-rssi",
         props.rssi !== undefined
         ? props.rssi + " dBm"
-        : "--";
+        : "--"
+    );
 
-    document
-    .getElementById("device-encrypted")
-    .textContent =
+    setText(
+        "device-encrypted",
         props.encrypted
         ? "Ja"
-        : "Nein";
+        : "Nein"
+    );
 
-    document
-    .getElementById("device-model-id")
-    .textContent =
-        props.model_id ?? "--";
+    setText(
+        "device-model-id",
+        props.model_id ?? "--"
+    );
 
-    document
-    .getElementById("device-gateway")
-    .textContent =
-        props.gateway_ip || props.gateway_id || "--";
+    setText(
+        "device-gateway",
+        props.gateway_ip ||
+        props.gateway_id ||
+        "--"
+    );
 
-    document
-    .getElementById("device-temperature")
-    .textContent =
+    setText(
+        "device-temperature",
         props.temperature !== undefined
         ? props.temperature + " °C"
-        : "--";
+        : "--"
+    );
 
-    document
-    .getElementById("device-humidity")
-    .textContent =
+    setText(
+        "device-humidity",
         props.humidity !== undefined
         ? props.humidity + " %"
-        : "--";
+        : "--"
+    );
 
-    document
-    .getElementById("device-battery")
-    .textContent =
+    setText(
+        "device-battery",
         props.battery !== undefined
         ? props.battery + " %"
-        : "--";
+        : "--"
+    );
 
-    document
-    .getElementById("device-last-seen")
-    .textContent =
-        props.last_seen
-        ? new Date(
-            props.last_seen * 1000
-        ).toLocaleString()
-        : "--";
+    setText(
+        "device-last-seen",
+        formatLastSeen(
+            props.last_seen
+        )
+    );
 
 }
 
@@ -167,7 +229,14 @@ function openGateway(){
         !currentDevice ||
         !currentDevice.properties
     ){
+
+        showDialog(
+            "Gateway",
+            "Keine Gerätedaten geladen."
+        );
+
         return;
+
     }
 
     const gatewayId =
@@ -181,6 +250,7 @@ function openGateway(){
         );
 
         return;
+
     }
 
     window.location.href =
@@ -202,6 +272,7 @@ function showRawData(){
         );
 
         return;
+
     }
 
     showDialog(
