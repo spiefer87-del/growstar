@@ -74,6 +74,11 @@ function renderBluetoothDevice(device){
         device.model || "--";
 
     document
+    .getElementById("device-model-detail")
+    .textContent =
+        device.model || "--";
+
+    document
     .getElementById("device-manufacturer")
     .textContent =
         device.manufacturer || "--";
