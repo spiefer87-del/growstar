@@ -1,3 +1,12 @@
+import json
+import time
+import threading
+
+try:
+    import websocket
+except ImportError:
+    websocket = None
+
 from core.hardware.gateway import Gateway
 
 from .api import ShellyAPI
@@ -18,6 +27,9 @@ class ShellyGateway(Gateway):
 
         self.bluetooth = False
         self.bluetooth_scan = {}
+        self.bluetooth_events = []
+        self.bluetooth_discovered = []
+        self.bluetooth_scan_finished = False
 
         self.rssi = None
         self.uptime = None
