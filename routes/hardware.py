@@ -57,6 +57,22 @@ def register(app):
             "gateway": gateway.to_dict()
     
         })
+
+    @app.post("/api/hardware/device/<device_id>/setup-sensors")
+    def hardware_device_setup_sensors(device_id):
+    
+        result = hardware.setup_ble_sensor(
+            device_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "Gerät nicht gefunden."
+            }), 404
+    
+        return jsonify(result)
     
     @app.post("/api/hardware/<gateway_id>/refresh")
     def refresh_gateway(gateway_id):
