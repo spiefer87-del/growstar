@@ -234,13 +234,32 @@ class HardwareService:
                 "device": device.to_dict()
             }
     
+        # Falls das Gerät auf diesem Gateway noch nicht eingerichtet ist:
+        # automatisch einrichten.
         if not device_key:
     
-            return {
-                "success": False,
-                "message": "BTHome Gerät ist noch nicht eingerichtet.",
-                "device": device.to_dict()
-            }
+            setup = self.setup_ble_sensor(
+                device_id
+            )
+    
+            if not setup or setup.get("success") is False:
+    
+                return {
+                    "success": False,
+                    "message": "BTHome Gerät konnte nicht automatisch eingerichtet werden.",
+                    "setup": setup,
+                    "device": device.to_dict()
+                }
+    
+            device = self.device(
+                device_id
+            )
+    
+            props = device.properties
+    
+            device_key = props.get(
+                "bthome_device_key"
+            )
     
         gateway = manager.gateway(
             gateway_id
@@ -415,7 +434,7 @@ class HardwareService:
 
 
     def _blu_device_from_event(self, gateway, event):
-    
+
         device_data = event.get(
             "device",
             {}
@@ -434,6 +453,60 @@ class HardwareService:
             ""
         ).lower()
     
+        device_id = (
+            "blu_" +
+            clean_addr
+        )
+    
+        existing = self.device(
+            device_id
+        )
+    
+        old_properties = {}
+    
+        if existing is not None:
+    
+            old_properties = dict(
+                existing.properties or {}
+            )
+    
+        gateway_changed = (
+            old_properties.get("gateway_id")
+            and old_properties.get("gateway_id") != gateway.id
+        )
+    
+        if gateway_changed:
+    
+            old_properties.pop(
+                "bthome_device_key",
+                None
+            )
+    
+            old_properties.pop(
+                "bthome_device_id",
+                None
+            )
+    
+            old_properties.pop(
+                "known_objects",
+                None
+            )
+    
+            old_properties.pop(
+                "setup_result",
+                None
+            )
+    
+            old_properties.pop(
+                "bthome_device_status",
+                None
+            )
+    
+            old_properties.pop(
+                "bthome_device_config",
+                None
+            )
+    
         mfdata = device_data.get(
             "shelly_mfdata",
             {}
@@ -449,16 +522,15 @@ class HardwareService:
     
             model = "Shelly BLU H&T"
     
-        name = device_data.get(
-            "local_name"
-        ) or model
-    
-        device = HardwareDevice()
-    
-        device.id = (
-            "blu_" +
-            clean_addr
+        name = (
+            device_data.get("local_name")
+            or old_properties.get("local_name")
+            or model
         )
+    
+        device = existing or HardwareDevice()
+    
+        device.id = device_id
     
         device.name = name
     
@@ -470,7 +542,7 @@ class HardwareService:
     
         device.online = True
     
-        device.properties = {
+        old_properties.update({
     
             "protocol": "bthome",
     
@@ -499,7 +571,9 @@ class HardwareService:
     
             "raw": event
     
-        }
+        })
+    
+        device.properties = old_properties
     
         return device
 
