@@ -333,6 +333,54 @@ function showRawData(){
 
 }
 
+async function readSensorValues(){
+
+    try{
+
+        showDialog(
+            "Sensorwerte",
+            "Sensorwerte werden gelesen...\n\nBitte den BLU H&T kurz aufwecken."
+        );
+
+        const response = await fetch(
+            "/api/hardware/device/" +
+            encodeURIComponent(
+                deviceId
+            ) +
+            "/read-values",
+            {
+                method:"POST"
+            }
+        );
+
+        const data = await response.json();
+
+        showDialog(
+            "Sensorwerte",
+            JSON.stringify(
+                data,
+                null,
+                2
+            )
+        );
+
+        loadBluetoothDevice();
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        showDialog(
+            "Sensorwerte Fehler",
+            String(err)
+        );
+
+    }
+
+}
+
 
 // ----------------------------------------------------
 // Buttons verbinden
@@ -366,6 +414,13 @@ function bindButtons(){
     ?.addEventListener(
         "click",
         setupSensors
+    );
+
+    document
+    .getElementById("read-values-btn")
+    ?.addEventListener(
+        "click",
+        readSensorValues
     );
 
 }
