@@ -176,12 +176,37 @@ class ShellyGateway(Gateway):
     # BTHome Discovery
     # --------------------------
     
-    def start_device_discovery(self, duration=30):
+    def start_device_discovery(self, duration=60):
 
         if not self.supports(
             "BTHome.StartDeviceDiscovery"
         ):
             return None
+    
+        # --------------------------
+        # Bluetooth vor Scan aktivieren
+        # --------------------------
+    
+        ble = self.get_ble_config()
+    
+        if ble and not ble.get(
+            "enable",
+            False
+        ):
+    
+            print(
+                "Bluetooth ist deaktiviert. Aktiviere Bluetooth..."
+            )
+    
+            self.enable_bluetooth()
+    
+            time.sleep(
+                2
+            )
+    
+        # --------------------------
+        # Scan vorbereiten
+        # --------------------------
     
         self.bluetooth_events = []
         self.bluetooth_discovered = []
@@ -196,7 +221,13 @@ class ShellyGateway(Gateway):
     
         listener.start()
     
-        time.sleep(0.5)
+        time.sleep(
+            0.5
+        )
+    
+        # --------------------------
+        # Discovery starten
+        # --------------------------
     
         self.api.call(
             "BTHome.StartDeviceDiscovery",
@@ -209,7 +240,12 @@ class ShellyGateway(Gateway):
     
         return {
             "status": status,
-            "duration": duration
+            "duration": duration,
+            "gateway": {
+                "id": self.id,
+                "ip": self.ip,
+                "name": self.name
+            }
         }
 
     def get_bthome_status(self):
@@ -559,6 +595,36 @@ class ShellyGateway(Gateway):
                 "id": device_id
             }
         )
+
+    def delete_bthome_device(self, key):
+
+        if not self.supports(
+            "BTHome.DeleteDevice"
+        ):
+    
+            return None
+    
+        device_id = self._bthome_component_id(
+            key
+        )
+    
+        if device_id is None:
+    
+            return None
+    
+        result = self.api.call(
+            "BTHome.DeleteDevice",
+            {
+                "id": device_id
+            }
+        )
+    
+        print(
+            "BTHome.DeleteDevice Result:",
+            result
+        )
+    
+        return result
     # --------------------------
     # BTHome Sensor Setup
     # --------------------------
