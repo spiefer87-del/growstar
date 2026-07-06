@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>Bluetooth Gerät</title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/dialog.css">
+
+</head>
+
+<body>
+
+    <div class="page">
+
+        <a href="/devices">
+            ← Zurück zu Geräte
+        </a>
+
+        <h1 id="device-name">
+            Bluetooth Gerät
+        </h1>
+
+        <div class="card">
+
+            <h2>Status</h2>
+
+            <p>
+                <strong>Modell:</strong>
+                <span id="device-model">--</span>
+            </p>
+
+            <p>
+                <strong>Hersteller:</strong>
+                <span id="device-manufacturer">--</span>
+            </p>
+
+            <p>
+                <strong>Typ:</strong>
+                <span id="device-type">--</span>
+            </p>
+
+            <p>
+                <strong>Status:</strong>
+                <span id="device-online">--</span>
+            </p>
+
+        </div>
+
+        <div class="card">
+
+            <h2>Bluetooth Informationen</h2>
+
+            <p>
+                <strong>Adresse:</strong>
+                <span id="device-addr">--</span>
+            </p>
+
+            <p>
+                <strong>RSSI:</strong>
+                <span id="device-rssi">--</span>
+            </p>
+
+            <p>
+                <strong>Verschlüsselt:</strong>
+                <span id="device-encrypted">--</span>
+            </p>
+
+            <p>
+                <strong>Model ID:</strong>
+                <span id="device-model-id">--</span>
+            </p>
+
+            <p>
+                <strong>Gateway:</strong>
+                <span id="device-gateway">--</span>
+            </p>
+
+        </div>
+
+        <div class="card">
+
+            <h2>Sensorwerte</h2>
+
+            <p>
+                <strong>Temperatur:</strong>
+                <span id="device-temperature">--</span>
+            </p>
+
+            <p>
+                <strong>Luftfeuchtigkeit:</strong>
+                <span id="device-humidity">--</span>
+            </p>
+
+            <p>
+                <strong>Batterie:</strong>
+                <span id="device-battery">--</span>
+            </p>
+
+            <p>
+                <strong>Letztes Signal:</strong>
+                <span id="device-last-seen">--</span>
+            </p>
+
+        </div>
+
+        <div class="card">
+
+            <h2>Aktionen</h2>
+
+            <button id="refresh-btn">
+                Gerät aktualisieren
+            </button>
+
+            <button id="gateway-btn">
+                Gateway öffnen
+            </button>
+
+            <button id="raw-btn">
+                Rohdaten anzeigen
+            </button>
+
+        </div>
+
+    </div>
+
+    {% include "components/dialog.html" %}
+
+    <script>
+        const deviceId = "{{ device_id }}";
+    </script>
+
+    <script src="/static/js/dialog.js"></script>
+    <script src="/static/js/blu_device.js"></script>
+
+</body>
+
+</html>
