@@ -537,17 +537,37 @@ async function startBleScan(){
             "/ble/discovered"
         );
 
-        const resultData = await resultResponse.json();
+        let addData = null;
 
+        if(
+            resultData.success &&
+            resultData.result.device_count > 0
+        ){
+        
+            const addResponse = await fetch(
+                "/api/hardware/" +
+                gatewayId +
+                "/ble/add-discovered",
+                {
+                    method:"POST"
+                }
+            );
+        
+            addData = await addResponse.json();
+        
+        }
+        
         showDialog(
             "BLE Scan Ergebnis",
             JSON.stringify(
-                resultData,
+                {
+                    scan: resultData,
+                    added: addData
+                },
                 null,
                 2
             )
         );
-
     }
 
     catch(err){
