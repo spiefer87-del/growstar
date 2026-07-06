@@ -298,6 +298,189 @@ class HardwareService:
             "known_objects": known_objects
         }
 
+    def pair_ble_device(self, device_id, gateway_id=None):
+
+        device = self.device(
+            device_id
+        )
+    
+        if device is None:
+    
+            return None
+    
+        props = device.properties
+    
+        addr = props.get(
+            "addr"
+        )
+    
+        if not addr:
+    
+            return {
+                "success": False,
+                "message": "Bluetooth-Adresse fehlt.",
+                "device": device.to_dict()
+            }
+    
+        if gateway_id is None:
+    
+            gateway_id = "192.168.178.91"
+    
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return {
+                "success": False,
+                "message": "Gateway nicht gefunden.",
+                "gateway_id": gateway_id,
+                "device": device.to_dict()
+            }
+    
+        old_gateway_id = props.get(
+            "gateway_id"
+        )
+    
+        old_key = props.get(
+            "bthome_device_key"
+        )
+    
+        # Falls auf anderem Gateway gekoppelt:
+        # dort sauber entkoppeln.
+        if (
+            old_gateway_id
+            and old_gateway_id != gateway_id
+            and old_key
+        ):
+    
+            old_gateway = manager.gateway(
+                old_gateway_id
+            )
+    
+            if old_gateway:
+    
+                old_gateway.delete_bthome_device(
+                    old_key
+                )
+    
+        add_result = gateway.add_bthome_device_by_addr(
+            addr,
+            device.name
+        )
+    
+        device_key = None
+    
+        if add_result:
+    
+            device_key = (
+                add_result.get("added")
+                or add_result.get("key")
+                or add_result.get("component")
+            )
+    
+        device_component_id = None
+    
+        if device_key:
+    
+            device_component_id = gateway._bthome_component_id(
+                device_key
+            )
+    
+        known_objects = None
+    
+        if device_key:
+    
+            known_objects = gateway.get_bthome_device_known_objects(
+                device_key
+            )
+    
+        props["gateway_id"] = gateway.id
+        props["gateway_ip"] = gateway.ip
+        props["bthome_device_key"] = device_key
+        props["bthome_device_id"] = device_component_id
+        props["known_objects"] = known_objects
+        props["setup_result"] = add_result
+        props["paired"] = bool(device_key)
+    
+        return {
+            "success": bool(device_key),
+            "message": (
+                "Gerät gekoppelt."
+                if device_key
+                else "Gerät konnte nicht gekoppelt werden."
+            ),
+            "gateway_id": gateway.id,
+            "add_device": add_result,
+            "known_objects": known_objects,
+            "device": device.to_dict()
+        }
+    
+    
+    def unpair_ble_device(self, device_id):
+    
+        device = self.device(
+            device_id
+        )
+    
+        if device is None:
+    
+            return None
+    
+        props = device.properties
+    
+        gateway_id = props.get(
+            "gateway_id"
+        )
+    
+        device_key = props.get(
+            "bthome_device_key"
+        )
+    
+        result = None
+    
+        if gateway_id and device_key:
+    
+            gateway = manager.gateway(
+                gateway_id
+            )
+    
+            if gateway:
+    
+                result = gateway.delete_bthome_device(
+                    device_key
+                )
+    
+        for key in [
+    
+            "bthome_device_key",
+            "bthome_device_id",
+            "known_objects",
+            "setup_result",
+            "bthome_device_status",
+            "bthome_device_config",
+            "bthome_sensors",
+            "temperature",
+            "humidity",
+            "battery"
+    
+        ]:
+    
+            props.pop(
+                key,
+                None
+            )
+    
+        props["paired"] = False
+    
+        return {
+            "success": True,
+            "message": "Gerät entkoppelt.",
+            "delete_result": result,
+            "device": device.to_dict()
+        }
+
     # ------------------------
     # Refresh
     # ------------------------
