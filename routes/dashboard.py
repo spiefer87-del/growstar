@@ -112,3 +112,11 @@ def register(app):
             "gateway.html",
             gateway_id=gateway_id
         )
+
+    @app.route("/devices/blu/<device_id>")
+    def bluetooth_device_page(device_id):
+    
+        return render_template(
+            "blu_device.html",
+            device_id=device_id
+        )
