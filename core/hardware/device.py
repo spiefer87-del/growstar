@@ -16,7 +16,10 @@ class HardwareDevice:
 
     online: bool = False
 
-    properties: dict = field(default_factory=dict)
+    properties: dict = field(
+        default_factory=dict
+    )
+
 
     def to_dict(self):
 
@@ -32,6 +35,8 @@ class HardwareDevice:
 
             "type": self.type,
 
-            "online": self.online
+            "online": self.online,
+
+            "properties": self.properties
 
         }
