@@ -132,6 +132,80 @@ class HardwareService:
     
         }
 
+    def setup_ble_sensor(self, device_id):
+
+        device = self.device(
+            device_id
+        )
+    
+        if device is None:
+    
+            return None
+    
+        props = device.properties
+    
+        gateway_id = props.get(
+            "gateway_id"
+        )
+    
+        addr = props.get(
+            "addr"
+        )
+    
+        if not gateway_id or not addr:
+    
+            return {
+                "success": False,
+                "message": "Gateway oder Bluetooth-Adresse fehlt.",
+                "device": device.to_dict()
+            }
+    
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return {
+                "success": False,
+                "message": "Gateway nicht gefunden.",
+                "device": device.to_dict()
+            }
+    
+        add_result = gateway.add_bthome_device_by_addr(
+            addr,
+            device.name
+        )
+    
+        device_key = None
+    
+        if add_result:
+    
+            device_key = (
+                add_result.get("key")
+                or add_result.get("added")
+                or add_result.get("component")
+            )
+    
+        known_objects = None
+    
+        if device_key:
+    
+            known_objects = gateway.get_bthome_device_known_objects(
+                device_key
+            )
+    
+        props["bthome_device_key"] = device_key
+        props["known_objects"] = known_objects
+        props["setup_result"] = add_result
+    
+        return {
+            "success": True,
+            "device": device.to_dict(),
+            "add_device": add_result,
+            "known_objects": known_objects
+        }
+
     # ------------------------
     # Refresh
     # ------------------------
