@@ -1,3 +1,6 @@
+import time
+
+from core.hardware.device import HardwareDevice
 from core.hardware.manager import manager
 from core.hardware.scanner import scanner
 
@@ -171,6 +174,132 @@ class HardwareService:
         return gateway.get_bthome_objects()
     
         return gateway.get_bthome_objects()
+
+    def add_discovered_ble_devices(self, gateway_id):
+
+        gateway = manager.gateway(
+            gateway_id
+        )
+    
+        if gateway is None:
+    
+            return None
+    
+        added = []
+    
+        for event in gateway.bluetooth_discovered:
+    
+            device = self._blu_device_from_event(
+                gateway,
+                event
+            )
+    
+            if device is None:
+    
+                continue
+    
+            manager.add_device(
+                device
+            )
+    
+            added.append(
+                device.to_dict()
+            )
+    
+        return {
+            "count": len(added),
+            "devices": added
+        }
+
+
+    def _blu_device_from_event(self, gateway, event):
+    
+        device_data = event.get(
+            "device",
+            {}
+        )
+    
+        addr = device_data.get(
+            "addr"
+        )
+    
+        if not addr:
+    
+            return None
+    
+        clean_addr = addr.replace(
+            ":",
+            ""
+        ).lower()
+    
+        mfdata = device_data.get(
+            "shelly_mfdata",
+            {}
+        )
+    
+        model_id = mfdata.get(
+            "model_id"
+        )
+    
+        model = "Shelly BLU"
+    
+        if model_id == 12:
+    
+            model = "Shelly BLU H&T"
+    
+        name = device_data.get(
+            "local_name"
+        ) or model
+    
+        device = HardwareDevice()
+    
+        device.id = (
+            "blu_" +
+            clean_addr
+        )
+    
+        device.name = name
+    
+        device.manufacturer = "Shelly"
+    
+        device.model = model
+    
+        device.type = "sensor"
+    
+        device.online = True
+    
+        device.properties = {
+    
+            "protocol": "bthome",
+    
+            "gateway_id": gateway.id,
+    
+            "gateway_ip": gateway.ip,
+    
+            "addr": addr,
+    
+            "local_name": device_data.get(
+                "local_name"
+            ),
+    
+            "rssi": device_data.get(
+                "rssi"
+            ),
+    
+            "encrypted": device_data.get(
+                "encrypted",
+                False
+            ),
+    
+            "model_id": model_id,
+    
+            "last_seen": time.time(),
+    
+            "raw": event
+    
+        }
+    
+        return device
 
 
 hardware = HardwareService()
