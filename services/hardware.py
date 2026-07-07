@@ -44,6 +44,125 @@ class HardwareService:
     
         return None
 
+    def _device_for_bthome_component(self, gateway, component):
+
+        for device in self.devices():
+    
+            props = device.properties or {}
+    
+            if (
+                props.get("gateway_id") == gateway.id
+                and props.get("bthome_device_key") == component
+            ):
+    
+                return device
+    
+            paired_gateways = props.get(
+                "paired_gateways",
+                {}
+            )
+    
+            gateway_pair = paired_gateways.get(
+                gateway.id,
+                {}
+            )
+    
+            if gateway_pair.get("bthome_device_key") == component:
+    
+                return device
+    
+    
+        # Fallback:
+        # Wenn nur ein Sensor auf diesem Gateway bekannt ist,
+        # ordnen wir das bthomedevice diesem Sensor zu.
+        candidates = []
+    
+        for device in self.devices():
+    
+            props = device.properties or {}
+    
+            if (
+                device.type == "sensor"
+                and props.get("gateway_id") == gateway.id
+            ):
+    
+                candidates.append(
+                    device
+                )
+    
+        if len(candidates) == 1:
+    
+            device = candidates[0]
+    
+            props = device.properties
+    
+            props["bthome_device_key"] = component
+            props["bthome_device_id"] = gateway._bthome_component_id(
+                component
+            )
+            props["paired"] = True
+    
+            return device
+    
+        return None
+    
+    
+    def _apply_bthome_sensor_updates(self, gateway):
+    
+        updated = []
+    
+        for update in gateway.bluetooth_sensor_events:
+    
+            component = update.get(
+                "component"
+            )
+    
+            if not component:
+    
+                continue
+    
+            device = self._device_for_bthome_component(
+                gateway,
+                component
+            )
+    
+            if device is None:
+    
+                continue
+    
+            props = device.properties
+    
+            for key in [
+                "temperature",
+                "humidity",
+                "battery",
+                "rssi",
+                "button",
+                "packet_id"
+            ]:
+    
+                if update.get(key) is not None:
+    
+                    props[key] = update.get(
+                        key
+                    )
+    
+            last_seen = (
+                update.get("last_updated_ts")
+                or update.get("ts")
+                or time.time()
+            )
+    
+            props["last_seen"] = last_seen
+            props["bthome_component"] = component
+            props["raw_sensor_update"] = update
+    
+            updated.append(
+                device.to_dict()
+            )
+    
+        return updated
+
     # ------------------------
     # Aktoren
     # ------------------------
@@ -630,9 +749,15 @@ class HardwareService:
                 device.to_dict()
             )
     
+        updated = self._apply_bthome_sensor_updates(
+            gateway
+        )
+    
         return {
             "count": len(added),
-            "devices": added
+            "devices": added,
+            "updated_count": len(updated),
+            "updated": updated
         }
 
 
