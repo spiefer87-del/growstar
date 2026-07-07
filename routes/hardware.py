@@ -331,3 +331,38 @@ def register(app):
             "success": True,
             "result": result
         })
+
+    @app.post("/api/hardware/<gateway_id>/ble/device/<device_id>/pair")
+    def gateway_pair_ble_device(gateway_id, device_id):
+    
+        result = hardware.pair_ble_device(
+            device_id,
+            gateway_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "Gerät nicht gefunden."
+            }), 404
+    
+        return jsonify(result)
+    
+    
+    @app.post("/api/hardware/<gateway_id>/ble/device/<device_id>/unpair")
+    def gateway_unpair_ble_device(gateway_id, device_id):
+    
+        result = hardware.unpair_ble_device(
+            device_id,
+            gateway_id
+        )
+    
+        if result is None:
+    
+            return jsonify({
+                "success": False,
+                "message": "Gerät nicht gefunden."
+            }), 404
+    
+        return jsonify(result)
