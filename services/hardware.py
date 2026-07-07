@@ -298,7 +298,7 @@ class HardwareService:
             "known_objects": known_objects
         }
 
-    def pair_ble_device(self, device_id, gateway_id=None):
+    def pair_ble_device(self, device_id, gateway_id):
 
         device = self.device(
             device_id
@@ -322,10 +322,6 @@ class HardwareService:
                 "device": device.to_dict()
             }
     
-        if gateway_id is None:
-    
-            gateway_id = "192.168.178.91"
-    
         gateway = manager.gateway(
             gateway_id
         )
@@ -338,32 +334,6 @@ class HardwareService:
                 "gateway_id": gateway_id,
                 "device": device.to_dict()
             }
-    
-        old_gateway_id = props.get(
-            "gateway_id"
-        )
-    
-        old_key = props.get(
-            "bthome_device_key"
-        )
-    
-        # Falls auf anderem Gateway gekoppelt:
-        # dort sauber entkoppeln.
-        if (
-            old_gateway_id
-            and old_gateway_id != gateway_id
-            and old_key
-        ):
-    
-            old_gateway = manager.gateway(
-                old_gateway_id
-            )
-    
-            if old_gateway:
-    
-                old_gateway.delete_bthome_device(
-                    old_key
-                )
     
         add_result = gateway.add_bthome_device_by_addr(
             addr,
@@ -396,6 +366,33 @@ class HardwareService:
                 device_key
             )
     
+        paired_gateways = props.get(
+            "paired_gateways",
+            {}
+        )
+    
+        paired_gateways[gateway.id] = {
+    
+            "gateway_id": gateway.id,
+    
+            "gateway_ip": gateway.ip,
+    
+            "bthome_device_key": device_key,
+    
+            "bthome_device_id": device_component_id,
+    
+            "known_objects": known_objects,
+    
+            "setup_result": add_result,
+    
+            "paired": bool(device_key),
+    
+            "paired_at": time.time()
+    
+        }
+    
+        props["paired_gateways"] = paired_gateways
+    
         props["gateway_id"] = gateway.id
         props["gateway_ip"] = gateway.ip
         props["bthome_device_key"] = device_key
@@ -407,9 +404,9 @@ class HardwareService:
         return {
             "success": bool(device_key),
             "message": (
-                "Gerät gekoppelt."
+                "Gerät auf diesem Gateway gekoppelt."
                 if device_key
-                else "Gerät konnte nicht gekoppelt werden."
+                else "Gerät konnte auf diesem Gateway nicht gekoppelt werden."
             ),
             "gateway_id": gateway.id,
             "add_device": add_result,
@@ -418,7 +415,7 @@ class HardwareService:
         }
     
     
-    def unpair_ble_device(self, device_id):
+    def unpair_ble_device(self, device_id, gateway_id):
     
         device = self.device(
             device_id
@@ -430,57 +427,80 @@ class HardwareService:
     
         props = device.properties
     
-        gateway_id = props.get(
-            "gateway_id"
+        gateway = manager.gateway(
+            gateway_id
         )
     
-        device_key = props.get(
-            "bthome_device_key"
+        if gateway is None:
+    
+            return {
+                "success": False,
+                "message": "Gateway nicht gefunden.",
+                "gateway_id": gateway_id,
+                "device": device.to_dict()
+            }
+    
+        paired_gateways = props.get(
+            "paired_gateways",
+            {}
         )
     
-        result = None
+        gateway_pair = paired_gateways.get(
+            gateway.id,
+            {}
+        )
     
-        if gateway_id and device_key:
+        device_key = (
+            gateway_pair.get("bthome_device_key")
+            or props.get("bthome_device_key")
+        )
     
-            gateway = manager.gateway(
-                gateway_id
+        delete_result = None
+    
+        if device_key:
+    
+            delete_result = gateway.delete_bthome_device(
+                device_key
             )
     
-            if gateway:
+        paired_gateways.pop(
+            gateway.id,
+            None
+        )
     
-                result = gateway.delete_bthome_device(
-                    device_key
+        props["paired_gateways"] = paired_gateways
+    
+        if props.get("gateway_id") == gateway.id:
+    
+            for key in [
+    
+                "bthome_device_key",
+                "bthome_device_id",
+                "known_objects",
+                "setup_result",
+                "bthome_device_status",
+                "bthome_device_config",
+                "bthome_sensors",
+                "temperature",
+                "humidity",
+                "battery"
+    
+            ]:
+    
+                props.pop(
+                    key,
+                    None
                 )
     
-        for key in [
-    
-            "bthome_device_key",
-            "bthome_device_id",
-            "known_objects",
-            "setup_result",
-            "bthome_device_status",
-            "bthome_device_config",
-            "bthome_sensors",
-            "temperature",
-            "humidity",
-            "battery"
-    
-        ]:
-    
-            props.pop(
-                key,
-                None
-            )
-    
-        props["paired"] = False
+            props["paired"] = False
     
         return {
             "success": True,
-            "message": "Gerät entkoppelt.",
-            "delete_result": result,
+            "message": "Gerät auf diesem Gateway entkoppelt.",
+            "gateway_id": gateway.id,
+            "delete_result": delete_result,
             "device": device.to_dict()
         }
-
     # ------------------------
     # Refresh
     # ------------------------
