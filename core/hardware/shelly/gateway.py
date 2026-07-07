@@ -486,33 +486,33 @@ class ShellyGateway(Gateway):
                 self._handle_bthome_device_event(
                     event
                 )
-    
-    
-        def get_ble_scan_result(self):
 
-            return {
-    
-                "scanning": self.bluetooth_scanning,
-    
-                "finished": self.bluetooth_scan_finished,
-    
-                "device_count": len(
-                    self.bluetooth_discovered
-                ),
-    
-                "sensor_event_count": len(
-                    self.bluetooth_sensor_events
-                ),
-    
-                "events": self.bluetooth_events,
-    
-                "discovered": self.bluetooth_discovered,
-    
-                "sensor_events": self.bluetooth_sensor_events,
-    
-                "known_devices": self.bluetooth_known_devices
-    
-            }
+
+    def get_ble_scan_result(self):
+
+        return {
+
+            "scanning": self.bluetooth_scanning,
+
+            "finished": self.bluetooth_scan_finished,
+
+            "device_count": len(
+                self.bluetooth_discovered
+            ),
+
+            "sensor_event_count": len(
+                self.bluetooth_sensor_events
+            ),
+
+            "events": self.bluetooth_events,
+
+            "discovered": self.bluetooth_discovered,
+
+            "sensor_events": self.bluetooth_sensor_events,
+
+            "known_devices": self.bluetooth_known_devices
+
+        }
 
     def add_bthome_device(self, event):
 
