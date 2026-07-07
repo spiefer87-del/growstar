@@ -360,7 +360,33 @@ class ShellyGateway(Gateway):
 
     
     
-    
+    def listen_for_sensor_updates(self, duration=5):
+
+        print(
+            "BTHome Sensor Listener gestartet:",
+            self.ip
+        )
+
+        before = len(
+            self.bluetooth_sensor_events
+        )
+
+        self._listen_bthome_events(
+            duration
+        )
+
+        after = len(
+            self.bluetooth_sensor_events
+        )
+
+        return {
+            "duration": duration,
+            "events_before": before,
+            "events_after": after,
+            "new_events": after - before,
+            "known_devices": self.bluetooth_known_devices
+        }
+        
     def _handle_bthome_event(self, raw):
 
         try:
