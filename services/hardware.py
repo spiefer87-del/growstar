@@ -360,6 +360,57 @@ class HardwareService:
     
         return updated
 
+    def _apply_known_bthome_values_to_device(self, gateway, device):
+
+        props = device.properties or {}
+    
+        component = (
+            props.get("bthome_device_key")
+            or props.get("bthome_component")
+        )
+    
+        if not component:
+    
+            return False
+    
+        known = gateway.bluetooth_known_devices.get(
+            component
+        )
+    
+        if not known:
+    
+            return False
+    
+        for key in [
+            "temperature",
+            "humidity",
+            "battery",
+            "rssi",
+            "button",
+            "packet_id"
+        ]:
+    
+            if known.get(key) is not None:
+    
+                props[key] = known.get(
+                    key
+                )
+    
+        props["last_seen"] = (
+            known.get("last_updated_ts")
+            or known.get("ts")
+            or props.get("last_seen")
+            or time.time()
+        )
+    
+        props["raw_sensor_update"] = known
+        props["bthome_component"] = component
+    
+        device.properties = props
+        device.online = True
+    
+        return True
+
     # ------------------------
     # Aktoren
     # ------------------------
@@ -563,27 +614,41 @@ class HardwareService:
                 "device": device.to_dict()
             }
     
+        listen_result = None
+    
         # ------------------------------------------------
-        # Falls Werte durch BLE Scan/WebSocket bereits
-        # im Gateway-Zwischenspeicher liegen, übernehmen.
+        # Kurz auf neue Sensorpakete warten.
+        # Temperatur/Luftfeuchte kommen nur per Event.
         # ------------------------------------------------
     
-        updated = []
+        try:
     
-        if hasattr(
-            self,
-            "_apply_bthome_sensor_updates"
-        ):
-    
-            updated = self._apply_bthome_sensor_updates(
-                gateway
+            listen_result = gateway.listen_for_sensor_updates(
+                5
             )
     
-        # Nach dem Anwenden nochmal Gerät holen,
-        # weil Properties aktualisiert worden sein können.
-        device = self.device(
-            device_id
+        except Exception as e:
+    
+            print(
+                "Sensor Listener Fehler:",
+                e
+            )
+    
+    
+        # ------------------------------------------------
+        # Event-Werte aus Gateway-Cache übernehmen
+        # ------------------------------------------------
+    
+        cache_applied = self._apply_known_bthome_values_to_device(
+            gateway,
+            device
         )
+    
+    
+        # ------------------------------------------------
+        # Zusätzlich Status lesen:
+        # liefert meist Batterie/RSSI.
+        # ------------------------------------------------
     
         props = device.properties
     
@@ -644,8 +709,8 @@ class HardwareService:
             "status": status,
             "config": config,
             "known_objects": known_objects,
-            "updated": updated,
-            "updated_count": len(updated)
+            "listen": listen_result,
+            "cache_applied": cache_applied
         }
 
     def pair_ble_device(self, device_id, gateway_id):
