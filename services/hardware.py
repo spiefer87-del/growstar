@@ -411,6 +411,114 @@ class HardwareService:
     
         return True
 
+    def _value_from_sensor_status(self, status):
+
+        if not status:
+    
+            return None
+    
+        if "value" in status:
+    
+            return status.get(
+                "value"
+            )
+    
+        if "input" in status:
+    
+            return status.get(
+                "input"
+            )
+    
+        return None
+    
+    
+    def _apply_known_objects_values(self, gateway, device, known_objects):
+    
+        if not known_objects:
+    
+            return False
+    
+        objects = known_objects.get(
+            "objects",
+            []
+        )
+    
+        if not objects:
+    
+            return False
+    
+        props = device.properties
+    
+        changed = False
+    
+        for obj in objects:
+    
+            obj_id = obj.get(
+                "obj_id"
+            )
+    
+            component = obj.get(
+                "component"
+            )
+    
+            if not component:
+    
+                continue
+    
+            status = gateway.get_bthome_sensor_status(
+                component
+            )
+    
+            value = self._value_from_sensor_status(
+                status
+            )
+    
+            if value is None:
+    
+                continue
+    
+            if obj_id == 1:
+    
+                props["battery"] = value
+    
+                changed = True
+    
+            elif obj_id == 30:
+    
+                props["button"] = value
+    
+                changed = True
+    
+            elif obj_id == 46:
+    
+                props["humidity"] = value
+    
+                changed = True
+    
+            elif obj_id == 69:
+    
+                props["temperature"] = value
+    
+                changed = True
+    
+            if status.get("last_updated_ts"):
+    
+                props["last_seen"] = status.get(
+                    "last_updated_ts"
+                )
+    
+            props.setdefault(
+                "bthome_sensor_status",
+                {}
+            )
+    
+            props["bthome_sensor_status"][component] = {
+                "obj_id": obj_id,
+                "status": status
+            }
+    
+        return changed
+
     # ------------------------
     # Aktoren
     # ------------------------
@@ -589,11 +697,6 @@ class HardwareService:
             "gateway_id"
         )
     
-        device_key = (
-            props.get("bthome_device_key")
-            or props.get("bthome_component")
-        )
-    
         if not gateway_id:
     
             return {
@@ -614,17 +717,51 @@ class HardwareService:
                 "device": device.to_dict()
             }
     
+        # ------------------------------------------------
+        # BTHome Device Key robust ermitteln
+        # ------------------------------------------------
+    
+        device_key = (
+            props.get("bthome_device_key")
+            or props.get("bthome_component")
+        )
+    
+        if not device_key:
+    
+            paired_gateways = props.get(
+                "paired_gateways",
+                {}
+            )
+    
+            gateway_pair = paired_gateways.get(
+                gateway_id,
+                {}
+            )
+    
+            device_key = gateway_pair.get(
+                "bthome_device_key"
+            )
+    
+        if not device_key and props.get("bthome_device_id") is not None:
+    
+            device_key = (
+                "bthomedevice:" +
+                str(
+                    props.get("bthome_device_id")
+                )
+            )
+    
         listen_result = None
     
         # ------------------------------------------------
-        # Kurz auf neue Sensorpakete warten.
-        # Temperatur/Luftfeuchte kommen nur per Event.
+        # Kurz auf neue Sensorpakete hören.
+        # Nicht kritisch, wenn nichts Neues kommt.
         # ------------------------------------------------
     
         try:
     
             listen_result = gateway.listen_for_sensor_updates(
-                5
+                3
             )
     
         except Exception as e:
@@ -634,33 +771,36 @@ class HardwareService:
                 e
             )
     
-    
         # ------------------------------------------------
-        # Event-Werte aus Gateway-Cache übernehmen
+        # Event-Cache übernehmen
         # ------------------------------------------------
     
-        cache_applied = self._apply_known_bthome_values_to_device(
-            gateway,
-            device
-        )
+        cache_applied = False
     
+        try:
     
-        # ------------------------------------------------
-        # Zusätzlich Status lesen:
-        # liefert meist Batterie/RSSI.
-        # ------------------------------------------------
+            cache_applied = self._apply_known_bthome_values_to_device(
+                gateway,
+                device
+            )
+    
+        except Exception as e:
+    
+            print(
+                "BTHome Cache Fehler:",
+                e
+            )
     
         props = device.properties
-    
-        device_key = (
-            props.get("bthome_device_key")
-            or props.get("bthome_component")
-            or device_key
-        )
     
         status = None
         config = None
         known_objects = None
+        sensor_values_applied = False
+    
+        # ------------------------------------------------
+        # BTHomeDevice und BTHomeSensor Komponenten lesen
+        # ------------------------------------------------
     
         if device_key:
     
@@ -675,6 +815,16 @@ class HardwareService:
             known_objects = gateway.get_bthome_device_known_objects(
                 device_key
             )
+    
+            if known_objects:
+    
+                sensor_values_applied = self._apply_known_objects_values(
+                    gateway,
+                    device,
+                    known_objects
+                )
+    
+                props = device.properties
     
             if status:
     
@@ -697,20 +847,44 @@ class HardwareService:
                         "last_updated_ts"
                     )
     
+            props["bthome_device_key"] = device_key
             props["bthome_device_status"] = status
             props["bthome_device_config"] = config
             props["known_objects"] = known_objects
+            props["paired"] = True
+    
+        # ------------------------------------------------
+        # Falls noch raw_sensors vorhanden sind:
+        # Temperatur/Luftfeuchte daraus retten
+        # ------------------------------------------------
+    
+        try:
+    
+            self._apply_raw_sensor_values(
+                device
+            )
+    
+        except Exception as e:
+    
+            print(
+                "Raw Sensor Werte Fehler:",
+                e
+            )
+    
+        props = device.properties
     
         props["last_read"] = time.time()
     
         return {
             "success": True,
             "device": device.to_dict(),
+            "device_key": device_key,
             "status": status,
             "config": config,
             "known_objects": known_objects,
             "listen": listen_result,
-            "cache_applied": cache_applied
+            "cache_applied": cache_applied,
+            "sensor_values_applied": sensor_values_applied
         }
 
     def pair_ble_device(self, device_id, gateway_id):
