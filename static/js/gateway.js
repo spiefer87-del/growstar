@@ -14,6 +14,23 @@ const REFRESH_INTERVAL = 5000;
 
 
 // ----------------------------------------------------
+// Helfer
+// ----------------------------------------------------
+
+function wait(ms){
+
+    return new Promise(
+        resolve => setTimeout(
+            resolve,
+            ms
+        )
+    );
+
+}
+
+
+
+// ----------------------------------------------------
 // Gateway laden
 // ----------------------------------------------------
 
@@ -22,10 +39,10 @@ async function loadGateway(){
     try{
 
         const response = await fetch(
-
             "/api/hardware/" +
-            gatewayId
-
+            encodeURIComponent(
+                gatewayId
+            )
         );
 
         const data = await response.json();
@@ -43,6 +60,11 @@ async function loadGateway(){
     catch(err){
 
         console.error(err);
+
+        showDialog(
+            "Gateway Fehler",
+            String(err)
+        );
 
     }
 
@@ -59,15 +81,14 @@ async function refreshGateway(){
     try{
 
         const response = await fetch(
-
             "/api/hardware/" +
-            gatewayId +
+            encodeURIComponent(
+                gatewayId
+            ) +
             "/refresh",
-
             {
                 method:"POST"
             }
-
         );
 
         const data = await response.json();
@@ -86,6 +107,11 @@ async function refreshGateway(){
 
         console.error(err);
 
+        showDialog(
+            "Gateway Fehler",
+            String(err)
+        );
+
     }
 
 }
@@ -101,13 +127,13 @@ function updateGateway(gateway){
     document
     .getElementById("gateway-name")
     .textContent =
-        gateway.name;
+        gateway.name || "Gateway";
 
 
     document
     .getElementById("gateway-ip")
     .textContent =
-        gateway.ip;
+        gateway.ip || "--";
 
 
     document
@@ -119,8 +145,8 @@ function updateGateway(gateway){
     document
     .getElementById("gateway-rssi")
     .textContent =
-        (gateway.rssi ?? "--")
-        + " dBm";
+        (gateway.rssi ?? "--") +
+        " dBm";
 
 
     document
@@ -132,45 +158,29 @@ function updateGateway(gateway){
     document
     .getElementById("gateway-model")
     .textContent =
-        gateway.model;
+        gateway.model || "--";
 
 
     document
     .getElementById("gateway-mac")
     .textContent =
-        gateway.mac;
+        gateway.mac || "--";
 
 
     document
     .getElementById("gateway-online")
     .innerHTML =
-
         gateway.online
-
-        ?
-
-        '<span class="badge">Online</span>'
-
-        :
-
-        'Offline';
-
+        ? '<span class="badge online">Online</span>'
+        : '<span class="badge offline">Offline</span>';
 
 
     document
     .getElementById("gateway-bluetooth")
     .innerHTML =
-
         gateway.bluetooth_enabled
-
-        ?
-
-        '<span class="badge">🟢 Aktiv</span>'
-
-        :
-
-        '<span class="badge" style="background:#dc2626">🔴 Deaktiviert</span>';
-
+        ? '<span class="badge online">Bluetooth aktiv</span>'
+        : '<span class="badge danger">Bluetooth deaktiviert</span>';
 
 
     renderActions(
@@ -179,22 +189,30 @@ function updateGateway(gateway){
 
 }
 
-//
+
+
 // ----------------------------------------------------
-// Gateway Aktionen
+// Gateway Aktionen anzeigen
 // ----------------------------------------------------
 
 function renderActions(gateway){
 
     const actions =
-
         document.getElementById(
             "gateway-actions"
         );
 
+    if(!actions){
+
+        console.warn(
+            "gateway-actions nicht gefunden"
+        );
+
+        return;
+
+    }
 
     actions.innerHTML = "";
-
 
 
     actions.innerHTML += `
@@ -208,27 +226,27 @@ function renderActions(gateway){
     `;
 
 
-
     if(gateway.capabilities?.ble_config){
 
         actions.innerHTML += `
 
             <button id="bt-enable">
 
-                🟢 Bluetooth aktivieren
+                Bluetooth aktivieren
 
             </button>
 
-            <button id="bt-disable">
+            <button
+                id="bt-disable"
+                class="secondary">
 
-                🔴 Bluetooth deaktivieren
+                Bluetooth deaktivieren
 
             </button>
 
         `;
 
     }
-
 
 
     if(gateway.capabilities?.bthome_discovery){
@@ -237,7 +255,7 @@ function renderActions(gateway){
 
             <button id="ble-scan-btn">
 
-                🔎 BLE Scan starten
+                BLE Scan starten
 
             </button>
 
@@ -246,10 +264,11 @@ function renderActions(gateway){
     }
 
 
-
     actions.innerHTML += `
 
-        <button id="methods-btn">
+        <button
+            id="methods-btn"
+            class="secondary">
 
             RPC Methoden anzeigen
 
@@ -258,80 +277,61 @@ function renderActions(gateway){
     `;
 
 
-
     bindButtons();
 
 }
 
-//
+
+
 // ----------------------------------------------------
 // Buttons verbinden
 // ----------------------------------------------------
 
 function bindButtons(){
 
-
     document
     .getElementById("refresh-btn")
     ?.addEventListener(
-
         "click",
-
         refreshGateway
-
     );
-
 
 
     document
     .getElementById("bt-enable")
     ?.addEventListener(
-
         "click",
-
         enableBluetooth
-
     );
-
 
 
     document
     .getElementById("bt-disable")
     ?.addEventListener(
-
         "click",
-
         disableBluetooth
-
     );
-
 
 
     document
     .getElementById("methods-btn")
     ?.addEventListener(
-
         "click",
-
         listMethods
-
     );
-
 
 
     document
     .getElementById("ble-scan-btn")
     ?.addEventListener(
-
         "click",
-
         startBleScan
-
     );
 
 }
 
-//
+
+
 // ----------------------------------------------------
 // Bluetooth
 // ----------------------------------------------------
@@ -339,19 +339,14 @@ function bindButtons(){
 async function enableBluetooth(){
 
     await fetch(
-
         "/api/hardware/" +
-
-        gatewayId +
-
+        encodeURIComponent(
+            gatewayId
+        ) +
         "/bluetooth/enable",
-
         {
-
             method:"POST"
-
         }
-
     );
 
     loadGateway();
@@ -363,26 +358,22 @@ async function enableBluetooth(){
 async function disableBluetooth(){
 
     await fetch(
-
         "/api/hardware/" +
-
-        gatewayId +
-
+        encodeURIComponent(
+            gatewayId
+        ) +
         "/bluetooth/disable",
-
         {
-
             method:"POST"
-
         }
-
     );
 
     loadGateway();
 
 }
 
-//
+
+
 // ----------------------------------------------------
 // RPC Methoden
 // ----------------------------------------------------
@@ -392,26 +383,30 @@ async function listMethods(){
     try{
 
         const response = await fetch(
-
             "/api/hardware/" +
-            gatewayId +
+            encodeURIComponent(
+                gatewayId
+            ) +
             "/methods"
-
         );
 
         const data = await response.json();
 
-        const methods = data.methods.methods;
+        const methods =
+            data.methods?.methods || [];
 
         const groups = {};
 
         methods.forEach(method=>{
 
-            const parts = method.split(".");
+            const parts =
+                method.split(".");
 
-            const group = parts[0];
+            const group =
+                parts[0];
 
-            const name = parts
+            const name =
+                parts
                 .slice(1)
                 .join(".");
 
@@ -421,40 +416,39 @@ async function listMethods(){
 
             }
 
-            groups[group].push(name);
+            groups[group].push(
+                name
+            );
 
         });
 
         let text = "";
 
         Object.keys(groups)
+        .sort()
+        .forEach(group=>{
+
+            text += group + "\n";
+            text += "────────────────────────\n";
+
+            groups[group]
             .sort()
-            .forEach(group=>{
+            .forEach(name=>{
 
-                text += group + "\n";
-                text += "────────────────────────\n";
-
-                groups[group]
-                    .sort()
-                    .forEach(name=>{
-
-                        text +=
-                            "• " +
-                            name +
-                            "\n";
-
-                    });
-
-                text += "\n";
+                text +=
+                    "• " +
+                    name +
+                    "\n";
 
             });
 
+            text += "\n";
+
+        });
+
         showDialog(
-
             "RPC Methoden",
-
-            text
-
+            text || "Keine Methoden gefunden."
         );
 
     }
@@ -463,25 +457,20 @@ async function listMethods(){
 
         console.error(err);
 
+        showDialog(
+            "RPC Methoden Fehler",
+            String(err)
+        );
+
     }
 
 }
 
 
-//
+
 // ----------------------------------------------------
 // BLE Scan
 // ----------------------------------------------------
-function wait(ms){
-
-    return new Promise(
-        resolve => setTimeout(
-            resolve,
-            ms
-        )
-    );
-
-}
 
 async function startBleScan(){
 
@@ -494,7 +483,9 @@ async function startBleScan(){
 
         const scanResponse = await fetch(
             "/api/hardware/" +
-            gatewayId +
+            encodeURIComponent(
+                gatewayId
+            ) +
             "/ble/scan",
             {
                 method:"POST"
@@ -515,18 +506,18 @@ async function startBleScan(){
             );
 
             return;
+
         }
 
         const duration =
             scanData.result?.duration ||
-            scanData.result?.result?.duration ||
-            30;
+            60;
 
         showDialog(
             "BLE Scan",
             "Scan läuft...\n\nDauer: " +
             duration +
-            " Sekunden\n\nBitte den BLU Sensor in den Pairing-Modus versetzen."
+            " Sekunden\n\nFalls es ein neuer Sensor ist: bitte Pairing-Modus aktivieren.\n\nBereits gekoppelte Sensoren müssen nur kurz senden."
         );
 
         await wait(
@@ -535,26 +526,33 @@ async function startBleScan(){
 
         const resultResponse = await fetch(
             "/api/hardware/" +
-            gatewayId +
+            encodeURIComponent(
+                gatewayId
+            ) +
             "/ble/discovered"
         );
 
         const resultData = await resultResponse.json();
 
+
+        // Wichtig:
+        // Immer ausführen, auch wenn device_count 0 ist.
+        // Bereits gekoppelte Sensoren kommen als sensor_events.
         let addData = null;
 
         const addResponse = await fetch(
             "/api/hardware/" +
-            gatewayId +
+            encodeURIComponent(
+                gatewayId
+            ) +
             "/ble/add-discovered",
             {
                 method:"POST"
             }
         );
-        
+
         addData = await addResponse.json();
 
-        }
 
         showDialog(
             "BLE Scan Ergebnis",
@@ -567,6 +565,8 @@ async function startBleScan(){
                 2
             )
         );
+
+        loadGateway();
 
     }
 
@@ -582,7 +582,9 @@ async function startBleScan(){
     }
 
 }
-//
+
+
+
 // ----------------------------------------------------
 // Initialisierung
 // ----------------------------------------------------
@@ -590,11 +592,6 @@ async function startBleScan(){
 loadGateway();
 
 setInterval(
-
     loadGateway,
-
     REFRESH_INTERVAL
-
 );
-
-
