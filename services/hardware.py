@@ -46,6 +46,10 @@ class HardwareService:
 
     def _device_for_bthome_component(self, gateway, component):
 
+        # ------------------------
+        # 1. Direkter Treffer über aktuelle Kopplung
+        # ------------------------
+    
         for device in self.devices():
     
             props = device.properties or {}
@@ -72,46 +76,221 @@ class HardwareService:
                 return device
     
     
-        # Fallback:
-        # Wenn nur ein Sensor auf diesem Gateway bekannt ist,
-        # ordnen wir das bthomedevice diesem Sensor zu.
-        candidates = []
+        # ------------------------
+        # 2. Adresse vom Shelly-Gateway abfragen
+        # ------------------------
+    
+        config = gateway.get_bthome_device_config(
+            component
+        )
+    
+        addr = self._extract_addr_from_bthome_config(
+            config
+        )
+    
+        name = self._extract_name_from_bthome_config(
+            config
+        )
+    
+        device = self._find_device_by_addr(
+            addr
+        )
+    
+    
+        # ------------------------
+        # 3. Falls Gerät noch nicht existiert:
+        #    aus Gateway-Config anlegen
+        # ------------------------
+    
+        if device is None and addr:
+    
+            device = HardwareDevice()
+    
+            device.id = self._blu_id_from_addr(
+                addr
+            )
+    
+            device.name = name
+    
+            device.manufacturer = "Shelly"
+    
+            device.model = "Shelly BLU H&T"
+    
+            device.type = "sensor"
+    
+            device.online = True
+    
+            device.properties = {
+                "protocol": "bthome",
+                "addr": addr,
+                "local_name": name,
+                "model_id": 12
+            }
+    
+            manager.add_device(
+                device
+            )
+    
+    
+        if device is None:
+    
+            return None
+    
+    
+        # ------------------------
+        # 4. Gerät mit aktuellem Gateway verknüpfen
+        # ------------------------
+    
+        props = device.properties
+    
+        component_id = gateway._bthome_component_id(
+            component
+        )
+    
+        paired_gateways = props.get(
+            "paired_gateways",
+            {}
+        )
+    
+        paired_gateways[gateway.id] = {
+    
+            "gateway_id": gateway.id,
+    
+            "gateway_ip": gateway.ip,
+    
+            "bthome_device_key": component,
+    
+            "bthome_device_id": component_id,
+    
+            "config": config,
+    
+            "paired": True,
+    
+            "paired_at": time.time()
+    
+        }
+    
+        props["paired_gateways"] = paired_gateways
+    
+        props["gateway_id"] = gateway.id
+        props["gateway_ip"] = gateway.ip
+        props["bthome_device_key"] = component
+        props["bthome_device_id"] = component_id
+        props["bthome_device_config"] = config
+        props["paired"] = True
+    
+        if addr:
+    
+            props["addr"] = addr
+    
+        if name:
+    
+            props["local_name"] = name
+    
+        return device
+    
+    def _blu_id_from_addr(self, addr):
+
+        if not addr:
+    
+            return None
+    
+        clean_addr = addr.replace(
+            ":",
+            ""
+        ).lower()
+    
+        return (
+            "blu_" +
+            clean_addr
+        )
+    
+    
+    def _find_device_by_addr(self, addr):
+    
+        if not addr:
+    
+            return None
+    
+        wanted = addr.lower()
     
         for device in self.devices():
     
             props = device.properties or {}
     
+            current_addr = props.get(
+                "addr"
+            )
+    
             if (
-                device.type == "sensor"
-                and props.get("gateway_id") == gateway.id
+                current_addr
+                and current_addr.lower() == wanted
             ):
     
-                candidates.append(
-                    device
-                )
-    
-        if len(candidates) == 1:
-    
-            device = candidates[0]
-    
-            props = device.properties
-    
-            props["bthome_device_key"] = component
-            props["bthome_device_id"] = gateway._bthome_component_id(
-                component
-            )
-            props["paired"] = True
-    
-            return device
+                return device
     
         return None
     
     
-    def _apply_bthome_sensor_updates(self, gateway):
+    def _extract_addr_from_bthome_config(self, config):
     
+        if not config:
+    
+            return None
+    
+        data = config
+    
+        if "config" in data:
+    
+            data = data.get(
+                "config",
+                {}
+            )
+    
+        return (
+            data.get("addr")
+            or data.get("address")
+            or data.get("mac")
+        )
+    
+    
+    def _extract_name_from_bthome_config(self, config):
+    
+        if not config:
+    
+            return "Shelly BLU"
+    
+        data = config
+    
+        if "config" in data:
+    
+            data = data.get(
+                "config",
+                {}
+            )
+    
+        return (
+            data.get("name")
+            or data.get("local_name")
+            or "Shelly BLU"
+        )
+    def _apply_bthome_sensor_updates(self, gateway):
+
         updated = []
     
-        for update in gateway.bluetooth_sensor_events:
+        handled = set()
+    
+        updates = list(
+            gateway.bluetooth_sensor_events
+        )
+    
+        for component, update in gateway.bluetooth_known_devices.items():
+    
+            updates.append(
+                update
+            )
+    
+        for update in updates:
     
             component = update.get(
                 "component"
@@ -120,6 +299,21 @@ class HardwareService:
             if not component:
     
                 continue
+    
+            key = (
+                component,
+                update.get("packet_id"),
+                update.get("ts"),
+                update.get("type")
+            )
+    
+            if key in handled:
+    
+                continue
+    
+            handled.add(
+                key
+            )
     
             device = self._device_for_bthome_component(
                 gateway,
@@ -132,7 +326,7 @@ class HardwareService:
     
             props = device.properties
     
-            for key in [
+            for value_key in [
                 "temperature",
                 "humidity",
                 "battery",
@@ -141,10 +335,10 @@ class HardwareService:
                 "packet_id"
             ]:
     
-                if update.get(key) is not None:
+                if update.get(value_key) is not None:
     
-                    props[key] = update.get(
-                        key
+                    props[value_key] = update.get(
+                        value_key
                     )
     
             last_seen = (
@@ -156,6 +350,9 @@ class HardwareService:
             props["last_seen"] = last_seen
             props["bthome_component"] = component
             props["raw_sensor_update"] = update
+            props["online"] = True
+    
+            device.online = True
     
             updated.append(
                 device.to_dict()
