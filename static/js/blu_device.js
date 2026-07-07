@@ -381,6 +381,150 @@ async function readSensorValues(){
 
 }
 
+async function pairCurrentGateway(){
+
+    try{
+
+        if(
+            !currentDevice ||
+            !currentDevice.properties ||
+            !currentDevice.properties.gateway_id
+        ){
+
+            showDialog(
+                "Bluetooth koppeln",
+                "Kein Gateway beim Gerät hinterlegt."
+            );
+
+            return;
+
+        }
+
+        const gatewayId =
+            currentDevice.properties.gateway_id;
+
+        showDialog(
+            "Bluetooth koppeln",
+            "Gerät wird mit Gateway " +
+            gatewayId +
+            " gekoppelt..."
+        );
+
+        const response = await fetch(
+            "/api/hardware/" +
+            encodeURIComponent(
+                gatewayId
+            ) +
+            "/ble/device/" +
+            encodeURIComponent(
+                deviceId
+            ) +
+            "/pair",
+            {
+                method:"POST"
+            }
+        );
+
+        const data = await response.json();
+
+        showDialog(
+            "Bluetooth koppeln",
+            JSON.stringify(
+                data,
+                null,
+                2
+            )
+        );
+
+        loadBluetoothDevice();
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        showDialog(
+            "Bluetooth koppeln Fehler",
+            String(err)
+        );
+
+    }
+
+}
+
+
+async function unpairCurrentGateway(){
+
+    try{
+
+        if(
+            !currentDevice ||
+            !currentDevice.properties ||
+            !currentDevice.properties.gateway_id
+        ){
+
+            showDialog(
+                "Bluetooth entkoppeln",
+                "Kein Gateway beim Gerät hinterlegt."
+            );
+
+            return;
+
+        }
+
+        const gatewayId =
+            currentDevice.properties.gateway_id;
+
+        showDialog(
+            "Bluetooth entkoppeln",
+            "Gerät wird von Gateway " +
+            gatewayId +
+            " entkoppelt..."
+        );
+
+        const response = await fetch(
+            "/api/hardware/" +
+            encodeURIComponent(
+                gatewayId
+            ) +
+            "/ble/device/" +
+            encodeURIComponent(
+                deviceId
+            ) +
+            "/unpair",
+            {
+                method:"POST"
+            }
+        );
+
+        const data = await response.json();
+
+        showDialog(
+            "Bluetooth entkoppeln",
+            JSON.stringify(
+                data,
+                null,
+                2
+            )
+        );
+
+        loadBluetoothDevice();
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        showDialog(
+            "Bluetooth entkoppeln Fehler",
+            String(err)
+        );
+
+    }
+
+}
 
 // ----------------------------------------------------
 // Buttons verbinden
@@ -414,6 +558,20 @@ function bindButtons(){
     ?.addEventListener(
         "click",
         setupSensors
+    );
+
+    document
+    .getElementById("pair-current-gateway-btn")
+    ?.addEventListener(
+        "click",
+        pairCurrentGateway
+    );
+    
+    document
+    .getElementById("unpair-current-gateway-btn")
+    ?.addEventListener(
+        "click",
+        unpairCurrentGateway
     );
 
     document
