@@ -538,8 +538,9 @@ class HardwareService:
             "gateway_id"
         )
     
-        device_key = props.get(
-            "bthome_device_key"
+        device_key = (
+            props.get("bthome_device_key")
+            or props.get("bthome_component")
         )
     
         if not gateway_id:
@@ -549,33 +550,6 @@ class HardwareService:
                 "message": "Kein Gateway beim Gerät hinterlegt.",
                 "device": device.to_dict()
             }
-    
-        # Falls das Gerät auf diesem Gateway noch nicht eingerichtet ist:
-        # automatisch einrichten.
-        if not device_key:
-    
-            setup = self.setup_ble_sensor(
-                device_id
-            )
-    
-            if not setup or setup.get("success") is False:
-    
-                return {
-                    "success": False,
-                    "message": "BTHome Gerät konnte nicht automatisch eingerichtet werden.",
-                    "setup": setup,
-                    "device": device.to_dict()
-                }
-    
-            device = self.device(
-                device_id
-            )
-    
-            props = device.properties
-    
-            device_key = props.get(
-                "bthome_device_key"
-            )
     
         gateway = manager.gateway(
             gateway_id
@@ -589,21 +563,79 @@ class HardwareService:
                 "device": device.to_dict()
             }
     
-        status = gateway.get_bthome_device_status(
-            device_key
+        # ------------------------------------------------
+        # Falls Werte durch BLE Scan/WebSocket bereits
+        # im Gateway-Zwischenspeicher liegen, übernehmen.
+        # ------------------------------------------------
+    
+        updated = []
+    
+        if hasattr(
+            self,
+            "_apply_bthome_sensor_updates"
+        ):
+    
+            updated = self._apply_bthome_sensor_updates(
+                gateway
+            )
+    
+        # Nach dem Anwenden nochmal Gerät holen,
+        # weil Properties aktualisiert worden sein können.
+        device = self.device(
+            device_id
         )
     
-        config = gateway.get_bthome_device_config(
-            device_key
+        props = device.properties
+    
+        device_key = (
+            props.get("bthome_device_key")
+            or props.get("bthome_component")
+            or device_key
         )
     
-        known_objects = gateway.get_bthome_device_known_objects(
-            device_key
-        )
+        status = None
+        config = None
+        known_objects = None
     
-        props["bthome_device_status"] = status
-        props["bthome_device_config"] = config
-        props["known_objects"] = known_objects
+        if device_key:
+    
+            status = gateway.get_bthome_device_status(
+                device_key
+            )
+    
+            config = gateway.get_bthome_device_config(
+                device_key
+            )
+    
+            known_objects = gateway.get_bthome_device_known_objects(
+                device_key
+            )
+    
+            if status:
+    
+                for key in [
+                    "battery",
+                    "rssi",
+                    "last_updated_ts",
+                    "packet_id"
+                ]:
+    
+                    if status.get(key) is not None:
+    
+                        props[key] = status.get(
+                            key
+                        )
+    
+                if status.get("last_updated_ts"):
+    
+                    props["last_seen"] = status.get(
+                        "last_updated_ts"
+                    )
+    
+            props["bthome_device_status"] = status
+            props["bthome_device_config"] = config
+            props["known_objects"] = known_objects
+    
         props["last_read"] = time.time()
     
         return {
@@ -611,7 +643,9 @@ class HardwareService:
             "device": device.to_dict(),
             "status": status,
             "config": config,
-            "known_objects": known_objects
+            "known_objects": known_objects,
+            "updated": updated,
+            "updated_count": len(updated)
         }
 
     def pair_ble_device(self, device_id, gateway_id):
