@@ -867,6 +867,29 @@ class ShellyGateway(Gateway):
             }
         )
 
+    def get_bthome_sensor_status(self, key):
+
+        if not self.supports(
+            "BTHomeSensor.GetStatus"
+        ):
+
+            return None
+
+        sensor_id = self._bthome_component_id(
+            key
+        )
+
+        if sensor_id is None:
+
+            return None
+
+        return self.api.call(
+            "BTHomeSensor.GetStatus",
+            {
+                "id": sensor_id
+            }
+        )
+
     def delete_bthome_device(self, key):
 
         if not self.supports(
