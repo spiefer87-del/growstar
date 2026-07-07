@@ -543,22 +543,16 @@ async function startBleScan(){
 
         let addData = null;
 
-        if(
-            resultData.success &&
-            resultData.result &&
-            resultData.result.device_count > 0
-        ){
-
-            const addResponse = await fetch(
-                "/api/hardware/" +
-                gatewayId +
-                "/ble/add-discovered",
-                {
-                    method:"POST"
-                }
-            );
-
-            addData = await addResponse.json();
+        const addResponse = await fetch(
+            "/api/hardware/" +
+            gatewayId +
+            "/ble/add-discovered",
+            {
+                method:"POST"
+            }
+        );
+        
+        addData = await addResponse.json();
 
         }
 
