@@ -30,6 +30,8 @@ class ShellyGateway(Gateway):
         self.bluetooth_events = []
         self.bluetooth_discovered = []
         self.bluetooth_scan_finished = False
+        self.bluetooth_sensor_events = []
+        self.bluetooth_known_devices = {}
 
         self.rssi = None
         self.uptime = None
@@ -355,93 +357,162 @@ class ShellyGateway(Gateway):
             "BLE WebSocket Listener beendet:",
             self.ip
         )
+
+    
     
     
     def _handle_bthome_event(self, raw):
 
         try:
-    
+
             data = json.loads(
                 raw
             )
-    
+
         except Exception:
-    
+
             data = {
                 "raw": raw
             }
-    
+
         print(
             "BLE Event:",
             data
         )
-    
+
         self.bluetooth_events.append(
             data
         )
-    
+
         self.bluetooth_events = self.bluetooth_events[-100:]
-    
-        if data.get("method") != "NotifyEvent":
-    
+
+
+        # --------------------------
+        # Status von bereits gekoppelten
+        # BTHome Devices auswerten
+        # --------------------------
+
+        if data.get("method") == "NotifyStatus":
+
+            params = data.get(
+                "params",
+                {}
+            )
+
+            ts = params.get(
+                "ts",
+                time.time()
+            )
+
+            for component, payload in params.items():
+
+                if (
+                    isinstance(component, str)
+                    and component.startswith("bthomedevice:")
+                ):
+
+                    self._handle_bthome_device_status(
+                        component,
+                        payload,
+                        ts
+                    )
+
             return
-    
+
+
+        if data.get("method") != "NotifyEvent":
+
+            return
+
         params = data.get(
             "params",
             {}
         )
-    
+
         events = params.get(
             "events",
             []
         )
-    
+
         for event in events:
-    
+
             component = event.get(
                 "component"
             )
-    
+
             event_name = event.get(
                 "event"
             )
-    
+
+
+            # --------------------------
+            # Neues Gerät während Discovery
+            # --------------------------
+
             if (
                 component == "bthome"
                 and event_name == "device_discovered"
             ):
-    
+
                 self.bluetooth_discovered.append(
                     event
                 )
-    
+
+
+            # --------------------------
+            # Discovery beendet
+            # --------------------------
+
             if (
                 component == "bthome"
                 and event_name == "discovery_done"
             ):
-    
-                self.bluetooth_scan_finished = True
-    
-                self.bluetooth_scanning = False
-    
-    
-    def get_ble_scan_result(self):
 
-        return {
+                self.bluetooth_scan_finished = True
+
+                self.bluetooth_scanning = False
+
+
+            # --------------------------
+            # Bereits gekoppeltes Gerät
+            # liefert Sensordaten
+            # --------------------------
+
+            if (
+                isinstance(component, str)
+                and component.startswith("bthomedevice:")
+            ):
+
+                self._handle_bthome_device_event(
+                    event
+                )
     
-            "scanning": self.bluetooth_scanning,
     
-            "finished": self.bluetooth_scan_finished,
+        def get_ble_scan_result(self):
+
+            return {
     
-            "device_count": len(
-                self.bluetooth_discovered
-            ),
+                "scanning": self.bluetooth_scanning,
     
-            "events": self.bluetooth_events,
+                "finished": self.bluetooth_scan_finished,
     
-            "discovered": self.bluetooth_discovered
+                "device_count": len(
+                    self.bluetooth_discovered
+                ),
     
-        }
+                "sensor_event_count": len(
+                    self.bluetooth_sensor_events
+                ),
+    
+                "events": self.bluetooth_events,
+    
+                "discovered": self.bluetooth_discovered,
+    
+                "sensor_events": self.bluetooth_sensor_events,
+    
+                "known_devices": self.bluetooth_known_devices
+    
+            }
 
     def add_bthome_device(self, event):
 
@@ -547,6 +618,180 @@ class ShellyGateway(Gateway):
         except Exception:
 
             return None
+
+    def _sensor_value(self, sensors, obj_id):
+
+        items = sensors.get(
+            str(obj_id),
+            []
+        )
+
+        if not items:
+
+            return None
+
+        if not isinstance(
+            items,
+            list
+        ):
+
+            return None
+
+        if len(items) == 0:
+
+            return None
+
+        return items[0].get(
+            "value"
+        )
+
+
+    def _values_from_bthome_sensors(self, sensors):
+
+        values = {}
+
+        battery = self._sensor_value(
+            sensors,
+            1
+        )
+
+        humidity = self._sensor_value(
+            sensors,
+            46
+        )
+
+        temperature = self._sensor_value(
+            sensors,
+            69
+        )
+
+        button = self._sensor_value(
+            sensors,
+            30
+        )
+
+        if battery is not None:
+
+            values["battery"] = battery
+
+        if humidity is not None:
+
+            values["humidity"] = humidity
+
+        if temperature is not None:
+
+            values["temperature"] = temperature
+
+        if button is not None:
+
+            values["button"] = button
+
+        values["raw_sensors"] = sensors
+
+        return values
+
+
+    def _store_bthome_sensor_update(self, update):
+
+        component = update.get(
+            "component"
+        )
+
+        if not component:
+
+            return
+
+        old = self.bluetooth_known_devices.get(
+            component,
+            {}
+        )
+
+        old.update(
+            update
+        )
+
+        self.bluetooth_known_devices[component] = old
+
+        self.bluetooth_sensor_events.append(
+            update
+        )
+
+        self.bluetooth_sensor_events = self.bluetooth_sensor_events[-100:]
+
+
+    def _handle_bthome_device_status(self, component, payload, ts=None):
+
+        if not isinstance(
+            payload,
+            dict
+        ):
+
+            return
+
+        update = {
+            "component": component,
+            "component_id": self._bthome_component_id(
+                component
+            ),
+            "ts": ts or time.time(),
+            "type": "status"
+        }
+
+        for key in [
+            "battery",
+            "rssi",
+            "last_updated_ts",
+            "packet_id"
+        ]:
+
+            if key in payload and payload.get(key) is not None:
+
+                update[key] = payload.get(
+                    key
+                )
+
+        self._store_bthome_sensor_update(
+            update
+        )
+
+
+    def _handle_bthome_device_event(self, event):
+
+        component = event.get(
+            "component"
+        )
+
+        sensors = event.get(
+            "sensors",
+            {}
+        )
+
+        values = self._values_from_bthome_sensors(
+            sensors
+        )
+
+        update = {
+            "component": component,
+            "component_id": self._bthome_component_id(
+                component
+            ),
+            "event": event.get(
+                "event"
+            ),
+            "ts": event.get(
+                "ts",
+                time.time()
+            ),
+            "type": "event"
+        }
+
+        update.update(
+            values
+        )
+
+        self._store_bthome_sensor_update(
+            update
+        )
 
 
     def get_bthome_device_status(self, key):
