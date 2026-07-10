@@ -470,7 +470,115 @@ button.secondary{
 
 }
 
+.form-label{
 
+    display:block;
+
+    margin-top:16px;
+
+    margin-bottom:6px;
+
+    color:var(--muted);
+
+    font-size:.85rem;
+
+}
+
+
+.form-control{
+
+    width:100%;
+
+    padding:10px 12px;
+
+    border:none;
+
+    border-radius:var(--radius-sm);
+
+    background:#e5e7eb;
+
+    color:#0f172a;
+
+    font-size:1rem;
+
+}
+
+
+.offset-row{
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:10px;
+
+    margin-top:16px;
+
+}
+
+
+.offset-row button{
+
+    width:42px;
+
+    height:42px;
+
+    padding:0;
+
+    border-radius:var(--radius-sm);
+
+    background:#334155;
+
+    font-size:1.4rem;
+
+}
+
+
+.number-input{
+
+    width:90px;
+
+    padding:10px;
+
+    border:none;
+
+    border-radius:var(--radius-sm);
+
+    background:#e5e7eb;
+
+    color:#0f172a;
+
+    font-size:1rem;
+
+    text-align:center;
+
+}
+
+
+.saved{
+
+    text-align:center;
+
+    font-size:.85rem;
+
+    color:var(--accent);
+
+    opacity:0;
+
+    transition:opacity .3s ease;
+
+    margin-top:8px;
+
+}
+
+
+.saved.show{
+
+    opacity:1;
+
+}
 @media(max-width:600px){
 
     body{
