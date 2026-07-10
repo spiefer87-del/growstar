@@ -14,6 +14,20 @@
   "MAX_HUM": 75.0,
   "TEMP_OFFSET": 0.0,
   "HUM_OFFSET": 0.0,
+  "SENSOR_ASSIGNMENTS": {
+    "temperature": {
+      "source": "legacy",
+      "device_id": null,
+      "property": "temperature",
+      "label": "Alter Sensor"
+    },
+    "humidity": {
+      "source": "legacy",
+      "device_id": null,
+      "property": "humidity",
+      "label": "Alter Sensor"
+    }
+  },
   "RAMP_DURATION_MIN": 40.0,
   "RAMP_ENABLED": 1.0,
   "IP_HEATING": "192.168.178.84",
