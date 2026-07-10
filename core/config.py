@@ -43,6 +43,24 @@ DEFAULT_CONFIG = {
     "RAMP_DURATION_MIN": 60,
     "RAMP_ENABLED": 0,
 
+    "SENSOR_ASSIGNMENTS": {
+
+        "temperature": {
+            "source": "legacy",
+            "device_id": None,
+            "property": "temperature",
+            "label": "Alter Sensor"
+        },
+
+        "humidity": {
+            "source": "legacy",
+            "device_id": None,
+            "property": "humidity",
+            "label": "Alter Sensor"
+        }
+
+    },
+
     # ================= DEVICE SYSTEM =================
     "DEVICE_MODES": {
         "fan":      {"mode": "ENV",  "params": {}},
