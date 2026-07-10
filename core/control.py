@@ -8,6 +8,7 @@ from core.config import config
 from core.profile import get_profile
 from core.ramp import get_ramped_target
 from core.helpers import minutes_now, in_time_window
+from core.sensors import apply_sensor_assignments
 from core.actuators import (
     set_device,
     set_heating,
@@ -115,6 +116,8 @@ def evaluate_env_conditions(device):
 
 
 def control_device(device):
+
+    apply_sensor_assignments()
 
     mode = get_device_mode(device)
     params = get_device_params(device)
