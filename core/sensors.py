@@ -12,10 +12,6 @@ from core.hardware.manager import manager
 _last_sensor_update = 0
 
 
-# ----------------------------------------------------
-# Helfer
-# ----------------------------------------------------
-
 def _to_float(value):
 
     if value is None:
@@ -39,11 +35,47 @@ def _find_hardware_device(device_id):
 
         return None
 
-    for device in manager.devices_list():
+    if hasattr(manager, "device"):
 
-        if device.id == device_id:
+        try:
 
-            return device
+            device = manager.device(
+                device_id
+            )
+
+            if device is not None:
+
+                return device
+
+        except Exception:
+
+            pass
+
+    for attr in [
+        "devices_list",
+        "devices"
+    ]:
+
+        if hasattr(manager, attr):
+
+            try:
+
+                value = getattr(
+                    manager,
+                    attr
+                )
+
+                devices = value() if callable(value) else value
+
+                for device in devices:
+
+                    if device.id == device_id:
+
+                        return device
+
+            except Exception:
+
+                pass
 
     return None
 
@@ -90,10 +122,6 @@ def _assignment(sensor_name):
     )
 
 
-# ----------------------------------------------------
-# Werte aus Hardware-Geräten lesen
-# ----------------------------------------------------
-
 def _read_hardware_value(sensor_name, assignment):
 
     device_id = assignment.get(
@@ -131,17 +159,13 @@ def _read_hardware_value(sensor_name, assignment):
     )
 
 
-# ----------------------------------------------------
-# Sensor-Zuweisungen anwenden
-# ----------------------------------------------------
-
 def apply_sensor_assignments(force=False):
     """
-    Wendet Sensor-Zuweisungen auf state.live_state an.
+    Wendet Sensor-Zuweisungen an.
 
     Wichtig:
     source == "legacy" verändert NICHTS.
-    Dadurch bleibt die alte MQTT/Pi-Mikro-Logik aktiv.
+    Damit bleibt dein alter MQTT/Pi-Mikro-Sensor aktiv.
     """
 
     global _last_sensor_update
@@ -156,6 +180,8 @@ def apply_sensor_assignments(force=False):
         return False
 
     _last_sensor_update = now
+
+    changed = False
 
     temp_assignment = _assignment(
         "temperature"
@@ -174,8 +200,6 @@ def apply_sensor_assignments(force=False):
         "source",
         "legacy"
     )
-
-    changed = False
 
 
     # ------------------------------------------------
@@ -198,11 +222,13 @@ def apply_sensor_assignments(force=False):
                 )
             )
 
+            temp = temp_raw + temp_offset
+
             state.live_state["temp_raw"] = temp_raw
-            state.live_state["temp"] = temp_raw + temp_offset
+            state.live_state["temp"] = temp
 
             state.last_temp_raw = temp_raw
-            state.last_ds_temp = temp_raw + temp_offset
+            state.last_ds_temp = temp
             state.last_ds_time = now
             state.temp_stale = False
 
@@ -229,22 +255,18 @@ def apply_sensor_assignments(force=False):
                 )
             )
 
+            hum = hum_raw + hum_offset
+
             state.live_state["hum_raw"] = hum_raw
-            state.live_state["hum"] = hum_raw + hum_offset
+            state.live_state["hum"] = hum
 
             state.last_hum_raw = hum_raw
-            state.last_hum = hum_raw + hum_offset
+            state.last_hum = hum
             state.last_dht_time = now
             state.hum_stale = False
 
             changed = True
 
-
-    # ------------------------------------------------
-    # VPD nur neu berechnen, wenn wir aktiv einen
-    # neuen Sensorwert übernommen haben.
-    # Bei legacy bleibt alles wie bisher.
-    # ------------------------------------------------
 
     if changed:
 
