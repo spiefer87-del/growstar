@@ -353,6 +353,10 @@ class HardwareService:
             props["online"] = True
     
             device.online = True
+
+            self._publish_device_sensor_source(
+                device
+            )
     
             updated.append(
                 device.to_dict()
@@ -519,6 +523,46 @@ class HardwareService:
     
         return changed
 
+    def _publish_device_sensor_source(self, device):
+
+        if device is None:
+
+            return None
+
+        props = device.properties or {}
+
+        if device.type != "sensor":
+
+            return None
+
+        source_id = (
+            "hardware:" +
+            device.id
+        )
+
+        label = (
+            device.name
+            or props.get("local_name")
+            or device.model
+            or device.id
+        )
+
+        source = update_sensor_source(
+            source_id,
+            label=label,
+            source_type="hardware",
+            temperature=props.get("temperature"),
+            humidity=props.get("humidity"),
+            battery=props.get("battery"),
+            rssi=props.get("rssi"),
+            raw=device.to_dict()
+        )
+
+        props["sensor_source_id"] = source_id
+
+        device.properties = props
+
+        return source
     # ------------------------
     # Aktoren
     # ------------------------
@@ -874,6 +918,10 @@ class HardwareService:
         props = device.properties
     
         props["last_read"] = time.time()
+
+        sensor_source = self._publish_device_sensor_source(
+            device
+        )
     
         return {
             "success": True,
@@ -884,9 +932,10 @@ class HardwareService:
             "known_objects": known_objects,
             "listen": listen_result,
             "cache_applied": cache_applied,
-            "sensor_values_applied": sensor_values_applied
+            "sensor_values_applied": sensor_values_applied,
+            "sensor_source": sensor_source
         }
-
+        
     def pair_ble_device(self, device_id, gateway_id):
 
         device = self.device(
@@ -1372,6 +1421,10 @@ class HardwareService:
         })
     
         device.properties = old_properties
+
+        self._publish_device_sensor_source(
+            device
+        )
     
         return device
 
