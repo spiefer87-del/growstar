@@ -526,27 +526,27 @@ class HardwareService:
     def _publish_device_sensor_source(self, device):
 
         if device is None:
-
+    
             return None
-
-        props = device.properties or {}
-
+    
         if device.type != "sensor":
-
+    
             return None
-
+    
+        props = device.properties or {}
+    
         source_id = (
             "hardware:" +
             device.id
         )
-
+    
         label = (
             device.name
             or props.get("local_name")
             or device.model
             or device.id
         )
-
+    
         source = update_sensor_source(
             source_id,
             label=label,
@@ -557,11 +557,11 @@ class HardwareService:
             rssi=props.get("rssi"),
             raw=device.to_dict()
         )
-
+    
         props["sensor_source_id"] = source_id
-
+    
         device.properties = props
-
+    
         return source
     # ------------------------
     # Aktoren
@@ -725,7 +725,7 @@ class HardwareService:
             "known_objects": known_objects
         }
 
-    def read_ble_sensor_values(self, device_id):
+    def read_ble_sensor_values(self, device_id, listen=True):
 
         device = self.device(
             device_id
@@ -802,18 +802,27 @@ class HardwareService:
         # Nicht kritisch, wenn nichts Neues kommt.
         # ------------------------------------------------
     
-        try:
-    
-            listen_result = gateway.listen_for_sensor_updates(
-                3
-            )
-    
-        except Exception as e:
-    
-            print(
-                "Sensor Listener Fehler:",
-                e
-            )
+        if listen:
+
+            try:
+        
+                listen_result = gateway.listen_for_sensor_updates(
+                    3
+                )
+        
+            except Exception as e:
+        
+                print(
+                    "Sensor Listener Fehler:",
+                    e
+                )
+        
+        else:
+        
+            listen_result = {
+                "skipped": True,
+                "reason": "background_update"
+            }
     
         # ------------------------------------------------
         # Event-Cache übernehmen
