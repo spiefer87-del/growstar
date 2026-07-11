@@ -44,22 +44,17 @@ DEFAULT_CONFIG = {
     "RAMP_ENABLED": 0,
 
     "SENSOR_ASSIGNMENTS": {
-
-        "temperature": {
-            "source": "legacy",
-            "device_id": None,
-            "property": "temperature",
-            "label": "Alter Sensor"
-        },
-
-        "humidity": {
-            "source": "legacy",
-            "device_id": None,
-            "property": "humidity",
-            "label": "Alter Sensor"
-        }
-
-    },
+      "temperature": {
+        "source_id": "mqtt:ds18b20",
+        "field": "temperature",
+        "label": "Alter Temperatursensor"
+      },
+      "humidity": {
+        "source_id": "mqtt:dht22",
+        "field": "humidity",
+        "label": "Alter Feuchtesensor"
+      }
+    }
 
     # ================= DEVICE SYSTEM =================
     "DEVICE_MODES": {
