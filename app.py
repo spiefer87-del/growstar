@@ -29,6 +29,7 @@ from threads.mqtt import mqtt_thread
 from threads.shelly import shelly_background_loop
 from threads.main import main_loop
 from threads.hardware import hardware_loop
+from threads.blu import start_blu_thread
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.state import register as register_state_routes
@@ -99,6 +100,8 @@ threading.Thread(target=shelly_background_loop, daemon=True).start()
 print("🧵 Shelly Background Thread gestartet")
 threading.Thread(target=mqtt_thread, daemon=True).start()
 print("📡 MQTT Sensor Thread läuft")
+threading.Thread(target=start_blu_thread, daemon=True).start()
+print("📡 BLU Sensor Thread läuft")
 threading.Thread(target=watchdog_loop, daemon=True).start()
 log_event("Watchdog Thread gestartet")
 threading.Thread(target=main_loop, daemon=True).start()
