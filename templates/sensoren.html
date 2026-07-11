@@ -50,7 +50,7 @@
         </div>
 
         <div class="sub">
-            Quelle:
+            Aktuelle Quelle:
             <strong id="temp_source_label">
                 --
             </strong>
@@ -112,7 +112,7 @@
         </div>
 
         <div class="sub">
-            Quelle:
+            Aktuelle Quelle:
             <strong id="hum_source_label">
                 --
             </strong>
@@ -159,10 +159,11 @@
 
 <div class="card" style="margin-top:16px;">
 
-    <h2>Regelungsquelle speichern</h2>
+    <h2>Regelungsquelle</h2>
 
     <p class="sub">
-        Standard bleibt „Alter Sensor“. Erst nach dem Speichern wird die Regelung auf den ausgewählten Sensor umgestellt.
+        Die Regelung nutzt immer die hier gespeicherte Quelle.
+        Standard ist weiterhin der alte MQTT-Sensor.
     </p>
 
     <div class="actions">
@@ -187,6 +188,18 @@
 
 </div>
 
+
+
+<div class="card" style="margin-top:16px;">
+
+    <h2>Verfügbare Sensorquellen</h2>
+
+    <div id="sensor-source-list" class="source-list">
+        Lade Sensorquellen...
+    </div>
+
+</div>
+
 </div>
 
 
@@ -197,6 +210,8 @@ let sensorOptions = {
     temperature: [],
     humidity: []
 };
+
+let sensorSources = [];
 
 let assignments = {};
 
@@ -223,9 +238,8 @@ function fmt(value, digits=1){
 function optionValue(option){
 
     return [
-        option.source || "legacy",
-        option.device_id || "",
-        option.property || ""
+        option.source_id || "",
+        option.field || ""
     ].join("|");
 
 }
@@ -236,29 +250,9 @@ function parseOptionValue(value){
     const parts =
         value.split("|");
 
-    const source =
-        parts[0] || "legacy";
-
-    const deviceId =
-        parts[1] || null;
-
-    const property =
-        parts[2] || null;
-
-    if(source === "hardware_device"){
-
-        return {
-            source: "hardware_device",
-            device_id: deviceId,
-            property: property
-        };
-
-    }
-
     return {
-        source: "legacy",
-        device_id: null,
-        property: property
+        source_id: parts[0] || null,
+        field: parts[1] || null
     };
 
 }
@@ -267,9 +261,8 @@ function parseOptionValue(value){
 function assignmentValue(assignment){
 
     return [
-        assignment?.source || "legacy",
-        assignment?.device_id || "",
-        assignment?.property || ""
+        assignment?.source_id || "",
+        assignment?.field || ""
     ].join("|");
 
 }
@@ -300,7 +293,7 @@ function renderSelect(sensorName, selectId){
             );
 
         let label =
-            option.label || value;
+            option.label || option.source_id || value;
 
         if(
             option.value !== null &&
@@ -331,10 +324,17 @@ function renderSelect(sensorName, selectId){
 
     });
 
-    select.value =
+    const selected =
         assignmentValue(
             assignments[sensorName]
         );
+
+    if(selected){
+
+        select.value =
+            selected;
+
+    }
 
 }
 
@@ -342,30 +342,80 @@ function renderSelect(sensorName, selectId){
 function renderSourceLabels(){
 
     const temp =
-        assignments.temperature || {
-            source:"legacy",
-            label:"Alter Sensor"
-        };
+        assignments.temperature || {};
 
     const hum =
-        assignments.humidity || {
-            source:"legacy",
-            label:"Alter Sensor"
-        };
+        assignments.humidity || {};
 
     document.getElementById("temp_source_label").textContent =
-        temp.label || (
-            temp.source === "hardware_device"
-            ? temp.device_id
-            : "Alter Sensor"
-        );
+        temp.label ||
+        temp.source_id ||
+        "--";
 
     document.getElementById("hum_source_label").textContent =
-        hum.label || (
-            hum.source === "hardware_device"
-            ? hum.device_id
-            : "Alter Sensor"
+        hum.label ||
+        hum.source_id ||
+        "--";
+
+}
+
+
+function renderSources(){
+
+    const box =
+        document.getElementById(
+            "sensor-source-list"
         );
+
+    if(
+        !sensorSources ||
+        sensorSources.length === 0
+    ){
+
+        box.innerHTML =
+            '<div class="sub">Noch keine Sensorquellen verfügbar.</div>';
+
+        return;
+
+    }
+
+    let html = "";
+
+    sensorSources.forEach(source=>{
+
+        html += `
+
+            <div class="source-item">
+
+                <div>
+                    <strong>
+                        ${source.label || source.id}
+                    </strong>
+                </div>
+
+                <div class="sub">
+                    ${source.id || "--"}
+                </div>
+
+                <div class="sub">
+                    Temperatur:
+                    ${source.temperature !== undefined && source.temperature !== null ? source.temperature + " °C" : "--"}
+                    · Luftfeuchte:
+                    ${source.humidity !== undefined && source.humidity !== null ? source.humidity + " %" : "--"}
+                    · Batterie:
+                    ${source.battery !== undefined && source.battery !== null ? source.battery + " %" : "--"}
+                    · RSSI:
+                    ${source.rssi !== undefined && source.rssi !== null ? source.rssi + " dBm" : "--"}
+                </div>
+
+            </div>
+
+        `;
+
+    });
+
+    box.innerHTML =
+        html;
 
 }
 
@@ -432,6 +482,9 @@ async function loadAssignments(){
             humidity: []
         };
 
+    sensorSources =
+        data.sources || [];
+
     renderSelect(
         "temperature",
         "temperature-source"
@@ -443,6 +496,8 @@ async function loadAssignments(){
     );
 
     renderSourceLabels();
+
+    renderSources();
 
 }
 
@@ -539,25 +594,25 @@ async function saveSensorAssignments(){
             ).value
         );
 
-    const tempLabel =
-        document
-        .getElementById("temperature-source")
-        .selectedOptions[0]
-        ?.textContent
-        ?.replace(/\s\(.+\)$/, "") || "Alter Sensor";
+    const tempSelect =
+        document.getElementById(
+            "temperature-source"
+        );
 
-    const humLabel =
-        document
-        .getElementById("humidity-source")
-        .selectedOptions[0]
-        ?.textContent
-        ?.replace(/\s\(.+\)$/, "") || "Alter Sensor";
+    const humSelect =
+        document.getElementById(
+            "humidity-source"
+        );
 
     tempOption.label =
-        tempLabel;
+        tempSelect.selectedOptions[0]?.textContent
+        ?.replace(/\s\(.+\)$/, "") ||
+        tempOption.source_id;
 
     humOption.label =
-        humLabel;
+        humSelect.selectedOptions[0]?.textContent
+        ?.replace(/\s\(.+\)$/, "") ||
+        humOption.source_id;
 
     const response = await fetch(
         "/api/sensors/assignments",
