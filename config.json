@@ -16,18 +16,16 @@
   "HUM_OFFSET": 0.0,
   "SENSOR_ASSIGNMENTS": {
     "temperature": {
-      "source": "legacy",
-      "device_id": null,
-      "property": "temperature",
-      "label": "Alter Sensor"
+      "source_id": "mqtt:ds18b20",
+      "field": "temperature",
+      "label": "Alter Temperatursensor"
     },
     "humidity": {
-      "source": "legacy",
-      "device_id": null,
-      "property": "humidity",
-      "label": "Alter Sensor"
+      "source_id": "mqtt:dht22",
+      "field": "humidity",
+      "label": "Alter Feuchtesensor"
     }
-  },
+  }
   "RAMP_DURATION_MIN": 40.0,
   "RAMP_ENABLED": 1.0,
   "IP_HEATING": "192.168.178.84",
