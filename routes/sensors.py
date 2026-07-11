@@ -99,42 +99,107 @@ def _hardware_sources():
 
 def _sensor_options():
 
-    # Alte MQTT-Quellen immer anbieten
-    update_sensor_source(
-        "mqtt:ds18b20",
-        label="Alter Temperatursensor",
-        source_type="mqtt",
-        temperature=state.live_state.get("legacy_temp_raw")
-        or state.live_state.get("temp_raw")
-    )
-
-    update_sensor_source(
-        "mqtt:dht22",
-        label="Alter Feuchtesensor",
-        source_type="mqtt",
-        humidity=state.live_state.get("legacy_hum_raw")
-        or state.live_state.get("hum_raw")
-    )
-
     sources = {}
+
+    # ------------------------
+    # Bereits bekannte Quellen
+    # ------------------------
 
     for source in list_sensor_sources():
 
-        sources[source.get("id")] = source
+        source_id = source.get(
+            "id"
+        )
+
+        if not source_id:
+
+            continue
+
+        sources[source_id] = source
+
+
+    # ------------------------
+    # MQTT-Quellen immer anbieten,
+    # aber NICHT aus live_state temp_raw/hum_raw befüllen.
+    # Die echten MQTT-Werte kommen ausschließlich aus services/mqtt.py.
+    # ------------------------
+
+    sources.setdefault(
+        "mqtt:ds18b20",
+        {
+            "id": "mqtt:ds18b20",
+            "label": "Alter Temperatursensor",
+            "type": "mqtt",
+            "temperature": None,
+            "humidity": None,
+            "battery": None,
+            "rssi": None
+        }
+    )
+
+    sources.setdefault(
+        "mqtt:dht22",
+        {
+            "id": "mqtt:dht22",
+            "label": "Alter Feuchtesensor",
+            "type": "mqtt",
+            "temperature": None,
+            "humidity": None,
+            "battery": None,
+            "rssi": None
+        }
+    )
+
+
+    # ------------------------
+    # Hardware / BLU Quellen ergänzen
+    # ------------------------
 
     for source in _hardware_sources():
 
-        sources[source.get("id")] = source
+        source_id = source.get(
+            "id"
+        )
+
+        if not source_id:
+
+            continue
+
+        existing = sources.get(
+            source_id,
+            {}
+        )
+
+        existing.update(
+            source
+        )
+
+        sources[source_id] = existing
+
 
     temperature = []
     humidity = []
 
     for source in sources.values():
 
-        source_id = source.get("id")
-        label = source.get("label") or source_id
+        source_id = source.get(
+            "id"
+        )
 
-        if source.get("temperature") is not None or source_id == "mqtt:ds18b20":
+        label = (
+            source.get("label")
+            or source_id
+        )
+
+
+        # ------------------------
+        # Temperatur-Auswahl
+        # ------------------------
+
+        if (
+            source.get("temperature") is not None
+            or source_id == "mqtt:ds18b20"
+        ):
 
             temperature.append({
                 "source_id": source_id,
@@ -144,7 +209,15 @@ def _sensor_options():
                 "type": source.get("type")
             })
 
-        if source.get("humidity") is not None or source_id == "mqtt:dht22":
+
+        # ------------------------
+        # Feuchte-Auswahl
+        # ------------------------
+
+        if (
+            source.get("humidity") is not None
+            or source_id == "mqtt:dht22"
+        ):
 
             humidity.append({
                 "source_id": source_id,
@@ -153,6 +226,7 @@ def _sensor_options():
                 "value": source.get("humidity"),
                 "type": source.get("type")
             })
+
 
     return {
         "temperature": temperature,
