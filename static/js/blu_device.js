@@ -2,7 +2,7 @@ let currentDevice = null;
 
 const DEVICE_REFRESH_INTERVAL = 10000;
 
-let refreshInProgress = false;
+let loadInProgress = false;
 
 
 // ----------------------------------------------------
@@ -72,7 +72,15 @@ function formatLastSeen(value){
 // Gerät laden
 // ----------------------------------------------------
 
-async function loadBluetoothDevice(){
+async function loadBluetoothDevice(showResult=false){
+
+    if(loadInProgress){
+
+        return;
+
+    }
+
+    loadInProgress = true;
 
     try{
 
@@ -83,107 +91,40 @@ async function loadBluetoothDevice(){
             )
         );
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
         if(!data.success){
 
-            showDialog(
-                "Bluetooth Gerät",
-                JSON.stringify(
-                    data,
-                    null,
-                    2
-                )
-            );
+            if(showResult){
+
+                showDialog(
+                    "Bluetooth Gerät",
+                    JSON.stringify(
+                        data,
+                        null,
+                        2
+                    )
+                );
+
+            }
 
             return;
 
         }
 
-        currentDevice = data.device;
+        currentDevice =
+            data.device;
 
         renderBluetoothDevice(
             currentDevice
         );
 
-    }
-
-    catch(err){
-
-        console.error(err);
-
-        showDialog(
-            "Fehler",
-            String(err)
-        );
-
-    }
-
-}
-
-
-// ----------------------------------------------------
-// Sensorwerte aktualisieren
-// ----------------------------------------------------
-
-async function refreshSensorValues(showResult=false){
-
-    if(refreshInProgress){
-
-        return;
-
-    }
-
-    refreshInProgress = true;
-
-    try{
-
         if(showResult){
 
             showDialog(
-                "Sensorwerte",
-                "Sensorwerte werden aktualisiert..."
-            );
-
-        }
-
-        const response = await fetch(
-            "/api/hardware/device/" +
-            encodeURIComponent(
-                deviceId
-            ) +
-            "/read-values",
-            {
-                method:"POST"
-            }
-        );
-
-        const data = await response.json();
-
-        if(data.device){
-
-            currentDevice = data.device;
-
-            renderBluetoothDevice(
-                currentDevice
-            );
-
-        }
-        else{
-
-            await loadBluetoothDevice();
-
-        }
-
-        if(showResult){
-
-            showDialog(
-                "Sensorwerte aktualisiert",
-                JSON.stringify(
-                    data,
-                    null,
-                    2
-                )
+                "Anzeige aktualisiert",
+                "Die aktuellen gespeicherten Gerätedaten wurden geladen."
             );
 
         }
@@ -197,7 +138,7 @@ async function refreshSensorValues(showResult=false){
         if(showResult){
 
             showDialog(
-                "Sensorwerte Fehler",
+                "Fehler",
                 String(err)
             );
 
@@ -207,7 +148,7 @@ async function refreshSensorValues(showResult=false){
 
     finally{
 
-        refreshInProgress = false;
+        loadInProgress = false;
 
     }
 
@@ -262,7 +203,7 @@ function renderBluetoothDevice(device){
 
     setText(
         "device-rssi",
-        props.rssi !== undefined
+        props.rssi !== undefined && props.rssi !== null
         ? props.rssi + " dBm"
         : "--"
     );
@@ -288,21 +229,21 @@ function renderBluetoothDevice(device){
 
     setText(
         "device-temperature",
-        props.temperature !== undefined
+        props.temperature !== undefined && props.temperature !== null
         ? props.temperature + " °C"
         : "--"
     );
 
     setText(
         "device-humidity",
-        props.humidity !== undefined
+        props.humidity !== undefined && props.humidity !== null
         ? props.humidity + " %"
         : "--"
     );
 
     setText(
         "device-battery",
-        props.battery !== undefined
+        props.battery !== undefined && props.battery !== null
         ? props.battery + " %"
         : "--"
     );
@@ -341,7 +282,8 @@ async function setupSensors(){
             }
         );
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
         showDialog(
             "Sensorwerte Einrichtung",
@@ -352,7 +294,7 @@ async function setupSensors(){
             )
         );
 
-        await refreshSensorValues(
+        await loadBluetoothDevice(
             false
         );
 
@@ -480,7 +422,8 @@ async function pairCurrentGateway(){
             }
         );
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
         showDialog(
             "Bluetooth koppeln",
@@ -491,7 +434,7 @@ async function pairCurrentGateway(){
             )
         );
 
-        await refreshSensorValues(
+        await loadBluetoothDevice(
             false
         );
 
@@ -555,7 +498,8 @@ async function unpairCurrentGateway(){
             }
         );
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
         showDialog(
             "Bluetooth entkoppeln",
@@ -566,7 +510,9 @@ async function unpairCurrentGateway(){
             )
         );
 
-        await loadBluetoothDevice();
+        await loadBluetoothDevice(
+            false
+        );
 
     }
 
@@ -594,7 +540,7 @@ function bindButtons(){
     .getElementById("refresh-btn")
     ?.addEventListener(
         "click",
-        ()=>refreshSensorValues(true)
+        ()=>loadBluetoothDevice(true)
     );
 
     document
@@ -632,13 +578,6 @@ function bindButtons(){
         unpairCurrentGateway
     );
 
-    document
-    .getElementById("read-values-btn")
-    ?.addEventListener(
-        "click",
-        ()=>refreshSensorValues(true)
-    );
-
 }
 
 
@@ -651,6 +590,6 @@ bindButtons();
 loadBluetoothDevice();
 
 setInterval(
-    ()=>refreshSensorValues(false),
+    ()=>loadBluetoothDevice(false),
     DEVICE_REFRESH_INTERVAL
 );
