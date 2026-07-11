@@ -8,10 +8,7 @@ import core.context as ctx
 
 from core.config import config
 
-from services.sensor import (
-        update_temperature,
-        update_humidity,
-    )
+from core.sensor_sources import update_sensor_source
 
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
@@ -48,12 +45,24 @@ def on_message(client, userdata, msg):
 
     if msg.topic == TOPIC_DS and "temp" in data:
 
-        try:
-            update_temperature(float(data["temp"]))
-        except Exception:
+            try:
+        
+                update_sensor_source(
+                    "mqtt:ds18b20",
+                    label="Alter Temperatursensor",
+                    source_type="mqtt",
+                    temperature=float(data["temp"]),
+                    raw=data
+                )
+        
+            except Exception as e:
+        
+                print(
+                    "❌ MQTT Temperatur Fehler:",
+                    e
+                )
+        
             return
-    
-        return
 
     # =========================
     # Luftfeuchte
@@ -61,12 +70,24 @@ def on_message(client, userdata, msg):
 
     if msg.topic == TOPIC_DHT and "hum" in data:
 
-        try:
-            update_humidity(float(data["hum"]))
-        except Exception:
+            try:
+        
+                update_sensor_source(
+                    "mqtt:dht22",
+                    label="Alter Feuchtesensor",
+                    source_type="mqtt",
+                    humidity=float(data["hum"]),
+                    raw=data
+                )
+        
+            except Exception as e:
+        
+                print(
+                    "❌ MQTT Feuchte Fehler:",
+                    e
+                )
+        
             return
-    
-        return
 
 
 def create_client():
