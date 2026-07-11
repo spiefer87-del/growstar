@@ -17,6 +17,8 @@ from core.control import (
     control_device,
 )
 
+from core.sensor_sources import apply_sensor_assignments
+
 from core.ramp import (
     check_ramp_schedule,
     update_ramp,
@@ -32,6 +34,12 @@ def main_loop():
     while True:
 
         now = time.time()
+
+        # =========================================
+        # Sensor-Zuweisung anwenden
+        # =========================================
+
+        apply_sensor_assignments()
 
         # =========================================
         # Sollwerte aktualisieren
