@@ -5,7 +5,7 @@ from core.hardware.manager import manager
 from core.hardware.scanner import scanner
 
 from core.hardware.shelly.discovery import ShellyDiscovery
-
+from core.sensor_sources import update_sensor_source
 
 class HardwareService:
 
