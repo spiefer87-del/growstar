@@ -1,34 +1,39 @@
+# routes/sensors.py
+
 from flask import jsonify, request
 
 import core.state as state
 
 from core.config import config, save_config
-from core.sensors import apply_sensor_assignments
+
+from core.sensor_sources import (
+    list_sensor_sources,
+    update_sensor_source,
+    apply_sensor_assignments,
+)
 
 from services.hardware import hardware
 
 
-def _sensor_options():
+def _default_assignments():
 
-    temperature = [
-        {
-            "source": "legacy",
-            "device_id": None,
-            "property": "temperature",
-            "label": "Alter Sensor",
-            "value": state.live_state.get("temp")
+    return {
+        "temperature": {
+            "source_id": "mqtt:ds18b20",
+            "field": "temperature",
+            "label": "Alter Temperatursensor"
+        },
+        "humidity": {
+            "source_id": "mqtt:dht22",
+            "field": "humidity",
+            "label": "Alter Feuchtesensor"
         }
-    ]
+    }
 
-    humidity = [
-        {
-            "source": "legacy",
-            "device_id": None,
-            "property": "humidity",
-            "label": "Alter Sensor",
-            "value": state.live_state.get("hum")
-        }
-    ]
+
+def _hardware_sources():
+
+    sources = []
 
     try:
 
@@ -46,8 +51,14 @@ def _sensor_options():
 
             continue
 
+        source_id = (
+            "hardware:" +
+            device.id
+        )
+
         label = (
             device.name
+            or props.get("local_name")
             or device.model
             or device.id
         )
@@ -59,25 +70,89 @@ def _sensor_options():
                 props.get("gateway_ip")
             )
 
-        temperature.append(
-            {
-                "source": "hardware_device",
-                "device_id": device.id,
-                "property": "temperature",
-                "label": label,
-                "value": props.get("temperature")
-            }
+        # Hardware-Sensor auch als Quelle veröffentlichen,
+        # falls er schon Werte hat.
+        update_sensor_source(
+            source_id,
+            label=label,
+            source_type="hardware",
+            temperature=props.get("temperature"),
+            humidity=props.get("humidity"),
+            battery=props.get("battery"),
+            rssi=props.get("rssi"),
+            raw=device.to_dict()
         )
 
-        humidity.append(
-            {
-                "source": "hardware_device",
-                "device_id": device.id,
-                "property": "humidity",
+        sources.append({
+            "id": source_id,
+            "label": label,
+            "type": "hardware",
+            "temperature": props.get("temperature"),
+            "humidity": props.get("humidity"),
+            "battery": props.get("battery"),
+            "rssi": props.get("rssi"),
+            "last_seen": props.get("last_seen")
+        })
+
+    return sources
+
+
+def _sensor_options():
+
+    # Alte MQTT-Quellen immer anbieten
+    update_sensor_source(
+        "mqtt:ds18b20",
+        label="Alter Temperatursensor",
+        source_type="mqtt",
+        temperature=state.live_state.get("legacy_temp_raw")
+        or state.live_state.get("temp_raw")
+    )
+
+    update_sensor_source(
+        "mqtt:dht22",
+        label="Alter Feuchtesensor",
+        source_type="mqtt",
+        humidity=state.live_state.get("legacy_hum_raw")
+        or state.live_state.get("hum_raw")
+    )
+
+    sources = {}
+
+    for source in list_sensor_sources():
+
+        sources[source.get("id")] = source
+
+    for source in _hardware_sources():
+
+        sources[source.get("id")] = source
+
+    temperature = []
+    humidity = []
+
+    for source in sources.values():
+
+        source_id = source.get("id")
+        label = source.get("label") or source_id
+
+        if source.get("temperature") is not None or source_id == "mqtt:ds18b20":
+
+            temperature.append({
+                "source_id": source_id,
+                "field": "temperature",
                 "label": label,
-                "value": props.get("humidity")
-            }
-        )
+                "value": source.get("temperature"),
+                "type": source.get("type")
+            })
+
+        if source.get("humidity") is not None or source_id == "mqtt:dht22":
+
+            humidity.append({
+                "source_id": source_id,
+                "field": "humidity",
+                "label": label,
+                "value": source.get("humidity"),
+                "type": source.get("type")
+            })
 
     return {
         "temperature": temperature,
@@ -87,50 +162,42 @@ def _sensor_options():
 
 def _normalize_assignment(sensor_name, data):
 
-    source = data.get(
-        "source",
-        "legacy"
+    source_id = data.get(
+        "source_id"
     )
 
-    if source == "hardware_device":
+    field = data.get(
+        "field"
+    )
 
-        device_id = data.get(
-            "device_id"
+    label = data.get(
+        "label"
+    )
+
+    if not source_id:
+
+        defaults = _default_assignments()
+
+        return defaults.get(
+            sensor_name
         )
 
-        prop = data.get(
-            "property"
-        )
+    if not field:
 
-        if not prop:
-
-            prop = (
-                "temperature"
-                if sensor_name == "temperature"
-                else "humidity"
-            )
-
-        label = data.get(
-            "label",
-            "Hardware Sensor"
-        )
-
-        return {
-            "source": "hardware_device",
-            "device_id": device_id,
-            "property": prop,
-            "label": label
-        }
-
-    return {
-        "source": "legacy",
-        "device_id": None,
-        "property": (
+        field = (
             "temperature"
             if sensor_name == "temperature"
             else "humidity"
-        ),
-        "label": "Alter Sensor"
+        )
+
+    if not label:
+
+        label = source_id
+
+    return {
+        "source_id": source_id,
+        "field": field,
+        "label": label
     }
 
 
@@ -141,20 +208,7 @@ def register(app):
 
         config.setdefault(
             "SENSOR_ASSIGNMENTS",
-            {
-                "temperature": {
-                    "source": "legacy",
-                    "device_id": None,
-                    "property": "temperature",
-                    "label": "Alter Sensor"
-                },
-                "humidity": {
-                    "source": "legacy",
-                    "device_id": None,
-                    "property": "humidity",
-                    "label": "Alter Sensor"
-                }
-            }
+            _default_assignments()
         )
 
         return jsonify({
@@ -163,7 +217,8 @@ def register(app):
                 "SENSOR_ASSIGNMENTS",
                 {}
             ),
-            "options": _sensor_options()
+            "options": _sensor_options(),
+            "sources": list_sensor_sources()
         })
 
 
@@ -199,9 +254,7 @@ def register(app):
             config
         )
 
-        changed = apply_sensor_assignments(
-            force=True
-        )
+        changed = apply_sensor_assignments()
 
         return jsonify({
             "success": True,
@@ -214,9 +267,7 @@ def register(app):
     @app.post("/api/sensors/apply")
     def apply_sensors():
 
-        changed = apply_sensor_assignments(
-            force=True
-        )
+        changed = apply_sensor_assignments()
 
         return jsonify({
             "success": True,
