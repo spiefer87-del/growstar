@@ -25,7 +25,7 @@
       "field": "humidity",
       "label": "Alter Feuchtesensor"
     }
-  }
+  },
   "RAMP_DURATION_MIN": 40.0,
   "RAMP_ENABLED": 1.0,
   "IP_HEATING": "192.168.178.84",
