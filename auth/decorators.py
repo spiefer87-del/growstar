@@ -34,3 +34,24 @@ def permission_required(permission_name):
         return wrapped
 
     return decorator
+
+
+def any_permission_required(*permission_names):
+    required = set(permission_names)
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped(*args, **kwargs):
+            user = getattr(g, "current_user", None)
+            if not user:
+                return _login_redirect()
+
+            user_permissions = set(user.get("permissions", []))
+            if not required.intersection(user_permissions):
+                abort(403)
+
+            return view(*args, **kwargs)
+
+        return wrapped
+
+    return decorator

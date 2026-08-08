@@ -20,7 +20,17 @@ def install_auth(app):
     @app.before_request
     def load_current_user_and_require_login():
         user_id = session.get("user_id")
-        g.current_user = load_user(user_id) if user_id else None
+        user = load_user(user_id) if user_id else None
+
+        # Phase 2: Passwort-Reset kann alle bisherigen Sessions dieses Users
+        # ungültig machen. Alte Phase-1-Sessions werden einmalig neu angemeldet.
+        if user:
+            session_version = session.get("session_version")
+            if session_version != user.get("session_version"):
+                session.clear()
+                user = None
+
+        g.current_user = user
 
         if user_id and not g.current_user:
             session.clear()
@@ -39,7 +49,25 @@ def install_auth(app):
 
     @app.context_processor
     def inject_auth_context():
+        current_user = getattr(g, "current_user", None)
+
+        def has_permission(permission_name):
+            return bool(
+                current_user
+                and permission_name in current_user.get("permissions", [])
+            )
+
+        def has_any_permission(*permission_names):
+            return bool(
+                current_user
+                and set(permission_names).intersection(
+                    current_user.get("permissions", [])
+                )
+            )
+
         return {
-            "current_user": getattr(g, "current_user", None),
+            "current_user": current_user,
             "csrf_token": csrf_token,
+            "has_permission": has_permission,
+            "has_any_permission": has_any_permission,
         }
