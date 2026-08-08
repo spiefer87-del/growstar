@@ -202,10 +202,13 @@
 </div>
 {% endif %}
 
+{% if has_permission('settings.view') %}
 <a href="/system" class="system-link">⚙️</a>
+{% endif %}
 
 <h1>🌱 Grow Dashboard</h1>
 
+{% if has_permission('grow.view') %}
 <!-- ===================== -->
 <!-- 🌡️ UMGEBUNGSWERTE -->
 <!-- ===================== -->
@@ -241,6 +244,7 @@
         </div>
     </a>
 
+{% if has_permission('settings.view') %}
     <a href="/settings" class="card-link">
         <div class="card env" id="profile-card">
             <h2>Profil</h2>
@@ -250,6 +254,7 @@
             <div class="sub">Klick für Einstellungen</div>
         </div>
     </a>
+{% endif %}
 
     <a href="/ph" class="card-link">
         <div class="card env" id="ph-card">
@@ -386,6 +391,9 @@
 
 </div>
 
+{% endif %}
+
+{% if has_any_permission('grow.view', 'plants.view', 'diary.view') %}
 <!-- ===================== -->
 <!-- 📊 MANAGEMENT -->
 <!-- ===================== -->
@@ -393,6 +401,7 @@
 
 <div class="grid" id="meta-grid">
 
+{% if has_permission('grow.view') %}
     <a href="/energie" class="card-link">
         <div class="card meta" id="energie-card">
             <h2>⚡ Energie</h2>
@@ -400,7 +409,9 @@
             <div class="sub">Verbrauch & Kosten</div>
         </div>
     </a>
+{% endif %}
 
+{% if has_permission('plants.view') %}
     <a href="/pflanzendaten" class="card-link">
         <div class="card meta" id="plants-card">
             <h2>🌿 Pflanzendaten</h2>
@@ -408,7 +419,9 @@
             <div class="sub">Sorten & Phasen</div>
         </div>
     </a>
+{% endif %}
 
+{% if has_permission('diary.view') %}
     <a href="/tagebuch" class="card-link">
         <div class="card meta" id="journal-card">
             <h2>📓 Tagebuch</h2>
@@ -416,10 +429,13 @@
             <div class="sub">Notizen & Ereignisse</div>
         </div>
     </a>
+{% endif %}
 
 </div>
+{% endif %}
 
 
+{% if has_permission('grow.view') %}
 <script>
 let ENV_CARDS = {};
 let DEV_CARDS = {};
@@ -460,7 +476,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 async function renderDashboard() {
-    const cfg = await fetch("/api/config").then(r => r.json());
+    const canViewSettings = {{ 'true' if has_permission('settings.view') else 'false' }};
+    if (!canViewSettings) return;
+
+    const response = await fetch("/api/config");
+    if (!response.ok) return;
+    const cfg = await response.json();
 
     const envGrid = document.getElementById("env-grid");
     const devGrid = document.getElementById("device-grid");
@@ -601,6 +622,7 @@ renderDashboard();
 loadState();
 setInterval(loadState, 2000);
 </script>
+{% endif %}
 
 
 
