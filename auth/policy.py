@@ -253,6 +253,14 @@ MANAGEMENT_PREFIXES = {
 
 
 def _management_requirement(path, method):
+
+    # Das neue Betriebsjournal liegt bewusst im Pflanzenmanagement,
+    # behält aber seine eigenständigen diary.* Berechtigungen.
+    if _matches_prefix(path, "/pflanzenmanagement/tagebuch"):
+        if method in SAFE_METHODS:
+            return require("diary.view")
+        return require("diary.edit")
+
     for prefix, rules in MANAGEMENT_PREFIXES.items():
         if not _matches_prefix(path, prefix):
             continue
