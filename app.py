@@ -43,6 +43,7 @@ from routes.admin import register as register_admin_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
+from plant_management.database import init_plant_management_db
 
 
 # =========================================
@@ -81,6 +82,7 @@ def create_flask_app():
     init_diary_db()
     init_plants_table()
     init_auth_db()
+    init_plant_management_db()
 
     app = Flask(__name__)
     app.config.update(
