@@ -476,9 +476,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 async function renderDashboard() {
-    const canViewSettings = {{ 'true' if has_permission('settings.view') else 'false' }};
-    if (!canViewSettings) return;
-
     const response = await fetch("/api/config");
     if (!response.ok) return;
     const cfg = await response.json();
