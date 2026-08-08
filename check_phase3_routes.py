@@ -4,7 +4,7 @@ from auth.policy import permission_requirement
 
 def describe(requirement):
     if requirement is None:
-        return "eigene Route/Decorator"
+        return "eigene Route/Decorator oder öffentlich"
 
     joiner = " ODER " if requirement.mode == "any" else " UND "
     return joiner.join(requirement.permissions)
@@ -22,6 +22,6 @@ for rule in sorted(flask_app.url_map.iter_rules(), key=lambda item: item.rule):
     for method in methods:
         requirement = permission_requirement(rule.rule, method)
         print(
-            f"{method:7} {rule.rule:42} "
-            f"{rule.endpoint:30} -> {describe(requirement)}"
+            f"{method:7} {rule.rule:52} "
+            f"{rule.endpoint:32} -> {describe(requirement)}"
         )
