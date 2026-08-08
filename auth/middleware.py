@@ -10,9 +10,10 @@ from flask import (
     session,
     url_for,
 )
+from markupsafe import escape
 
 from .csrf import csrf_token, validate_request_csrf
-from .database import load_user, write_audit
+from .database import PERMISSIONS, load_user, write_audit
 from .policy import permission_requirement
 
 
@@ -35,6 +36,7 @@ def _authentication_required_response():
         return jsonify(
             success=False,
             error="authentication_required",
+            message="Deine Sitzung ist abgelaufen oder du bist nicht angemeldet.",
         ), 401
 
     return _login_redirect()
@@ -45,9 +47,40 @@ def _csrf_failed_response():
         return jsonify(
             success=False,
             error="invalid_csrf",
+            message=(
+                "Die Sicherheitsprüfung ist fehlgeschlagen. "
+                "Bitte lade die Seite neu und versuche es erneut."
+            ),
         ), 400
 
     abort(400, "Ungültige oder fehlende CSRF-Prüfung")
+
+
+def _permission_labels(requirement):
+    if not requirement:
+        return []
+
+    return [
+        PERMISSIONS.get(permission, permission)
+        for permission in requirement.permissions
+    ]
+
+
+def _permission_message(requirement):
+    labels = _permission_labels(requirement)
+
+    if not labels:
+        return "Du hast keine Berechtigung für diese Aktion."
+
+    if len(labels) == 1:
+        return f"Für diese Aktion wird die Berechtigung „{labels[0]}“ benötigt."
+
+    joined = ", ".join(f"„{label}“" for label in labels)
+
+    if requirement.mode == "all":
+        return f"Für diese Aktion werden folgende Berechtigungen benötigt: {joined}."
+
+    return f"Für diese Aktion wird eine der folgenden Berechtigungen benötigt: {joined}."
 
 
 def _audit_denied(requirement):
@@ -99,9 +132,52 @@ def _audit_csrf_denied():
         pass
 
 
+def _inject_feedback_assets(response):
+    """
+    Übergangslösung für bestehende Growstar-Templates.
+
+    Neue Seiten sollen templates/base.html verwenden. Bestehende ältere
+    Templates bekommen das globale Feedback-Script hier automatisch in den
+    <head> eingefügt. Dadurch müssen wir nicht sofort jede einzelne Growstar-
+    Seite umbauen und trotzdem funktionieren Toasts/CSRF-Header überall.
+    """
+
+    if response.is_streamed or response.direct_passthrough:
+        return response
+
+    content_type = response.headers.get("Content-Type", "")
+    if "text/html" not in content_type.lower():
+        return response
+
+    try:
+        html = response.get_data(as_text=True)
+    except Exception:
+        return response
+
+    if not html or "data-growstar-feedback" in html:
+        return response
+
+    head_end = html.lower().find("</head>")
+    if head_end < 0:
+        return response
+
+    token = escape(csrf_token())
+    script_url = escape(url_for("static", filename="js/growstar-feedback.js"))
+
+    assets = (
+        f'    <meta name="csrf-token" content="{token}">\n'
+        f'    <script data-growstar-feedback src="{script_url}"></script>\n'
+    )
+
+    html = html[:head_end] + assets + html[head_end:]
+    response.set_data(html)
+    return response
+
+
 def install_auth(app):
     """
-    Installiert Login, zentrale RBAC-Prüfung und CSRF-Schutz für Growstar.
+    Installiert Login, zentrale RBAC-Prüfung, CSRF-Schutz und globales
+    Benutzer-Feedback für Growstar.
 
     routes/admin.py behält seine feingranularen Decorators. Die bestehenden
     Grow-/Hardware-/Konfigurationsrouten werden zusätzlich über auth.policy
@@ -190,16 +266,31 @@ def install_auth(app):
             "has_all_permissions": has_all_permissions,
         }
 
+    @app.after_request
+    def add_global_feedback(response):
+        return _inject_feedback_assets(response)
+
     @app.errorhandler(403)
     def permission_denied(error):
-        if request.path.startswith("/api/"):
-            return jsonify(
-                success=False,
-                error="forbidden",
-            ), 403
-
         requirement = getattr(g, "required_permissions", None)
+        labels = _permission_labels(requirement)
+
+        if request.path.startswith("/api/"):
+            payload = {
+                "success": False,
+                "error": "forbidden",
+                "message": _permission_message(requirement),
+                "required_labels": labels,
+            }
+
+            if requirement:
+                payload["requirement_mode"] = requirement.mode
+                payload["required_permissions"] = list(requirement.permissions)
+
+            return jsonify(payload), 403
+
         return render_template(
             "errors/403.html",
             requirement=requirement,
+            permission_labels=labels,
         ), 403
