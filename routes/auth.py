@@ -60,6 +60,7 @@ def register(app):
 
                 session.clear()
                 session["user_id"] = user["id"]
+                session["session_version"] = user["session_version"]
                 session.permanent = True
                 rotate_csrf_token()
 
