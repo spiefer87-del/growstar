@@ -131,6 +131,36 @@
         }
 
 
+        .user-panel {
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .user-name {
+            color: var(--muted);
+            font-size: .85rem;
+        }
+
+        .logout-button {
+            border: 1px solid rgba(148,163,184,.2);
+            background: var(--card);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 8px 10px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            .user-name { display: none; }
+            .user-panel { top: 12px; right: 62px; }
+            .system-link { top: 12px; right: 12px; }
+        }
+
         .system-link {
             position: fixed;
             top: 20px;
@@ -150,6 +180,16 @@
     </style>
 </head>
 <body>
+
+{% if current_user %}
+<div class="user-panel">
+    <span class="user-name">{{ current_user.display_name }}</span>
+    <form method="post" action="{{ url_for('auth_logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="logout-button" title="Abmelden">↪</button>
+    </form>
+</div>
+{% endif %}
 
 <a href="/system" class="system-link">⚙️</a>
 
