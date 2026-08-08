@@ -42,7 +42,7 @@ def _matches_prefix(path, prefix):
 READ_EXACT = {
     "/": require("dashboard.view"),
     "/grow-control": require("grow.view"),
-    "/pflanzenmanagement": require("plants.view", "diary.view", mode="any"),
+    "/pflanzenmanagement": require("plants.view"),
 
     # Grow / Live-Daten
     "/temperature": require("grow.view"),
@@ -209,6 +209,16 @@ def _hardware_write_requirement(path):
 # ---------------------------------------------------------------------------
 
 MANAGEMENT_PREFIXES = {
+    "/pflanzenmanagement": {
+        "read": require("plants.view"),
+        "post": require("plants.edit"),
+        "write": require("plants.edit"),
+    },
+    "/api/plant-management": {
+        "read": require("plants.view"),
+        "post": require("plants.edit"),
+        "write": require("plants.edit"),
+    },
     "/inventory": {
         "read": require("inventory.view"),
         "post": require("inventory.create"),
