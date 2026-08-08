@@ -1,11 +1,10 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Keine Berechtigung – Growstar</title>
-    <style>
-        * { box-sizing: border-box; }
+{% extends "base.html" %}
+
+{% block title %}Keine Berechtigung – Growstar{% endblock %}
+
+{% block head %}
+<style>
+* { box-sizing: border-box; }
         body {
             margin: 0;
             min-height: 100vh;
@@ -46,16 +45,31 @@
             background: #16a34a;
             color: #fff;
         }
-    </style>
-</head>
-<body>
-    <main class="card">
+        .permission-note {
+            margin: 18px 0 0;
+            padding: 12px 14px;
+            border-radius: 10px;
+            background: #172554;
+            color: #dbeafe;
+            line-height: 1.45;
+        }
+</style>
+{% endblock %}
+
+{% block page %}
+<main class="card">
         <div class="icon">🔒</div>
         <h1>Keine Berechtigung</h1>
         <p>
             Dein Benutzer ist angemeldet, besitzt für diesen Bereich aber
             nicht die erforderlichen Rechte.
         </p>
+        {% if permission_labels %}
+            <div class="permission-note">
+                <strong>Benötigt:</strong>
+                {{ permission_labels | join(', ') }}
+            </div>
+        {% endif %}
         <div class="actions">
             <a class="primary" href="{{ url_for('dashboard') }}">Zum Dashboard</a>
             {% if has_any_permission('users.view', 'users.manage', 'roles.view', 'roles.manage', 'audit.view') %}
@@ -63,5 +77,4 @@
             {% endif %}
         </div>
     </main>
-</body>
-</html>
+{% endblock %}
