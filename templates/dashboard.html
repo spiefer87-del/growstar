@@ -1,12 +1,10 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <title>Grow Dashboard</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
 
-    <style>
-        *,
+{% block title %}Grow Dashboard{% endblock %}
+
+{% block head %}
+<style>
+*,
         *::before,
         *::after {
             box-sizing: border-box;
@@ -185,10 +183,10 @@
             justify-content: center;
             box-shadow: 0 8px 25px rgba(0,0,0,.4);
         }
-    </style>
-</head>
-<body>
+</style>
+{% endblock %}
 
+{% block page %}
 {% if current_user %}
 <div class="user-panel">
     {% if has_any_permission('users.view', 'users.manage', 'roles.view', 'roles.manage', 'audit.view') %}
@@ -620,8 +618,4 @@ loadState();
 setInterval(loadState, 2000);
 </script>
 {% endif %}
-
-
-
-</body>
-</html>
+{% endblock %}
