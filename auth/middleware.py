@@ -11,7 +11,7 @@ from flask import (
     url_for,
 )
 
-from .csrf import csrf_token
+from .csrf import csrf_token, validate_request_csrf
 from .database import load_user, write_audit
 from .policy import permission_requirement
 
@@ -20,6 +20,9 @@ PUBLIC_ENDPOINTS = {
     "auth_login",
     "static",
 }
+
+
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
 
 def _login_redirect():
@@ -37,10 +40,20 @@ def _authentication_required_response():
     return _login_redirect()
 
 
+def _csrf_failed_response():
+    if request.path.startswith("/api/"):
+        return jsonify(
+            success=False,
+            error="invalid_csrf",
+        ), 400
+
+    abort(400, "Ungültige oder fehlende CSRF-Prüfung")
+
+
 def _audit_denied(requirement):
     # Lesende Polling-Requests würden das Audit-Log unnötig fluten. Kritische
     # Schreibversuche werden dagegen protokolliert.
-    if request.method in {"GET", "HEAD", "OPTIONS"}:
+    if request.method in SAFE_METHODS:
         return
 
     user = getattr(g, "current_user", None)
@@ -65,11 +78,32 @@ def _audit_denied(requirement):
         pass
 
 
+def _audit_csrf_denied():
+    user = getattr(g, "current_user", None)
+    if not user:
+        return
+
+    try:
+        write_audit(
+            action="auth.csrf_denied",
+            user_id=user["id"],
+            entity_type="route",
+            entity_id=request.path,
+            details={
+                "method": request.method,
+                "origin": request.headers.get("Origin"),
+            },
+            ip_address=request.remote_addr,
+        )
+    except Exception:
+        pass
+
+
 def install_auth(app):
     """
-    Installiert Login + zentrale RBAC-Prüfung für die gesamte Growstar-Web-App.
+    Installiert Login, zentrale RBAC-Prüfung und CSRF-Schutz für Growstar.
 
-    routes/admin.py behält seine feingranularen Decorators. Alle bestehenden
+    routes/admin.py behält seine feingranularen Decorators. Die bestehenden
     Grow-/Hardware-/Konfigurationsrouten werden zusätzlich über auth.policy
     nach Pfad und HTTP-Methode geschützt.
     """
@@ -101,6 +135,14 @@ def install_auth(app):
 
         if not g.current_user:
             return _authentication_required_response()
+
+        # Schreibende Requests benötigen entweder ein explizites CSRF-Token
+        # oder müssen eindeutig aus derselben Origin stammen. Login prüft sein
+        # Token weiterhin selbst, weil die Route öffentlich erreichbar ist.
+        if request.method.upper() not in SAFE_METHODS:
+            if not validate_request_csrf():
+                _audit_csrf_denied()
+                return _csrf_failed_response()
 
         requirement = permission_requirement(request.path, request.method)
         if requirement is None:

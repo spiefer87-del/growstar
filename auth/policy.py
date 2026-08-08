@@ -66,7 +66,7 @@ READ_EXACT = {
     "/settings": require("settings.view"),
     "/system": require("settings.view"),
     "/design": require("settings.view"),
-    "/energie/settings": require("settings.manage"),
+    "/energie/settings": require("settings.view"),
 
     # Hardware / Sensorik
     "/sensoren": require("hardware.view"),
@@ -83,6 +83,7 @@ READ_EXACT = {
 READ_PREFIX = (
     ("/devices", require("hardware.view")),
     ("/api/state", require("grow.view")),
+    ("/api/history", require("grow.view")),
     ("/api/diagrams", require("grow.view")),
     ("/api/energy", require("grow.view")),
     ("/api/plants", require("plants.view")),
@@ -94,17 +95,40 @@ READ_PREFIX = (
     ("/api/sensors", require("hardware.view")),
     ("/api/blu", require("hardware.view")),
     ("/api/watchdog", require("hardware.view")),
-    # /api/config wird auch vom Dashboard für Reihenfolge/Sichtbarkeit benutzt.
-    # Grow-Leser dürfen diese Anzeige-Konfiguration lesen; Änderungen bleiben
-    # separat geschützt.
+
+    # Diese Daten werden auch für die normale Grow-Anzeige benötigt.
     ("/api/config", require("grow.view", "settings.view", mode="any")),
     ("/api/profile", require("grow.view", "settings.view", mode="any")),
 )
 
 
 # ---------------------------------------------------------------------------
-# Schreibrechte. Spezifische Regeln stehen vor generischen Regeln.
+# Schreibrechte
 # ---------------------------------------------------------------------------
+#
+# Die Reihenfolge ist wichtig. Spezifische Aktionen werden vor generischen
+# Präfixen geprüft. Dadurch unterscheiden wir bewusst zwischen:
+#   grow.control       -> laufenden Grow bedienen
+#   grow.configure     -> Regelparameter / Gerätekonfiguration ändern
+#   hardware.control   -> Hardware-Aktionen ausführen (Scan/Refresh/Read)
+#   hardware.configure -> Pairing, Zuordnung und Hardware-Konfiguration
+# ---------------------------------------------------------------------------
+
+WRITE_EXACT = {
+    # Grow-Konfiguration / Datenpflege
+    "/api/config": require("grow.configure", "settings.manage", mode="any"),
+    "/api/diagrams/import": require("grow.configure"),
+    "/api/reset_history": require("settings.manage"),
+
+    # Energiezähler zurücksetzen ist administrativer als reine Bedienung.
+    "/api/energy/reset_today_all": require("grow.configure"),
+    "/api/energy/reset_total_all": require("grow.configure"),
+
+    # Hardware-Aktionen ohne dauerhafte Konfigurationsänderung
+    "/api/hardware/scan": require("hardware.control"),
+    "/api/watchdog/log/clear": require("hardware.control"),
+}
+
 
 WRITE_PREFIX = (
     # Pflanzen / Tagebuch
@@ -113,22 +137,24 @@ WRITE_PREFIX = (
     ("/api/diary", require("diary.edit")),
     ("/tagebuch", require("diary.edit")),
 
-    # Grow-Regelung konfigurieren
-    ("/api/config", require("grow.configure", "settings.manage", mode="any")),
+    # Grow-Regelung
+    # Moduswechsel ist Bedienung; Geräteeinstellungen selbst sind Konfiguration.
+    ("/api/device/mode", require("grow.control")),
+    ("/api/device", require("grow.configure")),
     ("/api/profile", require("grow.configure", "settings.manage", mode="any")),
     ("/settings", require("grow.configure", "settings.manage", mode="any")),
 
+    # Energiezähler einzelner Geräte zurücksetzen
+    ("/api/energy/reset_today", require("grow.configure")),
+    ("/api/energy/reset_total", require("grow.configure")),
+
     # Hardware-Inventar / Sensorik konfigurieren
-    ("/api/hardware", require("hardware.configure")),
-    ("/api/device", require("hardware.configure")),
-    ("/api/devices", require("hardware.configure")),
-    ("/api/sensor", require("hardware.configure")),
     ("/api/sensors", require("hardware.configure")),
+    ("/api/sensor", require("hardware.configure")),
     ("/api/blu", require("hardware.configure")),
     ("/connections", require("hardware.configure")),
     ("/sensoren", require("hardware.configure")),
     ("/devices", require("hardware.configure")),
-    ("/api/watchdog", require("hardware.configure")),
 
     # System-/Energieeinstellungen
     ("/energie/settings", require("settings.manage")),
@@ -138,9 +164,46 @@ WRITE_PREFIX = (
 )
 
 
+def _hardware_write_requirement(path):
+    """Feingranulare Rechte für die vorhandenen Hardware-Endpunkte."""
+
+    if not _matches_prefix(path, "/api/hardware") and not _matches_prefix(
+        path, "/api/watchdog"
+    ):
+        return None
+
+    # Aktionen, die Hardware nur anstoßen/abfragen, aber keine dauerhafte
+    # Zuordnung verändern.
+    control_suffixes = (
+        "/refresh",
+        "/read-values",
+        "/ble/scan",
+        "/log/clear",
+    )
+    if path == "/api/hardware/scan" or path.endswith(control_suffixes):
+        return require("hardware.control")
+
+    # Bluetooth ein/aus, Pairing, Registrierung, Sensor-Setup und Unpairing
+    # verändern die Hardware-Konfiguration dauerhaft.
+    configure_markers = (
+        "/bluetooth/enable",
+        "/bluetooth/disable",
+        "/pair",
+        "/unpair",
+        "/setup-sensors",
+        "/register-discovered",
+        "/add-discovered",
+    )
+    if any(marker in path for marker in configure_markers):
+        return require("hardware.configure")
+
+    # Sonstige schreibende Hardware-Endpunkte bleiben fail-closed auf
+    # hardware.configure.
+    return require("hardware.configure")
+
+
 # ---------------------------------------------------------------------------
-# Reservierte Management-Pfade für die nächsten Module. Dadurch ist die
-# Rechtearchitektur bereits vorbereitet, bevor Lager/Warenannahme dazukommen.
+# Reservierte Management-Pfade für kommende Module
 # ---------------------------------------------------------------------------
 
 MANAGEMENT_PREFIXES = {
@@ -200,13 +263,16 @@ def permission_requirement(path, method):
 
     Auth-/Admin-Routen werden bewusst nicht hier geregelt:
     - /login und /logout werden durch Auth selbst behandelt.
-    - /admin nutzt weiterhin die feineren Decorators aus routes/admin.py.
+    - /admin nutzt die feineren Decorators aus routes/admin.py.
     """
 
     path = _normalize_path(path)
     method = (method or "GET").upper()
 
-    if path == "/login" or path == "/logout":
+    if path in {"/login", "/logout"}:
+        return None
+
+    if _matches_prefix(path, "/static"):
         return None
 
     if _matches_prefix(path, "/admin"):
@@ -225,21 +291,25 @@ def permission_requirement(path, method):
             if _matches_prefix(path, prefix):
                 return requirement
 
-        # Unbekannte API-Lesezugriffe werden nicht einfach mit dashboard.view
-        # freigegeben. Sie benötigen mindestens Grow-Leserecht.
+        # Unbekannte API-Lesezugriffe benötigen mindestens Grow-Leserecht.
         if _matches_prefix(path, "/api"):
             return require("grow.view")
 
-        # Bestehende, noch nicht explizit klassifizierte HTML-Seiten bleiben
-        # für Dashboard-Benutzer lesbar. Neue sensible Module sollten oben eine
-        # eigene Regel bekommen.
+        # Unklassifizierte HTML-Seiten bleiben nur für Dashboard-Benutzer
+        # lesbar. Sensible neue Module sollten explizit ergänzt werden.
         return require("dashboard.view")
+
+    exact = WRITE_EXACT.get(path)
+    if exact:
+        return exact
+
+    hardware = _hardware_write_requirement(path)
+    if hardware:
+        return hardware
 
     for prefix, requirement in WRITE_PREFIX:
         if _matches_prefix(path, prefix):
             return requirement
 
-    # Fail-closed für bisher unbekannte Schreibzugriffe: Ein eingeloggter
-    # Viewer darf niemals allein durch eine neue POST-Route Schreibrechte
-    # erhalten. Standard für bestehende Grow-APIs ist grow.control.
+    # Fail-closed für unbekannte Schreibzugriffe.
     return require("grow.control")
