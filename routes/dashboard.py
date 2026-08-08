@@ -1,14 +1,24 @@
 from flask import render_template
-from services.hardware import hardware
-from flask import abort
-from core.hardware.manager import manager
 
 
 def register(app):
 
+    # ================================================================
+    # Growstar Main Dashboard
+    # ================================================================
+
     @app.route("/")
     def dashboard():
         return render_template("dashboard.html")
+
+
+    # ================================================================
+    # Grow Control
+    # ================================================================
+
+    @app.route("/grow-control")
+    def grow_control_dashboard():
+        return render_template("grow_control.html")
 
 
     @app.route("/settings")
@@ -77,11 +87,6 @@ def register(app):
         return render_template("energie.html")
 
 
-    @app.route("/pflanzendaten")
-    def pflanzendaten_page():
-        return render_template("pflanzendaten.html")
-
-
     @app.route("/energie/settings")
     def energie_settings_page():
         return render_template("energie_settings.html")
@@ -92,31 +97,27 @@ def register(app):
         return render_template("connections.html")
 
 
-    @app.route("/tagebuch")
-    def tagebuch_page():
-        return render_template("tagebuch.html")
-
-
     @app.route("/watchdog")
     def watchdog_page():
         return render_template("watchdog.html")
-    
+
+
     @app.route("/devices")
     def devices():
         return render_template("devices.html")
 
+
     @app.route("/devices/<gateway_id>")
     def gateway_page(gateway_id):
-    
         return render_template(
             "gateway.html",
-            gateway_id=gateway_id
+            gateway_id=gateway_id,
         )
+
 
     @app.route("/devices/blu/<device_id>")
     def bluetooth_device_page(device_id):
-    
         return render_template(
             "blu_device.html",
-            device_id=device_id
+            device_id=device_id,
         )
