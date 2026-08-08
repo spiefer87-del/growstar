@@ -41,6 +41,8 @@ def _matches_prefix(path, prefix):
 
 READ_EXACT = {
     "/": require("dashboard.view"),
+    "/grow-control": require("grow.view"),
+    "/pflanzenmanagement": require("plants.view", "diary.view", mode="any"),
 
     # Grow / Live-Daten
     "/temperature": require("grow.view"),
