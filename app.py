@@ -38,6 +38,7 @@ from routes.watchdog import register as register_watchdog_routes
 from routes.hardware import register as register_hardware_routes
 from routes.sensors import register as register_sensor_routes
 from routes.auth import register as register_auth_routes
+from routes.admin import register as register_admin_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -90,6 +91,7 @@ def create_flask_app():
     )
 
     register_auth_routes(app)
+    register_admin_routes(app)
     register_dashboard_routes(app)
     register_state_routes(app)
     register_plants_routes(app)
