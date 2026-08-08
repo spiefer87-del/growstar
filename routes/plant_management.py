@@ -1,3 +1,5 @@
+import os
+
 from flask import (
     abort,
     flash,
@@ -40,6 +42,26 @@ from plant_management.excel_io import (
     import_cultivars_xlsx,
 )
 
+from plant_management.journal import (
+    JOURNAL_CATEGORIES,
+    JOURNAL_SEVERITIES,
+    MEASUREMENT_FIELDS,
+    MAX_ATTACHMENT_BYTES,
+    MAX_ATTACHMENTS_PER_REQUEST,
+    list_journal_entries,
+    get_journal_entry,
+    save_journal_entry,
+    measurements_from_form,
+    resolve_follow_up,
+    cancel_journal_entry,
+    get_revisions,
+    journal_stats,
+    save_attachments,
+    get_attachment,
+    remove_attachment,
+    export_journal_xlsx,
+)
+
 
 MAX_EXCEL_BYTES = 10 * 1024 * 1024
 
@@ -63,6 +85,20 @@ def _form_data():
     return request.form.to_dict(flat=True)
 
 
+def _current_user_identity():
+    user = getattr(g, "current_user", None)
+    if not user:
+        return None, None
+
+    name = (
+        user.get("display_name")
+        or user.get("username")
+        or user.get("email")
+        or f"Benutzer {user.get('id')}"
+    )
+    return user.get("id"), name
+
+
 def register(app):
 
     # ------------------------------------------------------------------
@@ -76,6 +112,8 @@ def register(app):
             "plants/dashboard.html",
             **data,
             stages=STAGES,
+            journal_stats=journal_stats(),
+            recent_journal=list_journal_entries(limit=6),
         )
 
 
@@ -393,6 +431,10 @@ def register(app):
             stages=STAGES,
             stage_labels=STAGE_LABELS,
             stage_colors=STAGE_COLORS,
+            journal_entries=list_journal_entries(
+                plant_id=plant_id,
+                limit=8,
+            ),
         )
 
 
@@ -480,6 +522,336 @@ def register(app):
         return redirect(url_for("plant_list"))
 
 
+    # ------------------------------------------------------------------
+    # Betriebsjournal / Electronic Batch Record
+    # ------------------------------------------------------------------
+
+    @app.route("/pflanzenmanagement/tagebuch")
+    def plant_journal():
+        filters = {
+            "search": request.args.get("q") or None,
+            "category": request.args.get("category") or None,
+            "severity": request.args.get("severity") or None,
+            "plant_id": request.args.get("plant_id") or None,
+            "batch_id": request.args.get("batch_id") or None,
+            "date_from": request.args.get("date_from") or None,
+            "date_to": request.args.get("date_to") or None,
+            "open_follow_up": request.args.get("open") == "1",
+        }
+
+        return render_template(
+            "plants/journal.html",
+            entries=list_journal_entries(**filters),
+            filters=filters,
+            stats=journal_stats(),
+            categories=JOURNAL_CATEGORIES,
+            severities=JOURNAL_SEVERITIES,
+            plants=list_plants(status="active"),
+            batches=list_batches(include_archived=False),
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/tagebuch/neu",
+        methods=["GET", "POST"],
+    )
+    @permission_required("diary.edit")
+    def plant_journal_new():
+        if request.method == "POST":
+            try:
+                user_id, user_name = _current_user_identity()
+
+                entry_id = save_journal_entry(
+                    _form_data(),
+                    plant_ids=request.form.getlist("plant_ids"),
+                    batch_ids=request.form.getlist("batch_ids"),
+                    measurements=measurements_from_form(request.form),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+
+                save_attachments(
+                    entry_id,
+                    request.files.getlist("attachments"),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+
+                _audit(
+                    "diary.entry_created",
+                    "journal_entry",
+                    entry_id,
+                )
+
+                flash("Journal-Eintrag wurde angelegt.", "success")
+                return redirect(
+                    url_for("plant_journal_detail", entry_id=entry_id)
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/journal_form.html",
+            entry=None,
+            categories=JOURNAL_CATEGORIES,
+            severities=JOURNAL_SEVERITIES,
+            measurement_fields=MEASUREMENT_FIELDS,
+            plants=list_plants(status="active"),
+            batches=list_batches(include_archived=False),
+            preselected_plant_id=request.args.get("plant_id"),
+            preselected_batch_id=request.args.get("batch_id"),
+            max_attachment_mb=MAX_ATTACHMENT_BYTES // 1024 // 1024,
+            max_attachments=MAX_ATTACHMENTS_PER_REQUEST,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/tagebuch/<int:entry_id>",
+    )
+    def plant_journal_detail(entry_id):
+        entry = get_journal_entry(entry_id)
+        if not entry:
+            abort(404)
+
+        return render_template(
+            "plants/journal_detail.html",
+            entry=entry,
+            revisions=get_revisions(entry_id),
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/tagebuch/<int:entry_id>/bearbeiten",
+        methods=["GET", "POST"],
+    )
+    @permission_required("diary.edit")
+    def plant_journal_edit(entry_id):
+        entry = get_journal_entry(entry_id)
+        if not entry:
+            abort(404)
+
+        if entry["is_cancelled"]:
+            flash(
+                "Ein stornierter Journal-Eintrag kann nicht mehr bearbeitet werden.",
+                "error",
+            )
+            return redirect(
+                url_for("plant_journal_detail", entry_id=entry_id)
+            )
+
+        if request.method == "POST":
+            try:
+                user_id, user_name = _current_user_identity()
+
+                save_journal_entry(
+                    _form_data(),
+                    entry_id=entry_id,
+                    plant_ids=request.form.getlist("plant_ids"),
+                    batch_ids=request.form.getlist("batch_ids"),
+                    measurements=measurements_from_form(request.form),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+
+                save_attachments(
+                    entry_id,
+                    request.files.getlist("attachments"),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+
+                _audit(
+                    "diary.entry_updated",
+                    "journal_entry",
+                    entry_id,
+                )
+
+                flash(
+                    "Journal-Eintrag wurde gespeichert. "
+                    "Die vorherige Version wurde revisionssicher archiviert.",
+                    "success",
+                )
+                return redirect(
+                    url_for("plant_journal_detail", entry_id=entry_id)
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/journal_form.html",
+            entry=get_journal_entry(entry_id),
+            categories=JOURNAL_CATEGORIES,
+            severities=JOURNAL_SEVERITIES,
+            measurement_fields=MEASUREMENT_FIELDS,
+            plants=list_plants(),
+            batches=list_batches(include_archived=True),
+            preselected_plant_id=None,
+            preselected_batch_id=None,
+            max_attachment_mb=MAX_ATTACHMENT_BYTES // 1024 // 1024,
+            max_attachments=MAX_ATTACHMENTS_PER_REQUEST,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/tagebuch/<int:entry_id>/erledigen",
+        methods=["POST"],
+    )
+    @permission_required("diary.edit")
+    def plant_journal_resolve(entry_id):
+        user_id, user_name = _current_user_identity()
+
+        try:
+            changed = resolve_follow_up(
+                entry_id,
+                user_id=user_id,
+                user_name=user_name,
+            )
+            if changed:
+                _audit(
+                    "diary.follow_up_resolved",
+                    "journal_entry",
+                    entry_id,
+                )
+                flash("Folgeaktion wurde als erledigt markiert.", "success")
+            else:
+                flash("Folgeaktion war bereits erledigt.", "info")
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(
+            url_for("plant_journal_detail", entry_id=entry_id)
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/tagebuch/<int:entry_id>/stornieren",
+        methods=["POST"],
+    )
+    @permission_required("diary.edit")
+    def plant_journal_cancel(entry_id):
+        user_id, user_name = _current_user_identity()
+
+        try:
+            changed = cancel_journal_entry(
+                entry_id,
+                reason=request.form.get("reason"),
+                user_id=user_id,
+                user_name=user_name,
+            )
+
+            if changed:
+                _audit(
+                    "diary.entry_cancelled",
+                    "journal_entry",
+                    entry_id,
+                    {"reason": request.form.get("reason")},
+                )
+                flash(
+                    "Eintrag wurde storniert und bleibt aus "
+                    "Nachvollziehbarkeitsgründen erhalten.",
+                    "success",
+                )
+            else:
+                flash("Eintrag war bereits storniert.", "info")
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(
+            url_for("plant_journal_detail", entry_id=entry_id)
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/tagebuch/anhaenge/<int:attachment_id>",
+    )
+    def plant_journal_attachment(attachment_id):
+        attachment = get_attachment(attachment_id)
+        if not attachment:
+            abort(404)
+
+        file_path = attachment["path"]
+        if not os.path.isfile(file_path):
+            abort(404)
+
+        return send_file(
+            file_path,
+            mimetype=attachment["mime_type"],
+            as_attachment=request.args.get("download") == "1",
+            download_name=attachment["original_name"],
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/tagebuch/anhaenge/<int:attachment_id>/entfernen",
+        methods=["POST"],
+    )
+    @permission_required("diary.edit")
+    def plant_journal_attachment_remove(attachment_id):
+        attachment = get_attachment(attachment_id)
+        if not attachment:
+            abort(404)
+
+        user_id, user_name = _current_user_identity()
+
+        if remove_attachment(
+            attachment_id,
+            user_id=user_id,
+            user_name=user_name,
+        ):
+            _audit(
+                "diary.attachment_removed",
+                "journal_attachment",
+                attachment_id,
+            )
+            flash(
+                "Anhang wurde aus der aktiven Ansicht entfernt. "
+                "Der Audit-Trail bleibt erhalten.",
+                "success",
+            )
+
+        return redirect(
+            url_for(
+                "plant_journal_detail",
+                entry_id=attachment["entry_id"],
+            )
+        )
+
+
+    @app.route("/pflanzenmanagement/tagebuch/export.xlsx")
+    def plant_journal_export():
+        filters = {
+            "search": request.args.get("q") or None,
+            "category": request.args.get("category") or None,
+            "severity": request.args.get("severity") or None,
+            "plant_id": request.args.get("plant_id") or None,
+            "batch_id": request.args.get("batch_id") or None,
+            "date_from": request.args.get("date_from") or None,
+            "date_to": request.args.get("date_to") or None,
+            "open_follow_up": request.args.get("open") == "1",
+            "limit": 5000,
+        }
+
+        stream = export_journal_xlsx(
+            list_journal_entries(**filters)
+        )
+
+        _audit(
+            "diary.journal_exported",
+            "journal_entry",
+        )
+
+        return send_file(
+            stream,
+            as_attachment=True,
+            download_name="growstar_betriebsjournal.xlsx",
+            mimetype=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+
+
+    # Alter Link bleibt kompatibel.
     @app.route("/tagebuch")
     def tagebuch_page():
-        return render_template("tagebuch.html")
+        return redirect(url_for("plant_journal"))
