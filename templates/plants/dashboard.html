@@ -1,1 +1,178 @@
+{% extends "base.html" %}
 
+{% block title %}Pflanzenmanagement – Growstar{% endblock %}
+
+{% block head %}
+<style>
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+    }
+
+    :root {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #e5e7eb;
+        --muted: #94a3b8;
+        --accent: #22c55e;
+    }
+
+    body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 28px;
+        background:
+            radial-gradient(circle at top left, rgba(34,197,94,.08), transparent 30rem),
+            var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .page {
+        max-width: 1050px;
+        margin: 0 auto;
+    }
+
+    .page-head {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 30px;
+    }
+
+    .back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        flex: 0 0 44px;
+        border-radius: 12px;
+        background: var(--card);
+        border: 1px solid rgba(148,163,184,.2);
+        color: var(--text);
+        text-decoration: none;
+        font-size: 1.3rem;
+    }
+
+    .page-head h1 {
+        margin: 0;
+        font-size: clamp(1.65rem, 4vw, 2.2rem);
+    }
+
+    .page-head p {
+        margin: 5px 0 0;
+        color: var(--muted);
+    }
+
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+    }
+
+    .card-link {
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .card {
+        min-height: 210px;
+        border-radius: 20px;
+        padding: 26px;
+        background: linear-gradient(145deg, #1e293b, #111827);
+        border: 1px solid rgba(148,163,184,.14);
+        box-shadow: 0 16px 40px rgba(0,0,0,.25);
+        transition: transform .18s ease, border-color .18s ease;
+    }
+
+    .card-link:hover .card {
+        transform: translateY(-3px);
+        border-color: rgba(34,197,94,.5);
+    }
+
+    .icon {
+        font-size: 2.4rem;
+        margin-bottom: 24px;
+    }
+
+    .card h2 {
+        margin: 0;
+        font-size: 1.25rem;
+    }
+
+    .card p {
+        margin: 10px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+    }
+
+    .action {
+        margin-top: 22px;
+        color: var(--accent);
+        font-weight: 700;
+        font-size: .9rem;
+    }
+
+    @media (max-width: 650px) {
+        body {
+            padding: 18px 12px;
+        }
+
+        .grid {
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+
+        .card {
+            min-height: 175px;
+            padding: 22px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block page %}
+<main class="page">
+    <header class="page-head">
+        <a class="back" href="{{ url_for('dashboard') }}" title="Zum Main Dashboard">←</a>
+        <div>
+            <h1>🌿 Pflanzenmanagement</h1>
+            <p>Pflanzenbezogene Daten und Dokumentation</p>
+        </div>
+    </header>
+
+    <div class="grid">
+
+        {% if has_permission('plants.view') %}
+        <a class="card-link" href="{{ url_for('pflanzendaten_page') }}">
+            <section class="card">
+                <div class="icon">🌱</div>
+                <h2>Pflanzendaten</h2>
+                <p>
+                    Sorten, Pflanzenprofile, Phasen und die bestehenden
+                    Pflanzendaten verwalten.
+                </p>
+                <div class="action">Öffnen →</div>
+            </section>
+        </a>
+        {% endif %}
+
+        {% if has_permission('diary.view') %}
+        <a class="card-link" href="{{ url_for('tagebuch_page') }}">
+            <section class="card">
+                <div class="icon">📓</div>
+                <h2>Tagebuch</h2>
+                <p>
+                    Ereignisse, Notizen und die laufende Dokumentation
+                    des Grows einsehen und pflegen.
+                </p>
+                <div class="action">Öffnen →</div>
+            </section>
+        </a>
+        {% endif %}
+
+    </div>
+</main>
+{% endblock %}
