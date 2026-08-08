@@ -1,4 +1,4 @@
-# Gunicorn-Konfiguration für Growstar
+# Gunicorn-Konfiguration für Growstartest
 # WICHTIG: workers muss 1 bleiben, da jeder Worker sonst eine eigene
 # Hardware-, MQTT-, Shelly- und Regelungsinstanz starten würde.
 
