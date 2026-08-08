@@ -247,14 +247,14 @@
     </a>
     {% endif %}
 
-    {% if has_any_permission('plants.view', 'diary.view') %}
+    {% if has_permission('plants.view') %}
     <a class="module-link" href="{{ url_for('plant_management_dashboard') }}">
         <section class="module-card plants">
             <div class="module-icon">🌿</div>
             <h2>Pflanzenmanagement</h2>
             <p>
-                Pflanzendaten, Sorten, Phasen und das zugehörige
-                Grow-Tagebuch an einem eigenen Ort.
+                Aktive Pflanzen, Sortenstamm, Durchgänge und Lifecycle-Timeline
+                in einem eigenständigen Management-Modul.
             </p>
             <div class="module-action">Öffnen →</div>
         </section>
