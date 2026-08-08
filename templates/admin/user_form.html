@@ -1,0 +1,71 @@
+{% extends "admin/base.html" %}
+{% block title %}{% if mode == 'new' %}Benutzer anlegen{% else %}Benutzer bearbeiten{% endif %} – Growstar{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{% if mode == 'new' %}Benutzer anlegen{% else %}Benutzer bearbeiten{% endif %}</h1>
+        {% if user %}<p>ID {{ user.id }} · {{ user.username }}</p>{% else %}<p>Neues Konto mit Rollen und Berechtigungen.</p>{% endif %}
+    </div>
+    <div class="actions"><a class="button secondary" href="{{ url_for('admin_users') }}">Zurück</a></div>
+</div>
+
+<div class="card form-card">
+    {% if user and user.id == current_user.id %}
+        <div class="notice">Das ist dein eigenes Konto. Selbst-Deaktivierung und das Entfernen deiner Administratorrolle werden blockiert.</div>
+    {% endif %}
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-grid">
+            <div><label for="username">Benutzername</label><input id="username" name="username" type="text" required maxlength="80" value="{{ request.form.get('username', user.username if user else '') }}"></div>
+            <div><label for="display_name">Anzeigename</label><input id="display_name" name="display_name" type="text" required maxlength="120" value="{{ request.form.get('display_name', user.display_name if user else '') }}"></div>
+            <div><label for="email">E-Mail (optional)</label><input id="email" name="email" type="email" maxlength="254" value="{{ request.form.get('email', user.email if user and user.email else '') }}"></div>
+            <div>
+                <label>Status</label>
+                <label class="check">
+                    <input type="checkbox" name="is_active" value="1" {% if request.method == 'POST' %}{% if request.form.get('is_active') == '1' %}checked{% endif %}{% elif not user or user.is_active %}checked{% endif %}>
+                    <span><strong>Benutzer aktiv</strong><small>Deaktivierte Benutzer können sich nicht anmelden.</small></span>
+                </label>
+            </div>
+        </div>
+
+        {% if mode == 'new' %}
+        <div class="section">
+            <h2>Startpasswort</h2>
+            <div class="form-grid">
+                <div><label for="password">Passwort (mind. 12 Zeichen)</label><input id="password" name="password" type="password" autocomplete="new-password" required></div>
+                <div><label for="password_repeat">Passwort wiederholen</label><input id="password_repeat" name="password_repeat" type="password" autocomplete="new-password" required></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="section">
+            <h2>Rollen</h2>
+            <div class="check-list">
+                {% for role in roles %}
+                <label class="check">
+                    <input type="checkbox" name="roles" value="{{ role.id }}" {% if role.id in selected_role_ids %}checked{% endif %}>
+                    <span><strong>{{ role.name }} {% if role.is_system %}<span class="badge system">System</span>{% endif %}</strong><small>{{ role.description or 'Keine Beschreibung' }}</small></span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="section actions"><button class="button" type="submit">Speichern</button></div>
+    </form>
+</div>
+
+{% if mode == 'edit' %}
+<div class="card form-card section">
+    <h2>Passwort zurücksetzen</h2>
+    <p class="muted">Nach dem Speichern werden andere bestehende Sitzungen dieses Benutzers ungültig.</p>
+    <form method="post" action="{{ url_for('admin_user_password', user_id=user.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-grid">
+            <div><label for="new_password">Neues Passwort</label><input id="new_password" name="password" type="password" autocomplete="new-password" minlength="12" required></div>
+            <div><label for="new_password_repeat">Passwort wiederholen</label><input id="new_password_repeat" name="password_repeat" type="password" autocomplete="new-password" minlength="12" required></div>
+        </div>
+        <div class="section actions"><button class="button secondary" type="submit">Passwort ändern</button></div>
+    </form>
+</div>
+{% endif %}
+{% endblock %}

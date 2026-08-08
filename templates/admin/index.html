@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block title %}Verwaltung – Growstar{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Verwaltung</h1>
+        <p>Benutzer, Rollen, Berechtigungen und nachvollziehbare Änderungen.</p>
+    </div>
+</div>
+
+<div class="grid">
+    <div class="card"><div class="stat-label">Benutzer</div><div class="stat-value">{{ stats.users_total }}</div><div class="muted">{{ stats.users_active }} aktiv</div></div>
+    <div class="card"><div class="stat-label">Rollen</div><div class="stat-value">{{ stats.roles_total }}</div></div>
+    <div class="card"><div class="stat-label">Berechtigungen</div><div class="stat-value">{{ stats.permissions_total }}</div></div>
+    <div class="card"><div class="stat-label">Audit-Einträge</div><div class="stat-value">{{ stats.audit_total }}</div></div>
+</div>
+
+<div class="section grid">
+    {% if has_any_permission('users.view', 'users.manage') %}
+    <div class="card">
+        <h2>👤 Benutzer</h2>
+        <p class="muted">Konten verwalten, Rollen zuweisen, Benutzer deaktivieren und Passwörter zurücksetzen.</p>
+        <a class="button secondary" href="{{ url_for('admin_users') }}">Benutzer öffnen</a>
+    </div>
+    {% endif %}
+    {% if has_any_permission('roles.view', 'roles.manage') %}
+    <div class="card">
+        <h2>🛡️ Rollen & Rechte</h2>
+        <p class="muted">Berechtigungen modular kombinieren. Der Administrator behält immer Vollzugriff.</p>
+        <a class="button secondary" href="{{ url_for('admin_roles') }}">Rollen öffnen</a>
+    </div>
+    {% endif %}
+    {% if has_permission('audit.view') %}
+    <div class="card">
+        <h2>📜 Audit-Log</h2>
+        <p class="muted">Anmeldungen und Verwaltungsänderungen mit Benutzer, Zeit und IP nachvollziehen.</p>
+        <a class="button secondary" href="{{ url_for('admin_audit') }}">Audit-Log öffnen</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

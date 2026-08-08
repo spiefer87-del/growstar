@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Growstar Verwaltung{% endblock %}</title>
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --bg: #0f172a;
+            --panel: #111c2e;
+            --card: #1e293b;
+            --card-soft: #172033;
+            --border: #334155;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --accent: #22c55e;
+            --accent-dark: #16a34a;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --info: #38bdf8;
+        }
+        html { color-scheme: dark; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+        a { color: inherit; }
+        .shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 250px minmax(0, 1fr);
+        }
+        .sidebar {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            padding: 22px 16px;
+            border-right: 1px solid rgba(148,163,184,.14);
+            background: #0b1220;
+        }
+        .brand {
+            font-size: 1.35rem;
+            font-weight: 800;
+            margin: 0 8px 22px;
+        }
+        .brand small {
+            display: block;
+            margin-top: 3px;
+            font-size: .72rem;
+            color: var(--muted);
+            font-weight: 600;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+        .nav { display: grid; gap: 6px; }
+        .nav a {
+            text-decoration: none;
+            padding: 11px 12px;
+            border-radius: 10px;
+            color: var(--muted);
+            font-weight: 650;
+        }
+        .nav a:hover,
+        .nav a.active {
+            background: var(--card);
+            color: var(--text);
+        }
+        .sidebar-footer {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 18px;
+            padding-top: 14px;
+            border-top: 1px solid rgba(148,163,184,.12);
+        }
+        .userline {
+            color: var(--muted);
+            font-size: .82rem;
+            margin-bottom: 9px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .logout {
+            width: 100%;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text);
+            padding: 9px 11px;
+            border-radius: 9px;
+            cursor: pointer;
+            font: inherit;
+        }
+        .main { min-width: 0; padding: 28px; }
+        .page-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 22px;
+        }
+        .page-head h1 { margin: 0; font-size: 1.65rem; }
+        .page-head p { margin: 5px 0 0; color: var(--muted); }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .button,
+        button.button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 14px;
+            background: var(--accent);
+            color: #052e16;
+            text-decoration: none;
+            font: inherit;
+            font-weight: 750;
+            cursor: pointer;
+        }
+        .button.secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+        .button.danger { background: #7f1d1d; color: #fee2e2; }
+        .button.small { padding: 7px 10px; font-size: .85rem; }
+        .grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+        .card {
+            background: var(--card);
+            border: 1px solid rgba(148,163,184,.12);
+            border-radius: 15px;
+            padding: 18px;
+            box-shadow: 0 12px 28px rgba(0,0,0,.18);
+        }
+        .stat-label { color: var(--muted); font-size: .82rem; text-transform: uppercase; letter-spacing: .05em; }
+        .stat-value { margin-top: 8px; font-size: 1.8rem; font-weight: 800; }
+        .section { margin-top: 20px; }
+        .section h2 { font-size: 1.05rem; margin: 0 0 12px; }
+        .table-wrap { overflow-x: auto; border: 1px solid rgba(148,163,184,.12); border-radius: 14px; }
+        table { width: 100%; border-collapse: collapse; background: var(--card-soft); }
+        th, td { padding: 12px 13px; text-align: left; border-bottom: 1px solid rgba(148,163,184,.10); vertical-align: top; }
+        th { color: var(--muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .05em; }
+        tr:last-child td { border-bottom: 0; }
+        .muted { color: var(--muted); }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            border-radius: 999px;
+            padding: 4px 8px;
+            margin: 2px 3px 2px 0;
+            background: #243349;
+            color: #cbd5e1;
+            font-size: .76rem;
+            font-weight: 700;
+        }
+        .badge.good { background: #14532d; color: #bbf7d0; }
+        .badge.off { background: #3f3f46; color: #d4d4d8; }
+        .badge.system { background: #1e3a5f; color: #bae6fd; }
+        .flash {
+            margin-bottom: 16px;
+            padding: 11px 13px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+        }
+        .flash.success { background: #14532d; color: #dcfce7; border-color: #166534; }
+        .flash.error { background: #7f1d1d; color: #fee2e2; border-color: #991b1b; }
+        .flash.message { background: #1e3a5f; color: #e0f2fe; border-color: #075985; }
+        .form-card { max-width: 900px; }
+        .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 15px; }
+        label { display: block; margin-bottom: 6px; color: var(--muted); font-size: .85rem; }
+        input[type="text"], input[type="email"], input[type="password"], textarea, select {
+            width: 100%;
+            background: #0f172a;
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 11px 12px;
+            border-radius: 10px;
+            font: inherit;
+            outline: none;
+        }
+        textarea { min-height: 90px; resize: vertical; }
+        input:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(34,197,94,.12); }
+        input[readonly] { opacity: .72; cursor: not-allowed; }
+        .check-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+        .check {
+            display: flex;
+            gap: 9px;
+            align-items: flex-start;
+            padding: 10px;
+            background: #0f172a;
+            border: 1px solid rgba(148,163,184,.12);
+            border-radius: 10px;
+        }
+        .check input { margin-top: 3px; }
+        .check strong { display: block; font-size: .9rem; }
+        .check small { display: block; color: var(--muted); margin-top: 2px; }
+        .notice { padding: 12px 14px; border-radius: 10px; background: #172554; color: #dbeafe; margin-bottom: 14px; }
+        .danger-note { background: #451a03; color: #ffedd5; }
+        .permission-group { margin-bottom: 18px; }
+        .permission-group h3 { margin: 0 0 9px; color: var(--muted); font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; }
+        .audit-details { max-width: 460px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .78rem; color: #cbd5e1; margin: 0; }
+        .search { display: flex; gap: 8px; max-width: 520px; }
+        .search input { flex: 1; }
+        @media (max-width: 900px) {
+            .shell { display: block; }
+            .sidebar { position: static; height: auto; border-right: 0; border-bottom: 1px solid rgba(148,163,184,.14); }
+            .nav { display: flex; overflow-x: auto; }
+            .nav a { white-space: nowrap; }
+            .sidebar-footer { position: static; margin-top: 14px; }
+            .main { padding: 18px 12px 28px; }
+            .grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+            .form-grid, .check-list { grid-template-columns: 1fr; }
+            .page-head { align-items: flex-start; }
+        }
+        @media (max-width: 520px) {
+            .grid { grid-template-columns: 1fr; }
+            .page-head { display: block; }
+            .actions { margin-top: 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <aside class="sidebar">
+        <div class="brand">🌱 Growstar<small>Verwaltung</small></div>
+        <nav class="nav">
+            <a href="{{ url_for('dashboard') }}">← Dashboard</a>
+            <a href="{{ url_for('admin_index') }}" class="{% if request.endpoint == 'admin_index' %}active{% endif %}">Übersicht</a>
+            {% if has_any_permission('users.view', 'users.manage') %}
+                <a href="{{ url_for('admin_users') }}" class="{% if request.endpoint in ['admin_users','admin_user_new','admin_user_edit'] %}active{% endif %}">Benutzer</a>
+            {% endif %}
+            {% if has_any_permission('roles.view', 'roles.manage') %}
+                <a href="{{ url_for('admin_roles') }}" class="{% if request.endpoint in ['admin_roles','admin_role_new','admin_role_edit'] %}active{% endif %}">Rollen & Rechte</a>
+            {% endif %}
+            {% if has_permission('audit.view') %}
+                <a href="{{ url_for('admin_audit') }}" class="{% if request.endpoint == 'admin_audit' %}active{% endif %}">Audit-Log</a>
+            {% endif %}
+        </nav>
+        <div class="sidebar-footer">
+            <div class="userline">Angemeldet als <strong>{{ current_user.display_name }}</strong></div>
+            <form method="post" action="{{ url_for('auth_logout') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="logout" type="submit">Abmelden</button>
+            </form>
+        </div>
+    </aside>
+
+    <main class="main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</div>
+</body>
+</html>

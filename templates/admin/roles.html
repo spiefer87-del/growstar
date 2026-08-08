@@ -1,0 +1,28 @@
+{% extends "admin/base.html" %}
+{% block title %}Rollen & Rechte – Growstar{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Rollen & Rechte</h1>
+        <p>Rollen bündeln einzelne Berechtigungen. Benutzer können mehrere Rollen erhalten.</p>
+    </div>
+    {% if has_permission('roles.manage') %}<div class="actions"><a class="button" href="{{ url_for('admin_role_new') }}">＋ Rolle anlegen</a></div>{% endif %}
+</div>
+
+<div class="table-wrap">
+<table>
+    <thead><tr><th>Rolle</th><th>Beschreibung</th><th>Benutzer</th><th>Rechte</th><th></th></tr></thead>
+    <tbody>
+    {% for role in roles %}
+        <tr>
+            <td><strong>{{ role.name }}</strong>{% if role.is_system %} <span class="badge system">System</span>{% endif %}</td>
+            <td class="muted">{{ role.description or '–' }}</td>
+            <td>{{ role.user_count }}</td>
+            <td>{{ role.permission_count }}</td>
+            <td>{% if has_permission('roles.manage') %}<a class="button secondary small" href="{{ url_for('admin_role_edit', role_id=role.id) }}">Bearbeiten</a>{% endif %}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

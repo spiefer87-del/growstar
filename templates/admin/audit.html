@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% block title %}Audit-Log – Growstar{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Audit-Log</h1>
+        <p>Die letzten 250 passenden Ereignisse. Passwörter werden nicht protokolliert.</p>
+    </div>
+</div>
+
+<form class="search" method="get" action="{{ url_for('admin_audit') }}">
+    <input type="text" name="q" value="{{ search }}" placeholder="Aktion, Benutzer oder Objekt suchen">
+    <button class="button secondary" type="submit">Suchen</button>
+</form>
+
+<div class="table-wrap section">
+<table>
+    <thead><tr><th>Zeit</th><th>Benutzer</th><th>Aktion</th><th>Objekt</th><th>IP</th><th>Details</th></tr></thead>
+    <tbody>
+    {% for entry in entries %}
+        <tr>
+            <td>{{ entry.created_at_display }}</td>
+            <td>{% if entry.username %}<strong>{{ entry.display_name or entry.username }}</strong><div class="muted">{{ entry.username }}</div>{% else %}<span class="muted">System / unbekannt</span>{% endif %}</td>
+            <td><span class="mono">{{ entry.action }}</span></td>
+            <td>{% if entry.entity_type %}{{ entry.entity_type }}{% if entry.entity_id %} #{{ entry.entity_id }}{% endif %}{% else %}–{% endif %}</td>
+            <td class="mono">{{ entry.ip_address or '–' }}</td>
+            <td>{% if entry.details_pretty %}<pre class="audit-details">{{ entry.details_pretty }}</pre>{% else %}<span class="muted">–</span>{% endif %}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="6" class="muted">Keine passenden Einträge.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "admin/base.html" %}
+{% block title %}Benutzer – Growstar{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Benutzer</h1>
+        <p>Konten werden deaktiviert statt gelöscht, damit spätere Betriebsdaten zuordenbar bleiben.</p>
+    </div>
+    {% if has_permission('users.manage') %}
+    <div class="actions"><a class="button" href="{{ url_for('admin_user_new') }}">＋ Benutzer anlegen</a></div>
+    {% endif %}
+</div>
+
+<div class="table-wrap">
+<table>
+    <thead>
+        <tr><th>Benutzer</th><th>Status</th><th>Rollen</th><th>Letzter Login</th><th>Erstellt</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for user in users %}
+        <tr>
+            <td><strong>{{ user.display_name }}</strong><div class="muted">{{ user.username }}{% if user.email %} · {{ user.email }}{% endif %}</div></td>
+            <td>{% if user.is_active %}<span class="badge good">Aktiv</span>{% else %}<span class="badge off">Deaktiviert</span>{% endif %}</td>
+            <td>{% for role in user.roles %}<span class="badge">{{ role }}</span>{% else %}<span class="muted">Keine Rolle</span>{% endfor %}</td>
+            <td>{{ user.last_login_display }}</td>
+            <td>{{ user.created_at_display }}</td>
+            <td>{% if has_permission('users.manage') %}<a class="button secondary small" href="{{ url_for('admin_user_edit', user_id=user.id) }}">Bearbeiten</a>{% endif %}</td>
+        </tr>
+    {% else %}
+        <tr><td colspan="6" class="muted">Keine Benutzer vorhanden.</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+</div>
+{% endblock %}

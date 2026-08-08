@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% block title %}{% if mode == 'new' %}Rolle anlegen{% else %}Rolle bearbeiten{% endif %} – Growstar{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{% if mode == 'new' %}Rolle anlegen{% else %}Rolle bearbeiten{% endif %}</h1>
+        {% if role %}<p>{{ role.name }}{% if role.is_system %} · Systemrolle{% endif %}</p>{% else %}<p>Eigene Rolle aus einzelnen Berechtigungen zusammenstellen.</p>{% endif %}
+    </div>
+    <div class="actions"><a class="button secondary" href="{{ url_for('admin_roles') }}">Zurück</a></div>
+</div>
+
+<div class="card form-card">
+    {% if administrator_role %}
+        <div class="notice danger-note">Die Administratorrolle ist absichtlich unveränderlicher Vollzugriff. Neue Berechtigungen werden ihr automatisch hinzugefügt.</div>
+    {% elif role and role.is_system %}
+        <div class="notice">Der Name einer Systemrolle bleibt fest. Beschreibung und Berechtigungen dürfen angepasst werden.</div>
+    {% endif %}
+
+    <form method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-grid">
+            <div><label for="name">Rollenname</label><input id="name" name="name" type="text" maxlength="100" required value="{{ request.form.get('name', role.name if role else '') }}" {% if role and role.is_system %}readonly{% endif %}></div>
+            <div><label for="description">Beschreibung</label><input id="description" name="description" type="text" maxlength="250" value="{{ request.form.get('description', role.description if role and role.description else '') }}"></div>
+        </div>
+
+        <div class="section">
+            <h2>Berechtigungen</h2>
+            {% for group, permissions in permission_groups.items() %}
+            <div class="permission-group">
+                <h3>{{ group }}</h3>
+                <div class="check-list">
+                {% for permission in permissions %}
+                    <label class="check">
+                        <input type="checkbox" name="permissions" value="{{ permission.id }}" {% if permission.id in selected_permission_ids %}checked{% endif %} {% if administrator_role %}disabled{% endif %}>
+                        <span><strong class="mono">{{ permission.name }}</strong><small>{{ permission.description }}</small></span>
+                    </label>
+                {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="actions"><button class="button" type="submit">Speichern</button></div>
+    </form>
+</div>
+{% endblock %}
