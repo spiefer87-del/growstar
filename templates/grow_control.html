@@ -1,0 +1,639 @@
+{% extends "base.html" %}
+
+{% block title %}Grow Control – Growstar{% endblock %}
+
+{% block head %}
+<style>
+*,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #22c55e;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --on: #16a34a;
+            --off: #334155;
+            --disabled: #7c2d12;
+        }
+
+        html { font-size: 16px; }
+
+        body {
+            margin: 0;
+            padding: 20px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 1.8rem;
+        }
+
+        h3 {
+            margin: 30px 0 12px;
+            font-size: 0.9rem;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            align-items: stretch;
+        }
+
+        @media (max-width: 600px) {
+            html { font-size: 11px; }
+
+            body {
+                padding: 10px;
+                overflow-x: hidden;
+            }
+
+            .grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 8px;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            height: 100%;
+        }
+
+        .card h2 {
+            margin: 0 0 8px;
+            font-size: 0.85rem;
+            color: var(--muted);
+            text-transform: uppercase;
+        }
+
+        .value {
+            font-size: 1.6rem;
+            font-weight: 600;
+        }
+
+        .sub {
+            margin-top: 6px;
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        .badge {
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .badge.tag {
+            background: #22c55e;
+            color: #022c22;
+        }
+
+        .badge.nacht {
+            background: #38bdf8;
+            color: #082f49;
+        }
+
+        .card-link {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* Geräte */
+        .device.on { background: linear-gradient(135deg, #14532d, #16a34a); }
+        .device.off { background: linear-gradient(135deg, #0f172a, #334155); }
+        .device.disabled { background: linear-gradient(135deg, #431407, #7c2d12); }
+
+        .card.meta {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            border: 1px solid rgba(148,163,184,.15);
+        }
+
+
+        .user-panel {
+            position: fixed;
+            top: 20px;
+            right: 80px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .user-name {
+            color: var(--muted);
+            font-size: .85rem;
+        }
+
+        .logout-button,
+        .admin-button {
+            border: 1px solid rgba(148,163,184,.2);
+            background: var(--card);
+            color: var(--text);
+            border-radius: 10px;
+            padding: 8px 10px;
+            cursor: pointer;
+            text-decoration: none;
+            line-height: 1;
+        }
+
+        .admin-button:hover,
+        .logout-button:hover {
+            border-color: rgba(34,197,94,.55);
+        }
+
+        @media (max-width: 600px) {
+            .user-name { display: none; }
+            .user-panel { top: 12px; right: 62px; }
+            .system-link { top: 12px; right: 12px; }
+        }
+
+        .system-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            font-size: 1.6rem;
+            text-decoration: none;
+            color: var(--muted);
+            background: var(--card);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 25px rgba(0,0,0,.4);
+        }
+
+        .grow-control-heading {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 8px;
+        }
+
+        .grow-control-heading h1 {
+            margin: 0;
+        }
+
+        .dashboard-subtitle {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: .9rem;
+        }
+
+        .main-dashboard-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 44px;
+            height: 44px;
+            flex: 0 0 44px;
+            border-radius: 12px;
+            border: 1px solid rgba(148,163,184,.2);
+            background: var(--card);
+            color: var(--text);
+            text-decoration: none;
+            font-size: 1.3rem;
+        }
+
+        .main-dashboard-link:hover {
+            border-color: rgba(34,197,94,.55);
+        }
+</style>
+{% endblock %}
+
+{% block page %}
+{% if current_user %}
+<div class="user-panel">
+    {% if has_any_permission('users.view', 'users.manage', 'roles.view', 'roles.manage', 'audit.view') %}
+        <a href="{{ url_for('admin_index') }}" class="admin-button" title="Verwaltung">🛡️</a>
+    {% endif %}
+    <span class="user-name">{{ current_user.display_name }}</span>
+    <form method="post" action="{{ url_for('auth_logout') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="logout-button" title="Abmelden">↪</button>
+    </form>
+</div>
+{% endif %}
+
+{% if has_permission('settings.view') %}
+<a href="/system" class="system-link">⚙️</a>
+{% endif %}
+
+<div class="grow-control-heading">
+    <a class="main-dashboard-link" href="{{ url_for('dashboard') }}" title="Zum Main Dashboard">←</a>
+    <div>
+        <h1>🎛️ Grow Control</h1>
+        <div class="dashboard-subtitle">Klima & Anlagensteuerung</div>
+    </div>
+</div>
+
+{% if has_permission('grow.view') %}
+<!-- ===================== -->
+<!-- 🌡️ UMGEBUNGSWERTE -->
+<!-- ===================== -->
+<h3>Umgebungswerte</h3>
+<div class="grid" id="env-grid">
+
+    <a href="/temperature" class="card-link">
+        <div class="card env" id="temp-card">
+            <h2>Temperatur</h2>
+            <div class="value"><span id="temp-ist">--.-</span> °C</div>
+            <div class="sub">
+                Soll: <strong><span id="temp-soll">--.-</span> °C</strong>
+                <span id="temp-ramp"></span>
+            </div>
+        </div>
+    </a>
+
+    <a href="/humidity" class="card-link">
+        <div class="card env" id="hum-card">
+            <h2>Luftfeuchtigkeit</h2>
+            <div class="value"><span id="hum-ist">--.-</span> %</div>
+            <div class="sub">
+                Soll: <strong><span id="hum-soll">--.-</span> %</strong>
+            </div>
+        </div>
+    </a>
+
+    <a href="/vpd" class="card-link">
+        <div class="card env" id="vpd-card">
+            <h2>VPD</h2>
+            <div class="value"><span id="vpd">--.-</span> kPa</div>
+            <div class="sub">berechnet</div>
+        </div>
+    </a>
+
+{% if has_permission('settings.view') %}
+    <a href="/settings" class="card-link">
+        <div class="card env" id="profile-card">
+            <h2>Profil</h2>
+            <div class="value">
+                <span id="profile-badge" class="badge">---</span>
+            </div>
+            <div class="sub">Klick für Einstellungen</div>
+        </div>
+    </a>
+{% endif %}
+
+    <a href="/ph" class="card-link">
+        <div class="card env" id="ph-card">
+            <h2>pH-Wert</h2>
+            <div class="value"><span id="ph">--.-</span></div>
+            <div class="sub">Nährlösung</div>
+        </div>
+    </a>
+
+        <a href="/ec" class="card-link">
+        <div class="card env" id="ec-card">
+            <h2>EC-Wert</h2>
+            <div class="value"><span id="ec">--.-</span> mS</div>
+            <div class="sub">Nährlösung</div>
+        </div>
+    </a>
+
+        <a href="/water-temp" class="card-link">
+        <div class="card env" id="water-temp-card">
+            <h2>Wassertemp</h2>
+            <div class="value"><span id="water-temp">--.-</span> °C</div>
+            <div class="sub">Tank</div>
+        </div>
+    </a>
+
+        <a href="/light-level" class="card-link">
+        <div class="card env" id="light-level-card">
+            <h2>Helligkeit</h2>
+            <div class="value"><span id="light-level">---</span> lx</div>
+            <div class="sub">Sensor</div>
+        </div>
+    </a>
+
+
+</div>
+
+<!-- ===================== -->
+<!-- 🔌 GERÄTE -->
+<!-- ===================== -->
+<h3>Geräte</h3>
+<div class="grid" id="device-grid">
+
+    <a href="/licht" class="card-link">
+        <div class="card device" id="light-card">
+            <h2>💡 Beleuchtung</h2>
+            <div class="value" id="light-state">---</div>
+            <div class="sub">
+                Modus: <span id="light-mode">--</span>
+            </div>
+
+        </div>
+    </a>
+
+    <a href="/heizung" class="card-link">
+        <div class="card device" id="heating-card">
+            <h2>🔥 Heizung</h2>
+            <div class="value" id="heating-state">---</div>
+            <div class="sub">
+                Modus: <span id="heating-mode">--</span>
+            </div>
+        </div>
+    </a>
+
+    <a href="/abluft" class="card-link">
+        <div class="card device" id="fan-card">
+            <h2>💨 Lüfter</h2>
+            <div class="value" id="fan-state">---</div>
+            <div class="sub">
+                Modus: <span id="fan-mode">--</span>
+            </div>
+        </div>
+    </a>
+
+    <a href="/ventilator" class="card-link">
+        <div class="card device" id="vent-card">
+            <h2>🌀 Ventilator</h2>
+            <div class="value" id="vent-state">---</div>
+            <div class="sub">
+                Modus: <span id="vent-mode">--</span>
+            </div>
+        </div>
+    </a>
+
+    <a href="/bewaesserung" class="card-link">
+        <div class="card device" id="irrigation-card">
+            <h2>💧 Bewässerung</h2>
+            <div class="value" id="irrigation-state">---</div>
+            <div class="sub">
+                Modus: <span id="irrigation-mode">--</span></div>
+        </div>
+    </a>
+
+    <a href="/luftbefeuchter" class="card-link">
+        <div class="card device" id="humidifier-card">
+            <h2>💦 Luftbefeuchter</h2>
+            <div class="value" id="humidifier-state">---</div>
+            <div class="sub">
+                Modus: <span id="humidifier-mode">--</span>
+            </div>
+        </div>
+    </a>
+
+    <a href="/luftentfeuchter" class="card-link">
+        <div class="card device" id="dehumidifier-card">
+            <h2>🌬️ Entfeuchter</h2>
+            <div class="value" id="dehumidifier-state">---</div>
+            <div class="sub">
+                Modus: <span id="dehumidifier-mode">--</span>
+            </div>
+        </div>
+    </a>
+
+
+    <a href="/licht2" class="card-link">
+        <div class="card device" id="light2-card">
+            <h2>💡 Licht 2</h2>
+            <div class="value" id="light2-state">---</div>
+            <div class="sub">
+                Modus: <span id="light2-mode">--</span>
+            </div>
+        </div>
+    </a>
+
+    <a href="/ventilator2" class="card-link">
+        <div class="card device" id="vent2-card">
+            <h2>🌀 Ventilator 2</h2>
+            <div class="value" id="vent2-state">---</div>
+            <div class="sub">
+                Modus: <span id="vent2-mode">--</span>
+            </div>
+        </div>
+    </a>
+
+
+</div>
+
+{% endif %}
+
+{% if has_permission('grow.view') %}
+<!-- ===================== -->
+<!-- 📊 AUSWERTUNG -->
+<!-- ===================== -->
+<h3>Auswertung</h3>
+
+<div class="grid" id="meta-grid">
+    <a href="/energie" class="card-link">
+        <div class="card meta" id="energie-card">
+            <h2>⚡ Energie</h2>
+            <div class="value">Statistik</div>
+            <div class="sub">Verbrauch & Kosten</div>
+        </div>
+    </a>
+</div>
+{% endif %}
+
+
+{% if has_permission('grow.view') %}
+<script>
+let ENV_CARDS = {};
+let DEV_CARDS = {};
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    /* =========================
+       📦 KACHELN EINMAL SAMMELN
+    ========================= */
+
+    ENV_CARDS = {
+        profile: document.querySelector('a[href="/settings"]'),
+        temp:    document.querySelector('a[href="/temperature"]'),
+        hum:     document.querySelector('a[href="/humidity"]'),
+        vpd:     document.querySelector('a[href="/vpd"]'),
+        ph:      document.getElementById("ph-card"),
+        ec:      document.getElementById("ec-card"),
+        water_temp: document.getElementById("water-temp-card"),
+        light_level: document.getElementById("light-level-card")
+    };
+
+    DEV_CARDS = {
+        heating: document.querySelector('a[href="/heizung"]'),
+        fan:     document.querySelector('a[href="/abluft"]'),
+        light:   document.querySelector('a[href="/licht"]'),
+        vent:    document.querySelector('a[href="/ventilator"]'),
+        irrigation: document.querySelector('a[href="/bewaesserung"]'),
+        humidifier: document.querySelector('a[href="/luftbefeuchter"]'),
+        dehumidifier: document.querySelector('a[href="/luftentfeuchter"]'),
+        light2: document.querySelector('a[href="/licht2"]'),
+        vent2:  document.querySelector('a[href="/ventilator2"]')
+    };
+
+    
+
+    renderDashboard();
+});
+
+
+async function renderDashboard() {
+    const response = await fetch("/api/config");
+    if (!response.ok) return;
+    const cfg = await response.json();
+
+    const envGrid = document.getElementById("env-grid");
+    const devGrid = document.getElementById("device-grid");
+
+    envGrid.innerHTML = "";
+    devGrid.innerHTML = "";
+
+    /* =========================
+       🌱 UMGEBUNG
+    ========================= */
+    const envVisible = cfg.DASH_ENV || {};
+    const envOrder   = cfg.DASH_ENV_ORDER || {};
+
+    Object.entries(ENV_CARDS)
+        .filter(([key]) => envVisible[key] !== false)
+        .sort((a,b) => (envOrder[a[0]] ?? 99) - (envOrder[b[0]] ?? 99))
+        .forEach(([_, el]) => el && envGrid.appendChild(el));
+
+    /* =========================
+       🔌 GERÄTE
+    ========================= */
+    const devVisible = cfg.DASH_DEVICE || {};   // Fallback!
+    const devOrder   = cfg.DASH_DEVICE_ORDER || {};
+
+    Object.entries(DEV_CARDS)
+        .filter(([key, el]) =>
+            el &&
+            devVisible[key] !== false
+        )
+        .sort((a,b) =>
+            (devOrder[a[0]] ?? 99) -
+            (devOrder[b[0]] ?? 99)
+        )
+        .forEach(([_, el]) => devGrid.appendChild(el));
+}
+
+
+
+/* =========================
+   📡 LIVE STATE
+========================= */
+
+
+async function loadState() {
+    try {
+        const s = await fetch("/api/state").then(r => r.json());
+
+        const safe = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value;
+        };
+
+        safe("temp-ist",  s.temp != null ? s.temp.toFixed(1) : "--");
+        safe("temp-soll", s.temp_target != null ? s.temp_target.toFixed(1) : "--");
+        safe("hum-ist",   s.hum != null ? s.hum.toFixed(1) : "--");
+        safe("hum-soll",  s.hum_target != null ? s.hum_target.toFixed(1) : "--");
+        safe("vpd",       s.vpd != null ? s.vpd.toFixed(2) : "--");
+
+        const ramp = document.getElementById("temp-ramp");
+        if (ramp) ramp.textContent = s.ramp_active ? " ⏱️ Rampe aktiv" : "";
+
+        const badge = document.getElementById("profile-badge");
+        if (badge) {
+            badge.textContent = s.profile || "---";
+            badge.className = "badge " + (s.profile === "TAG" ? "tag" : "nacht");
+        }
+
+        updateDevice("heating", s);
+        updateDevice("fan",     s);
+        updateDevice("light",   s);
+        updateDevice("vent",    s);
+        updateDevice("irrigation", s);
+        updateDevice("humidifier", s);
+        updateDevice("dehumidifier", s);
+        updateDevice("light2", s);
+        updateDevice("vent2", s);
+
+    } catch (e) {
+        console.error("Dashboard Fehler:", e);
+    }
+}
+
+function updateDevice(name, state) {
+
+    const card  = document.getElementById(name + "-card");
+    const label = document.getElementById(name + "-state");
+    const modeEl = document.getElementById(name + "-mode");
+
+    if (!card || !label) return;
+
+    const on = state[name + "_on"] ?? false;
+    const mode = state[name + "_mode"] ?? "OFF";
+
+    /* ================= STATUS TEXT ================= */
+
+    if (mode === "OFF") {
+        label.textContent = "DEAKTIVIERT";
+    } else {
+        label.textContent = on ? "EIN" : "AUS";
+    }
+
+    /* ================= KARTENFARBE ================= */
+
+    if (mode === "OFF") {
+        card.className = "card device disabled";
+    } 
+    else if (on) {
+        card.className = "card device on";
+    } 
+    else {
+        card.className = "card device off";
+    }
+
+    /* ================= MODUS TEXT ================= */
+
+    if (modeEl) {
+
+        const MODE_LABELS = {
+            "OFF": "Deaktiviert",
+            "ON": "Dauerbetrieb",
+            "TIME": "Zeitgesteuert",
+            "INTERVAL": "Intervall",
+            "ENV": "Umgebung"
+        };
+
+        modeEl.textContent = MODE_LABELS[mode] || mode;
+    }
+}
+
+
+
+
+/* =========================
+   🚀 INIT
+========================= */
+
+renderDashboard();
+loadState();
+setInterval(loadState, 2000);
+</script>
+{% endif %}
+{% endblock %}
