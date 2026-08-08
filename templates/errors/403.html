@@ -1,1 +1,67 @@
-
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keine Berechtigung – Growstar</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background: #0f172a;
+            color: #e5e7eb;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .card {
+            width: min(520px, 100%);
+            padding: 32px;
+            border-radius: 20px;
+            background: #1e293b;
+            box-shadow: 0 18px 50px rgba(0,0,0,.35);
+            text-align: center;
+        }
+        .icon { font-size: 3rem; }
+        h1 { margin: 12px 0 8px; }
+        p { color: #94a3b8; line-height: 1.55; }
+        .actions {
+            margin-top: 24px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        a {
+            display: inline-block;
+            padding: 10px 16px;
+            border-radius: 10px;
+            text-decoration: none;
+            color: #e5e7eb;
+            background: #334155;
+        }
+        a.primary {
+            background: #16a34a;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="icon">🔒</div>
+        <h1>Keine Berechtigung</h1>
+        <p>
+            Dein Benutzer ist angemeldet, besitzt für diesen Bereich aber
+            nicht die erforderlichen Rechte.
+        </p>
+        <div class="actions">
+            <a class="primary" href="{{ url_for('dashboard') }}">Zum Dashboard</a>
+            {% if has_any_permission('users.view', 'users.manage', 'roles.view', 'roles.manage', 'audit.view') %}
+                <a href="{{ url_for('admin_index') }}">Verwaltung</a>
+            {% endif %}
+        </div>
+    </main>
+</body>
+</html>
