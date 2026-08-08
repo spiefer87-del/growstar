@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+
+{% block title %}{{ entry.title }} – Betriebsjournal{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">
+{% endblock %}
+
+{% block page %}
+<main class="pm-shell">
+
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_journal') }}">←</a>
+        <div>
+            <h1 class="pm-title">{{ entry.category_icon }} {{ entry.title }}</h1>
+            <div class="pm-subtitle">
+                {{ entry.category_label }} · {{ entry.occurred_at|replace('T', ' ') }}
+            </div>
+        </div>
+    </div>
+
+    {% if has_permission('diary.edit') and not entry.is_cancelled %}
+    <div class="pm-actions">
+        <a class="pm-button" href="{{ url_for('plant_journal_edit', entry_id=entry.id) }}">Bearbeiten</a>
+
+        {% if entry.is_open_follow_up %}
+        <form method="post" action="{{ url_for('plant_journal_resolve', entry_id=entry.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="pm-button primary" type="submit">✓ Folgeaktion erledigt</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+</header>
+
+{% set active_page = 'journal' %}
+<nav class="pm-nav">
+    <a href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a href="{{ url_for('batch_list') }}">Durchgänge</a>
+    <a class="active" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% if entry.is_cancelled %}
+<div class="pm-card pm-storno" style="margin-bottom:16px;">
+    <div class="pm-card-body">
+        <strong>Dieser Eintrag wurde storniert.</strong><br>
+        <span class="pm-muted">
+            Grund: {{ entry.cancel_reason }} ·
+            {{ entry.cancelled_by_name or 'unbekannt' }}
+        </span>
+    </div>
+</div>
+{% endif %}
+
+<section class="pm-grid">
+
+<article class="pm-card pm-span-8">
+    <div class="pm-card-head">
+        <h2>Dokumentation</h2>
+        <span class="pm-severity {{ entry.severity }}">{{ entry.severity_label }}</span>
+    </div>
+    <div class="pm-card-body">
+        {% if entry.body %}
+        <div class="pm-journal-body" style="margin-top:0;">{{ entry.body }}</div>
+        {% else %}
+        <div class="pm-muted">Keine zusätzliche Beschreibung.</div>
+        {% endif %}
+
+        {% if entry.tags %}
+        <div class="pm-journal-meta">
+            {% for tag in entry.tags.split(',') %}
+            <span class="pm-chip">#{{ tag.strip() }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</article>
+
+<article class="pm-card pm-span-4">
+    <div class="pm-card-head"><h2>Kontext</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-form">
+            <div>
+                <div class="pm-detail-label">Zeitpunkt</div>
+                <div class="pm-detail-value">{{ entry.occurred_at|replace('T', ' ') }}</div>
+            </div>
+            <div>
+                <div class="pm-detail-label">Erfasst von</div>
+                <div class="pm-detail-value">{{ entry.created_by_name or 'System' }}</div>
+            </div>
+            <div>
+                <div class="pm-detail-label">Kategorie</div>
+                <div class="pm-detail-value">{{ entry.category_icon }} {{ entry.category_label }}</div>
+            </div>
+            <div>
+                <div class="pm-detail-label">Folgeaktion</div>
+                <div class="pm-detail-value">
+                    {% if entry.is_open_follow_up %}
+                        <span class="pm-chip warning">
+                            offen{% if entry.follow_up_due_on %} · fällig {{ entry.follow_up_due_on }}{% endif %}
+                        </span>
+                    {% elif entry.follow_up_required and entry.is_resolved %}
+                        <span class="pm-chip done">erledigt</span>
+                    {% else %}
+                        keine
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</article>
+
+{% if entry.plants or entry.batches %}
+<article class="pm-card pm-span-12">
+    <div class="pm-card-head"><h2>Zuordnung</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-journal-meta" style="margin-top:0;">
+        {% for plant in entry.plants %}
+            <a class="pm-chip" href="{{ url_for('plant_detail', plant_id=plant.id) }}">
+                🌱 {{ plant.code }} · {{ plant.display_name }}
+            </a>
+        {% endfor %}
+        {% for batch in entry.batches %}
+            <span class="pm-chip">🗂️ {{ batch.code }} · {{ batch.name }}</span>
+        {% endfor %}
+        </div>
+    </div>
+</article>
+{% endif %}
+
+{% if entry.measurements %}
+<article class="pm-card pm-span-12">
+    <div class="pm-card-head"><h2>Messwerte</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-detail-grid">
+        {% for measurement in entry.measurements %}
+            <div class="pm-detail">
+                <div class="pm-detail-label">{{ measurement.label }}</div>
+                <div class="pm-detail-value">
+                    {{ '%g'|format(measurement.value) }} {{ measurement.unit or '' }}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+</article>
+{% endif %}
+
+{% if entry.attachments %}
+<article class="pm-card pm-span-12">
+    <div class="pm-card-head"><h2>Fotos & Dokumente</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-attachment-grid">
+        {% for attachment in entry.attachments %}
+            <div class="pm-attachment">
+
+                {% if attachment.mime_type.startswith('image/') %}
+                <a href="{{ url_for('plant_journal_attachment', attachment_id=attachment.id) }}" target="_blank">
+                    <img
+                        class="pm-attachment-preview"
+                        src="{{ url_for('plant_journal_attachment', attachment_id=attachment.id) }}"
+                        alt="{{ attachment.original_name }}"
+                        loading="lazy"
+                    >
+                </a>
+                {% endif %}
+
+                <div class="pm-attachment-name">{{ attachment.original_name }}</div>
+
+                <div class="pm-actions" style="justify-content:flex-start;margin-top:9px;">
+                    <a
+                        class="pm-button"
+                        href="{{ url_for('plant_journal_attachment', attachment_id=attachment.id, download=1) }}"
+                    >Download</a>
+
+                    {% if has_permission('diary.edit') and not entry.is_cancelled %}
+                    <form
+                        method="post"
+                        action="{{ url_for('plant_journal_attachment_remove', attachment_id=attachment.id) }}"
+                        onsubmit="return confirm('Anhang aus der aktiven Ansicht entfernen?');"
+                    >
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="pm-button danger" type="submit">Entfernen</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+</article>
+{% endif %}
+
+{% if revisions %}
+<article class="pm-card pm-span-8">
+    <div class="pm-card-head"><h2>Revisionshistorie</h2></div>
+    <div class="pm-card-body">
+        {% for revision in revisions %}
+        <div class="pm-revision">
+            <div>
+                <strong>Revision {{ revision.revision_no }}</strong>
+                <div class="pm-muted">
+                    geändert von {{ revision.changed_by_name or 'unbekannt' }}
+                </div>
+            </div>
+            <span class="pm-code">{{ revision.changed_at }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</article>
+{% endif %}
+
+{% if has_permission('diary.edit') and not entry.is_cancelled %}
+<article class="pm-card pm-span-4 pm-storno">
+    <div class="pm-card-head"><h2>Stornieren</h2></div>
+    <div class="pm-card-body">
+        <p class="pm-muted">
+            Journal-Einträge werden nicht gelöscht. Eine Stornierung bleibt im Audit-Trail nachvollziehbar.
+        </p>
+
+        <form class="pm-form" method="post" action="{{ url_for('plant_journal_cancel', entry_id=entry.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="pm-field">
+                <span class="pm-label">Stornogrund</span>
+                <textarea class="pm-textarea" name="reason" required></textarea>
+            </label>
+            <button
+                class="pm-button danger"
+                type="submit"
+                onclick="return confirm('Eintrag wirklich stornieren?');"
+            >Eintrag stornieren</button>
+        </form>
+    </div>
+</article>
+{% endif %}
+
+</section>
+</main>
+{% endblock %}

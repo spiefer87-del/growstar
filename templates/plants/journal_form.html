@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Journal-Eintrag bearbeiten' if entry else 'Journal-Eintrag anlegen' }} – Growstar{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">
+{% endblock %}
+
+{% block page %}
+<main class="pm-shell">
+
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_journal_detail', entry_id=entry.id) if entry else url_for('plant_journal') }}">←</a>
+        <div>
+            <h1 class="pm-title">{{ 'Journal-Eintrag bearbeiten' if entry else 'Neuer Journal-Eintrag' }}</h1>
+            <div class="pm-subtitle">
+                Dokumentiere den tatsächlichen Vorgang – nicht nur eine freie Notiz.
+            </div>
+        </div>
+    </div>
+</header>
+
+{% set active_page = 'journal' %}
+<nav class="pm-nav">
+    <a href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a href="{{ url_for('batch_list') }}">Durchgänge</a>
+    <a class="active" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<form class="pm-form" method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+<section class="pm-grid">
+
+<article class="pm-card pm-span-8">
+    <div class="pm-card-head"><h2>Dokumentation</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-form-grid">
+
+            <label class="pm-field">
+                <span class="pm-label">Zeitpunkt *</span>
+                <input
+                    class="pm-input"
+                    type="datetime-local"
+                    name="occurred_at"
+                    required
+                    value="{{ entry.occurred_at if entry else '' }}"
+                >
+            </label>
+
+            <label class="pm-field">
+                <span class="pm-label">Kategorie *</span>
+                <select class="pm-select" name="category" required>
+                    {% for code,label,icon,color in categories %}
+                    <option value="{{ code }}" {{ 'selected' if entry and entry.category == code else '' }}>
+                        {{ icon }} {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="pm-field">
+                <span class="pm-label">Priorität</span>
+                <select class="pm-select" name="severity">
+                    {% for code,label in severities %}
+                    <option value="{{ code }}" {{ 'selected' if (entry and entry.severity == code) or (not entry and code == 'info') else '' }}>
+                        {{ label }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <label class="pm-field">
+                <span class="pm-label">Tags</span>
+                <input
+                    class="pm-input"
+                    name="tags"
+                    value="{{ entry.tags if entry and entry.tags else '' }}"
+                    placeholder="z. B. kontrolle, woche-3"
+                >
+            </label>
+
+            <label class="pm-field full">
+                <span class="pm-label">Titel *</span>
+                <input
+                    class="pm-input"
+                    required
+                    name="title"
+                    value="{{ entry.title if entry else '' }}"
+                    placeholder="Kurz und eindeutig: Was ist passiert?"
+                >
+            </label>
+
+            <label class="pm-field full">
+                <span class="pm-label">Beschreibung</span>
+                <textarea
+                    class="pm-textarea"
+                    name="body"
+                    style="min-height:160px;"
+                    placeholder="Beobachtung, Arbeitsschritte, Ergebnis, Besonderheiten …"
+                >{{ entry.body if entry and entry.body else '' }}</textarea>
+            </label>
+
+        </div>
+    </div>
+</article>
+
+<article class="pm-card pm-span-4">
+    <div class="pm-card-head"><h2>Zuordnung</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-form">
+
+            <label class="pm-field">
+                <span class="pm-label">Pflanzen</span>
+                <select class="pm-select pm-multi" name="plant_ids" multiple>
+                    {% for plant in plants %}
+                    {% set selected = (entry and plant.id in entry.plant_ids) or (not entry and preselected_plant_id|string == plant.id|string) %}
+                    <option value="{{ plant.id }}" {{ 'selected' if selected else '' }}>
+                        {{ plant.code }} · {{ plant.display_name }} · {{ plant.cultivar_name or 'ohne Sorte' }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <span class="pm-help">Mehrfachauswahl ist möglich.</span>
+            </label>
+
+            <label class="pm-field">
+                <span class="pm-label">Durchgänge</span>
+                <select class="pm-select pm-multi" name="batch_ids" multiple>
+                    {% for batch in batches %}
+                    {% set selected = (entry and batch.id in entry.batch_ids) or (not entry and preselected_batch_id|string == batch.id|string) %}
+                    <option value="{{ batch.id }}" {{ 'selected' if selected else '' }}>
+                        {{ batch.code }} · {{ batch.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </label>
+
+        </div>
+    </div>
+</article>
+
+<article class="pm-card pm-span-8">
+    <div class="pm-card-head"><h2>Strukturierte Messwerte</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-form-grid">
+        {% for metric,label,unit in measurement_fields %}
+            {% set current = namespace(value='') %}
+            {% if entry %}
+                {% for measurement in entry.measurements %}
+                    {% if measurement.metric == metric %}
+                        {% set current.value = measurement.value %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+
+            <label class="pm-field">
+                <span class="pm-label">{{ label }}{% if unit %} · {{ unit }}{% endif %}</span>
+                <input
+                    class="pm-input"
+                    inputmode="decimal"
+                    name="measurement_{{ metric }}"
+                    value="{{ current.value }}"
+                >
+            </label>
+        {% endfor %}
+        </div>
+    </div>
+</article>
+
+<article class="pm-card pm-span-4">
+    <div class="pm-card-head"><h2>Folgeaktion</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-form">
+
+            <label class="pm-check">
+                <input
+                    type="checkbox"
+                    name="follow_up_required"
+                    value="1"
+                    {{ 'checked' if entry and entry.follow_up_required else '' }}
+                >
+                <span>
+                    <strong>Folgeaktion erforderlich</strong><br>
+                    <span class="pm-help">
+                        Der Eintrag bleibt im Dashboard offen, bis er aktiv erledigt wird.
+                    </span>
+                </span>
+            </label>
+
+            <label class="pm-field">
+                <span class="pm-label">Fällig am</span>
+                <input
+                    class="pm-input"
+                    type="date"
+                    name="follow_up_due_on"
+                    value="{{ entry.follow_up_due_on if entry and entry.follow_up_due_on else '' }}"
+                >
+            </label>
+
+        </div>
+    </div>
+</article>
+
+<article class="pm-card pm-span-12">
+    <div class="pm-card-head"><h2>Fotos & Dokumente</h2></div>
+    <div class="pm-card-body">
+        <label class="pm-field">
+            <span class="pm-label">
+                Bis zu {{ max_attachments }} Anhänge · maximal {{ max_attachment_mb }} MB je Datei
+            </span>
+            <input
+                class="pm-input"
+                type="file"
+                name="attachments"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+            >
+            <span class="pm-help">
+                Dateien liegen nicht öffentlich im Static-Verzeichnis, sondern werden erst nach Anmeldung ausgeliefert.
+            </span>
+        </label>
+
+        {% if entry and entry.attachments %}
+        <div class="pm-attachment-grid" style="margin-top:14px;">
+            {% for attachment in entry.attachments %}
+            <div class="pm-attachment">
+                <div class="pm-attachment-name">{{ attachment.original_name }}</div>
+                <div class="pm-muted" style="margin-top:5px;font-size:.76rem;">
+                    {{ (attachment.size_bytes / 1024)|round(1) }} KB
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</article>
+
+</section>
+
+<div class="pm-actions" style="justify-content:flex-start;margin-top:17px;">
+    <button class="pm-button primary" type="submit">
+        {{ 'Änderungen speichern' if entry else 'Journal-Eintrag speichern' }}
+    </button>
+    <a class="pm-button" href="{{ url_for('plant_journal_detail', entry_id=entry.id) if entry else url_for('plant_journal') }}">Abbrechen</a>
+</div>
+
+</form>
+
+<script>
+(() => {
+    const input = document.querySelector('input[name="occurred_at"]');
+    if (input && !input.value) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        input.value = now.toISOString().slice(0, 16);
+    }
+})();
+</script>
+
+</main>
+{% endblock %}

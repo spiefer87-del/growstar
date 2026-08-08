@@ -33,7 +33,7 @@
     <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
     <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
     {% if has_permission('diary.view') %}
-    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    <a class="{{ 'active' if active_page == 'journal' else '' }}" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
     {% endif %}
 </nav>
 
@@ -62,8 +62,8 @@
             <div class="pm-kpi-value">{{ active_batch_count }}</div>
         </div>
         <div class="pm-kpi">
-            <div class="pm-kpi-label">Phasen belegt</div>
-            <div class="pm-kpi-value">{{ stage_counts|length }}</div>
+            <div class="pm-kpi-label">Offene Folgeaktionen</div>
+            <div class="pm-kpi-value">{{ journal_stats.open_followups }}</div>
         </div>
     </section>
 
@@ -161,6 +161,48 @@
                 </p>
             </div>
         </article>
+
+        {% if has_permission('diary.view') %}
+        <article class="pm-card pm-span-12">
+            <div class="pm-card-head">
+                <h2>Letzte Journal-Ereignisse</h2>
+                <a class="pm-button" href="{{ url_for('plant_journal') }}">Betriebsjournal öffnen</a>
+            </div>
+            <div class="pm-card-body">
+                {% if recent_journal %}
+                <div class="pm-journal-feed">
+                    {% for entry in recent_journal %}
+                    <div
+                        class="pm-journal-entry"
+                        style="--journal-color:{{ entry.category_color }}"
+                    >
+                        <div class="pm-journal-accent"></div>
+                        <div class="pm-journal-content">
+                            <div class="pm-journal-top">
+                                <div>
+                                    <div class="pm-journal-category">
+                                        {{ entry.category_icon }} {{ entry.category_label }}
+                                    </div>
+                                    <div class="pm-journal-title">
+                                        <a href="{{ url_for('plant_journal_detail', entry_id=entry.id) }}">
+                                            {{ entry.title }}
+                                        </a>
+                                    </div>
+                                </div>
+                                <div class="pm-journal-time">
+                                    {{ entry.occurred_date }}<br>{{ entry.occurred_time }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="pm-empty">Noch keine Journal-Ereignisse vorhanden.</div>
+                {% endif %}
+            </div>
+        </article>
+        {% endif %}
     </section>
 </main>
 {% endblock %}

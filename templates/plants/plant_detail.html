@@ -16,7 +16,7 @@
     <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
     <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
     {% if has_permission('diary.view') %}
-    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    <a class="{{ 'active' if active_page == 'journal' else '' }}" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
     {% endif %}
 </nav>
 
@@ -80,6 +80,48 @@
 </div>
 </article>
 {% endif %}
+
+{% if has_permission('diary.view') %}
+<article class="pm-card pm-span-12">
+<div class="pm-card-head">
+    <h2>Betriebsjournal</h2>
+    <div class="pm-actions">
+        <a class="pm-button" href="{{ url_for('plant_journal', plant_id=plant.id) }}">Alle Einträge</a>
+        {% if has_permission('diary.edit') %}
+        <a class="pm-button primary" href="{{ url_for('plant_journal_new', plant_id=plant.id) }}">＋ Eintrag</a>
+        {% endif %}
+    </div>
+</div>
+<div class="pm-card-body">
+{% if journal_entries %}
+<div class="pm-journal-feed">
+{% for entry in journal_entries %}
+<div class="pm-journal-entry" style="--journal-color:{{ entry.category_color }}">
+    <div class="pm-journal-accent"></div>
+    <div class="pm-journal-content">
+        <div class="pm-journal-top">
+            <div>
+                <div class="pm-journal-category">{{ entry.category_icon }} {{ entry.category_label }}</div>
+                <div class="pm-journal-title">
+                    <a href="{{ url_for('plant_journal_detail', entry_id=entry.id) }}">{{ entry.title }}</a>
+                </div>
+            </div>
+            <div class="pm-journal-time">{{ entry.occurred_date }}<br>{{ entry.occurred_time }}</div>
+        </div>
+        {% if entry.body %}
+        <div class="pm-journal-body">{{ entry.body[:220] }}{% if entry.body|length > 220 %}…{% endif %}</div>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+</div>
+{% else %}
+<div class="pm-empty">Für diese Pflanze gibt es noch keine Journal-Einträge.</div>
+{% endif %}
+</div>
+</article>
+{% endif %}
+
 </section>
 </main>
 {% endblock %}

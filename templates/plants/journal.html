@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Betriebsjournal – Growstar{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">
+{% endblock %}
+
+{% block page %}
+<main class="pm-shell">
+
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <div>
+            <h1 class="pm-title">📒 Betriebsjournal</h1>
+            <div class="pm-subtitle">
+                Electronic Batch Record · Beobachtungen, Arbeiten, Messungen und Folgeaktionen
+            </div>
+        </div>
+    </div>
+
+    <div class="pm-actions">
+        <a class="pm-button" href="{{ url_for('plant_journal_export', **request.args) }}">Excel Export</a>
+        {% if has_permission('diary.edit') %}
+        <a class="pm-button primary" href="{{ url_for('plant_journal_new') }}">＋ Eintrag</a>
+        {% endif %}
+    </div>
+</header>
+
+{% set active_page = 'journal' %}
+<nav class="pm-nav">
+    <a href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a href="{{ url_for('batch_list') }}">Durchgänge</a>
+    <a class="active" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-journal-kpis">
+    <div class="pm-kpi">
+        <div class="pm-kpi-label">Heute</div>
+        <div class="pm-kpi-value">{{ stats.today_count }}</div>
+    </div>
+    <div class="pm-kpi">
+        <div class="pm-kpi-label">Letzte 7 Tage</div>
+        <div class="pm-kpi-value">{{ stats.seven_day_count }}</div>
+    </div>
+    <div class="pm-kpi">
+        <div class="pm-kpi-label">Offene Folgeaktionen</div>
+        <div class="pm-kpi-value">{{ stats.open_followups }}</div>
+    </div>
+    <div class="pm-kpi">
+        <div class="pm-kpi-label">Kritische Einträge</div>
+        <div class="pm-kpi-value">{{ stats.critical_count }}</div>
+    </div>
+</section>
+
+<form class="pm-journal-filters" method="get">
+    <input
+        class="pm-input"
+        name="q"
+        value="{{ filters.search or '' }}"
+        placeholder="Titel, Text, Tags oder Autor durchsuchen …"
+    >
+
+    <select class="pm-select" name="category">
+        <option value="">Alle Kategorien</option>
+        {% for code,label,icon,color in categories %}
+        <option value="{{ code }}" {{ 'selected' if filters.category == code else '' }}>
+            {{ icon }} {{ label }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <select class="pm-select" name="severity">
+        <option value="">Alle Prioritäten</option>
+        {% for code,label in severities %}
+        <option value="{{ code }}" {{ 'selected' if filters.severity == code else '' }}>{{ label }}</option>
+        {% endfor %}
+    </select>
+
+    <select class="pm-select" name="plant_id">
+        <option value="">Alle Pflanzen</option>
+        {% for plant in plants %}
+        <option value="{{ plant.id }}" {{ 'selected' if filters.plant_id|string == plant.id|string else '' }}>
+            {{ plant.code }} · {{ plant.display_name }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <select class="pm-select" name="batch_id">
+        <option value="">Alle Durchgänge</option>
+        {% for batch in batches %}
+        <option value="{{ batch.id }}" {{ 'selected' if filters.batch_id|string == batch.id|string else '' }}>
+            {{ batch.code }} · {{ batch.name }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <button class="pm-button" type="submit">Filtern</button>
+
+    <input class="pm-input" type="date" name="date_from" value="{{ filters.date_from or '' }}" title="Von">
+    <input class="pm-input" type="date" name="date_to" value="{{ filters.date_to or '' }}" title="Bis">
+
+    <label class="pm-check" style="padding:9px 3px;">
+        <input type="checkbox" name="open" value="1" {{ 'checked' if filters.open_follow_up else '' }}>
+        <span class="pm-muted">nur offene Folgeaktionen</span>
+    </label>
+
+    <a class="pm-button" href="{{ url_for('plant_journal') }}">Filter löschen</a>
+</form>
+
+<section class="pm-journal-feed">
+
+{% for entry in entries %}
+<article
+    class="pm-journal-entry {{ 'cancelled' if entry.is_cancelled else '' }}"
+    style="--journal-color:{{ entry.category_color }}"
+>
+    <div class="pm-journal-accent"></div>
+
+    <div class="pm-journal-content">
+        <div class="pm-journal-top">
+            <div>
+                <div class="pm-journal-category">
+                    <span>{{ entry.category_icon }}</span>
+                    <span>{{ entry.category_label }}</span>
+                    <span class="pm-severity {{ entry.severity }}">{{ entry.severity_label }}</span>
+                </div>
+
+                <h2 class="pm-journal-title">
+                    <a href="{{ url_for('plant_journal_detail', entry_id=entry.id) }}">
+                        {{ entry.title }}
+                    </a>
+                </h2>
+            </div>
+
+            <div class="pm-journal-time">
+                <strong>{{ entry.occurred_date }}</strong><br>
+                {{ entry.occurred_time }}
+            </div>
+        </div>
+
+        {% if entry.body %}
+        <div class="pm-journal-body">
+            {{ entry.body[:420] }}{% if entry.body|length > 420 %}…{% endif %}
+        </div>
+        {% endif %}
+
+        {% if entry.measurements %}
+        <div class="pm-journal-measurements">
+            {% for measurement in entry.measurements %}
+            <span class="pm-measurement">
+                {{ measurement.label }}
+                <strong>{{ '%g'|format(measurement.value) }}</strong>
+                {{ measurement.unit or '' }}
+            </span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="pm-journal-meta">
+            {% for plant in entry.plants %}
+            <a class="pm-chip" href="{{ url_for('plant_detail', plant_id=plant.id) }}">
+                🌱 {{ plant.code }} · {{ plant.display_name }}
+            </a>
+            {% endfor %}
+
+            {% for batch in entry.batches %}
+            <span class="pm-chip">🗂️ {{ batch.code }} · {{ batch.name }}</span>
+            {% endfor %}
+
+            {% if entry.attachments %}
+            <span class="pm-chip">📎 {{ entry.attachments|length }}</span>
+            {% endif %}
+
+            {% if entry.is_open_follow_up %}
+            <span class="pm-chip warning">
+                ⏳ Folgeaktion offen
+                {% if entry.follow_up_due_on %}· {{ entry.follow_up_due_on }}{% endif %}
+            </span>
+            {% elif entry.follow_up_required and entry.is_resolved %}
+            <span class="pm-chip done">✓ Folgeaktion erledigt</span>
+            {% endif %}
+
+            {% if entry.is_cancelled %}
+            <span class="pm-chip critical">Storniert</span>
+            {% endif %}
+        </div>
+
+        <div class="pm-muted" style="margin-top:11px;font-size:.76rem;">
+            Erfasst von {{ entry.created_by_name or 'System' }}
+            {% if entry.tags %} · #{{ entry.tags|replace(',', ' #') }}{% endif %}
+        </div>
+    </div>
+</article>
+{% else %}
+<div class="pm-card">
+    <div class="pm-empty">
+        Für diese Auswahl gibt es noch keine Journal-Einträge.
+        {% if has_permission('diary.edit') %}
+        <br><br><a class="pm-button primary" href="{{ url_for('plant_journal_new') }}">Ersten Eintrag erfassen</a>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+</section>
+</main>
+{% endblock %}
