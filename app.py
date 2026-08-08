@@ -7,6 +7,7 @@
 import atexit
 import os
 import threading
+import secrets
 
 from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -36,11 +37,37 @@ from routes.profile import register as register_profile_routes
 from routes.watchdog import register as register_watchdog_routes
 from routes.hardware import register as register_hardware_routes
 from routes.sensors import register as register_sensor_routes
+from routes.auth import register as register_auth_routes
+
+from auth.database import init_auth_db
+from auth.middleware import install_auth
 
 
 # =========================================
 # Flask-Anwendung
 # =========================================
+
+def _load_or_create_secret_key():
+    """Lädt einen persistenten Flask-Session-Schlüssel außerhalb des Quellcodes."""
+
+    env_key = os.getenv("GROWSTAR_SECRET_KEY")
+    if env_key:
+        return env_key
+
+    instance_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "instance")
+    secret_file = os.path.join(instance_dir, "secret.key")
+    os.makedirs(instance_dir, exist_ok=True)
+
+    if os.path.exists(secret_file):
+        with open(secret_file, "r", encoding="utf-8") as f:
+            return f.read().strip()
+
+    secret = secrets.token_hex(32)
+    with open(secret_file, "w", encoding="utf-8") as f:
+        f.write(secret)
+    os.chmod(secret_file, 0o600)
+    return secret
+
 
 def create_flask_app():
     """Erzeugt die Flask-App, ohne Regelungs-Threads zu starten."""
@@ -51,9 +78,18 @@ def create_flask_app():
     init_db()
     init_diary_db()
     init_plants_table()
+    init_auth_db()
 
     app = Flask(__name__)
+    app.config.update(
+        SECRET_KEY=_load_or_create_secret_key(),
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+        # Erst auf 1 setzen, wenn ausschließlich HTTPS verwendet wird.
+        SESSION_COOKIE_SECURE=os.getenv("GROWSTAR_HTTPS_ONLY") == "1",
+    )
 
+    register_auth_routes(app)
     register_dashboard_routes(app)
     register_state_routes(app)
     register_plants_routes(app)
@@ -66,6 +102,9 @@ def create_flask_app():
     register_watchdog_routes(app)
     register_hardware_routes(app)
     register_sensor_routes(app)
+
+    # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
+    install_auth(app)
 
     # Nur aktivieren, wenn wirklich genau ein vertrauenswürdiger Reverse Proxy
     # (hier: Caddy auf demselben Rechner) vor Flask/Gunicorn steht.
