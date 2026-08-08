@@ -1,11 +1,10 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}Growstar Verwaltung{% endblock %}</title>
-    <style>
-        * { box-sizing: border-box; }
+{% extends "base.html" %}
+
+{% block title %}Growstar Verwaltung{% endblock %}
+
+{% block head %}
+<style>
+* { box-sizing: border-box; }
         :root {
             --bg: #0f172a;
             --panel: #111c2e;
@@ -218,9 +217,10 @@
             .page-head { display: block; }
             .actions { margin-top: 12px; }
         }
-    </style>
-</head>
-<body>
+</style>
+{% endblock %}
+
+{% block page %}
 <div class="shell">
     <aside class="sidebar">
         <div class="brand">🌱 Growstar<small>Verwaltung</small></div>
@@ -255,5 +255,4 @@
         {% block content %}{% endblock %}
     </main>
 </div>
-</body>
-</html>
+{% endblock %}
