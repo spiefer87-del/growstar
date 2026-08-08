@@ -1,11 +1,10 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Growstar – Anmeldung</title>
-    <style>
-        * { box-sizing: border-box; }
+{% extends "base.html" %}
+
+{% block title %}Growstar – Anmeldung{% endblock %}
+
+{% block head %}
+<style>
+* { box-sizing: border-box; }
         :root {
             --bg: #0f172a;
             --card: #1e293b;
@@ -91,10 +90,11 @@
             font-size: .78rem;
             line-height: 1.45;
         }
-    </style>
-</head>
-<body>
-    <main class="login-card">
+</style>
+{% endblock %}
+
+{% block page %}
+<main class="login-card">
         <div class="brand">🌱 Growstar</div>
         <p class="subtitle">Management System</p>
 
@@ -137,5 +137,4 @@
             Zugriff nur für autorisierte Benutzer. Anmeldungen werden protokolliert.
         </div>
     </main>
-</body>
-</html>
+{% endblock %}
