@@ -146,13 +146,21 @@
             font-size: .85rem;
         }
 
-        .logout-button {
+        .logout-button,
+        .admin-button {
             border: 1px solid rgba(148,163,184,.2);
             background: var(--card);
             color: var(--text);
             border-radius: 10px;
             padding: 8px 10px;
             cursor: pointer;
+            text-decoration: none;
+            line-height: 1;
+        }
+
+        .admin-button:hover,
+        .logout-button:hover {
+            border-color: rgba(34,197,94,.55);
         }
 
         @media (max-width: 600px) {
@@ -183,6 +191,9 @@
 
 {% if current_user %}
 <div class="user-panel">
+    {% if has_any_permission('users.view', 'users.manage', 'roles.view', 'roles.manage', 'audit.view') %}
+        <a href="{{ url_for('admin_index') }}" class="admin-button" title="Verwaltung">🛡️</a>
+    {% endif %}
     <span class="user-name">{{ current_user.display_name }}</span>
     <form method="post" action="{{ url_for('auth_logout') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
