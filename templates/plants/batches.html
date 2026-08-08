@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Durchgänge – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a><div><h1 class="pm-title">Durchgänge</h1><div class="pm-subtitle">Lot-/Batch-Prinzip für zusammengehörige Pflanzen</div></div></div>
+{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button primary" href="{{ url_for('batch_new') }}">＋ Durchgang</a></div>{% endif %}
+</header>
+{% set active_page = 'batches' %}
+
+<nav class="pm-nav">
+    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
+    {% if has_permission('diary.view') %}
+    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    {% endif %}
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<div class="pm-card"><div class="pm-table-wrap"><table class="pm-table">
+<thead><tr><th>Code</th><th>Durchgang</th><th>Start</th><th>Standort</th><th>Status</th><th>Pflanzen</th><th>Aktiv</th></tr></thead>
+<tbody>
+{% for item in batches %}
+<tr>
+<td class="pm-code">{{ item.code }}</td>
+<td>
+    {% if has_permission('plants.edit') %}
+        <a href="{{ url_for('batch_edit', batch_id=item.id) }}"><strong>{{ item.name }}</strong></a>
+    {% else %}
+        <strong>{{ item.name }}</strong>
+    {% endif %}
+    </td>
+<td>{{ item.started_on or '—' }}</td><td>{{ item.location or '—' }}</td>
+<td>{{ item.status_label }}</td><td>{{ item.plant_count or 0 }}</td><td>{{ item.active_count or 0 }}</td>
+</tr>
+{% else %}<tr><td colspan="7"><div class="pm-empty">Noch keine Durchgänge.</div></td></tr>{% endfor %}
+</tbody></table></div></div>
+</main>
+{% endblock %}

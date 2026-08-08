@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Sorten importieren – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('cultivar_list') }}">←</a><div><h1 class="pm-title">Excel Import</h1><div class="pm-subtitle">Sortenstamm per XLSX pflegen</div></div></div>
+</header>
+{% set active_page = 'cultivars' %}
+
+<nav class="pm-nav">
+    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
+    {% if has_permission('diary.view') %}
+    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    {% endif %}
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<div class="pm-grid">
+<article class="pm-card pm-span-8">
+<div class="pm-card-head"><h2>Datei importieren</h2></div>
+<div class="pm-card-body">
+<form class="pm-form" method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label class="pm-field">
+<span class="pm-label">Excel-Datei (.xlsx)</span>
+<input class="pm-input" type="file" name="file" accept=".xlsx" required>
+<span class="pm-help">Maximal 10 MB. Bestehende Codes werden aktualisiert, neue Codes angelegt.</span>
+</label>
+<div class="pm-actions" style="justify-content:flex-start;">
+<button class="pm-button primary" type="submit">Import starten</button>
+<a class="pm-button" href="{{ url_for('cultivar_template') }}">Importvorlage laden</a>
+</div>
+</form>
+</div>
+</article>
+
+<article class="pm-card pm-span-4">
+<div class="pm-card-head"><h2>Importprinzip</h2></div>
+<div class="pm-card-body pm-muted">
+<p>Der Sortenstamm funktioniert wie industrielle Stammdatenpflege:</p>
+<p><strong>Code vorhanden:</strong> Datensatz wird aktualisiert.</p>
+<p><strong>Code leer:</strong> Growstar erzeugt einen neuen Code.</p>
+<p><strong>Pflichtfeld:</strong> Sorte.</p>
+</div>
+</article>
+
+{% if result %}
+<article class="pm-card pm-span-12">
+<div class="pm-card-head"><h2>Importprotokoll</h2></div>
+<div class="pm-card-body">
+<p>Neu: <strong>{{ result.created }}</strong> · Aktualisiert: <strong>{{ result.updated }}</strong> · Übersprungen: <strong>{{ result.skipped }}</strong></p>
+{% if result.errors %}
+<ul>
+{% for error in result.errors %}<li>{{ error }}</li>{% endfor %}
+</ul>
+{% endif %}
+</div>
+</article>
+{% endif %}
+</div>
+</main>
+{% endblock %}

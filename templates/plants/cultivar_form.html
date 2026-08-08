@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Sorte bearbeiten' if cultivar else 'Sorte anlegen' }} – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('cultivar_list') }}">←</a>
+        <div>
+            <h1 class="pm-title">{{ 'Sorte bearbeiten' if cultivar else 'Neue Sorte' }}</h1>
+            <div class="pm-subtitle">{{ cultivar.code if cultivar else 'Neuer Stammdatensatz' }}</div>
+        </div>
+    </div>
+</header>
+{% set active_page = 'cultivars' %}
+
+<nav class="pm-nav">
+    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
+    {% if has_permission('diary.view') %}
+    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    {% endif %}
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<div class="pm-card">
+<div class="pm-card-body">
+<form class="pm-form" method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="pm-form-grid">
+        <label class="pm-field">
+            <span class="pm-label">Code</span>
+            <input class="pm-input" name="code" value="{{ cultivar.code if cultivar else '' }}" placeholder="automatisch, z. B. CV-0001">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Sorte *</span>
+            <input class="pm-input" required name="name" value="{{ cultivar.name if cultivar else '' }}">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Breeder / Züchter</span>
+            <input class="pm-input" name="breeder" value="{{ cultivar.breeder if cultivar and cultivar.breeder else '' }}">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Genetik</span>
+            <input class="pm-input" name="genetics" value="{{ cultivar.genetics if cultivar and cultivar.genetics else '' }}">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Typ</span>
+            <input class="pm-input" name="growth_type" value="{{ cultivar.growth_type if cultivar and cultivar.growth_type else '' }}" placeholder="frei definierbar">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Tags</span>
+            <input class="pm-input" name="tags" value="{{ cultivar.tags if cultivar and cultivar.tags else '' }}" placeholder="z. B. intern, test, favorisiert">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Sativa %</span>
+            <input class="pm-input" type="number" min="0" max="100" name="sativa_pct" value="{{ cultivar.sativa_pct if cultivar and cultivar.sativa_pct is not none else '' }}">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Indica %</span>
+            <input class="pm-input" type="number" min="0" max="100" name="indica_pct" value="{{ cultivar.indica_pct if cultivar and cultivar.indica_pct is not none else '' }}">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Vegetation – Planwert Tage</span>
+            <input class="pm-input" type="number" min="0" name="expected_veg_days" value="{{ cultivar.expected_veg_days if cultivar and cultivar.expected_veg_days is not none else '' }}">
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Blüte – Planwert Tage</span>
+            <input class="pm-input" type="number" min="0" name="expected_flower_days" value="{{ cultivar.expected_flower_days if cultivar and cultivar.expected_flower_days is not none else '' }}">
+        </label>
+        <label class="pm-field full">
+            <span class="pm-label">Beschreibung</span>
+            <textarea class="pm-textarea" name="description">{{ cultivar.description if cultivar and cultivar.description else '' }}</textarea>
+        </label>
+        <label class="pm-field full">
+            <span class="pm-label">Interne Notizen</span>
+            <textarea class="pm-textarea" name="notes">{{ cultivar.notes if cultivar and cultivar.notes else '' }}</textarea>
+        </label>
+        <label class="pm-field">
+            <span class="pm-label">Status</span>
+            <select class="pm-select" name="active">
+                <option value="1" {{ 'selected' if not cultivar or cultivar.active else '' }}>Aktiv</option>
+                <option value="0" {{ 'selected' if cultivar and not cultivar.active else '' }}>Inaktiv</option>
+            </select>
+        </label>
+    </div>
+    <div class="pm-actions" style="justify-content:flex-start;">
+        <button class="pm-button primary" type="submit">Speichern</button>
+        <a class="pm-button" href="{{ url_for('cultivar_list') }}">Abbrechen</a>
+    </div>
+</form>
+</div>
+</div>
+</main>
+{% endblock %}

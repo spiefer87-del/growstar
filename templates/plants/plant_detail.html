@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ plant.display_name }} – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('plant_list') }}">←</a><div><h1 class="pm-title">{{ plant.display_name }}</h1><div class="pm-subtitle">{{ plant.code }} · {{ plant.cultivar_name or 'ohne Sortenzuordnung' }}</div></div></div>
+{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button" href="{{ url_for('plant_edit', plant_id=plant.id) }}">Bearbeiten</a></div>{% endif %}
+</header>
+{% set active_page = 'plants' %}
+
+<nav class="pm-nav">
+    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
+    {% if has_permission('diary.view') %}
+    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    {% endif %}
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-grid">
+<article class="pm-card pm-span-12">
+<div class="pm-card-body">
+<div class="pm-detail-grid">
+<div class="pm-detail"><div class="pm-detail-label">Phase</div><div class="pm-detail-value"><span class="pm-stage" style="--stage-color:{{ plant.stage_color }}"><span class="pm-stage-dot"></span>{{ plant.stage_label }}</span></div></div>
+<div class="pm-detail"><div class="pm-detail-label">Status</div><div class="pm-detail-value">{{ plant.status_label }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Alter</div><div class="pm-detail-value">{{ plant.age_days if plant.age_days is not none else '—' }} Tage</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Phase seit</div><div class="pm-detail-value">{{ plant.stage_days if plant.stage_days is not none else '—' }} Tage</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Sorte</div><div class="pm-detail-value">{{ plant.cultivar_name or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Durchgang</div><div class="pm-detail-value">{{ plant.batch_name or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Standort</div><div class="pm-detail-value">{{ plant.location or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Start</div><div class="pm-detail-value">{{ plant.started_on }}</div></div>
+</div>
+</div>
+</article>
+
+<article class="pm-card pm-span-8">
+<div class="pm-card-head"><h2>Lifecycle / Phasenverlauf</h2></div>
+<div class="pm-card-body">
+<div class="pm-history">
+{% for event in events %}
+<div class="pm-history-item">
+<div class="pm-history-line"><div class="pm-history-dot" style="--history-color:{{ event.stage_color }}"></div></div>
+<div>
+<strong>{{ event.stage_label }}</strong>
+<div class="pm-muted">{{ event.started_on }}{% if event.ended_on %} → {{ event.ended_on }}{% else %} → heute{% endif %} · {{ event.days }} Tage</div>
+{% if event.note %}<div style="margin-top:5px;">{{ event.note }}</div>{% endif %}
+</div>
+</div>
+{% else %}
+<div class="pm-empty">Noch kein Phasenverlauf vorhanden.</div>
+{% endfor %}
+</div>
+</div>
+</article>
+
+{% if has_permission('plants.edit') %}
+<article class="pm-card pm-span-4">
+<div class="pm-card-head"><h2>Phase wechseln</h2></div>
+<div class="pm-card-body">
+<form class="pm-form" method="post" action="{{ url_for('plant_stage_change', plant_id=plant.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label class="pm-field"><span class="pm-label">Neue Phase</span><select class="pm-select" name="stage">{% for code,label,color in stages %}<option value="{{ code }}" {{ 'selected' if plant.current_stage == code else '' }}>{{ label }}</option>{% endfor %}</select></label>
+<label class="pm-field"><span class="pm-label">Startdatum</span><input class="pm-input" type="date" name="started_on"></label>
+<label class="pm-field"><span class="pm-label">Notiz</span><textarea class="pm-textarea" name="note"></textarea></label>
+<button class="pm-button primary" type="submit">Phase übernehmen</button>
+</form>
+</div>
+</article>
+{% endif %}
+</section>
+</main>
+{% endblock %}

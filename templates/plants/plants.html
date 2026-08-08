@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Pflanzen – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a><div><h1 class="pm-title">Pflanzen</h1><div class="pm-subtitle">Work in Process · aktuelle und historische Pflanzen</div></div></div>
+{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button primary" href="{{ url_for('plant_new') }}">＋ Pflanze</a></div>{% endif %}
+</header>
+{% set active_page = 'plants' %}
+
+<nav class="pm-nav">
+    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
+    {% if has_permission('diary.view') %}
+    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    {% endif %}
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<form class="pm-filterbar" method="get">
+<input class="pm-input" name="q" value="{{ filters.search or '' }}" placeholder="Suche …">
+<select class="pm-select" name="status">
+<option value="">Alle Status</option>
+{% for code,label in statuses %}<option value="{{ code }}" {{ 'selected' if filters.status == code else '' }}>{{ label }}</option>{% endfor %}
+</select>
+<select class="pm-select" name="stage">
+<option value="">Alle Phasen</option>
+{% for code,label,color in stages %}<option value="{{ code }}" {{ 'selected' if filters.stage == code else '' }}>{{ label }}</option>{% endfor %}
+</select>
+<select class="pm-select" name="cultivar_id">
+<option value="">Alle Sorten</option>
+{% for c in cultivars %}<option value="{{ c.id }}" {{ 'selected' if filters.cultivar_id|string == c.id|string else '' }}>{{ c.name }}</option>{% endfor %}
+</select>
+<select class="pm-select" name="batch_id">
+<option value="">Alle Durchgänge</option>
+{% for b in batches %}<option value="{{ b.id }}" {{ 'selected' if filters.batch_id|string == b.id|string else '' }}>{{ b.name }}</option>{% endfor %}
+</select>
+<button class="pm-button" type="submit">Filtern</button>
+</form>
+
+<div class="pm-card">
+<div class="pm-table-wrap">
+<table class="pm-table">
+<thead><tr><th>Pflanze</th><th>Sorte</th><th>Phase</th><th>Status</th><th>Alter</th><th>Phase seit</th><th>Standort</th><th>Durchgang</th></tr></thead>
+<tbody>
+{% for plant in plants %}
+<tr>
+<td><a href="{{ url_for('plant_detail', plant_id=plant.id) }}"><strong>{{ plant.display_name }}</strong><br><span class="pm-code">{{ plant.code }}</span></a></td>
+<td>{{ plant.cultivar_name or '—' }}</td>
+<td><span class="pm-stage" style="--stage-color:{{ plant.stage_color }}"><span class="pm-stage-dot"></span>{{ plant.stage_label }}</span></td>
+<td><span class="pm-status {{ '' if plant.status == 'active' else 'inactive' }}">{{ plant.status_label }}</span></td>
+<td>{{ plant.age_days if plant.age_days is not none else '—' }} d</td>
+<td>{{ plant.stage_days if plant.stage_days is not none else '—' }} d</td>
+<td>{{ plant.location or '—' }}</td>
+<td>{{ plant.batch_name or '—' }}</td>
+</tr>
+{% else %}
+<tr><td colspan="8"><div class="pm-empty">Keine Pflanzen für diesen Filter.</div></td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</main>
+{% endblock %}

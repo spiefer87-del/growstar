@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Sortenstamm – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <div><h1 class="pm-title">Sortenstamm</h1><div class="pm-subtitle">Master Data Management</div></div>
+    </div>
+    <div class="pm-actions">
+        <a class="pm-button" href="{{ url_for('cultivar_template') }}">Vorlage</a>
+        <a class="pm-button" href="{{ url_for('cultivar_export') }}">Excel Export</a>
+        {% if has_permission('plants.edit') %}
+        <a class="pm-button" href="{{ url_for('cultivar_import') }}">Excel Import</a>
+        <a class="pm-button primary" href="{{ url_for('cultivar_new') }}">＋ Sorte</a>
+        {% endif %}
+    </div>
+</header>
+{% set active_page = 'cultivars' %}
+
+<nav class="pm-nav">
+    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
+    {% if has_permission('diary.view') %}
+    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    {% endif %}
+</nav>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<form class="pm-filterbar" method="get" style="grid-template-columns:minmax(250px,1fr) auto;">
+    <input class="pm-input" name="q" value="{{ query }}" placeholder="Sorte, Code, Breeder, Genetik oder Tag suchen …">
+    <button class="pm-button" type="submit">Suchen</button>
+</form>
+<div class="pm-card">
+<div class="pm-table-wrap">
+<table class="pm-table">
+<thead><tr><th>Code</th><th>Sorte</th><th>Breeder</th><th>Genetik</th><th>Typ</th><th>Plan</th><th>Status</th></tr></thead>
+<tbody>
+{% for item in cultivars %}
+<tr>
+    <td class="pm-code">{{ item.code }}</td>
+    <td>
+    {% if has_permission('plants.edit') %}
+        <a href="{{ url_for('cultivar_edit', cultivar_id=item.id) }}"><strong>{{ item.name }}</strong></a>
+    {% else %}
+        <strong>{{ item.name }}</strong>
+    {% endif %}
+    </td>
+    <td>{{ item.breeder or '—' }}</td>
+    <td>{{ item.genetics or '—' }}</td>
+    <td>{{ item.growth_type or '—' }}</td>
+    <td>
+        {% if item.expected_veg_days %}Veg {{ item.expected_veg_days }}d{% endif %}
+        {% if item.expected_veg_days and item.expected_flower_days %} · {% endif %}
+        {% if item.expected_flower_days %}Blüte {{ item.expected_flower_days }}d{% endif %}
+        {% if not item.expected_veg_days and not item.expected_flower_days %}—{% endif %}
+    </td>
+    <td><span class="pm-status {{ '' if item.active else 'inactive' }}">{{ 'Aktiv' if item.active else 'Inaktiv' }}</span></td>
+</tr>
+{% else %}
+<tr><td colspan="7"><div class="pm-empty">Noch keine Sorten vorhanden.</div></td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+</div>
+</main>
+{% endblock %}

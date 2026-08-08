@@ -3,176 +3,164 @@
 {% block title %}Pflanzenmanagement – Growstar{% endblock %}
 
 {% block head %}
-<style>
-    *,
-    *::before,
-    *::after {
-        box-sizing: border-box;
-    }
-
-    :root {
-        --bg: #0f172a;
-        --card: #1e293b;
-        --text: #e5e7eb;
-        --muted: #94a3b8;
-        --accent: #22c55e;
-    }
-
-    body {
-        margin: 0;
-        min-height: 100vh;
-        padding: 28px;
-        background:
-            radial-gradient(circle at top left, rgba(34,197,94,.08), transparent 30rem),
-            var(--bg);
-        color: var(--text);
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    .page {
-        max-width: 1050px;
-        margin: 0 auto;
-    }
-
-    .page-head {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        margin-bottom: 30px;
-    }
-
-    .back {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 44px;
-        height: 44px;
-        flex: 0 0 44px;
-        border-radius: 12px;
-        background: var(--card);
-        border: 1px solid rgba(148,163,184,.2);
-        color: var(--text);
-        text-decoration: none;
-        font-size: 1.3rem;
-    }
-
-    .page-head h1 {
-        margin: 0;
-        font-size: clamp(1.65rem, 4vw, 2.2rem);
-    }
-
-    .page-head p {
-        margin: 5px 0 0;
-        color: var(--muted);
-    }
-
-    .grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 20px;
-    }
-
-    .card-link {
-        text-decoration: none;
-        color: inherit;
-    }
-
-    .card {
-        min-height: 210px;
-        border-radius: 20px;
-        padding: 26px;
-        background: linear-gradient(145deg, #1e293b, #111827);
-        border: 1px solid rgba(148,163,184,.14);
-        box-shadow: 0 16px 40px rgba(0,0,0,.25);
-        transition: transform .18s ease, border-color .18s ease;
-    }
-
-    .card-link:hover .card {
-        transform: translateY(-3px);
-        border-color: rgba(34,197,94,.5);
-    }
-
-    .icon {
-        font-size: 2.4rem;
-        margin-bottom: 24px;
-    }
-
-    .card h2 {
-        margin: 0;
-        font-size: 1.25rem;
-    }
-
-    .card p {
-        margin: 10px 0 0;
-        color: var(--muted);
-        line-height: 1.55;
-    }
-
-    .action {
-        margin-top: 22px;
-        color: var(--accent);
-        font-weight: 700;
-        font-size: .9rem;
-    }
-
-    @media (max-width: 650px) {
-        body {
-            padding: 18px 12px;
-        }
-
-        .grid {
-            grid-template-columns: 1fr;
-            gap: 14px;
-        }
-
-        .card {
-            min-height: 175px;
-            padding: 22px;
-        }
-    }
-</style>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">
 {% endblock %}
 
 {% block page %}
-<main class="page">
-    <header class="page-head">
-        <a class="back" href="{{ url_for('dashboard') }}" title="Zum Main Dashboard">←</a>
-        <div>
-            <h1>🌿 Pflanzenmanagement</h1>
-            <p>Pflanzenbezogene Daten und Dokumentation</p>
+<main class="pm-shell">
+    <header class="pm-header">
+        <div class="pm-heading-wrap">
+            <a class="pm-back" href="{{ url_for('dashboard') }}">←</a>
+            <div>
+                <h1 class="pm-title">🌿 Pflanzenmanagement</h1>
+                <div class="pm-subtitle">Operations Board · Pflanzen, Phasen, Sorten und Durchgänge</div>
+            </div>
         </div>
+        {% if has_permission('plants.edit') %}
+        <div class="pm-actions">
+            <a class="pm-button" href="{{ url_for('cultivar_new') }}">＋ Sorte</a>
+            <a class="pm-button primary" href="{{ url_for('plant_new') }}">＋ Pflanze</a>
+        </div>
+        {% endif %}
     </header>
 
-    <div class="grid">
+    {% set active_page = 'dashboard' %}
+    
+<nav class="pm-nav">
+    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
+    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
+    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
+    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
+    {% if has_permission('diary.view') %}
+    <a href="{{ url_for('tagebuch_page') }}">Tagebuch</a>
+    {% endif %}
+</nav>
 
-        {% if has_permission('plants.view') %}
-        <a class="card-link" href="{{ url_for('pflanzendaten_page') }}">
-            <section class="card">
-                <div class="icon">🌱</div>
-                <h2>Pflanzendaten</h2>
-                <p>
-                    Sorten, Pflanzenprofile, Phasen und die bestehenden
-                    Pflanzendaten verwalten.
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+
+    <section class="pm-kpis">
+        <div class="pm-kpi">
+            <div class="pm-kpi-label">Aktive Pflanzen</div>
+            <div class="pm-kpi-value">{{ active_plant_count }}</div>
+        </div>
+        <div class="pm-kpi">
+            <div class="pm-kpi-label">Sorten im Stamm</div>
+            <div class="pm-kpi-value">{{ cultivar_count }}</div>
+        </div>
+        <div class="pm-kpi">
+            <div class="pm-kpi-label">Aktive Durchgänge</div>
+            <div class="pm-kpi-value">{{ active_batch_count }}</div>
+        </div>
+        <div class="pm-kpi">
+            <div class="pm-kpi-label">Phasen belegt</div>
+            <div class="pm-kpi-value">{{ stage_counts|length }}</div>
+        </div>
+    </section>
+
+    <section class="pm-grid">
+        <article class="pm-card pm-span-8">
+            <div class="pm-card-head">
+                <h2>Aktuell laufende Pflanzen</h2>
+                <a class="pm-button" href="{{ url_for('plant_list', status='active') }}">Alle anzeigen</a>
+            </div>
+
+            {% if active_plants %}
+            <div class="pm-table-wrap">
+                <table class="pm-table">
+                    <thead>
+                        <tr>
+                            <th>Pflanze</th>
+                            <th>Sorte</th>
+                            <th>Phase</th>
+                            <th>Phase seit</th>
+                            <th>Alter</th>
+                            <th>Durchgang</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for plant in active_plants[:12] %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('plant_detail', plant_id=plant.id) }}">
+                                    <strong>{{ plant.display_name }}</strong><br>
+                                    <span class="pm-code">{{ plant.code }}</span>
+                                </a>
+                            </td>
+                            <td>{{ plant.cultivar_name or '—' }}</td>
+                            <td>
+                                <span class="pm-stage" style="--stage-color: {{ plant.stage_color }}">
+                                    <span class="pm-stage-dot"></span>
+                                    {{ plant.stage_label }}
+                                </span>
+                            </td>
+                            <td>{{ plant.stage_days if plant.stage_days is not none else '—' }} Tage</td>
+                            <td>{{ plant.age_days if plant.age_days is not none else '—' }} Tage</td>
+                            <td>{{ plant.batch_name or '—' }}</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+                <div class="pm-empty">
+                    Noch keine aktiven Pflanzen vorhanden.
+                    {% if has_permission('plants.edit') %}
+                    <br><br>
+                    <a class="pm-button primary" href="{{ url_for('plant_new') }}">Erste Pflanze anlegen</a>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </article>
+
+        <article class="pm-card pm-span-4">
+            <div class="pm-card-head">
+                <h2>WIP nach Phase</h2>
+            </div>
+            <div class="pm-card-body">
+                {% if stage_counts %}
+                {% set maximum = stage_counts | map(attribute='count') | max %}
+                <div class="pm-stage-bars">
+                    {% for item in stage_counts %}
+                    <div class="pm-stage-bar">
+                        <span>{{ item.label }}</span>
+                        <div class="pm-stage-track">
+                            <div
+                                class="pm-stage-fill"
+                                style="--width: {{ ((item.count / maximum) * 100)|round(1) }}%; --fill: {{ item.color }}"
+                            ></div>
+                        </div>
+                        <strong>{{ item.count }}</strong>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                    <div class="pm-empty">Noch keine Phasendaten.</div>
+                {% endif %}
+            </div>
+        </article>
+
+        <article class="pm-card pm-span-12">
+            <div class="pm-card-head">
+                <h2>Lifecycle Timeline</h2>
+                <a class="pm-button" href="{{ url_for('plant_timeline') }}">Große Timeline</a>
+            </div>
+            <div class="pm-card-body">
+                <p class="pm-muted" style="margin:0;">
+                    Die Timeline wird aus echten Phasenwechseln aufgebaut.
+                    Jeder Wechsel schließt die vorherige Phase und eröffnet einen neuen Zeitabschnitt.
                 </p>
-                <div class="action">Öffnen →</div>
-            </section>
-        </a>
-        {% endif %}
-
-        {% if has_permission('diary.view') %}
-        <a class="card-link" href="{{ url_for('tagebuch_page') }}">
-            <section class="card">
-                <div class="icon">📓</div>
-                <h2>Tagebuch</h2>
-                <p>
-                    Ereignisse, Notizen und die laufende Dokumentation
-                    des Grows einsehen und pflegen.
-                </p>
-                <div class="action">Öffnen →</div>
-            </section>
-        </a>
-        {% endif %}
-
-    </div>
+            </div>
+        </article>
+    </section>
 </main>
 {% endblock %}
