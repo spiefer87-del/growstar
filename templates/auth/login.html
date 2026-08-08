@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Growstar – Anmeldung</title>
+    <style>
+        * { box-sizing: border-box; }
+        :root {
+            --bg: #0f172a;
+            --card: #1e293b;
+            --accent: #22c55e;
+            --accent-dark: #16a34a;
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --border: #334155;
+            --danger: #fecaca;
+            --danger-bg: #7f1d1d;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        .login-card {
+            width: min(420px, 100%);
+            background: var(--card);
+            border: 1px solid rgba(148, 163, 184, .14);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 55px rgba(0, 0, 0, .35);
+        }
+        .brand {
+            font-size: 1.65rem;
+            font-weight: 750;
+            margin-bottom: 4px;
+        }
+        .subtitle {
+            color: var(--muted);
+            margin: 0 0 26px;
+        }
+        label {
+            display: block;
+            margin: 16px 0 7px;
+            color: var(--muted);
+            font-size: .9rem;
+        }
+        input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: #0f172a;
+            color: var(--text);
+            padding: 13px 14px;
+            font: inherit;
+            outline: none;
+        }
+        input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, .14);
+        }
+        button {
+            width: 100%;
+            margin-top: 22px;
+            border: 0;
+            border-radius: 12px;
+            padding: 13px 16px;
+            background: var(--accent);
+            color: #052e16;
+            font: inherit;
+            font-weight: 750;
+            cursor: pointer;
+        }
+        button:hover { background: var(--accent-dark); }
+        .flash {
+            margin: 0 0 16px;
+            padding: 11px 13px;
+            border-radius: 10px;
+            background: var(--danger-bg);
+            color: var(--danger);
+            font-size: .9rem;
+        }
+        .security-note {
+            margin-top: 20px;
+            color: var(--muted);
+            font-size: .78rem;
+            line-height: 1.45;
+        }
+    </style>
+</head>
+<body>
+    <main class="login-card">
+        <div class="brand">🌱 Growstar</div>
+        <p class="subtitle">Management System</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for category, message in messages %}
+                <div class="flash">{{ message }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        <form method="post" action="{{ url_for('auth_login') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if next_url %}
+                <input type="hidden" name="next" value="{{ next_url }}">
+            {% endif %}
+
+            <label for="username">Benutzername</label>
+            <input
+                id="username"
+                name="username"
+                type="text"
+                autocomplete="username"
+                autocapitalize="none"
+                required
+                autofocus
+            >
+
+            <label for="password">Passwort</label>
+            <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+            >
+
+            <button type="submit">Anmelden</button>
+        </form>
+
+        <div class="security-note">
+            Zugriff nur für autorisierte Benutzer. Anmeldungen werden protokolliert.
+        </div>
+    </main>
+</body>
+</html>
