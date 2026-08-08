@@ -26,6 +26,7 @@ from threads.hardware import hardware_loop
 from threads.blu import start_blu_thread
 
 from routes.dashboard import register as register_dashboard_routes
+from routes.plant_management import register as register_plant_management_routes
 from routes.state import register as register_state_routes
 from routes.plants import register as register_plants_routes
 from routes.diary import register as register_diary_routes
@@ -93,6 +94,7 @@ def create_flask_app():
     register_auth_routes(app)
     register_admin_routes(app)
     register_dashboard_routes(app)
+    register_plant_management_routes(app)
     register_state_routes(app)
     register_plants_routes(app)
     register_diary_routes(app)
@@ -109,7 +111,7 @@ def create_flask_app():
     install_auth(app)
 
     # Nur aktivieren, wenn wirklich genau ein vertrauenswürdiger Reverse Proxy
-    # (hier: Caddy auf demselben Rechner) vor Flask/Gunicorn steht.
+    # vor Flask/Gunicorn steht.
     if os.getenv("GROWSTAR_BEHIND_PROXY") == "1":
         app.wsgi_app = ProxyFix(
             app.wsgi_app,
