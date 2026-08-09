@@ -2,24 +2,42 @@
 
 import time
 
-from flask import jsonify
+from flask import jsonify, request
 
-from core.devices import get_device_mode
+from core.config_update import apply_config_patch, config_snapshot
+from core.devices import DEVICE_NAMES, get_device_mode
+from core.profile import PROFILES, apply_profile, get_active_profile
 from core.runtime import get_runtime, list_runtimes
 from core.tents import manager as tent_manager, validate_tent_id
 
 
-_DEVICE_NAMES = (
-    "heating",
-    "fan",
-    "light",
-    "vent",
-    "irrigation",
-    "humidifier",
-    "dehumidifier",
-    "light2",
-    "vent2",
-)
+_DEVICE_NAMES = DEVICE_NAMES
+
+_STATION_CONFIG_FORBIDDEN_KEYS = {
+    "SENSOR_ASSIGNMENTS",
+    "TEMP_OFFSET",
+    "HUM_OFFSET",
+    "DEVICE_MODES",
+    "DEVICE_PARAMS",
+    "DEVICE_ENV_CONFIG",
+}
+
+
+def _validate_station_config_patch(data):
+    if not isinstance(data, dict):
+        raise TypeError("Config-Update muss ein JSON-Objekt sein")
+
+    forbidden = [
+        key for key in data
+        if key in _STATION_CONFIG_FORBIDDEN_KEYS
+        or key.startswith("IP_")
+        or key.startswith("RELAY_")
+    ]
+    if forbidden:
+        raise ValueError(
+            "Diese Einstellungen besitzen einen eigenen stationsbezogenen "
+            "Endpunkt: " + ", ".join(sorted(forbidden))
+        )
 
 
 def _runtime_map():
@@ -101,6 +119,7 @@ def _state_snapshot(runtime):
 
         # Profil / Rampe
         "profile": st.current_profile,
+        "active_profile": get_active_profile(runtime=runtime),
         "ramp_active": bool(
             st.ramp_active and cfg.get("RAMP_ENABLED", 0)
         ),
@@ -117,19 +136,27 @@ def _state_snapshot(runtime):
         "shadow_outputs": shadow_outputs,
         "device_modes": cfg.get("DEVICE_MODES", {}),
 
-        # Energie bleibt für zusätzliche Runtimes vorerst getrennt/leer.
+        # Energie bleibt vorerst Runtime-lokal/leer für zusätzliche Stationen.
         "energy": dict(runtime.energy_state),
     }
 
 
-def register(app):
-    """Read-only Multi-Tent-API für Phase 3B.
+def _config_payload(runtime):
+    return {
+        "success": True,
+        "tent_id": runtime.tent_id,
+        "name": runtime.name,
+        "control_enabled": runtime.control_enabled,
+        "shadow_enabled": runtime.shadow_enabled,
+        "hardware_actuation_blocked": not runtime.control_enabled,
+        "active_profile": get_active_profile(runtime=runtime),
+        "profiles": sorted((PROFILES.get("profiles") or {}).keys()),
+        "config": config_snapshot(runtime),
+    }
 
-    Schreibende Zelt-APIs kommen bewusst erst später. Dadurch greift für diese
-    neuen GET-Endpunkte automatisch die bestehende zentrale Auth-Policy
-    (unbekannte /api-Lesezugriffe => mindestens grow.view), ohne neue
-    Schreibrechte einzuführen.
-    """
+
+def register(app):
+    """Generische Multi-Station-API für beliebig viele lokale Runtimes."""
 
     @app.route("/api/tents", methods=["GET"])
     def api_tents():
@@ -169,17 +196,37 @@ def register(app):
             return error
         return jsonify(_state_snapshot(runtime))
 
-    @app.route("/api/tents/<tent_id>/config", methods=["GET"])
+    @app.route("/api/tents/<tent_id>/config", methods=["GET", "POST"])
     def api_tent_config(tent_id):
         runtime, error = _find_runtime(tent_id)
         if error:
             return error
 
-        return jsonify({
-            "tent_id": runtime.tent_id,
-            "name": runtime.name,
-            "control_enabled": runtime.control_enabled,
-            "shadow_enabled": runtime.shadow_enabled,
-            "hardware_actuation_blocked": not runtime.control_enabled,
-            "config": runtime.config,
-        })
+        if request.method == "GET":
+            return jsonify(_config_payload(runtime))
+
+        data = request.get_json(silent=True) or {}
+        try:
+            _validate_station_config_patch(data)
+            result = apply_config_patch(data, runtime=runtime)
+        except (TypeError, ValueError) as exc:
+            return jsonify(success=False, error=str(exc)), 400
+
+        payload = _config_payload(runtime)
+        payload["changed_keys"] = result["changed_keys"]
+        return jsonify(payload)
+
+    @app.route("/api/tents/<tent_id>/profile/<name>", methods=["POST"])
+    def api_tent_profile(tent_id, name):
+        runtime, error = _find_runtime(tent_id)
+        if error:
+            return error
+
+        if not apply_profile(name, runtime=runtime):
+            return jsonify(
+                success=False,
+                error="profile_not_found",
+                profile=name,
+            ), 404
+
+        return jsonify(_config_payload(runtime))
