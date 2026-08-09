@@ -13,8 +13,8 @@ from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import init_db, init_diary_db, init_plants_table
-from core.config import config
 from core.tents import init_tents
+from core.runtime import get_default_runtime, resolve_runtime
 from core.actuators import set_heating, set_fan, set_vent
 
 from services.watchdog import log_event, watchdog_loop
@@ -153,70 +153,40 @@ def _start_daemon_thread(name, target):
     return thread
 
 
-def _sync_all_relays():
-    sync_relay(
-        "🔥 Heizung",
-        config["IP_HEATING"],
-        config["RELAY_HEATING"],
-        "heating_on",
-        "heating",
+def _sync_all_relays(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+
+    relay_definitions = (
+        ("🔥 Heizung", "IP_HEATING", "RELAY_HEATING", "heating_on", "heating"),
+        ("💨 Lüfter", "IP_FAN", "RELAY_FAN", "fan_on", "fan"),
+        ("💡 Licht", "IP_LIGHT", "RELAY_LIGHT", "light_on", "light"),
+        ("🌀 Ventilator", "IP_VENT", "RELAY_VENT", "vent_on", "vent"),
+        ("🚿 Bewässerung", "IP_IRRIGATION", "RELAY_IRRIGATION", "irrigation_on", "irrigation"),
+        ("💧 Luftbefeuchter", "IP_HUMIDIFIER", "RELAY_HUMIDIFIER", "humidifier_on", "humidifier"),
+        ("🌵 Luftentfeuchter", "IP_DEHUMIDIFIER", "RELAY_DEHUMIDIFIER", "dehumidifier_on", "dehumidifier"),
+        ("💡 Licht 2", "IP_LIGHT2", "RELAY_LIGHT2", "light2_on", "light2"),
+        ("🌀 Ventilator 2", "IP_VENT2", "RELAY_VENT2", "vent2_on", "vent2"),
     )
-    sync_relay(
-        "💨 Lüfter",
-        config["IP_FAN"],
-        config["RELAY_FAN"],
-        "fan_on",
-        "fan",
-    )
-    sync_relay(
-        "💡 Licht",
-        config["IP_LIGHT"],
-        config["RELAY_LIGHT"],
-        "light_on",
-        "light",
-    )
-    sync_relay(
-        "🌀 Ventilator",
-        config["IP_VENT"],
-        config["RELAY_VENT"],
-        "vent_on",
-        "vent",
-    )
-    sync_relay(
-        "🚿 Bewässerung",
-        config["IP_IRRIGATION"],
-        config["RELAY_IRRIGATION"],
-        "irrigation_on",
-        "irrigation",
-    )
-    sync_relay(
-        "💧 Luftbefeuchter",
-        config["IP_HUMIDIFIER"],
-        config["RELAY_HUMIDIFIER"],
-        "humidifier_on",
-        "humidifier",
-    )
-    sync_relay(
-        "🌵 Luftentfeuchter",
-        config["IP_DEHUMIDIFIER"],
-        config["RELAY_DEHUMIDIFIER"],
-        "dehumidifier_on",
-        "dehumidifier",
-    )
-    sync_relay(
-        "💡 Licht 2",
-        config["IP_LIGHT2"],
-        config["RELAY_LIGHT2"],
-        "light2_on",
-        "light2",
-    )
-    sync_relay(
-        "🌀 Ventilator 2",
-        config["IP_VENT2"],
-        config["RELAY_VENT2"],
-        "vent2_on",
-        "vent2",
-    )
+
+    for label, ip_key, relay_key, state_attr, device_key in relay_definitions:
+        ip = cfg.get(ip_key)
+        relay = cfg.get(relay_key)
+
+        # Zusätzliche Zelte dürfen in späteren Phasen zunächst unvollständig
+        # konfiguriert sein. Für tent_1 ändert sich bei vollständiger Config
+        # nichts; fehlende Hardware wird nur sauber übersprungen.
+        if not ip or relay is None:
+            continue
+
+        sync_relay(
+            label,
+            ip,
+            relay,
+            state_attr,
+            device_key,
+            runtime=rt,
+        )
 
 
 def start_backend():
@@ -231,8 +201,10 @@ def start_backend():
 
         print("🌱 Grow-Backend wird gestartet")
 
+        runtime = get_default_runtime()
+
         try:
-            _sync_all_relays()
+            _sync_all_relays(runtime=runtime)
 
             _start_daemon_thread(
                 "growstar-shelly",
@@ -260,7 +232,7 @@ def start_backend():
 
             _start_daemon_thread(
                 "growstar-main-control",
-                main_loop,
+                lambda: main_loop(runtime=runtime),
             )
             print("🧠 Main Control Thread gestartet")
 
@@ -291,10 +263,12 @@ def shutdown_backend():
         _backend_started = False
         print("🛑 Grow-Backend wird beendet")
 
+        runtime = get_default_runtime()
+
         for action in (
-            lambda: set_heating(False, "(Shutdown)"),
-            lambda: set_fan(False, "(Shutdown)"),
-            lambda: set_vent(False, "(Shutdown)"),
+            lambda: set_heating(False, "(Shutdown)", runtime=runtime),
+            lambda: set_fan(False, "(Shutdown)", runtime=runtime),
+            lambda: set_vent(False, "(Shutdown)", runtime=runtime),
         ):
             try:
                 action()
