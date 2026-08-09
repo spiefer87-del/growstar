@@ -14,7 +14,12 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import init_db, init_diary_db, init_plants_table
 from core.tents import init_tents
-from core.runtime import get_default_runtime, init_runtimes, resolve_runtime
+from core.runtime import (
+    get_default_runtime,
+    init_runtimes,
+    list_runtimes,
+    resolve_runtime,
+)
 from core.actuators import set_heating, set_fan, set_vent
 
 from services.watchdog import log_event, watchdog_loop
@@ -39,6 +44,7 @@ from routes.profile import register as register_profile_routes
 from routes.watchdog import register as register_watchdog_routes
 from routes.hardware import register as register_hardware_routes
 from routes.sensors import register as register_sensor_routes
+from routes.tents import register as register_tent_routes
 from routes.auth import register as register_auth_routes
 from routes.admin import register as register_admin_routes
 
@@ -116,6 +122,7 @@ def create_flask_app():
     register_watchdog_routes(app)
     register_hardware_routes(app)
     register_sensor_routes(app)
+    register_tent_routes(app)
 
     # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
     install_auth(app)
@@ -233,9 +240,33 @@ def start_backend():
 
             _start_daemon_thread(
                 "growstar-main-control",
-                lambda: main_loop(runtime=runtime),
+                lambda: main_loop(runtime=runtime, shadow=False),
             )
             print("🧠 Main Control Thread gestartet")
+
+            # Phase 3B: zusätzliche Zelte dürfen ausschließlich als Shadow-
+            # Regelkreis laufen. Es findet weder Relay-Sync noch Failsafe-
+            # Hardwarezugriff für diese Runtimes statt.
+            for extra_runtime in list_runtimes():
+                if extra_runtime.tent_id == runtime.tent_id:
+                    continue
+                if not extra_runtime.enabled or not extra_runtime.shadow_enabled:
+                    continue
+
+                # Zweite Sicherheitsbarriere neben core.actuators.
+                extra_runtime.control_enabled = False
+
+                _start_daemon_thread(
+                    f"growstar-shadow-{extra_runtime.tent_id}",
+                    lambda rt=extra_runtime: main_loop(
+                        runtime=rt,
+                        shadow=True,
+                    ),
+                )
+                print(
+                    f"🧪 [{extra_runtime.tent_id}] "
+                    "Shadow Control Thread gestartet"
+                )
 
             _start_daemon_thread(
                 "growstar-hardware",

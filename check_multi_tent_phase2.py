@@ -52,6 +52,7 @@ def main():
     rt_a = create_isolated_runtime(
         "tent_test_a",
         name="Testzelt A",
+        control_enabled=True,
         config_data={
             "TEMP_OFFSET": 1.0,
             "HUM_OFFSET": -2.0,
