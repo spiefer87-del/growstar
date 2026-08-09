@@ -83,6 +83,8 @@ READ_EXACT = {
 
 
 READ_PREFIX = (
+    # Alle Unterseiten des neuen Grow-Control-Hubs bleiben Grow-spezifisch.
+    ("/grow-control", require("grow.view")),
     ("/devices", require("hardware.view")),
     ("/api/state", require("grow.view")),
     ("/api/history", require("grow.view")),
