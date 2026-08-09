@@ -1,397 +1,113 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Verbindungen</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
 
+{% block title %}Verbindungen – Grow Control{% endblock %}
+
+{% block head %}
 <style>
-:root{
-    --bg:#0f172a;
-    --card:#1e293b;
-    --accent:#22c55e;
-    --danger:#ef4444;
-    --text:#e5e7eb;
-    --muted:#94a3b8;
-}
-
-body{
-    margin:0;
-    padding:20px;
-    background:var(--bg);
-    color:var(--text);
-    font-family:system-ui;
-}
-
-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:20px;
-}
-
-h1{margin:0;font-size:1.6rem}
-a.back{color:var(--muted);text-decoration:none}
-
-.grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-    gap:20px;
-}
-
-.card{
-    background:var(--card);
-    border-radius:16px;
-    padding:20px;
-    box-shadow:0 10px 30px rgba(0,0,0,.3);
-}
-
-.card h2{
-    margin:0 0 14px;
-    font-size:.95rem;
-    color:var(--muted);
-    text-transform:uppercase;
-}
-
-.row{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:10px;
-}
-
-label{font-size:.9rem}
-
-input,select{
-    background:#020617;
-    color:var(--text);
-    border:1px solid rgba(255,255,255,.1);
-    border-radius:8px;
-    padding:6px 8px;
-    font-size:.9rem;
-    width:120px;
-    text-align:center;
-}
-
-.status{
-    font-size:.85rem;
-    padding:4px 8px;
-    border-radius:999px;
-}
-
-.ok{background:rgba(34,197,94,.15);color:#22c55e}
-.err{background:rgba(239,68,68,.15);color:#ef4444}
-
-button{
-    margin-top:10px;
-    width:100%;
-    padding:10px;
-    border:none;
-    border-radius:10px;
-    background:var(--accent);
-    color:#022c22;
-    font-weight:600;
-    cursor:pointer;
-}
-
-.feedback{
-    margin-top:10px;
-    font-size:.85rem;
-    color:var(--accent);
-    display:none;
-}
+:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--purple:#a78bfa;--amber:#f59e0b}
+*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.55}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
 </style>
-</head>
+{% endblock %}
 
-<body>
+{% block page %}
+<div class="wrap">
+    <header class="topbar">
+        <div class="head"><a class="back" href="{{ url_for('grow_control_dashboard') }}">←</a><div><h1>🔗 Verbindungen</h1><div class="sub">Aktoren einer Grow-Station manuell IP und Relay zuweisen</div></div></div>
+        <select id="station-select" class="station-select" aria-label="Grow-Station"></select>
+    </header>
 
-<header>
-    <h1>🔌 Verbindungen</h1>
-    <a href="/system" class="back">← zurück</a>
-</header>
+    <div id="banner" class="banner">Station wird geladen …</div>
+    <div id="device-grid" class="grid"></div>
 
-<div class="grid">
-
-<!-- ================= HEIZUNG ================= -->
-<div class="card">
-    <h2>🔥 Heizung</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_HEATING">
+    <div class="actions">
+        {% if has_permission('hardware.configure') %}<button id="save-button" class="save" type="button">💾 Zuordnungen speichern</button>{% endif %}
+        <span id="feedback" class="feedback"></span>
     </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_HEATING"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_HEATING" class="status">–</span>
+    <div class="legend">
+        Ein Shelly kann mehrere Relays derselben oder verschiedener Stationen bereitstellen. Gesperrt wird nur eine echte Doppelbelegung derselben Kombination <strong>IP/Hostname + Relay</strong>.
+        LIVE-Hardware bleibt in dieser Phase schreibgeschützt; Shadow-/inaktive Stationen können sicher vorbereitet werden.
     </div>
 </div>
-
-<!-- ================= LÜFTER ================= -->
-<div class="card">
-    <h2>💨 Lüfter</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_FAN">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_FAN"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_FAN" class="status">–</span>
-    </div>
-</div>
-
-<!-- ================= LICHT ================= -->
-<div class="card">
-    <h2>💡 Licht</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_LIGHT">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_LIGHT"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_LIGHT" class="status">–</span>
-    </div>
-</div>
-
-<!-- ================= VENT ================= -->
-<div class="card">
-    <h2>🌀 Ventilator</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_VENT">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_VENT"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_VENT" class="status">–</span>
-    </div>
-</div>
-
-<!-- ================= BEWÄSSERUNG ================= -->
-<div class="card">
-    <h2>🚿 Bewässerung</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_IRRIGATION">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_IRRIGATION"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_IRRIGATION" class="status">–</span>
-    </div>
-</div>
-
-<!-- ================= LUFTBEFEUCHTER ================= -->
-<div class="card">
-    <h2>💧 Luftbefeuchter</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_HUMIDIFIER">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_HUMIDIFIER"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_HUMIDIFIER" class="status">–</span>
-    </div>
-</div>
-
-<!-- ================= LUFTENTFEUCHTER ================= -->
-<div class="card">
-    <h2>🌵 Luftentfeuchter</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_DEHUMIDIFIER">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_DEHUMIDIFIER"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_DEHUMIDIFIER" class="status">–</span>
-    </div>
-</div>
-
-<!-- ================= LICHT 2 ================= -->
-<div class="card">
-    <h2>💡 Beleuchtung 2</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_LIGHT2">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_LIGHT2"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_LIGHT2" class="status">–</span>
-    </div>
-</div>
-
-<!-- ================= VENT 2 ================= -->
-<div class="card">
-    <h2>🌀 Ventilator 2</h2>
-
-    <div class="row">
-        <label>IP</label>
-        <input id="IP_VENT2">
-    </div>
-
-    <div class="row">
-        <label>Relay</label>
-        <select id="RELAY_VENT2"></select>
-    </div>
-
-    <div class="row">
-        <label>Status</label>
-        <span id="STATUS_VENT2" class="status">–</span>
-    </div>
-</div>
-
-</div>
-
-<button onclick="save()">💾 Einstellungen speichern</button>
-<div id="feedback" class="feedback">✔ Einstellungen gespeichert</div>
 
 <script>
-const RELAYS=[0,1,2,3,4,5];
+(() => {
+    const CAN_CONFIGURE = {{ has_permission('hardware.configure')|tojson }};
+    const select = document.getElementById("station-select");
+    const grid = document.getElementById("device-grid");
+    const banner = document.getElementById("banner");
+    const saveButton = document.getElementById("save-button");
+    const feedback = document.getElementById("feedback");
+    let current = null;
 
-const DEVICES = [
-    "HEATING",
-    "FAN",
-    "LIGHT",
-    "VENT",
-    "IRRIGATION",
-    "HUMIDIFIER",
-    "DEHUMIDIFIER",
-    "LIGHT2",
-    "VENT2"
-];
+    const q = new URLSearchParams(location.search);
+    const preferred = q.get("tent");
+    const hwUrl = id => `/api/tents/${encodeURIComponent(id)}/hardware`;
 
-function fill(sel){
-    sel.innerHTML = "";
-    RELAYS.forEach(r=>{
-        const o=document.createElement("option");
-        o.value=r;
-        o.textContent=r;
-        sel.appendChild(o);
-    });
-}
-
-function showStatus(el, state){
-    if(state === true || state === false){
-        el.textContent="Verbunden";
-        el.className="status ok";
-    } else {
-        el.textContent="KEINE VERBINDUNG";
-        el.className="status err";
+    function relayOptions(selected){
+        let html='<option value="">–</option>';
+        for(let i=0;i<=15;i++) html += `<option value="${i}" ${Number(selected)===i ? 'selected' : ''}>${i}</option>`;
+        return html;
     }
-}
 
-async function load(){
-    const cfg = await (await fetch("/api/config")).json();
-    const st  = await (await fetch("/api/state")).json();
+    function render(snapshot){
+        current = snapshot;
+        const editable = CAN_CONFIGURE && snapshot.editable;
+        banner.className = "banner" + (snapshot.control_enabled ? " live" : snapshot.shadow_enabled ? " shadow" : "");
+        if(snapshot.control_enabled) banner.textContent = `${snapshot.name}: LIVE. Die laufende Hardware-Zuordnung ist zum Schutz des aktiven Regelkreises hier schreibgeschützt.`;
+        else if(snapshot.shadow_enabled) banner.textContent = `${snapshot.name}: SHADOW. Zuordnungen werden gespeichert, reale Aktorik bleibt weiterhin gesperrt.`;
+        else banner.textContent = `${snapshot.name}: Hardware-Control ist gesperrt. Die Station kann vorbereitet werden, ohne Relais zu schalten.`;
 
-    // Inputs füllen
-    DEVICES.forEach(d=>{
-        const ipEl = document.getElementById("IP_"+d);
-        const rEl  = document.getElementById("RELAY_"+d);
+        grid.innerHTML = Object.values(snapshot.assignments || {}).map(a => `
+            <article class="card" data-device="${a.device}">
+                <div class="card-head"><h2>${a.icon || '🔌'} ${a.label}</h2><span class="status ${a.configured ? 'ok':'none'}">${a.configured ? 'ZUGEORDNET':'OFFEN'}</span></div>
+                <div class="row"><label>IP / Host</label><input class="js-ip" value="${String(a.ip || '').replace(/"/g,'&quot;')}" placeholder="192.168.178.x" ${editable ? '' : 'disabled'}></div>
+                <div class="row"><label>Relay</label><select class="js-relay" ${editable ? '' : 'disabled'}>${relayOptions(a.relay)}</select></div>
+            </article>`).join("");
 
-        if(ipEl) ipEl.value = cfg["IP_"+d] || "";
-        if(rEl){
-            fill(rEl);
-            rEl.value = cfg["RELAY_"+d] ?? 0;
+        if(saveButton) saveButton.disabled = !editable;
+    }
+
+    async function loadHardware(id){
+        feedback.textContent="";
+        const res = await fetch(hwUrl(id));
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok){ banner.className="banner live"; banner.textContent=data.error || "Hardware-Zuordnung konnte nicht geladen werden."; grid.innerHTML=""; if(saveButton) saveButton.disabled=true; return; }
+        render(data);
+        const u=new URL(location.href);u.searchParams.set("tent",id);history.replaceState(null,"",u);
+    }
+
+    async function loadStations(){
+        const res = await fetch("/api/tents");
+        const data = await res.json();
+        const tents = data.tents || [];
+        select.innerHTML = tents.map(t => `<option value="${t.id}">${t.name || t.id}${t.control_enabled ? ' · LIVE' : t.shadow_enabled ? ' · SHADOW' : ''}</option>`).join("");
+        const wanted = tents.some(t=>t.id===preferred) ? preferred : data.default_tent_id;
+        select.value = wanted || tents[0]?.id || "";
+        if(select.value) loadHardware(select.value);
+    }
+
+    select.addEventListener("change",()=>loadHardware(select.value));
+
+    saveButton?.addEventListener("click", async () => {
+        if(!current || !current.editable) return;
+        const assignments={};
+        grid.querySelectorAll(".card[data-device]").forEach(card => {
+            assignments[card.dataset.device]={ip:card.querySelector(".js-ip").value.trim(), relay:card.querySelector(".js-relay").value};
+        });
+        feedback.className="feedback"; feedback.textContent="Speichere …";
+        const res = await fetch(hwUrl(select.value),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({assignments})});
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok){
+            feedback.className="feedback err";
+            if(data.error === "hardware_endpoint_conflict" && data.owner){
+                feedback.textContent=`Doppelbelegung: ${data.endpoint?.ip || ''} / Relay ${data.endpoint?.relay ?? ''} gehört bereits ${data.owner.tent_id} · ${data.owner.device}.`;
+            } else feedback.textContent=data.message || data.error || "Speichern fehlgeschlagen";
+            return;
         }
+        feedback.className="feedback ok"; feedback.textContent="Zuordnungen gespeichert"; render(data);
     });
 
-    // Status (kommt aus /api/state)
-    // -> hier nur anzeigen was existiert, sonst "keine Verbindung"
-    showStatus(STATUS_HEATING, st.heating_on);
-    showStatus(STATUS_FAN, st.fan_on);
-    showStatus(STATUS_LIGHT, st.light_on);
-    showStatus(STATUS_VENT, st.vent_on);
-
-    // neue Geräte: solange du im Backend noch keine *_on Variablen hast:
-    // wir zeigen erstmal "keine Verbindung" (später erweitern wir /api/state)
-    showStatus(STATUS_IRRIGATION, st.irrigation_on);
-    showStatus(STATUS_HUMIDIFIER, st.humidifier_on);
-    showStatus(STATUS_DEHUMIDIFIER, st.dehumidifier_on);
-    showStatus(STATUS_LIGHT2, st.light2_on);
-    showStatus(STATUS_VENT2, st.vent2_on);
-}
-
-async function save(){
-    if(!confirm("Bisherige Verbindungen überschreiben?")) return;
-
-    const data = {};
-
-    DEVICES.forEach(d=>{
-        const ipEl = document.getElementById("IP_"+d);
-        const rEl  = document.getElementById("RELAY_"+d);
-
-        if(ipEl) data["IP_"+d] = ipEl.value.trim();
-        if(rEl)  data["RELAY_"+d] = +rEl.value;
-    });
-
-    await fetch("/api/config",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(data)
-    });
-
-    feedback.style.display="block";
-    setTimeout(()=>feedback.style.display="none",2000);
-
-    load();
-}
-
-load();
+    loadStations();
+})();
 </script>
-
-</body>
-</html>
+{% endblock %}

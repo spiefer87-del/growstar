@@ -401,16 +401,16 @@
 <section class="section" aria-labelledby="grow-tools-title">
     <div class="section-head">
         <h2 id="grow-tools-title">🧰 System &amp; Infrastruktur</h2>
-        <p>Zentrale Werkzeuge für Grow Control. Die Bereiche werden schrittweise weiter zeltfähig gemacht.</p>
+        <p>Zentrale Werkzeuge für alle Grow-Stationen auf diesem Raspberry.</p>
     </div>
 
     <div class="module-grid">
         {% if has_permission('settings.view') %}
-        <a class="module-link" href="{{ url_for('system_page') }}">
+        <a class="module-link" href="{{ url_for('grow_control_setup') }}">
             <article class="module-card setup">
                 <div class="module-icon">⚙️</div>
                 <h3>Setup</h3>
-                <p>Systemeinstellungen und Controller-Grundkonfiguration.</p>
+                <p>Grow-Stationen anlegen, benennen, aktivieren und Shadow-Regelkreise verwalten.</p>
                 <div class="module-action">Öffnen →</div>
             </article>
         </a>
@@ -444,11 +444,11 @@
             </article>
         </a>
 
-        <a class="module-link" href="{{ url_for('connections_page') }}">
+        <a class="module-link" href="{{ url_for('grow_control_connections') }}">
             <article class="module-card connections">
                 <div class="module-icon">🔗</div>
                 <h3>Verbindungen</h3>
-                <p>Kommunikationswege und technische Verbindungen verwalten.</p>
+                <p>Aktoren pro Station manuell IP/Hostname und Relay zuweisen.</p>
                 <div class="module-action">Öffnen →</div>
             </article>
         </a>

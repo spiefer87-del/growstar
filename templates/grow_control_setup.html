@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Setup – Grow Control{% endblock %}
+
+{% block head %}
+<style>
+:root{
+    --bg:#0f172a; --card:#1e293b; --card2:#111827; --text:#e5e7eb;
+    --muted:#94a3b8; --green:#22c55e; --purple:#a78bfa; --amber:#f59e0b;
+    --red:#f87171; --blue:#38bdf8;
+}
+*{box-sizing:border-box}
+body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
+.wrap{max-width:1100px;margin:auto}
+.topbar{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}
+h1{margin:0;font-size:1.75rem}.subtitle{margin:5px 0 0;color:var(--muted);font-size:.9rem}
+.notice{margin:0 0 20px;padding:13px 15px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.22);color:#bae6fd;font-size:.88rem;line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+.card{background:var(--card);border:1px solid rgba(148,163,184,.15);border-radius:18px;padding:18px;box-shadow:0 10px 28px rgba(0,0,0,.22)}
+.card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.id{color:var(--muted);font-size:.78rem;margin-top:3px}.badge{padding:5px 9px;border-radius:999px;font-size:.7rem;font-weight:800}.live{background:rgba(34,197,94,.14);color:#86efac}.shadow{background:rgba(167,139,250,.14);color:#c4b5fd}.ready{background:rgba(148,163,184,.13);color:#cbd5e1}.restart{background:rgba(245,158,11,.14);color:#fcd34d}
+label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-input,.id-input{width:100%;border:1px solid #334155;border-radius:9px;padding:9px 10px;background:#020617;color:var(--text);font:inherit}.id-input{color:var(--muted)}
+.toggle-row{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px}.toggle{display:flex;align-items:center;gap:7px;color:var(--text);font-size:.86rem}.toggle input{width:18px;height:18px}
+.actions{display:flex;gap:9px;margin-top:16px}.btn{border:0;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}.btn.primary{background:var(--green);color:#052e16}.btn:disabled{opacity:.45;cursor:not-allowed}.feedback{min-height:20px;margin-top:10px;color:var(--muted);font-size:.8rem}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
+.add-card{margin-top:24px;background:rgba(30,41,59,.75);border:1px dashed rgba(148,163,184,.28);border-radius:18px;padding:18px}.add-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.add-grid .field label{margin-top:0}.section-title{margin:0 0 13px;font-size:1.05rem}
+@media(max-width:650px){body{padding:14px}.add-grid{grid-template-columns:1fr}.btn{width:100%}}
+</style>
+{% endblock %}
+
+{% block page %}
+<div class="wrap">
+    <div class="topbar">
+        <a class="back" href="{{ url_for('grow_control_dashboard') }}">←</a>
+        <div><h1>⚙️ Setup</h1><div class="subtitle">Grow-Stationen auf diesem Raspberry verwalten</div></div>
+    </div>
+
+    <div class="notice">
+        Alle Stationen laufen auf demselben Raspberry. Eine neue Station startet sicher ohne Hardware-Control.
+        Änderungen an <strong>Aktiv</strong> oder <strong>Shadow</strong> werden nach einem Growstar-Neustart wirksam;
+        reine Umbenennungen sofort.
+    </div>
+
+    <div id="station-grid" class="grid"><div class="card">Stationen werden geladen …</div></div>
+
+    {% if has_permission('grow.configure') %}
+    <section class="add-card">
+        <h2 class="section-title">➕ Neue Station</h2>
+        <div class="add-grid">
+            <div class="field"><label for="new-id">Station-ID</label><input class="id-input" id="new-id" placeholder="z. B. tent_3"></div>
+            <div class="field"><label for="new-name">Name</label><input class="name-input" id="new-name" placeholder="z. B. Blütezelt 3"></div>
+            <button id="add-button" class="btn primary" type="button">Anlegen</button>
+        </div>
+        <div id="add-feedback" class="feedback"></div>
+    </section>
+    {% endif %}
+</div>
+
+<script>
+(() => {
+    const API = "/api/tents";
+    const CAN_CONFIGURE = {{ has_permission('grow.configure')|tojson }};
+    const grid = document.getElementById("station-grid");
+
+    const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+
+    function mode(t){
+        if(t.control_enabled) return ["LIVE","live"];
+        if(t.shadow_enabled) return ["SHADOW","shadow"];
+        if(!t.runtime_loaded && t.configured_enabled) return ["NEUSTART","restart"];
+        return [t.configured_enabled ? "BEREIT" : "INAKTIV","ready"];
+    }
+
+    function card(t, defaultId){
+        const [modeText, modeCls] = mode(t);
+        const isDefault = t.id === defaultId;
+        const enabled = t.configured_enabled ?? t.enabled;
+        const shadow = t.configured_shadow_enabled ?? t.shadow_enabled;
+        const disabledAttr = (!CAN_CONFIGURE || isDefault) ? "disabled" : "";
+        return `
+        <article class="card" data-id="${esc(t.id)}">
+            <div class="card-head">
+                <div><strong>${esc(t.name || t.id)}</strong><div class="id">${esc(t.id)}</div></div>
+                <span class="badge ${modeCls}">${modeText}</span>
+            </div>
+            <label>Name</label>
+            <input class="name-input js-name" value="${esc(t.name || t.id)}" ${CAN_CONFIGURE ? "" : "disabled"}>
+            <label>Station-ID</label>
+            <input class="id-input" value="${esc(t.id)}" disabled>
+            <div class="toggle-row">
+                <label class="toggle"><input class="js-enabled" type="checkbox" ${enabled ? "checked" : ""} ${disabledAttr}> Aktiv</label>
+                <label class="toggle"><input class="js-shadow" type="checkbox" ${shadow ? "checked" : ""} ${disabledAttr}> Shadow-Regelkreis</label>
+            </div>
+            ${isDefault ? '<div class="feedback">Default-Station bleibt LIVE und kann hier nicht deaktiviert werden.</div>' : ''}
+            ${CAN_CONFIGURE ? '<div class="actions"><button class="btn primary js-save" type="button">Speichern</button></div>' : ''}
+            <div class="feedback js-feedback"></div>
+        </article>`;
+    }
+
+    async function load(){
+        const res = await fetch(API);
+        if(!res.ok){ grid.innerHTML='<div class="card">Stationen konnten nicht geladen werden.</div>'; return; }
+        const data = await res.json();
+        grid.innerHTML = (data.tents || []).map(t => card(t, data.default_tent_id)).join("") || '<div class="card">Keine Stationen.</div>';
+        bind();
+    }
+
+    function bind(){
+        grid.querySelectorAll(".card[data-id]").forEach(el => {
+            const enabled = el.querySelector(".js-enabled");
+            const shadow = el.querySelector(".js-shadow");
+            if(enabled && shadow){
+                enabled.addEventListener("change", () => { if(!enabled.checked) shadow.checked = false; shadow.disabled = !enabled.checked || !CAN_CONFIGURE; });
+                shadow.disabled = !enabled.checked || shadow.disabled;
+            }
+            el.querySelector(".js-save")?.addEventListener("click", () => saveCard(el));
+        });
+    }
+
+    async function saveCard(el){
+        const id = el.dataset.id;
+        const fb = el.querySelector(".js-feedback");
+        const payload = {name: el.querySelector(".js-name").value.trim()};
+        const enabled = el.querySelector(".js-enabled");
+        const shadow = el.querySelector(".js-shadow");
+        if(enabled && !enabled.disabled){ payload.enabled = enabled.checked; payload.shadow_enabled = shadow.checked; }
+        fb.className="feedback"; fb.textContent="Speichere …";
+        const res = await fetch(`${API}/${encodeURIComponent(id)}`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok){ fb.className="feedback err"; fb.textContent=data.error || "Speichern fehlgeschlagen"; return; }
+        fb.className="feedback ok"; fb.textContent=data.restart_required ? "Gespeichert · Neustart erforderlich" : "Gespeichert";
+        setTimeout(load, 700);
+    }
+
+    document.getElementById("add-button")?.addEventListener("click", async () => {
+        const id = document.getElementById("new-id").value.trim();
+        const name = document.getElementById("new-name").value.trim() || id;
+        const fb = document.getElementById("add-feedback");
+        fb.className="feedback"; fb.textContent="Lege Station an …";
+        const res = await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tent_id:id,name})});
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok){ fb.className="feedback err"; fb.textContent=data.error || "Anlegen fehlgeschlagen"; return; }
+        fb.className="feedback ok"; fb.textContent="Station angelegt · Growstar-Neustart erforderlich";
+        document.getElementById("new-id").value=""; document.getElementById("new-name").value="";
+        load();
+    });
+
+    load();
+})();
+</script>
+{% endblock %}
