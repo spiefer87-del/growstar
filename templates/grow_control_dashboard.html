@@ -389,12 +389,12 @@
 
 <section class="section" aria-labelledby="tent-overview-title">
     <div class="section-head">
-        <h2 id="tent-overview-title">🏕️ Zelte</h2>
-        <p>Live-Übersicht der geladenen Grow-Runtimes</p>
+        <h2 id="tent-overview-title">🏕️ Grow-Stationen</h2>
+        <p>Alle auf diesem Raspberry registrierten Zelte und Grow-Einheiten</p>
     </div>
 
     <div class="tent-overview-grid" id="tent-overview-grid">
-        <div class="tent-loading">Zelte werden geladen …</div>
+        <div class="tent-loading">Grow-Stationen werden geladen …</div>
     </div>
 </section>
 
@@ -472,6 +472,10 @@
     const grid = document.getElementById("tent-overview-grid");
     if (!grid) return;
 
+    const TENT_DETAIL_TEMPLATE = {{ url_for('grow_control_tent', tent_id='__TENT_ID__')|tojson }};
+    const buildTentUrl = (tentId) =>
+        TENT_DETAIL_TEMPLATE.replace("__TENT_ID__", encodeURIComponent(tentId));
+
     const fmt = (value, digits, suffix) => {
         const number = Number(value);
         return Number.isFinite(number) ? `${number.toFixed(digits)}${suffix}` : "--";
@@ -504,7 +508,7 @@
         parent.appendChild(box);
     };
 
-    const renderTent = (tent, defaultTentId) => {
+    const renderTent = (tent) => {
         const card = document.createElement("article");
         card.className = "tent-card";
 
@@ -543,18 +547,18 @@
         status.textContent = mode.detail;
         foot.appendChild(status);
 
-        // Bis die Live-Ansicht in Phase 4B vollständig zeltbezogen ist,
-        // darf ausschließlich das Default-Zelt die bestehende Regelansicht öffnen.
-        if (tent.id === defaultTentId) {
+        if (tent.runtime_loaded) {
             const open = document.createElement("a");
             open.className = "tent-open-link";
-            open.href = "{{ url_for('grow_control_live') }}";
+            // Keine fest verdrahteten Stations-IDs: jede Runtime nutzt
+            // dieselbe generische Detailroute.
+            open.href = buildTentUrl(tent.id);
             open.textContent = "Öffnen →";
             foot.appendChild(open);
         } else {
             const readOnly = document.createElement("span");
             readOnly.className = "tent-readonly";
-            readOnly.textContent = "Nur Anzeige";
+            readOnly.textContent = "Runtime offline";
             foot.appendChild(readOnly);
         }
 
@@ -575,28 +579,34 @@
             }
 
             const payload = await response.json();
-            const tents = Array.isArray(payload.tents) ? payload.tents : [];
-            const defaultTentId = payload.default_tent_id || "tent_1";
+            const tents = Array.isArray(payload.tents) ? [...payload.tents] : [];
+            tents.sort((a, b) =>
+                String(a.name || a.id || "").localeCompare(
+                    String(b.name || b.id || ""),
+                    "de",
+                    { numeric: true }
+                )
+            );
 
             grid.replaceChildren();
 
             if (!tents.length) {
                 const empty = document.createElement("div");
                 empty.className = "tent-loading";
-                empty.textContent = "Keine Zelte registriert.";
+                empty.textContent = "Keine Grow-Stationen registriert.";
                 grid.appendChild(empty);
                 return;
             }
 
             tents.forEach((tent) => {
-                grid.appendChild(renderTent(tent, defaultTentId));
+                grid.appendChild(renderTent(tent));
             });
         } catch (error) {
-            console.error("Zeltübersicht konnte nicht geladen werden:", error);
+            console.error("Grow-Stationen konnten nicht geladen werden:", error);
             grid.replaceChildren();
             const item = document.createElement("div");
             item.className = "tent-error";
-            item.textContent = "Zeltstatus momentan nicht verfügbar.";
+            item.textContent = "Stationsstatus momentan nicht verfügbar.";
             grid.appendChild(item);
         }
     }
