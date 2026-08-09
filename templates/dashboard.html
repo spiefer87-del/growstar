@@ -163,6 +163,173 @@
         --module-glow: rgba(167,139,250,.20);
     }
 
+
+
+    /* ================================================================
+       🏕️ MULTI-TENT OVERVIEW
+       ================================================================ */
+    .tent-section {
+        max-width: 1180px;
+        margin: 0 auto 30px;
+    }
+
+    .tent-section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 14px;
+    }
+
+    .tent-section-head h2 {
+        margin: 0;
+        font-size: 1.15rem;
+    }
+
+    .tent-section-head p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: .9rem;
+    }
+
+    .tent-overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+        gap: 14px;
+    }
+
+    .tent-card {
+        min-width: 0;
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px solid rgba(148,163,184,.14);
+        background: linear-gradient(145deg, rgba(30,41,59,.98), rgba(15,23,42,.98));
+        box-shadow: 0 12px 30px rgba(0,0,0,.20);
+    }
+
+    .tent-card-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+    }
+
+    .tent-card-title {
+        min-width: 0;
+    }
+
+    .tent-card-title strong {
+        display: block;
+        font-size: 1.05rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .tent-id {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: .75rem;
+    }
+
+    .tent-mode-badge {
+        flex: 0 0 auto;
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: .70rem;
+        font-weight: 800;
+        letter-spacing: .05em;
+    }
+
+    .tent-mode-badge.live {
+        background: rgba(34,197,94,.16);
+        color: #86efac;
+        border: 1px solid rgba(34,197,94,.28);
+    }
+
+    .tent-mode-badge.shadow {
+        background: rgba(167,139,250,.16);
+        color: #c4b5fd;
+        border: 1px solid rgba(167,139,250,.30);
+    }
+
+    .tent-mode-badge.ready,
+    .tent-mode-badge.offline {
+        background: rgba(148,163,184,.12);
+        color: var(--muted);
+        border: 1px solid rgba(148,163,184,.20);
+    }
+
+    .tent-values {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 16px;
+    }
+
+    .tent-value {
+        min-width: 0;
+        padding: 10px 8px;
+        border-radius: 12px;
+        background: rgba(15,23,42,.58);
+        text-align: center;
+    }
+
+    .tent-value span {
+        display: block;
+        color: var(--muted);
+        font-size: .68rem;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+    }
+
+    .tent-value strong {
+        display: block;
+        margin-top: 3px;
+        font-size: .95rem;
+        white-space: nowrap;
+    }
+
+    .tent-card-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: .78rem;
+    }
+
+    .tent-open-link {
+        color: var(--green);
+        font-weight: 750;
+        text-decoration: none;
+    }
+
+    .tent-open-link:hover {
+        text-decoration: underline;
+    }
+
+    .tent-readonly {
+        color: #c4b5fd;
+        font-weight: 700;
+    }
+
+    .tent-loading,
+    .tent-error {
+        grid-column: 1 / -1;
+        padding: 16px 18px;
+        border-radius: 14px;
+        color: var(--muted);
+        border: 1px dashed rgba(148,163,184,.22);
+    }
+
+    .tent-error {
+        color: #fca5a5;
+        border-color: rgba(248,113,113,.25);
+    }
+
     .empty-state {
         max-width: 1180px;
         margin: 30px auto 0;
@@ -231,6 +398,21 @@
     {% endif %}
 </header>
 
+{% if has_permission('grow.view') %}
+<section class="tent-section" aria-labelledby="tent-overview-title">
+    <div class="tent-section-head">
+        <div>
+            <h2 id="tent-overview-title">🏕️ Zelte</h2>
+            <p>Live-Übersicht der geladenen Grow-Runtimes</p>
+        </div>
+    </div>
+
+    <div class="tent-overview-grid" id="tent-overview-grid">
+        <div class="tent-loading">Zelte werden geladen …</div>
+    </div>
+</section>
+{% endif %}
+
 <main class="module-grid">
 
     {% if has_permission('grow.view') %}
@@ -291,4 +473,148 @@
     Für deinen Benutzer sind derzeit keine Module freigeschaltet.
 </div>
 {% endif %}
+
+
+{% if has_permission('grow.view') %}
+<script>
+(() => {
+    const grid = document.getElementById("tent-overview-grid");
+    if (!grid) return;
+
+    const fmt = (value, digits, suffix) => {
+        const number = Number(value);
+        return Number.isFinite(number) ? `${number.toFixed(digits)}${suffix}` : "--";
+    };
+
+    const modeInfo = (tent) => {
+        if (!tent.runtime_loaded) {
+            return { text: "OFFLINE", cls: "offline", detail: "Runtime nicht geladen" };
+        }
+        if (tent.control_enabled) {
+            return { text: "LIVE", cls: "live", detail: "Hardware-Regelung aktiv" };
+        }
+        if (tent.shadow_enabled || tent.runtime_mode === "shadow") {
+            return { text: "SHADOW", cls: "shadow", detail: "Hardware gesperrt" };
+        }
+        return { text: "BEREIT", cls: "ready", detail: "Regelkreis nicht aktiv" };
+    };
+
+    const addValue = (parent, label, value) => {
+        const box = document.createElement("div");
+        box.className = "tent-value";
+
+        const caption = document.createElement("span");
+        caption.textContent = label;
+
+        const strong = document.createElement("strong");
+        strong.textContent = value;
+
+        box.append(caption, strong);
+        parent.appendChild(box);
+    };
+
+    const renderTent = (tent, defaultTentId) => {
+        const card = document.createElement("article");
+        card.className = "tent-card";
+
+        const head = document.createElement("div");
+        head.className = "tent-card-head";
+
+        const title = document.createElement("div");
+        title.className = "tent-card-title";
+
+        const name = document.createElement("strong");
+        name.textContent = tent.name || tent.id || "Zelt";
+
+        const id = document.createElement("span");
+        id.className = "tent-id";
+        id.textContent = tent.id || "--";
+
+        title.append(name, id);
+
+        const mode = modeInfo(tent);
+        const badge = document.createElement("span");
+        badge.className = `tent-mode-badge ${mode.cls}`;
+        badge.textContent = mode.text;
+
+        head.append(title, badge);
+
+        const values = document.createElement("div");
+        values.className = "tent-values";
+        addValue(values, "Temp", fmt(tent.temp, 1, " °C"));
+        addValue(values, "Feuchte", fmt(tent.hum, 1, " %"));
+        addValue(values, "VPD", fmt(tent.vpd, 2, ""));
+
+        const foot = document.createElement("div");
+        foot.className = "tent-card-foot";
+
+        const status = document.createElement("span");
+        status.textContent = mode.detail;
+        foot.appendChild(status);
+
+        // Grow Control ist in Phase 4A noch das bestehende Default-Zelt.
+        // Dadurch kann ein Shadow-Zelt nicht versehentlich auf Detailseiten
+        // von tent_1 führen.
+        if (tent.id === defaultTentId) {
+            const open = document.createElement("a");
+            open.className = "tent-open-link";
+            open.href = "{{ url_for('grow_control_dashboard') }}";
+            open.textContent = "Öffnen →";
+            foot.appendChild(open);
+        } else {
+            const readOnly = document.createElement("span");
+            readOnly.className = "tent-readonly";
+            readOnly.textContent = "Nur Anzeige";
+            foot.appendChild(readOnly);
+        }
+
+        card.append(head, values, foot);
+        return card;
+    };
+
+    async function loadTents() {
+        try {
+            const response = await fetch("/api/tents", {
+                method: "GET",
+                headers: { "Accept": "application/json" },
+                cache: "no-store",
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const payload = await response.json();
+            const tents = Array.isArray(payload.tents) ? payload.tents : [];
+            const defaultTentId = payload.default_tent_id || "tent_1";
+
+            grid.replaceChildren();
+
+            if (!tents.length) {
+                const empty = document.createElement("div");
+                empty.className = "tent-loading";
+                empty.textContent = "Keine Zelte registriert.";
+                grid.appendChild(empty);
+                return;
+            }
+
+            tents.forEach((tent) => {
+                grid.appendChild(renderTent(tent, defaultTentId));
+            });
+        } catch (error) {
+            console.error("Zeltübersicht konnte nicht geladen werden:", error);
+            grid.replaceChildren();
+            const item = document.createElement("div");
+            item.className = "tent-error";
+            item.textContent = "Zeltstatus momentan nicht verfügbar.";
+            grid.appendChild(item);
+        }
+    }
+
+    loadTents();
+    window.setInterval(loadTents, 5000);
+})();
+</script>
+{% endif %}
+
 {% endblock %}
