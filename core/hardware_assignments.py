@@ -1,0 +1,300 @@
+from copy import deepcopy
+import ipaddress
+import re
+
+from core.config import config as default_config, save_config
+from core.runtime import get_runtime, list_runtimes
+from core.tent_config import ensure_tent_config, load_tent_config, save_tent_config
+from core.tents import DEFAULT_TENT_ID, manager as tent_manager, validate_tent_id
+
+
+DEVICE_HARDWARE = {
+    "heating": {
+        "label": "Heizung",
+        "icon": "🔥",
+        "ip_key": "IP_HEATING",
+        "relay_key": "RELAY_HEATING",
+    },
+    "fan": {
+        "label": "Abluft / Lüfter",
+        "icon": "💨",
+        "ip_key": "IP_FAN",
+        "relay_key": "RELAY_FAN",
+    },
+    "light": {
+        "label": "Beleuchtung",
+        "icon": "💡",
+        "ip_key": "IP_LIGHT",
+        "relay_key": "RELAY_LIGHT",
+    },
+    "vent": {
+        "label": "Ventilator",
+        "icon": "🌀",
+        "ip_key": "IP_VENT",
+        "relay_key": "RELAY_VENT",
+    },
+    "irrigation": {
+        "label": "Bewässerung",
+        "icon": "💧",
+        "ip_key": "IP_IRRIGATION",
+        "relay_key": "RELAY_IRRIGATION",
+    },
+    "humidifier": {
+        "label": "Luftbefeuchter",
+        "icon": "💦",
+        "ip_key": "IP_HUMIDIFIER",
+        "relay_key": "RELAY_HUMIDIFIER",
+    },
+    "dehumidifier": {
+        "label": "Entfeuchter",
+        "icon": "🌬️",
+        "ip_key": "IP_DEHUMIDIFIER",
+        "relay_key": "RELAY_DEHUMIDIFIER",
+    },
+    "light2": {
+        "label": "Licht 2",
+        "icon": "💡",
+        "ip_key": "IP_LIGHT2",
+        "relay_key": "RELAY_LIGHT2",
+    },
+    "vent2": {
+        "label": "Ventilator 2",
+        "icon": "🌀",
+        "ip_key": "IP_VENT2",
+        "relay_key": "RELAY_VENT2",
+    },
+}
+
+_HOST_RE = re.compile(
+    r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
+    r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$"
+)
+
+
+class HardwareConflictError(ValueError):
+    def __init__(self, message, *, endpoint=None, owner=None):
+        super().__init__(message)
+        self.endpoint = endpoint
+        self.owner = owner
+
+
+def _normalize_host(value):
+    value = str(value or "").strip()
+    if not value:
+        return ""
+
+    if "://" in value or "/" in value or any(ch.isspace() for ch in value):
+        raise ValueError("IP/Hostname darf kein Protokoll, keinen Pfad und keine Leerzeichen enthalten")
+
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        if not _HOST_RE.fullmatch(value):
+            raise ValueError(f"Ungültige IP/Hostname-Angabe: {value}")
+        return value.lower()
+
+    # services/shelly.py baut aktuell klassische http://<host>/... URLs.
+    # IPv6 würde dort Klammern benötigen und wird deshalb vorerst nicht
+    # stillschweigend akzeptiert.
+    if ip.version != 4:
+        raise ValueError("IPv6-Hardwareadressen werden derzeit noch nicht unterstützt")
+    return str(ip)
+
+
+def _normalize_relay(value):
+    if value in (None, ""):
+        return None
+    try:
+        relay = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Relay muss eine Ganzzahl sein") from exc
+    if relay < 0 or relay > 15:
+        raise ValueError("Relay muss zwischen 0 und 15 liegen")
+    return relay
+
+
+def _runtime_map():
+    return {runtime.tent_id: runtime for runtime in list_runtimes()}
+
+
+def _registered_config(tent_id, runtime_map=None):
+    tent_id = validate_tent_id(tent_id)
+    runtime_map = runtime_map or _runtime_map()
+
+    runtime = runtime_map.get(tent_id)
+    if runtime is not None:
+        return runtime.config, runtime
+
+    if tent_id == DEFAULT_TENT_ID:
+        return default_config, None
+
+    ensure_tent_config(tent_id)
+    return load_tent_config(tent_id), None
+
+
+def _save_registered_config(tent_id, cfg, runtime=None):
+    tent_id = validate_tent_id(tent_id)
+
+    if runtime is not None:
+        runtime.config.clear()
+        runtime.config.update(cfg)
+        runtime.persist_config()
+        return
+
+    if tent_id == DEFAULT_TENT_ID:
+        default_config.clear()
+        default_config.update(cfg)
+        save_config(default_config)
+        return
+
+    save_tent_config(tent_id, cfg)
+
+
+def hardware_snapshot(tent_id):
+    tent_id = validate_tent_id(tent_id)
+    tent = tent_manager.get(tent_id)
+    if tent is None:
+        raise KeyError(tent_id)
+
+    runtime_map = _runtime_map()
+    cfg, runtime = _registered_config(tent_id, runtime_map)
+
+    assignments = {}
+    for device, meta in DEVICE_HARDWARE.items():
+        host = str(cfg.get(meta["ip_key"]) or "").strip()
+        relay = cfg.get(meta["relay_key"])
+        try:
+            relay = int(relay) if relay not in (None, "") else None
+        except (TypeError, ValueError):
+            relay = None
+
+        assignments[device] = {
+            "device": device,
+            "label": meta["label"],
+            "icon": meta["icon"],
+            "ip": host,
+            "relay": relay,
+            "configured": bool(host) and relay is not None,
+        }
+
+    control_enabled = bool(runtime.control_enabled) if runtime else bool(tent.get("control_enabled", False))
+    return {
+        "success": True,
+        "tent_id": tent_id,
+        "name": (runtime.name if runtime else tent.get("name")) or tent_id,
+        "runtime_loaded": runtime is not None,
+        "control_enabled": control_enabled,
+        "shadow_enabled": bool(runtime.shadow_enabled) if runtime else bool(tent.get("shadow_enabled", False)),
+        "hardware_actuation_blocked": not control_enabled,
+        "editable": not control_enabled,
+        "assignments": assignments,
+    }
+
+
+def _normalize_patch(data):
+    if not isinstance(data, dict):
+        raise TypeError("Hardware-Update muss ein JSON-Objekt sein")
+
+    raw_assignments = data.get("assignments", data)
+    if not isinstance(raw_assignments, dict):
+        raise TypeError("assignments muss ein JSON-Objekt sein")
+
+    normalized = {}
+    unknown = sorted(set(raw_assignments) - set(DEVICE_HARDWARE))
+    if unknown:
+        raise ValueError("Unbekannte Geräte: " + ", ".join(unknown))
+
+    for device, raw in raw_assignments.items():
+        if not isinstance(raw, dict):
+            raise TypeError(f"Hardware-Zuordnung für {device} muss ein JSON-Objekt sein")
+
+        host = _normalize_host(raw.get("ip", raw.get("host")))
+        relay = _normalize_relay(raw.get("relay"))
+
+        if not host and relay is None:
+            normalized[device] = None
+            continue
+
+        if not host or relay is None:
+            raise ValueError(f"{device}: IP/Hostname und Relay müssen gemeinsam gesetzt werden")
+
+        normalized[device] = (host, relay)
+
+    return normalized
+
+
+def _endpoint_owners(*, exclude_tent_id=None, candidate_cfg=None):
+    runtime_map = _runtime_map()
+    owners = {}
+
+    for tent in tent_manager.list_tents():
+        tent_id = tent["id"]
+        if tent_id == exclude_tent_id and candidate_cfg is not None:
+            cfg = candidate_cfg
+        else:
+            cfg, _ = _registered_config(tent_id, runtime_map)
+
+        for device, meta in DEVICE_HARDWARE.items():
+            host = str(cfg.get(meta["ip_key"]) or "").strip()
+            relay = cfg.get(meta["relay_key"])
+            if not host or relay in (None, ""):
+                continue
+            try:
+                relay = int(relay)
+            except (TypeError, ValueError):
+                continue
+
+            endpoint = (host.lower(), relay)
+            owner = owners.get(endpoint)
+            current = {"tent_id": tent_id, "device": device}
+            if owner is not None and owner != current:
+                raise HardwareConflictError(
+                    f"Hardware-Endpunkt {host} / Relay {relay} ist mehrfach belegt",
+                    endpoint={"ip": host, "relay": relay},
+                    owner=owner,
+                )
+            owners[endpoint] = current
+
+    return owners
+
+
+def update_hardware_assignments(tent_id, data):
+    """Ändert IP-/Relay-Zuordnungen einer Station sicher und atomar.
+
+    Phase 4D erlaubt absichtlich nur Stationen ohne aktive Hardware-Aktorik.
+    Das produktive LIVE-Zelt bleibt während dieser Phase schreibgeschützt.
+    """
+
+    tent_id = validate_tent_id(tent_id)
+    tent = tent_manager.get(tent_id)
+    if tent is None:
+        raise KeyError(tent_id)
+
+    runtime_map = _runtime_map()
+    cfg, runtime = _registered_config(tent_id, runtime_map)
+    control_enabled = bool(runtime.control_enabled) if runtime else bool(tent.get("control_enabled", False))
+    if control_enabled:
+        raise PermissionError(
+            "Hardware-Zuordnung einer LIVE-Station ist in Phase 4D gesperrt"
+        )
+
+    normalized = _normalize_patch(data)
+    working = deepcopy(cfg)
+
+    for device, endpoint in normalized.items():
+        meta = DEVICE_HARDWARE[device]
+        if endpoint is None:
+            working.pop(meta["ip_key"], None)
+            working.pop(meta["relay_key"], None)
+            continue
+
+        host, relay = endpoint
+        working[meta["ip_key"]] = host
+        working[meta["relay_key"]] = relay
+
+    # Prüft sowohl Doppelbelegungen innerhalb der Station als auch zwischen
+    # allen registrierten Stationen, inklusive aktuell deaktivierter Runtimes.
+    _endpoint_owners(exclude_tent_id=tent_id, candidate_cfg=working)
+
+    _save_registered_config(tent_id, working, runtime=runtime)
+    return hardware_snapshot(tent_id)

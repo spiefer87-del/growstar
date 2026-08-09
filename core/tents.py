@@ -250,6 +250,51 @@ class TentManager:
             self.save()
             return dict(item)
 
+    def update_tent(self, tent_id, *, name=None, enabled=None, shadow_enabled=None):
+        """Aktualisiert Stations-Metadaten atomar in einem einzigen Save.
+
+        ``None`` bedeutet bei booleschen Feldern "nicht ändern". Zusätzliche
+        Stationen bleiben weiterhin grundsätzlich ohne Hardware-Control.
+        """
+
+        tent_id = validate_tent_id(tent_id)
+
+        with self._lock:
+            current = self._data.get("tents", {}).get(tent_id)
+            if current is None:
+                raise KeyError(f"Unbekanntes Zelt '{tent_id}'")
+
+            working = dict(current)
+
+            if name is not None:
+                normalized_name = str(name or "").strip()
+                if not normalized_name:
+                    raise ValueError("name darf nicht leer sein")
+                working["name"] = normalized_name
+
+            requested_enabled = working.get("enabled", True) if enabled is None else bool(enabled)
+            requested_shadow = working.get("shadow_enabled", False) if shadow_enabled is None else bool(shadow_enabled)
+
+            if tent_id == DEFAULT_TENT_ID:
+                if enabled is not None and not requested_enabled:
+                    raise ValueError("tent_1 kann nicht deaktiviert werden")
+                if shadow_enabled is not None and requested_shadow:
+                    raise ValueError("tent_1 ist der produktive Regelkreis und kein Shadow-Zelt")
+                working["enabled"] = True
+                working["shadow_enabled"] = False
+                working["control_enabled"] = True
+            else:
+                if not requested_enabled and requested_shadow:
+                    raise ValueError("Shadow kann für eine deaktivierte Station nicht aktiviert werden")
+                working["enabled"] = requested_enabled
+                working["shadow_enabled"] = requested_shadow if requested_enabled else False
+                working["control_enabled"] = False
+
+            # Erst nach vollständiger Validierung ersetzen und genau einmal speichern.
+            self._data["tents"][tent_id] = self._normalize_tent(tent_id, working)
+            self.save()
+            return dict(self._data["tents"][tent_id])
+
     def rename_tent(self, tent_id, name):
         tent_id = validate_tent_id(tent_id)
         name = str(name or "").strip()
