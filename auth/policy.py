@@ -287,6 +287,12 @@ def _grow_control_read_requirement(path):
     if path == "/grow-control/sensors":
         return require("hardware.view")
 
+    if path == "/grow-control/connections":
+        return require("hardware.view")
+
+    if path == "/grow-control/setup":
+        return require("settings.view", "grow.view", mode="any")
+
     if not _matches_prefix(path, "/grow-control/tents"):
         return None
 
@@ -303,7 +309,7 @@ def _tent_api_read_requirement(path):
     if not _matches_prefix(path, "/api/tents"):
         return None
 
-    if "/sensors" in path:
+    if "/sensors" in path or path.endswith("/hardware"):
         return require("hardware.view")
 
     if path.endswith("/config") or "/profile/" in path:
@@ -316,7 +322,7 @@ def _tent_api_write_requirement(path):
     if not _matches_prefix(path, "/api/tents"):
         return None
 
-    if "/sensors" in path:
+    if "/sensors" in path or path.endswith("/hardware"):
         return require("hardware.configure")
 
     if "/devices/" in path:
