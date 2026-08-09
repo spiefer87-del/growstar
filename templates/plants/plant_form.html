@@ -11,16 +11,7 @@
 </header>
 {% set active_page = 'plants' %}
 
-<nav class="pm-nav">
-    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
-    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
-    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
-    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
-    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
-    {% if has_permission('diary.view') %}
-    <a class="{{ 'active' if active_page == 'journal' else '' }}" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
-    {% endif %}
-</nav>
+{% include "plants/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}

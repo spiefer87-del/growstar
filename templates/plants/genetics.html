@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Genetik & Mutterpflanzen – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <div>
+            <h1 class="pm-title">🧬 Genetik & Mutterpflanzen</h1>
+            <div class="pm-subtitle">Selektionen, genetische Linien und lebende Donor-/Mutterbestände</div>
+        </div>
+    </div>
+    {% if has_permission('plants.edit') %}
+    <div class="pm-actions">
+        <a class="pm-button primary" href="{{ url_for('genetic_line_new') }}">＋ Genetische Linie</a>
+    </div>
+    {% endif %}
+</header>
+{% set active_page = 'genetics' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-kpis">
+    <div class="pm-kpi"><div class="pm-kpi-label">Genetische Linien</div><div class="pm-kpi-value">{{ genetic_lines|length }}</div></div>
+    <div class="pm-kpi"><div class="pm-kpi-label">Aktive Mütter / Spender</div><div class="pm-kpi-value">{{ mothers|length }}</div></div>
+    <div class="pm-kpi"><div class="pm-kpi-label">Linien mit Mutterbestand</div><div class="pm-kpi-value">{{ genetic_lines|selectattr('active_mother_count','gt',0)|list|length }}</div></div>
+    <div class="pm-kpi"><div class="pm-kpi-label">Pflanzen in Linien</div><div class="pm-kpi-value">{{ genetic_lines|sum(attribute='plant_count') }}</div></div>
+</section>
+
+<section class="pm-grid">
+<article class="pm-card pm-span-7">
+    <div class="pm-card-head"><h2>Genetische Linien / Selektionen</h2></div>
+    <div class="pm-table-wrap">
+    <table class="pm-table">
+        <thead><tr><th>Linie</th><th>Sorte</th><th>Quelle</th><th>Pflanzen</th><th>Mütter</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for line in genetic_lines %}
+        <tr>
+            <td><a href="{{ url_for('genetic_line_detail', line_id=line.id) }}"><strong>{{ line.name }}</strong><br><span class="pm-code">{{ line.code }}</span></a></td>
+            <td>{{ line.cultivar_name }}</td>
+            <td>{% if line.source_plant_id %}{{ line.source_plant_code }} · {{ line.source_plant_name }}{% else %}—{% endif %}</td>
+            <td>{{ line.plant_count }}</td>
+            <td>{{ line.active_mother_count }}</td>
+            <td><span class="pm-status {{ '' if line.status == 'active' else 'inactive' }}">{{ line.status }}</span></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6"><div class="pm-empty">Noch keine genetischen Linien angelegt.</div></td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</article>
+
+<article class="pm-card pm-span-5">
+    <div class="pm-card-head"><h2>Aktive Mutter-/Spenderpflanzen</h2></div>
+    <div class="pm-card-body">
+    {% if mothers %}
+    <div class="pm-stack">
+        {% for plant in mothers %}
+        <a class="pm-record" href="{{ url_for('plant_detail', plant_id=plant.id) }}">
+            <div>
+                <strong>{{ plant.display_name }}</strong>
+                <div class="pm-muted">{{ plant.code }} · {{ plant.cultivar_name or '—' }}</div>
+            </div>
+            <div style="text-align:right">
+                <span class="pm-chip">{{ plant.role_label }}</span>
+                <div class="pm-muted" style="margin-top:5px">{{ plant.genetic_line_code or '—' }}</div>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="pm-empty">Aktuell sind keine Mutter-/Spenderpflanzen aktiv.</div>
+    {% endif %}
+    </div>
+</article>
+</section>
+</main>
+{% endblock %}

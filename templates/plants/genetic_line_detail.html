@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}{{ line.name }} – Genetik – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('genetics_dashboard') }}">←</a><div><h1 class="pm-title">🧬 {{ line.name }}</h1><div class="pm-subtitle">{{ line.code }} · {{ line.cultivar_name }}</div></div></div>
+{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button" href="{{ url_for('genetic_line_edit', line_id=line.id) }}">Bearbeiten</a></div>{% endif %}
+</header>
+{% set active_page = 'genetics' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-grid">
+<article class="pm-card pm-span-4"><div class="pm-card-head"><h2>Stammdaten</h2></div><div class="pm-card-body">
+<div class="pm-detail-grid pm-detail-grid-2">
+<div class="pm-detail"><div class="pm-detail-label">Sorte</div><div class="pm-detail-value">{{ line.cultivar_name }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Status</div><div class="pm-detail-value">{{ line.status }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Selektion</div><div class="pm-detail-value">{{ line.selection_type or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Datum</div><div class="pm-detail-value">{{ line.selected_on or '—' }}</div></div>
+</div>
+{% if line.source_plant_id %}<p><span class="pm-muted">Quelle:</span> <a href="{{ url_for('plant_detail', plant_id=line.source_plant_id) }}">{{ line.source_plant_code }} · {{ line.source_plant_name }}</a></p>{% endif %}
+{% if line.notes %}<div class="pm-journal-body">{{ line.notes }}</div>{% endif %}
+</div></article>
+
+<article class="pm-card pm-span-8"><div class="pm-card-head"><h2>Pflanzen dieser Linie</h2></div><div class="pm-table-wrap">
+<table class="pm-table"><thead><tr><th>Pflanze</th><th>Rolle</th><th>Status</th><th>Phase</th><th>Start</th></tr></thead><tbody>
+{% for plant in plants %}
+<tr><td><a href="{{ url_for('plant_detail', plant_id=plant.id) }}"><strong>{{ plant.display_name }}</strong><br><span class="pm-code">{{ plant.code }}</span></a></td><td>{{ plant.current_role or 'production' }}</td><td>{{ plant.status }}</td><td>{{ plant.current_stage }}</td><td>{{ plant.started_on }}</td></tr>
+{% else %}<tr><td colspan="5"><div class="pm-empty">Noch keine Pflanzen dieser Linie zugeordnet.</div></td></tr>{% endfor %}
+</tbody></table></div></article>
+</section>
+</main>
+{% endblock %}

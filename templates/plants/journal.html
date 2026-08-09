@@ -29,14 +29,7 @@
 </header>
 
 {% set active_page = 'journal' %}
-<nav class="pm-nav">
-    <a href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
-    <a href="{{ url_for('plant_list') }}">Pflanzen</a>
-    <a href="{{ url_for('plant_timeline') }}">Timeline</a>
-    <a href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
-    <a href="{{ url_for('batch_list') }}">Durchgänge</a>
-    <a class="active" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
-</nav>
+{% include "plants/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}

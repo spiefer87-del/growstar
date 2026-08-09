@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Vermehrung – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a><div><h1 class="pm-title">🌱 Vermehrung</h1><div class="pm-subtitle">Saatgutbestand, Vermehrungsansätze und Herkunftskette</div></div></div>
+{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button" href="{{ url_for('seed_lot_new') }}">＋ Saatgut-Lot</a><a class="pm-button primary" href="{{ url_for('propagation_run_new') }}">＋ Ansatz</a></div>{% endif %}
+</header>
+{% set active_page = 'propagation' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-kpis">
+<div class="pm-kpi"><div class="pm-kpi-label">Samen verfügbar</div><div class="pm-kpi-value">{{ stats.seed_stock }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Sorten auf Lager</div><div class="pm-kpi-value">{{ stats.cultivars_in_stock }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Aktive Ansätze</div><div class="pm-kpi-value">{{ stats.active_runs }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Aktive Mütter</div><div class="pm-kpi-value">{{ stats.active_mothers }}</div></div>
+</section>
+<section class="pm-grid">
+<article class="pm-card pm-span-4"><div class="pm-card-head"><h2>Qualität</h2></div><div class="pm-card-body">
+<div class="pm-quality"><div><span class="pm-muted">Samen-Erfolgsquote</span><strong>{{ stats.germination_rate if stats.germination_rate is not none else '—' }}{% if stats.germination_rate is not none %} %{% endif %}</strong></div>
+<div><span class="pm-muted">Stecklings-Erfolgsquote</span><strong>{{ stats.rooting_rate if stats.rooting_rate is not none else '—' }}{% if stats.rooting_rate is not none %} %{% endif %}</strong></div></div>
+<div class="pm-actions" style="justify-content:flex-start;margin-top:15px"><a class="pm-button" href="{{ url_for('seed_lot_list') }}">Saatgut</a><a class="pm-button" href="{{ url_for('propagation_run_list') }}">Alle Ansätze</a></div>
+</div></article>
+<article class="pm-card pm-span-8"><div class="pm-card-head"><h2>Letzte Vermehrungsansätze</h2><a class="pm-button" href="{{ url_for('propagation_run_list') }}">Alle</a></div><div class="pm-table-wrap">
+<table class="pm-table"><thead><tr><th>Ansatz</th><th>Methode</th><th>Sorte / Genetik</th><th>Start</th><th>Erfolg</th><th>Status</th></tr></thead><tbody>
+{% for run in recent_runs %}
+<tr><td><a href="{{ url_for('propagation_run_detail', run_id=run.id) }}"><strong>{{ run.name }}</strong><br><span class="pm-code">{{ run.code }}</span></a></td><td>{{ run.method_label }}</td><td>{{ run.cultivar_name }}{% if run.genetic_line_name %}<br><span class="pm-muted">{{ run.genetic_line_name }}</span>{% endif %}</td><td>{{ run.started_on }}</td><td>{{ run.success_rate if run.success_rate is not none else '—' }}{% if run.success_rate is not none %} %{% endif %}</td><td>{{ run.status_label }}</td></tr>
+{% else %}<tr><td colspan="6"><div class="pm-empty">Noch keine Vermehrungsansätze vorhanden.</div></td></tr>{% endfor %}
+</tbody></table></div></article>
+
+<article class="pm-card pm-span-7"><div class="pm-card-head"><h2>Saatgut auf Lager</h2><a class="pm-button" href="{{ url_for('seed_lot_list') }}">Bestand öffnen</a></div><div class="pm-table-wrap">
+<table class="pm-table"><thead><tr><th>Lot</th><th>Sorte</th><th>Bestand</th><th>Erfolgsquote</th><th>Lagerort</th></tr></thead><tbody>
+{% for lot in seed_lots %}<tr><td><a href="{{ url_for('seed_lot_detail', lot_id=lot.id) }}"><span class="pm-code">{{ lot.code }}</span></a></td><td>{{ lot.cultivar_name }}</td><td><strong>{{ lot.stock }}</strong></td><td>{{ lot.success_rate if lot.success_rate is not none else '—' }}{% if lot.success_rate is not none %} %{% endif %}</td><td>{{ lot.storage_location or '—' }}</td></tr>
+{% else %}<tr><td colspan="5"><div class="pm-empty">Kein Saatgutbestand vorhanden.</div></td></tr>{% endfor %}
+</tbody></table></div></article>
+
+<article class="pm-card pm-span-5"><div class="pm-card-head"><h2>Mutterbestand</h2><a class="pm-button" href="{{ url_for('genetics_dashboard') }}">Genetik</a></div><div class="pm-card-body">
+{% for plant in mothers %}<a class="pm-record" href="{{ url_for('plant_detail', plant_id=plant.id) }}"><div><strong>{{ plant.display_name }}</strong><div class="pm-muted">{{ plant.cultivar_name }} · {{ plant.genetic_line_name or 'ohne Linie' }}</div></div><span class="pm-chip">{{ plant.role_label }}</span></a>
+{% else %}<div class="pm-empty">Keine aktiven Mutter-/Spenderpflanzen.</div>{% endfor %}
+</div></article>
+</section>
+</main>
+{% endblock %}

@@ -6,16 +6,7 @@
 <header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('batch_list') }}">←</a><div><h1 class="pm-title">{{ 'Durchgang bearbeiten' if batch else 'Neuer Durchgang' }}</h1><div class="pm-subtitle">{{ batch.code if batch else 'Neue Charge / neuer Grow-Durchgang' }}</div></div></div></header>
 {% set active_page = 'batches' %}
 
-<nav class="pm-nav">
-    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
-    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
-    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
-    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
-    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
-    {% if has_permission('diary.view') %}
-    <a class="{{ 'active' if active_page == 'journal' else '' }}" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
-    {% endif %}
-</nav>
+{% include "plants/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Genetische Linie bearbeiten' if line else 'Genetische Linie anlegen' }} – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+<div class="pm-heading-wrap">
+    <a class="pm-back" href="{{ url_for('genetic_line_detail', line_id=line.id) if line else url_for('genetics_dashboard') }}">←</a>
+    <div><h1 class="pm-title">{{ 'Genetische Linie bearbeiten' if line else 'Neue genetische Linie' }}</h1><div class="pm-subtitle">Konkrete Selektion innerhalb einer Sorte</div></div>
+</div>
+</header>
+{% set active_page = 'genetics' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<div class="pm-card"><div class="pm-card-body">
+<form class="pm-form" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="pm-form-grid">
+<label class="pm-field"><span class="pm-label">Code</span><input class="pm-input" name="code" value="{{ line.code if line else '' }}" placeholder="automatisch, z. B. GEN-0007"></label>
+<label class="pm-field"><span class="pm-label">Bezeichnung *</span><input class="pm-input" required name="name" value="{{ line.name if line else '' }}" placeholder="z. B. NL #3"></label>
+
+<label class="pm-field"><span class="pm-label">Sorte *</span>
+<select class="pm-select" name="cultivar_id" required>
+<option value="">— auswählen —</option>
+{% for c in cultivars %}
+{% set selected_id = line.cultivar_id if line else (source_plant.cultivar_id if source_plant else none) %}
+<option value="{{ c.id }}" {{ 'selected' if selected_id == c.id else '' }}>{{ c.code }} · {{ c.name }}</option>
+{% endfor %}
+</select></label>
+
+<label class="pm-field"><span class="pm-label">Ausgangspflanze</span>
+<select class="pm-select" name="source_plant_id">
+<option value="">— keine / extern —</option>
+{% for plant in plants %}
+{% set selected_id = line.source_plant_id if line else (source_plant.id if source_plant else none) %}
+<option value="{{ plant.id }}" {{ 'selected' if selected_id == plant.id else '' }}>{{ plant.code }} · {{ plant.display_name }} · {{ plant.cultivar_name or '—' }}</option>
+{% endfor %}
+</select></label>
+
+<label class="pm-field"><span class="pm-label">Selektionsart</span><input class="pm-input" name="selection_type" value="{{ line.selection_type if line and line.selection_type else '' }}" placeholder="z. B. Phänotyp-Selektion, externe Linie"></label>
+<label class="pm-field"><span class="pm-label">Selektiert am</span><input class="pm-input" type="date" name="selected_on" value="{{ line.selected_on if line and line.selected_on else '' }}"></label>
+
+<label class="pm-field"><span class="pm-label">Status</span><select class="pm-select" name="status">
+{% for code,label in statuses %}<option value="{{ code }}" {{ 'selected' if (line and line.status == code) or (not line and code == 'active') else '' }}>{{ label }}</option>{% endfor %}
+</select></label>
+
+<label class="pm-field full"><span class="pm-label">Notizen / Selektionsmerkmale</span><textarea class="pm-textarea" name="notes">{{ line.notes if line and line.notes else '' }}</textarea></label>
+</div>
+<div class="pm-actions" style="justify-content:flex-start"><button class="pm-button primary" type="submit">Speichern</button></div>
+</form>
+</div></div>
+</main>
+{% endblock %}

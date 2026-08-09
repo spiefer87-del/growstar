@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Vermehrungsansatz starten – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell"><header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('propagation_dashboard_page') }}">←</a><div><h1 class="pm-title">Neuer Vermehrungsansatz</h1><div class="pm-subtitle">Samen oder Stecklinge – mit automatischer Herkunftskette</div></div></div></header>
+{% set active_page = 'propagation' %}{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<div class="pm-card"><div class="pm-card-body"><form class="pm-form" method="post">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="pm-form-grid">
+<label class="pm-field"><span class="pm-label">Methode *</span><select id="method" class="pm-select" name="method" required>{% for code,label in methods %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+<label class="pm-field"><span class="pm-label">Anzahl *</span><input class="pm-input" type="number" min="1" max="500" name="target_count" value="1" required></label>
+<label class="pm-field"><span class="pm-label">Name</span><input class="pm-input" name="name" placeholder="optional, wird sonst automatisch erzeugt"></label>
+<label class="pm-field"><span class="pm-label">Startdatum</span><input class="pm-input" type="date" name="started_on"></label>
+
+<label id="seed-field" class="pm-field full"><span class="pm-label">Saatgut-Lot *</span><select class="pm-select" name="seed_lot_id"><option value="">— auswählen —</option>{% for lot in seed_lots %}<option value="{{ lot.id }}" {{ 'selected' if request.args.get('seed_lot_id')|string == lot.id|string else '' }}>{{ lot.code }} · {{ lot.cultivar_name }} · Bestand {{ lot.stock }}</option>{% endfor %}</select></label>
+
+<label id="mother-field" class="pm-field full"><span class="pm-label">Mutter-/Spenderpflanze *</span><select class="pm-select" name="mother_plant_id"><option value="">— auswählen —</option>{% for plant in mothers %}<option value="{{ plant.id }}">{{ plant.code }} · {{ plant.display_name }} · {{ plant.genetic_line_name }}</option>{% endfor %}</select></label>
+
+<label class="pm-field"><span class="pm-label">Durchgang</span><select class="pm-select" name="batch_id"><option value="">— keiner —</option>{% for batch in batches %}<option value="{{ batch.id }}">{{ batch.code }} · {{ batch.name }}</option>{% endfor %}</select></label>
+<label class="pm-field"><span class="pm-label">Standort</span><input class="pm-input" name="location"></label>
+<label class="pm-field full"><span class="pm-label">Notizen</span><textarea class="pm-textarea" name="notes"></textarea></label>
+</div>
+<div class="pm-actions" style="justify-content:flex-start"><button class="pm-button primary" type="submit">Ansatz starten</button></div>
+</form></div></div>
+<script>
+(() => {
+ const method = document.getElementById('method');
+ const seed = document.getElementById('seed-field');
+ const mother = document.getElementById('mother-field');
+ function sync(){ const cutting = method.value === 'cutting'; seed.style.display = cutting ? 'none' : 'grid'; mother.style.display = cutting ? 'grid' : 'none'; }
+ method.addEventListener('change', sync); sync();
+})();
+</script>
+</main>
+{% endblock %}

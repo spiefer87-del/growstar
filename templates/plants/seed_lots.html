@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Saatgut – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('propagation_dashboard_page') }}">←</a><div><h1 class="pm-title">🌰 Saatgutbestand</h1><div class="pm-subtitle">Lot-basierte Bestandsführung mit lückenlosen Bewegungen</div></div></div>
+<div class="pm-actions"><a class="pm-button" href="{{ url_for('seed_lot_template') }}">Vorlage</a><a class="pm-button" href="{{ url_for('seed_lot_export') }}">Excel Export</a>{% if has_permission('plants.edit') %}<a class="pm-button" href="{{ url_for('seed_lot_import') }}">Excel Import</a><a class="pm-button primary" href="{{ url_for('seed_lot_new') }}">＋ Lot</a>{% endif %}</div></header>
+{% set active_page = 'propagation' %}{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<form class="pm-filterbar" method="get" style="grid-template-columns:minmax(260px,1fr) auto"><input class="pm-input" name="q" value="{{ query }}" placeholder="Lot, Sorte, Lieferant, Lagerort …"><button class="pm-button" type="submit">Suchen</button></form>
+<div class="pm-card"><div class="pm-table-wrap"><table class="pm-table">
+<thead><tr><th>Lot</th><th>Sorte</th><th>Typ</th><th>Bestand</th><th>Verwendet</th><th>Erfolg</th><th>Lagerort</th><th>Status</th></tr></thead><tbody>
+{% for lot in lots %}<tr><td><a href="{{ url_for('seed_lot_detail', lot_id=lot.id) }}"><strong>{{ lot.code }}</strong><br><span class="pm-muted">{{ lot.breeder_lot or '—' }}</span></a></td><td>{{ lot.cultivar_name }}</td><td>{{ lot.seed_type_label }}</td><td><span class="pm-stock {{ 'low' if lot.stock <= 3 else '' }}">{{ lot.stock }}</span></td><td>{{ lot.used_units }}</td><td>{{ lot.success_rate if lot.success_rate is not none else '—' }}{% if lot.success_rate is not none %} %{% endif %}</td><td>{{ lot.storage_location or '—' }}</td><td>{{ lot.status_label }}</td></tr>
+{% else %}<tr><td colspan="8"><div class="pm-empty">Noch keine Saatgut-Lots vorhanden.</div></td></tr>{% endfor %}
+</tbody></table></div></div>
+</main>
+{% endblock %}

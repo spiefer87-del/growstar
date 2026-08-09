@@ -9,16 +9,7 @@
 </header>
 {% set active_page = 'plants' %}
 
-<nav class="pm-nav">
-    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
-    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
-    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
-    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
-    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
-    {% if has_permission('diary.view') %}
-    <a class="{{ 'active' if active_page == 'journal' else '' }}" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
-    {% endif %}
-</nav>
+{% include "plants/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
@@ -54,13 +45,14 @@
 <div class="pm-card">
 <div class="pm-table-wrap">
 <table class="pm-table">
-<thead><tr><th>Pflanze</th><th>Sorte</th><th>Phase</th><th>Status</th><th>Alter</th><th>Phase seit</th><th>Standort</th><th>Durchgang</th></tr></thead>
+<thead><tr><th>Pflanze</th><th>Sorte</th><th>Phase</th><th>Rolle</th><th>Status</th><th>Alter</th><th>Phase seit</th><th>Standort</th><th>Durchgang</th></tr></thead>
 <tbody>
 {% for plant in plants %}
 <tr>
 <td><a href="{{ url_for('plant_detail', plant_id=plant.id) }}"><strong>{{ plant.display_name }}</strong><br><span class="pm-code">{{ plant.code }}</span></a></td>
 <td>{{ plant.cultivar_name or '—' }}</td>
 <td><span class="pm-stage" style="--stage-color:{{ plant.stage_color }}"><span class="pm-stage-dot"></span>{{ plant.stage_label }}</span></td>
+<td><span class="pm-chip">{{ plant.role_label }}</span></td>
 <td><span class="pm-status {{ '' if plant.status == 'active' else 'inactive' }}">{{ plant.status_label }}</span></td>
 <td>{{ plant.age_days if plant.age_days is not none else '—' }} d</td>
 <td>{{ plant.stage_days if plant.stage_days is not none else '—' }} d</td>
@@ -68,7 +60,7 @@
 <td>{{ plant.batch_name or '—' }}</td>
 </tr>
 {% else %}
-<tr><td colspan="8"><div class="pm-empty">Keine Pflanzen für diesen Filter.</div></td></tr>
+<tr><td colspan="9"><div class="pm-empty">Keine Pflanzen für diesen Filter.</div></td></tr>
 {% endfor %}
 </tbody>
 </table>

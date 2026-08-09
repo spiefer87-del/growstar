@@ -3,22 +3,30 @@
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
 {% block page %}
 <main class="pm-shell">
-<header class="pm-header">
-<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('plant_list') }}">←</a><div><h1 class="pm-title">{{ plant.display_name }}</h1><div class="pm-subtitle">{{ plant.code }} · {{ plant.cultivar_name or 'ohne Sortenzuordnung' }}</div></div></div>
-{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button" href="{{ url_for('plant_edit', plant_id=plant.id) }}">Bearbeiten</a></div>{% endif %}
-</header>
-{% set active_page = 'plants' %}
 
-<nav class="pm-nav">
-    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
-    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
-    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
-    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
-    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
-    {% if has_permission('diary.view') %}
-    <a class="{{ 'active' if active_page == 'journal' else '' }}" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
+<header class="pm-header">
+<div class="pm-heading-wrap">
+    <a class="pm-back" href="{{ url_for('plant_list') }}">←</a>
+    <div>
+        <h1 class="pm-title">{{ plant.display_name }}</h1>
+        <div class="pm-subtitle">
+            {{ plant.code }} · {{ plant.cultivar_name or 'ohne Sortenzuordnung' }}
+            · {{ plant.role_label }}
+        </div>
+    </div>
+</div>
+{% if has_permission('plants.edit') %}
+<div class="pm-actions">
+    {% if not plant.genetic_line_id and plant.cultivar_id %}
+    <a class="pm-button" href="{{ url_for('genetic_line_new', source_plant_id=plant.id) }}">🧬 Linie anlegen</a>
     {% endif %}
-</nav>
+    <a class="pm-button" href="{{ url_for('plant_edit', plant_id=plant.id) }}">Bearbeiten</a>
+</div>
+{% endif %}
+</header>
+
+{% set active_page = 'plants' %}
+{% include "plants/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
@@ -31,17 +39,74 @@
 {% endwith %}
 
 <section class="pm-grid">
+
 <article class="pm-card pm-span-12">
 <div class="pm-card-body">
 <div class="pm-detail-grid">
 <div class="pm-detail"><div class="pm-detail-label">Phase</div><div class="pm-detail-value"><span class="pm-stage" style="--stage-color:{{ plant.stage_color }}"><span class="pm-stage-dot"></span>{{ plant.stage_label }}</span></div></div>
+<div class="pm-detail"><div class="pm-detail-label">Rolle</div><div class="pm-detail-value"><span class="pm-chip">{{ plant.role_label }}</span></div></div>
 <div class="pm-detail"><div class="pm-detail-label">Status</div><div class="pm-detail-value">{{ plant.status_label }}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Alter</div><div class="pm-detail-value">{{ plant.age_days if plant.age_days is not none else '—' }} Tage</div></div>
-<div class="pm-detail"><div class="pm-detail-label">Phase seit</div><div class="pm-detail-value">{{ plant.stage_days if plant.stage_days is not none else '—' }} Tage</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Sorte</div><div class="pm-detail-value">{{ plant.cultivar_name or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Genetische Linie</div><div class="pm-detail-value">{% if genetic_line %}<a href="{{ url_for('genetic_line_detail', line_id=genetic_line.id) }}">{{ genetic_line.code }} · {{ genetic_line.name }}</a>{% else %}—{% endif %}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Durchgang</div><div class="pm-detail-value">{{ plant.batch_name or '—' }}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Standort</div><div class="pm-detail-value">{{ plant.location or '—' }}</div></div>
-<div class="pm-detail"><div class="pm-detail-label">Start</div><div class="pm-detail-value">{{ plant.started_on }}</div></div>
+</div>
+</div>
+</article>
+
+{% if mother_summary %}
+<article class="pm-card pm-span-12">
+<div class="pm-card-head"><h2>🌿 Mutter-/Spenderleistung</h2><a class="pm-button" href="{{ url_for('propagation_run_new') }}">Stecklingsansatz starten</a></div>
+<div class="pm-card-body">
+<div class="pm-detail-grid">
+<div class="pm-detail"><div class="pm-detail-label">Ansätze</div><div class="pm-detail-value">{{ mother_summary.run_count }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Stecklinge gesamt</div><div class="pm-detail-value">{{ mother_summary.unit_count }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Erfolgreich</div><div class="pm-detail-value">{{ mother_summary.successful_units }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Erfolgsquote</div><div class="pm-detail-value">{{ mother_summary.success_rate if mother_summary.success_rate is not none else '—' }}{% if mother_summary.success_rate is not none %}%{% endif %}</div></div>
+</div>
+</div>
+</article>
+{% endif %}
+
+<article class="pm-card pm-span-6">
+<div class="pm-card-head"><h2>Herkunft & Rückverfolgbarkeit</h2></div>
+<div class="pm-card-body">
+{% if plant_origin %}
+<div class="pm-trace">
+    <div class="pm-trace-node"><span class="pm-trace-icon">🌱</span><div><strong>{{ plant_origin.origin_label }}</strong><div class="pm-muted">Ursprung dieser Pflanze</div></div></div>
+
+    {% if plant_origin.seed_lot_id %}
+    <div class="pm-trace-arrow">↓</div>
+    <a class="pm-trace-node" href="{{ url_for('seed_lot_detail', lot_id=plant_origin.seed_lot_id) }}"><span class="pm-trace-icon">🌰</span><div><strong>{{ plant_origin.seed_lot_code }}</strong><div class="pm-muted">Saatgut-Lot</div></div></a>
+    {% endif %}
+
+    {% if plant_origin.mother_plant_id %}
+    <div class="pm-trace-arrow">↓</div>
+    <a class="pm-trace-node" href="{{ url_for('plant_detail', plant_id=plant_origin.mother_plant_id) }}"><span class="pm-trace-icon">🌿</span><div><strong>{{ plant_origin.mother_plant_code }} · {{ plant_origin.mother_plant_name }}</strong><div class="pm-muted">Mutter-/Spenderpflanze</div></div></a>
+    {% endif %}
+
+    {% if plant_origin.propagation_run_id %}
+    <div class="pm-trace-arrow">↓</div>
+    <a class="pm-trace-node" href="{{ url_for('propagation_run_detail', run_id=plant_origin.propagation_run_id) }}"><span class="pm-trace-icon">🧬</span><div><strong>{{ plant_origin.propagation_run_code }}</strong><div class="pm-muted">Vermehrungsansatz</div></div></a>
+    {% endif %}
+</div>
+{% else %}
+<div class="pm-empty">Für diese ältere/manuell angelegte Pflanze ist noch keine strukturierte Herkunft hinterlegt.</div>
+{% endif %}
+</div>
+</article>
+
+<article class="pm-card pm-span-6">
+<div class="pm-card-head"><h2>Rollen-Historie</h2></div>
+<div class="pm-card-body">
+<div class="pm-history">
+{% for event in role_events %}
+<div class="pm-history-item">
+    <div class="pm-history-line"><div class="pm-history-dot" style="--history-color:#38bdf8"></div></div>
+    <div><strong>{{ event.role_label }}</strong><div class="pm-muted">{{ event.started_on }}{% if event.ended_on %} → {{ event.ended_on }}{% else %} → aktuell{% endif %}</div>{% if event.note %}<div style="margin-top:5px">{{ event.note }}</div>{% endif %}</div>
+</div>
+{% else %}<div class="pm-empty">Noch keine Rollen-Historie vorhanden.</div>{% endfor %}
 </div>
 </div>
 </article>
@@ -66,17 +131,50 @@
 </div>
 </article>
 
-{% if has_permission('plants.edit') %}
+{% if has_permission('plants.edit') and plant.status == 'active' %}
 <article class="pm-card pm-span-4">
-<div class="pm-card-head"><h2>Phase wechseln</h2></div>
+<div class="pm-card-head"><h2>Lifecycle-Steuerung</h2></div>
 <div class="pm-card-body">
+<div class="pm-form">
+
 <form class="pm-form" method="post" action="{{ url_for('plant_stage_change', plant_id=plant.id) }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<label class="pm-field"><span class="pm-label">Neue Phase</span><select class="pm-select" name="stage">{% for code,label,color in stages %}<option value="{{ code }}" {{ 'selected' if plant.current_stage == code else '' }}>{{ label }}</option>{% endfor %}</select></label>
+<label class="pm-field"><span class="pm-label">Phase wechseln</span><select class="pm-select" name="stage">{% for code,label,color in stages %}<option value="{{ code }}" {{ 'selected' if plant.current_stage == code else '' }}>{{ label }}</option>{% endfor %}</select></label>
 <label class="pm-field"><span class="pm-label">Startdatum</span><input class="pm-input" type="date" name="started_on"></label>
-<label class="pm-field"><span class="pm-label">Notiz</span><textarea class="pm-textarea" name="note"></textarea></label>
-<button class="pm-button primary" type="submit">Phase übernehmen</button>
+<label class="pm-field"><span class="pm-label">Notiz</span><input class="pm-input" name="note"></label>
+<button class="pm-button" type="submit">Phase übernehmen</button>
 </form>
+
+<hr class="pm-separator">
+
+<form class="pm-form" method="post" action="{{ url_for('plant_role_change', plant_id=plant.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label class="pm-field"><span class="pm-label">Rolle</span><select class="pm-select" name="role">{% for code,label in plant_roles %}<option value="{{ code }}" {{ 'selected' if plant.current_role == code else '' }}>{{ label }}</option>{% endfor %}</select></label>
+<label class="pm-field"><span class="pm-label">Genetische Linie</span><select class="pm-select" name="genetic_line_id"><option value="">— unverändert / keine —</option>{% for line in genetic_lines %}<option value="{{ line.id }}" {{ 'selected' if plant.genetic_line_id == line.id else '' }}>{{ line.code }} · {{ line.name }} · {{ line.cultivar_name }}</option>{% endfor %}</select><span class="pm-help">Mutter- und Spenderrollen benötigen eine genetische Linie.</span></label>
+<label class="pm-field"><span class="pm-label">Rollenstart</span><input class="pm-input" type="date" name="started_on"></label>
+<label class="pm-field"><span class="pm-label">Notiz</span><input class="pm-input" name="note"></label>
+<button class="pm-button" type="submit">Rolle übernehmen</button>
+</form>
+
+{% if plant.current_role in ['mother', 'donor'] %}
+<hr class="pm-separator">
+<form class="pm-form" method="post" action="{{ url_for('mother_release_to_flower', plant_id=plant.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label class="pm-field"><span class="pm-label">Mutterfunktion beenden & in Blüte überführen</span><input class="pm-input" type="date" name="started_on"></label>
+<input type="hidden" name="note" value="Mutter-/Spenderfunktion beendet; anschließend in den normalen Produktions-Lifecycle überführt.">
+<button class="pm-button primary" type="submit" onclick="return confirm('Mutterfunktion beenden und Pflanze in die Blütephase überführen? Herkunft und Genetik bleiben erhalten.');">In Produktions-Lifecycle überführen</button>
+</form>
+{% endif %}
+
+<hr class="pm-separator">
+<form class="pm-form" method="post" action="{{ url_for('plant_end_lifecycle', plant_id=plant.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<label class="pm-field"><span class="pm-label">Lebenszyklus beenden</span><input class="pm-input" type="date" name="ended_on"></label>
+<label class="pm-field"><span class="pm-label">Grund</span><input class="pm-input" required name="reason" placeholder="z. B. regulär beendet"></label>
+<button class="pm-button danger" type="submit" onclick="return confirm('Lebenszyklus dieser Pflanze wirklich beenden?');">Lebenszyklus beenden</button>
+</form>
+
+</div>
 </div>
 </article>
 {% endif %}
@@ -102,15 +200,11 @@
         <div class="pm-journal-top">
             <div>
                 <div class="pm-journal-category">{{ entry.category_icon }} {{ entry.category_label }}</div>
-                <div class="pm-journal-title">
-                    <a href="{{ url_for('plant_journal_detail', entry_id=entry.id) }}">{{ entry.title }}</a>
-                </div>
+                <div class="pm-journal-title"><a href="{{ url_for('plant_journal_detail', entry_id=entry.id) }}">{{ entry.title }}</a></div>
             </div>
             <div class="pm-journal-time">{{ entry.occurred_date }}<br>{{ entry.occurred_time }}</div>
         </div>
-        {% if entry.body %}
-        <div class="pm-journal-body">{{ entry.body[:220] }}{% if entry.body|length > 220 %}…{% endif %}</div>
-        {% endif %}
+        {% if entry.body %}<div class="pm-journal-body">{{ entry.body[:220] }}{% if entry.body|length > 220 %}…{% endif %}</div>{% endif %}
     </div>
 </div>
 {% endfor %}

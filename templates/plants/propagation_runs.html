@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Vermehrungsansätze – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell"><header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('propagation_dashboard_page') }}">←</a><div><h1 class="pm-title">Vermehrungsansätze</h1><div class="pm-subtitle">Samen und Stecklinge in einem gemeinsamen WIP-Prozess</div></div></div>{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button primary" href="{{ url_for('propagation_run_new') }}">＋ Ansatz</a></div>{% endif %}</header>
+{% set active_page = 'propagation' %}{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<form class="pm-filterbar" method="get" style="grid-template-columns:1fr 1fr auto">
+<select class="pm-select" name="method"><option value="">Alle Methoden</option>{% for code,label in methods %}<option value="{{ code }}" {{ 'selected' if method_filter == code else '' }}>{{ label }}</option>{% endfor %}</select>
+<select class="pm-select" name="status"><option value="">Alle Status</option><option value="active" {{ 'selected' if status_filter == 'active' else '' }}>Aktiv</option><option value="completed" {{ 'selected' if status_filter == 'completed' else '' }}>Abgeschlossen</option></select><button class="pm-button">Filtern</button></form>
+<div class="pm-card"><div class="pm-table-wrap"><table class="pm-table"><thead><tr><th>Ansatz</th><th>Methode</th><th>Sorte</th><th>Quelle</th><th>Start</th><th>Einheiten</th><th>Erfolg</th><th>Status</th></tr></thead><tbody>
+{% for run in runs %}<tr><td><a href="{{ url_for('propagation_run_detail', run_id=run.id) }}"><strong>{{ run.name }}</strong><br><span class="pm-code">{{ run.code }}</span></a></td><td>{{ run.method_label }}</td><td>{{ run.cultivar_name }}{% if run.genetic_line_name %}<br><span class="pm-muted">{{ run.genetic_line_name }}</span>{% endif %}</td><td>{% if run.method == 'seed' %}{{ run.seed_lot_code }}{% else %}{{ run.mother_plant_code }} · {{ run.mother_plant_name }}{% endif %}</td><td>{{ run.started_on }}</td><td>{{ run.total_units }}</td><td>{{ run.success_rate if run.success_rate is not none else '—' }}{% if run.success_rate is not none %}%{% endif %}</td><td>{{ run.status_label }}</td></tr>
+{% else %}<tr><td colspan="8"><div class="pm-empty">Noch keine Ansätze vorhanden.</div></td></tr>{% endfor %}
+</tbody></table></div></div></main>
+{% endblock %}

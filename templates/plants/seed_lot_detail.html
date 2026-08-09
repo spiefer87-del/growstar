@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ lot.code }} – Saatgut – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('seed_lot_list') }}">←</a><div><h1 class="pm-title">🌰 {{ lot.code }}</h1><div class="pm-subtitle">{{ lot.cultivar_name }} · {{ lot.breeder_lot or 'kein Hersteller-Lot' }}</div></div></div>
+{% if has_permission('plants.edit') %}<div class="pm-actions"><a class="pm-button" href="{{ url_for('seed_lot_edit', lot_id=lot.id) }}">Bearbeiten</a><a class="pm-button primary" href="{{ url_for('propagation_run_new', seed_lot_id=lot.id) }}">Ansatz starten</a></div>{% endif %}</header>
+{% set active_page = 'propagation' %}{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-kpis">
+<div class="pm-kpi"><div class="pm-kpi-label">Bestand</div><div class="pm-kpi-value">{{ lot.stock }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Verwendete Einheiten</div><div class="pm-kpi-value">{{ lot.used_units }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Erfolgreich</div><div class="pm-kpi-value">{{ lot.successful_units }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Erfolgsquote</div><div class="pm-kpi-value">{{ lot.success_rate if lot.success_rate is not none else '—' }}{% if lot.success_rate is not none %}%{% endif %}</div></div>
+</section>
+<section class="pm-grid">
+<article class="pm-card pm-span-5"><div class="pm-card-head"><h2>Lot-Daten</h2></div><div class="pm-card-body"><div class="pm-detail-grid pm-detail-grid-2">
+<div class="pm-detail"><div class="pm-detail-label">Typ</div><div class="pm-detail-value">{{ lot.seed_type_label }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Status</div><div class="pm-detail-value">{{ lot.status_label }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Lieferant</div><div class="pm-detail-value">{{ lot.supplier or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Lagerort</div><div class="pm-detail-value">{{ lot.storage_location or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Eingang</div><div class="pm-detail-value">{{ lot.acquired_on or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Herkunft</div><div class="pm-detail-value">{{ lot.origin_type or '—' }}</div></div>
+</div>{% if lot.notes %}<div class="pm-journal-body">{{ lot.notes }}</div>{% endif %}</div></article>
+
+{% if has_permission('plants.edit') %}
+<article class="pm-card pm-span-7"><div class="pm-card-head"><h2>Bestandsbewegung buchen</h2></div><div class="pm-card-body">
+<form class="pm-form" method="post" action="{{ url_for('seed_lot_movement', lot_id=lot.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="pm-form-grid">
+<label class="pm-field"><span class="pm-label">Menge (+ Zugang / − Abgang)</span><input class="pm-input" type="number" required name="quantity"></label>
+<label class="pm-field"><span class="pm-label">Buchungsart</span><select class="pm-select" name="movement_type">{% for code,label in movement_types %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select></label>
+<label class="pm-field"><span class="pm-label">Datum</span><input class="pm-input" type="date" name="occurred_on"></label>
+<label class="pm-field"><span class="pm-label">Notiz</span><input class="pm-input" name="note"></label>
+</div><button class="pm-button primary" type="submit">Buchen</button></form>
+</div></article>
+{% endif %}
+
+<article class="pm-card pm-span-12"><div class="pm-card-head"><h2>Bewegungsjournal</h2></div><div class="pm-table-wrap"><table class="pm-table">
+<thead><tr><th>Datum</th><th>Art</th><th>Menge</th><th>Referenz</th><th>Notiz</th><th>Benutzer</th></tr></thead><tbody>
+{% for m in movements %}<tr><td>{{ m.occurred_on }}</td><td>{{ m.movement_type }}</td><td><strong class="{{ 'pm-pos' if m.quantity > 0 else 'pm-neg' }}">{{ '%+d'|format(m.quantity) }}</strong></td><td>{{ (m.reference_type or '—') ~ (' #' ~ m.reference_id if m.reference_id else '') }}</td><td>{{ m.note or '—' }}</td><td>{{ m.created_by_name or 'System' }}</td></tr>
+{% else %}<tr><td colspan="6"><div class="pm-empty">Keine Bewegungen vorhanden.</div></td></tr>{% endfor %}
+</tbody></table></div></article>
+</section>
+</main>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ run.code }} – Vermehrung – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell"><header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('propagation_run_list') }}">←</a><div><h1 class="pm-title">🌱 {{ run.name }}</h1><div class="pm-subtitle">{{ run.code }} · {{ run.method_label }} · {{ run.cultivar_name }}</div></div></div></header>
+{% set active_page = 'propagation' %}{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+        <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-kpis">
+<div class="pm-kpi"><div class="pm-kpi-label">Einheiten</div><div class="pm-kpi-value">{{ run.total_units }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Erfolgreich</div><div class="pm-kpi-value">{{ run.successful_units }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Ausfälle</div><div class="pm-kpi-value">{{ run.failed_units }}</div></div>
+<div class="pm-kpi"><div class="pm-kpi-label">Pflanzen erzeugt</div><div class="pm-kpi-value">{{ run.created_plants }}</div></div>
+</section>
+<section class="pm-grid">
+<article class="pm-card pm-span-12"><div class="pm-card-head"><h2>Ansatzdaten</h2><span class="pm-chip">{{ run.status_label }}</span></div><div class="pm-card-body"><div class="pm-detail-grid">
+<div class="pm-detail"><div class="pm-detail-label">Methode</div><div class="pm-detail-value">{{ run.method_label }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Sorte</div><div class="pm-detail-value">{{ run.cultivar_name }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Quelle</div><div class="pm-detail-value">{% if run.method == 'seed' %}<a href="{{ url_for('seed_lot_detail', lot_id=run.seed_lot_id) }}">{{ run.seed_lot_code }}</a>{% else %}<a href="{{ url_for('plant_detail', plant_id=run.mother_plant_id) }}">{{ run.mother_plant_code }} · {{ run.mother_plant_name }}</a>{% endif %}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Genetische Linie</div><div class="pm-detail-value">{{ run.genetic_line_name or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Start</div><div class="pm-detail-value">{{ run.started_on }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Erfolgsquote</div><div class="pm-detail-value">{{ run.success_rate if run.success_rate is not none else '—' }}{% if run.success_rate is not none %}%{% endif %}</div></div>
+</div></div></article>
+
+<article class="pm-card pm-span-12"><div class="pm-card-head"><h2>Einheiten</h2></div><div class="pm-table-wrap"><table class="pm-table">
+<thead><tr><th>Einheit</th><th>Status</th><th>Ergebnisdatum</th><th>Notiz</th><th>Erzeugte Pflanze</th><th>Aktion</th></tr></thead><tbody>
+{% for unit in run.units %}<tr>
+<td><span class="pm-code">{{ unit.code }}</span></td><td>{{ unit.status_label }}</td><td>{{ unit.outcome_on or '—' }}</td><td>{{ unit.notes or '—' }}</td>
+<td>{% if unit.plant_id %}<a href="{{ url_for('plant_detail', plant_id=unit.plant_id) }}">{{ unit.plant_code }} · {{ unit.plant_name }}</a>{% else %}—{% endif %}</td>
+<td>
+{% if has_permission('plants.edit') and not unit.plant_id %}
+<form class="pm-inline-form" method="post" action="{{ url_for('propagation_unit_status', unit_id=unit.id) }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="run_id" value="{{ run.id }}">
+<select class="pm-select pm-select-small" name="status">
+{% if run.method == 'seed' %}
+<option value="germinating" {{ 'selected' if unit.status == 'germinating' else '' }}>Keimung läuft</option><option value="germinated" {{ 'selected' if unit.status == 'germinated' else '' }}>Erfolgreich gekeimt</option><option value="failed" {{ 'selected' if unit.status == 'failed' else '' }}>Ausgefallen</option>
+{% else %}
+<option value="rooting" {{ 'selected' if unit.status == 'rooting' else '' }}>Bewurzelung läuft</option><option value="rooted" {{ 'selected' if unit.status == 'rooted' else '' }}>Erfolgreich bewurzelt</option><option value="failed" {{ 'selected' if unit.status == 'failed' else '' }}>Ausgefallen</option>
+{% endif %}
+</select><input class="pm-input pm-input-small" type="date" name="outcome_on"><button class="pm-button" type="submit">Status</button></form>
+{% if unit.can_create_plant %}
+<form class="pm-inline-form" method="post" action="{{ url_for('propagation_unit_create_plant', unit_id=unit.id) }}" style="margin-top:6px">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="run_id" value="{{ run.id }}"><input class="pm-input pm-input-small" name="display_name" placeholder="Pflanzenname"><button class="pm-button primary" type="submit">Pflanze erzeugen</button></form>
+{% endif %}
+{% endif %}
+</td></tr>{% endfor %}
+</tbody></table></div></article>
+</section></main>
+{% endblock %}

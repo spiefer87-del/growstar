@@ -13,7 +13,7 @@
             <a class="pm-back" href="{{ url_for('dashboard') }}">←</a>
             <div>
                 <h1 class="pm-title">🌿 Pflanzenmanagement</h1>
-                <div class="pm-subtitle">Operations Board · Pflanzen, Phasen, Sorten und Durchgänge</div>
+                <div class="pm-subtitle">Cultivation Operations Board · Pflanzen, Genetik, Vermehrung, Phasen und Durchgänge</div>
             </div>
         </div>
         {% if has_permission('plants.edit') %}
@@ -26,16 +26,7 @@
 
     {% set active_page = 'dashboard' %}
     
-<nav class="pm-nav">
-    <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
-    <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
-    <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
-    <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sortenstamm</a>
-    <a class="{{ 'active' if active_page == 'batches' else '' }}" href="{{ url_for('batch_list') }}">Durchgänge</a>
-    {% if has_permission('diary.view') %}
-    <a class="{{ 'active' if active_page == 'journal' else '' }}" href="{{ url_for('plant_journal') }}">Betriebsjournal</a>
-    {% endif %}
-</nav>
+{% include "plants/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}
@@ -65,6 +56,14 @@
             <div class="pm-kpi-label">Offene Folgeaktionen</div>
             <div class="pm-kpi-value">{{ journal_stats.open_followups }}</div>
         </div>
+        <div class="pm-kpi">
+            <div class="pm-kpi-label">Saatgutbestand</div>
+            <div class="pm-kpi-value">{{ propagation_stats.seed_stock }}</div>
+        </div>
+        <div class="pm-kpi">
+            <div class="pm-kpi-label">Aktive Mütter</div>
+            <div class="pm-kpi-value">{{ propagation_stats.active_mothers }}</div>
+        </div>
     </section>
 
     <section class="pm-grid">
@@ -82,6 +81,7 @@
                             <th>Pflanze</th>
                             <th>Sorte</th>
                             <th>Phase</th>
+                            <th>Rolle</th>
                             <th>Phase seit</th>
                             <th>Alter</th>
                             <th>Durchgang</th>
@@ -103,6 +103,7 @@
                                     {{ plant.stage_label }}
                                 </span>
                             </td>
+                            <td><span class="pm-chip">{{ plant.role_label }}</span></td>
                             <td>{{ plant.stage_days if plant.stage_days is not none else '—' }} Tage</td>
                             <td>{{ plant.age_days if plant.age_days is not none else '—' }} Tage</td>
                             <td>{{ plant.batch_name or '—' }}</td>
@@ -146,6 +147,24 @@
                 {% else %}
                     <div class="pm-empty">Noch keine Phasendaten.</div>
                 {% endif %}
+            </div>
+        </article>
+
+        <article class="pm-card pm-span-12">
+            <div class="pm-card-head">
+                <h2>Genetik & Vermehrung</h2>
+                <div class="pm-actions">
+                    <a class="pm-button" href="{{ url_for('genetics_dashboard') }}">Genetik & Mütter</a>
+                    <a class="pm-button primary" href="{{ url_for('propagation_dashboard_page') }}">Vermehrung</a>
+                </div>
+            </div>
+            <div class="pm-card-body">
+                <div class="pm-detail-grid">
+                    <div class="pm-detail"><div class="pm-detail-label">Saatgut-Lots auf Lager</div><div class="pm-detail-value">{{ propagation_stats.lots_in_stock }}</div></div>
+                    <div class="pm-detail"><div class="pm-detail-label">Aktive Ansätze</div><div class="pm-detail-value">{{ propagation_stats.active_runs }}</div></div>
+                    <div class="pm-detail"><div class="pm-detail-label">Samen-Erfolgsquote</div><div class="pm-detail-value">{{ propagation_stats.germination_rate if propagation_stats.germination_rate is not none else '—' }}{% if propagation_stats.germination_rate is not none %}%{% endif %}</div></div>
+                    <div class="pm-detail"><div class="pm-detail-label">Stecklings-Erfolgsquote</div><div class="pm-detail-value">{{ propagation_stats.rooting_rate if propagation_stats.rooting_rate is not none else '—' }}{% if propagation_stats.rooting_rate is not none %}%{% endif %}</div></div>
+                </div>
             </div>
         </article>
 
