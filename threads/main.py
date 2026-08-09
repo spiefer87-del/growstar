@@ -25,93 +25,138 @@ from core.ramp import (
 from services.sensor import mark_stale_sensors
 
 
-def main_loop(runtime=None):
-    """Regelkreis für genau eine TentRuntime.
+def run_control_cycle(runtime=None, *, now=None, shadow=None):
+    """Führt genau einen vollständigen Regelzyklus einer TentRuntime aus.
 
-    ``runtime=None`` bleibt vollständig kompatibel zum bisherigen Aufruf und
-    verwendet automatisch ``tent_1``. Ein zweites Zelt wird in Phase 2 noch
-    nicht produktiv gestartet; der Loop ist aber bereits runtime-fähig.
+    Die Extraktion aus ``main_loop`` macht den Mehrzelt-Regelkreis testbar,
+    ohne Threads starten zu müssen. ``shadow`` dient nur der Statusanzeige;
+    die eigentliche Hardware-Sicherheitsbarriere liegt zusätzlich in
+    ``core.actuators`` und hängt ausschließlich an ``control_enabled``.
     """
 
     rt = resolve_runtime(runtime)
     st = rt.state
 
-    print(f"🧠 [{rt.tent_id}] Regelkreis gestartet")
+    if shadow is None:
+        shadow = not rt.control_enabled
 
-    while True:
-        now = time.time()
+    # Eine Runtime ohne Hardwarefreigabe darf auch bei einem versehentlich
+    # falschen Aufruf nur als Shadow laufen.
+    if not rt.control_enabled:
+        shadow = True
 
-        # =========================================
-        # Sensor-Zuweisung anwenden
-        # =========================================
+    loop_mode = "shadow" if shadow else "live"
+    rt.mark_loop(loop_mode)
 
-        apply_sensor_assignments(runtime=rt)
+    current_time = time.time() if now is None else float(now)
 
-        # =========================================
-        # Sollwerte / Profil / Rampe
-        # =========================================
+    # =========================================
+    # Sensor-Zuweisung anwenden
+    # =========================================
 
-        check_ramp_schedule(runtime=rt)
+    apply_sensor_assignments(runtime=rt)
 
-        if st.ramp_active:
-            update_ramp(runtime=rt)
+    # =========================================
+    # Sollwerte / Profil / Rampe
+    # =========================================
 
-        update_temperature_setpoint(runtime=rt)
-        update_humidity_setpoint(runtime=rt)
+    check_ramp_schedule(runtime=rt)
 
-        # =========================================
-        # Sensor Health
-        # =========================================
+    if st.ramp_active:
+        update_ramp(runtime=rt)
 
-        mark_stale_sensors(runtime=rt)
+    update_temperature_setpoint(runtime=rt)
+    update_humidity_setpoint(runtime=rt)
 
-        # =========================================
-        # Snapshot
-        # =========================================
+    # =========================================
+    # Sensor Health
+    # =========================================
+
+    mark_stale_sensors(runtime=rt)
+
+    # =========================================
+    # Snapshot
+    # =========================================
+
+    with rt.state_lock:
+        temp_val = st.live_state.get("temp")
+        hum_val = st.live_state.get("hum")
+
+    # =========================================
+    # Datenbank
+    # =========================================
+
+    if current_time - st.last_db_write >= DB_INTERVAL:
+        st.last_db_write = current_time
 
         with rt.state_lock:
-            temp_val = st.live_state.get("temp")
-            hum_val = st.live_state.get("hum")
+            temp_target = st.live_state.get("temp_target")
+            hum_target = st.live_state.get("hum_target")
 
-        # =========================================
-        # Datenbank
-        # =========================================
-
-        if now - st.last_db_write >= DB_INTERVAL:
-            st.last_db_write = now
+        if temp_val is not None and hum_val is not None:
+            vpd = calculate_vpd(temp_val, hum_val)
 
             with rt.state_lock:
-                temp_target = st.live_state.get("temp_target")
-                hum_target = st.live_state.get("hum_target")
+                st.live_state["vpd"] = vpd
 
-            if temp_val is not None and hum_val is not None:
-                vpd = calculate_vpd(temp_val, hum_val)
+            try:
+                insert_measurement(
+                    temp=temp_val,
+                    temp_target=temp_target,
+                    hum=hum_val,
+                    hum_target=hum_target,
+                    vpd=vpd,
+                    tent_id=rt.tent_id,
+                )
+            except Exception as exc:
+                print(
+                    f"❌ [{rt.tent_id}] DB insert_measurement Fehler:",
+                    exc,
+                )
 
-                with rt.state_lock:
-                    st.live_state["vpd"] = vpd
+    # =========================================
+    # Regelung
+    # =========================================
 
-                try:
-                    insert_measurement(
-                        temp=temp_val,
-                        temp_target=temp_target,
-                        hum=hum_val,
-                        hum_target=hum_target,
-                        vpd=vpd,
-                        tent_id=rt.tent_id,
-                    )
-                except Exception as exc:
-                    print(
-                        f"❌ [{rt.tent_id}] DB insert_measurement Fehler:",
-                        exc,
-                    )
+    control_device("fan", runtime=rt)
+    control_device("vent", runtime=rt)
+    control_device("heating", runtime=rt)
+    control_device("light", runtime=rt)
 
-        # =========================================
-        # Regelung
-        # =========================================
+    return {
+        "tent_id": rt.tent_id,
+        "mode": loop_mode,
+        "temp": temp_val,
+        "hum": hum_val,
+        "shadow_outputs": dict(rt.shadow_outputs),
+    }
 
-        control_device("fan", runtime=rt)
-        control_device("vent", runtime=rt)
-        control_device("heating", runtime=rt)
-        control_device("light", runtime=rt)
 
+def main_loop(runtime=None, *, shadow=None):
+    """Regelkreis für genau eine TentRuntime.
+
+    ``tent_1`` läuft weiterhin produktiv. Zusätzliche Runtimes werden in
+    Phase 3B nur mit ``shadow=True`` gestartet. Selbst wenn dieser Parameter
+    falsch gesetzt würde, verhindert ``control_enabled=False`` in der Runtime
+    jede physische Aktorik.
+    """
+
+    rt = resolve_runtime(runtime)
+
+    if shadow is None:
+        shadow = not rt.control_enabled
+
+    if not rt.control_enabled:
+        shadow = True
+
+    if shadow:
+        print(
+            f"🧪 [{rt.tent_id}] Shadow-Regelkreis gestartet "
+            "(Hardware-Aktorik gesperrt)"
+        )
+    else:
+        print(f"🧠 [{rt.tent_id}] Regelkreis gestartet")
+
+    while True:
+        run_control_cycle(runtime=rt, shadow=shadow)
         time.sleep(2)
