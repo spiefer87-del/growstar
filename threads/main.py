@@ -2,11 +2,8 @@
 
 import time
 
-import core.state as state
-import core.context as ctx
-
 from core.constants import DB_INTERVAL
-from core.tents import DEFAULT_TENT_ID
+from core.runtime import resolve_runtime
 
 from db import insert_measurement
 
@@ -25,104 +22,96 @@ from core.ramp import (
     update_ramp,
 )
 
-from services.sensor import (
-    mark_stale_sensors,
-)
+from services.sensor import mark_stale_sensors
 
 
-def main_loop():
+def main_loop(runtime=None):
+    """Regelkreis für genau eine TentRuntime.
+
+    ``runtime=None`` bleibt vollständig kompatibel zum bisherigen Aufruf und
+    verwendet automatisch ``tent_1``. Ein zweites Zelt wird in Phase 2 noch
+    nicht produktiv gestartet; der Loop ist aber bereits runtime-fähig.
+    """
+
+    rt = resolve_runtime(runtime)
+    st = rt.state
+
+    print(f"🧠 [{rt.tent_id}] Regelkreis gestartet")
 
     while True:
-
         now = time.time()
 
         # =========================================
         # Sensor-Zuweisung anwenden
         # =========================================
 
-        apply_sensor_assignments()
+        apply_sensor_assignments(runtime=rt)
 
         # =========================================
-        # Sollwerte aktualisieren
-        # =========================================
-        check_ramp_schedule()
-
-        # =========================================
-        # Rampe
+        # Sollwerte / Profil / Rampe
         # =========================================
 
-        if state.ramp_active:
-            update_ramp()
+        check_ramp_schedule(runtime=rt)
 
-        update_temperature_setpoint()
-        update_humidity_setpoint()
-        
+        if st.ramp_active:
+            update_ramp(runtime=rt)
+
+        update_temperature_setpoint(runtime=rt)
+        update_humidity_setpoint(runtime=rt)
+
         # =========================================
         # Sensor Health
         # =========================================
 
-        mark_stale_sensors()
+        mark_stale_sensors(runtime=rt)
 
         # =========================================
         # Snapshot
         # =========================================
 
-        with ctx.state_lock:
-
-            temp_val = state.live_state.get("temp")
-            hum_val = state.live_state.get("hum")
+        with rt.state_lock:
+            temp_val = st.live_state.get("temp")
+            hum_val = st.live_state.get("hum")
 
         # =========================================
         # Datenbank
         # =========================================
 
-        if now - state.last_db_write >= DB_INTERVAL:
+        if now - st.last_db_write >= DB_INTERVAL:
+            st.last_db_write = now
 
-            state.last_db_write = now
+            with rt.state_lock:
+                temp_target = st.live_state.get("temp_target")
+                hum_target = st.live_state.get("hum_target")
 
-            with ctx.state_lock:
+            if temp_val is not None and hum_val is not None:
+                vpd = calculate_vpd(temp_val, hum_val)
 
-                temp_target = state.live_state.get("temp_target")
-                hum_target = state.live_state.get("hum_target")
-
-            if (
-                temp_val is not None
-                and hum_val is not None
-            ):
-
-                vpd = calculate_vpd(
-                    temp_val,
-                    hum_val,
-                )
-
-                with ctx.state_lock:
-                    state.live_state["vpd"] = vpd
+                with rt.state_lock:
+                    st.live_state["vpd"] = vpd
 
                 try:
-
                     insert_measurement(
                         temp=temp_val,
                         temp_target=temp_target,
                         hum=hum_val,
                         hum_target=hum_target,
                         vpd=vpd,
-                        tent_id=DEFAULT_TENT_ID,
+                        tent_id=rt.tent_id,
                     )
-
-                except Exception as e:
-
+                except Exception as exc:
                     print(
-                        "❌ DB insert_measurement Fehler:",
-                        e
+                        f"❌ [{rt.tent_id}] DB insert_measurement Fehler:",
+                        exc,
                     )
 
         # =========================================
         # Regelung
         # =========================================
 
-        control_device("fan")
-        control_device("vent")
-        control_device("heating")
-        control_device("light")
+        control_device("fan", runtime=rt)
+        control_device("vent", runtime=rt)
+        control_device("heating", runtime=rt)
+        control_device("light", runtime=rt)
 
         time.sleep(2)
