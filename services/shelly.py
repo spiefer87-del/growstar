@@ -22,6 +22,10 @@ FAILSAFE_DEVICES = [
 def run_failsafe(runtime=None):
     rt = resolve_runtime(runtime)
 
+    # Shadow-Runtimes dürfen niemals physische Shellys prüfen/korrigieren.
+    if not rt.control_enabled:
+        return
+
     for device, ip_key, relay_key in FAILSAFE_DEVICES:
         failsafe_check(
             device,
@@ -43,6 +47,9 @@ def shelly_set(ip, relay, on):
 
 def failsafe_check(device, ip_key, relay_key, runtime=None):
     rt = resolve_runtime(runtime)
+    if not rt.control_enabled:
+        return
+
     cfg = rt.config
     st = rt.state
 
@@ -77,6 +84,9 @@ def sync_relay(
 ):
     rt = resolve_runtime(runtime)
     st = rt.state
+
+    if not rt.control_enabled:
+        return
 
     if not ip or relay is None:
         setattr(st, state_var, None)
