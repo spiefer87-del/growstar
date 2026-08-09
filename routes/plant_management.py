@@ -19,6 +19,15 @@ from plant_management.constants import (
     STAGE_COLORS,
     PLANT_STATUSES,
     BATCH_STATUSES,
+    PLANT_ROLES,
+    PLANT_ROLE_LABELS,
+    GENETIC_LINE_STATUSES,
+    SEED_LOT_STATUSES,
+    SEED_TYPES,
+    SEED_ORIGIN_TYPES,
+    SEED_MOVEMENT_TYPES,
+    PROPAGATION_METHODS,
+    PROPAGATION_UNIT_STATUS_LABELS,
 )
 from plant_management.database import (
     get_dashboard,
@@ -40,6 +49,35 @@ from plant_management.excel_io import (
     export_cultivars_xlsx,
     template_xlsx,
     import_cultivars_xlsx,
+)
+
+
+from plant_management.propagation import (
+    list_genetic_lines,
+    get_genetic_line,
+    save_genetic_line,
+    genetic_line_plants,
+    set_plant_role,
+    get_role_events,
+    list_mother_plants,
+    get_mother_summary,
+    list_seed_lots,
+    get_seed_lot,
+    save_seed_lot,
+    list_seed_movements,
+    book_seed_movement,
+    create_propagation_run,
+    list_propagation_runs,
+    get_propagation_run,
+    update_propagation_unit,
+    create_plant_from_propagation_unit,
+    get_plant_origin,
+    propagation_dashboard,
+)
+from plant_management.propagation_excel import (
+    export_seed_lots_xlsx,
+    seed_import_template_xlsx,
+    import_seed_lots_xlsx,
 )
 
 from plant_management.journal import (
@@ -99,6 +137,40 @@ def _current_user_identity():
     return user.get("id"), name
 
 
+def _system_journal(
+    title,
+    *,
+    body=None,
+    category="care",
+    severity="info",
+    plant_ids=None,
+    batch_ids=None,
+    tags=None,
+):
+    """
+    Automatische Betriebsdokumentation.
+    Ein Fehler im Journal darf den fachlichen Vorgang nicht zurückrollen.
+    """
+    try:
+        user_id, user_name = _current_user_identity()
+        save_journal_entry(
+            {
+                "category": category,
+                "severity": severity,
+                "title": title,
+                "body": body,
+                "tags": tags,
+            },
+            plant_ids=plant_ids or [],
+            batch_ids=batch_ids or [],
+            user_id=user_id,
+            user_name=user_name,
+            source="system",
+        )
+    except Exception:
+        pass
+
+
 def register(app):
 
     # ------------------------------------------------------------------
@@ -114,6 +186,7 @@ def register(app):
             stages=STAGES,
             journal_stats=journal_stats(),
             recent_journal=list_journal_entries(limit=6),
+            propagation_stats=propagation_dashboard(),
         )
 
 
@@ -435,6 +508,20 @@ def register(app):
                 plant_id=plant_id,
                 limit=8,
             ),
+            plant_origin=get_plant_origin(plant_id),
+            role_events=get_role_events(plant_id),
+            genetic_line=(
+                get_genetic_line(plant.get("genetic_line_id"))
+                if plant.get("genetic_line_id")
+                else None
+            ),
+            mother_summary=(
+                get_mother_summary(plant_id)
+                if plant.get("current_role") in {"mother", "donor"}
+                else None
+            ),
+            plant_roles=PLANT_ROLES,
+            genetic_lines=list_genetic_lines(include_inactive=False),
         )
 
 
@@ -848,6 +935,708 @@ def register(app):
                 "application/vnd.openxmlformats-officedocument."
                 "spreadsheetml.sheet"
             ),
+        )
+
+
+
+    # ------------------------------------------------------------------
+    # Phase 7 – Genetik / Mutterpflanzen
+    # ------------------------------------------------------------------
+
+    @app.route("/pflanzenmanagement/genetik")
+    def genetics_dashboard():
+        return render_template(
+            "plants/genetics.html",
+            genetic_lines=list_genetic_lines(),
+            mothers=list_mother_plants(active_only=True),
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/genetik/linien/neu",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def genetic_line_new():
+        source_plant_id = request.args.get("source_plant_id")
+        source_plant = (
+            get_plant(source_plant_id)
+            if source_plant_id
+            else None
+        )
+
+        if request.method == "POST":
+            try:
+                line_id = save_genetic_line(_form_data())
+                _audit(
+                    "plants.genetic_line_created",
+                    "genetic_line",
+                    line_id,
+                )
+                flash("Genetische Linie wurde angelegt.", "success")
+                return redirect(
+                    url_for(
+                        "genetic_line_detail",
+                        line_id=line_id,
+                    )
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/genetic_line_form.html",
+            line=None,
+            cultivars=list_cultivars(include_inactive=False),
+            plants=list_plants(),
+            source_plant=source_plant,
+            statuses=GENETIC_LINE_STATUSES,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/genetik/linien/<int:line_id>",
+    )
+    def genetic_line_detail(line_id):
+        line = get_genetic_line(line_id)
+        if not line:
+            abort(404)
+
+        return render_template(
+            "plants/genetic_line_detail.html",
+            line=line,
+            plants=genetic_line_plants(line_id),
+            mothers=[
+                p
+                for p in list_mother_plants(active_only=False)
+                if p.get("genetic_line_id") == line_id
+            ],
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/genetik/linien/<int:line_id>/bearbeiten",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def genetic_line_edit(line_id):
+        line = get_genetic_line(line_id)
+        if not line:
+            abort(404)
+
+        if request.method == "POST":
+            try:
+                save_genetic_line(_form_data(), line_id)
+                _audit(
+                    "plants.genetic_line_updated",
+                    "genetic_line",
+                    line_id,
+                )
+                flash("Genetische Linie wurde gespeichert.", "success")
+                return redirect(
+                    url_for(
+                        "genetic_line_detail",
+                        line_id=line_id,
+                    )
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/genetic_line_form.html",
+            line=get_genetic_line(line_id),
+            cultivars=list_cultivars(include_inactive=True),
+            plants=list_plants(),
+            source_plant=None,
+            statuses=GENETIC_LINE_STATUSES,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/pflanzen/<int:plant_id>/rolle",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def plant_role_change(plant_id):
+        plant = get_plant(plant_id)
+        if not plant:
+            abort(404)
+
+        role = request.form.get("role", "").strip()
+        user_id, user_name = _current_user_identity()
+
+        try:
+            changed = set_plant_role(
+                plant_id,
+                role,
+                started_on=request.form.get("started_on"),
+                genetic_line_id=request.form.get("genetic_line_id"),
+                note=request.form.get("note"),
+                user_id=user_id,
+                user_name=user_name,
+            )
+
+            if changed:
+                _audit(
+                    "plants.role_changed",
+                    "plant",
+                    plant_id,
+                    {"role": role},
+                )
+                _system_journal(
+                    f"Pflanzenrolle geändert: {PLANT_ROLE_LABELS.get(role, role)}",
+                    body=request.form.get("note"),
+                    plant_ids=[plant_id],
+                    tags="rolle,lifecycle",
+                )
+                flash("Pflanzenrolle wurde aktualisiert.", "success")
+            else:
+                flash("Die Rolle war bereits gesetzt.", "info")
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(url_for("plant_detail", plant_id=plant_id))
+
+
+    @app.route(
+        "/pflanzenmanagement/pflanzen/<int:plant_id>/mutter-in-bluete",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def mother_release_to_flower(plant_id):
+        plant = get_plant(plant_id)
+        if not plant:
+            abort(404)
+
+        if plant.get("current_role") not in {"mother", "donor"}:
+            flash("Diese Pflanze ist keine aktive Mutter-/Spenderpflanze.", "error")
+            return redirect(url_for("plant_detail", plant_id=plant_id))
+
+        started_on = request.form.get("started_on")
+        note = request.form.get("note") or (
+            "Mutterfunktion beendet; Pflanze in den normalen Produktions-Lifecycle überführt."
+        )
+        user_id, user_name = _current_user_identity()
+
+        try:
+            set_plant_role(
+                plant_id,
+                "production",
+                started_on=started_on,
+                note=note,
+                user_id=user_id,
+                user_name=user_name,
+            )
+            set_plant_stage(
+                plant_id,
+                "flowering",
+                started_on=started_on,
+                note=note,
+                created_by=user_id,
+            )
+
+            _audit(
+                "plants.mother_released_to_flower",
+                "plant",
+                plant_id,
+            )
+            _system_journal(
+                "Mutterpflanze in Produktions-Lifecycle überführt",
+                body=note,
+                category="care",
+                plant_ids=[plant_id],
+                tags="mutter,lifecycle",
+            )
+            flash(
+                "Die Mutterpflanze wurde aus der Mutterrolle gelöst und "
+                "in die Blütephase überführt. Abstammung und Historie bleiben erhalten.",
+                "success",
+            )
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(url_for("plant_detail", plant_id=plant_id))
+
+
+    @app.route(
+        "/pflanzenmanagement/pflanzen/<int:plant_id>/lebenszyklus-beenden",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def plant_end_lifecycle(plant_id):
+        plant = get_plant(plant_id)
+        if not plant:
+            abort(404)
+
+        ended_on = request.form.get("ended_on")
+        reason = request.form.get("reason") or "Lebenszyklus regulär beendet"
+        user_id, user_name = _current_user_identity()
+
+        try:
+            set_plant_role(
+                plant_id,
+                "retired",
+                started_on=ended_on,
+                note=reason,
+                user_id=user_id,
+                user_name=user_name,
+            )
+            set_plant_stage(
+                plant_id,
+                "finished",
+                started_on=ended_on,
+                note=reason,
+                created_by=user_id,
+            )
+
+            _audit(
+                "plants.lifecycle_finished",
+                "plant",
+                plant_id,
+                {"reason": reason},
+            )
+            _system_journal(
+                "Pflanzen-Lebenszyklus beendet",
+                body=reason,
+                category="care",
+                plant_ids=[plant_id],
+                tags="lifecycle,abschluss",
+            )
+            flash(
+                "Der Lebenszyklus wurde beendet. Die Pflanze bleibt vollständig "
+                "in Historie, Genetik und Abstammung nachvollziehbar.",
+                "success",
+            )
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(url_for("plant_detail", plant_id=plant_id))
+
+
+    # ------------------------------------------------------------------
+    # Phase 7 – Vermehrung / Saatgut
+    # ------------------------------------------------------------------
+
+    @app.route("/pflanzenmanagement/vermehrung")
+    def propagation_dashboard_page():
+        return render_template(
+            "plants/propagation_dashboard.html",
+            stats=propagation_dashboard(),
+            recent_runs=list_propagation_runs(limit=8),
+            seed_lots=list_seed_lots(
+                include_empty=False,
+                include_archived=False,
+            )[:8],
+            mothers=list_mother_plants(active_only=True),
+        )
+
+
+    @app.route("/pflanzenmanagement/vermehrung/saatgut")
+    def seed_lot_list():
+        return render_template(
+            "plants/seed_lots.html",
+            lots=list_seed_lots(
+                include_empty=True,
+                include_archived=True,
+                search=request.args.get("q"),
+            ),
+            query=request.args.get("q", ""),
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/saatgut/neu",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def seed_lot_new():
+        if request.method == "POST":
+            try:
+                user_id, user_name = _current_user_identity()
+                lot_id = save_seed_lot(
+                    _form_data(),
+                    initial_quantity=request.form.get("initial_quantity"),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+                lot = get_seed_lot(lot_id)
+
+                _audit(
+                    "plants.seed_lot_created",
+                    "seed_lot",
+                    lot_id,
+                )
+                _system_journal(
+                    f"Saatgut-Lot angelegt: {lot['code']}",
+                    body=(
+                        f"{lot['cultivar_name']} · Anfangsbestand "
+                        f"{lot['stock']} · Lagerort "
+                        f"{lot.get('storage_location') or '—'}"
+                    ),
+                    category="note",
+                    tags="saatgut,lager",
+                )
+                flash("Saatgut-Lot wurde angelegt.", "success")
+                return redirect(
+                    url_for("seed_lot_detail", lot_id=lot_id)
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/seed_lot_form.html",
+            lot=None,
+            cultivars=list_cultivars(include_inactive=False),
+            statuses=SEED_LOT_STATUSES,
+            seed_types=SEED_TYPES,
+            origin_types=SEED_ORIGIN_TYPES,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/saatgut/<int:lot_id>",
+    )
+    def seed_lot_detail(lot_id):
+        lot = get_seed_lot(lot_id)
+        if not lot:
+            abort(404)
+
+        return render_template(
+            "plants/seed_lot_detail.html",
+            lot=lot,
+            movements=list_seed_movements(lot_id),
+            movement_types=SEED_MOVEMENT_TYPES,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/saatgut/<int:lot_id>/bearbeiten",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def seed_lot_edit(lot_id):
+        lot = get_seed_lot(lot_id)
+        if not lot:
+            abort(404)
+
+        if request.method == "POST":
+            try:
+                save_seed_lot(_form_data(), lot_id)
+                _audit(
+                    "plants.seed_lot_updated",
+                    "seed_lot",
+                    lot_id,
+                )
+                flash("Saatgut-Lot wurde gespeichert.", "success")
+                return redirect(
+                    url_for("seed_lot_detail", lot_id=lot_id)
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/seed_lot_form.html",
+            lot=get_seed_lot(lot_id),
+            cultivars=list_cultivars(include_inactive=True),
+            statuses=SEED_LOT_STATUSES,
+            seed_types=SEED_TYPES,
+            origin_types=SEED_ORIGIN_TYPES,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/saatgut/<int:lot_id>/bewegung",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def seed_lot_movement(lot_id):
+        lot = get_seed_lot(lot_id)
+        if not lot:
+            abort(404)
+
+        user_id, user_name = _current_user_identity()
+
+        try:
+            quantity = int(request.form.get("quantity", "0"))
+            new_stock = book_seed_movement(
+                lot_id,
+                quantity,
+                request.form.get("movement_type") or "adjustment",
+                occurred_on=request.form.get("occurred_on"),
+                note=request.form.get("note"),
+                user_id=user_id,
+                user_name=user_name,
+            )
+
+            _audit(
+                "plants.seed_movement",
+                "seed_lot",
+                lot_id,
+                {
+                    "quantity": quantity,
+                    "new_stock": new_stock,
+                },
+            )
+            _system_journal(
+                f"Saatgutbestand gebucht: {lot['code']} {quantity:+d}",
+                body=f"Neuer Bestand: {new_stock}. {request.form.get('note') or ''}",
+                category="note",
+                tags="saatgut,lager,buchung",
+            )
+            flash(f"Bestand gebucht. Neuer Bestand: {new_stock}.", "success")
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(url_for("seed_lot_detail", lot_id=lot_id))
+
+
+    @app.route("/pflanzenmanagement/vermehrung/saatgut/export.xlsx")
+    def seed_lot_export():
+        _audit("plants.seed_exported", "seed_lot")
+        return send_file(
+            export_seed_lots_xlsx(),
+            as_attachment=True,
+            download_name="growstar_saatgut.xlsx",
+            mimetype=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+
+
+    @app.route("/pflanzenmanagement/vermehrung/saatgut/vorlage.xlsx")
+    def seed_lot_template():
+        return send_file(
+            seed_import_template_xlsx(),
+            as_attachment=True,
+            download_name="growstar_saatgut_importvorlage.xlsx",
+            mimetype=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/saatgut/import",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def seed_lot_import():
+        result = None
+
+        if request.method == "POST":
+            upload = request.files.get("file")
+
+            if not upload or not upload.filename:
+                flash("Bitte eine Excel-Datei auswählen.", "error")
+            elif not upload.filename.lower().endswith(".xlsx"):
+                flash("Es werden nur .xlsx-Dateien unterstützt.", "error")
+            else:
+                try:
+                    user_id, user_name = _current_user_identity()
+                    result = import_seed_lots_xlsx(
+                        upload.stream,
+                        user_id=user_id,
+                        user_name=user_name,
+                    )
+                    _audit(
+                        "plants.seed_imported",
+                        "seed_lot",
+                        details=result,
+                    )
+                    flash(
+                        f"Import abgeschlossen: {result['created']} neu, "
+                        f"{result['updated']} aktualisiert, "
+                        f"{result['booked']} Bestandsbuchungen, "
+                        f"{result['skipped']} übersprungen.",
+                        "success",
+                    )
+                except Exception as exc:
+                    flash(str(exc), "error")
+
+        return render_template(
+            "plants/seed_import.html",
+            result=result,
+        )
+
+
+    @app.route("/pflanzenmanagement/vermehrung/ansaetze")
+    def propagation_run_list():
+        return render_template(
+            "plants/propagation_runs.html",
+            runs=list_propagation_runs(
+                method=request.args.get("method") or None,
+                status=request.args.get("status") or None,
+            ),
+            method_filter=request.args.get("method", ""),
+            status_filter=request.args.get("status", ""),
+            methods=PROPAGATION_METHODS,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/ansaetze/neu",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def propagation_run_new():
+        if request.method == "POST":
+            try:
+                user_id, user_name = _current_user_identity()
+                run_id = create_propagation_run(
+                    _form_data(),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+                run = get_propagation_run(run_id)
+
+                _audit(
+                    "plants.propagation_started",
+                    "propagation_run",
+                    run_id,
+                    {
+                        "method": run["method"],
+                        "target_count": run["target_count"],
+                    },
+                )
+                _system_journal(
+                    f"Vermehrungsansatz gestartet: {run['code']}",
+                    body=(
+                        f"{run['method_label']} · {run['target_count']} Einheiten · "
+                        f"{run['cultivar_name']}"
+                    ),
+                    category="care",
+                    plant_ids=(
+                        [run["mother_plant_id"]]
+                        if run.get("mother_plant_id")
+                        else []
+                    ),
+                    batch_ids=(
+                        [run["batch_id"]]
+                        if run.get("batch_id")
+                        else []
+                    ),
+                    tags="vermehrung",
+                )
+
+                flash("Vermehrungsansatz wurde gestartet.", "success")
+                return redirect(
+                    url_for(
+                        "propagation_run_detail",
+                        run_id=run_id,
+                    )
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/propagation_run_form.html",
+            seed_lots=list_seed_lots(
+                include_empty=False,
+                include_archived=False,
+            ),
+            mothers=list_mother_plants(active_only=True),
+            batches=list_batches(include_archived=False),
+            methods=PROPAGATION_METHODS,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/ansaetze/<int:run_id>",
+    )
+    def propagation_run_detail(run_id):
+        run = get_propagation_run(run_id)
+        if not run:
+            abort(404)
+
+        return render_template(
+            "plants/propagation_run_detail.html",
+            run=run,
+            unit_status_labels=PROPAGATION_UNIT_STATUS_LABELS,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/einheiten/<int:unit_id>/status",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def propagation_unit_status(unit_id):
+        run_id = request.form.get("run_id")
+
+        try:
+            update_propagation_unit(
+                unit_id,
+                status=request.form.get("status"),
+                outcome_on=request.form.get("outcome_on"),
+                notes=request.form.get("notes"),
+            )
+            _audit(
+                "plants.propagation_unit_updated",
+                "propagation_unit",
+                unit_id,
+                {"status": request.form.get("status")},
+            )
+            flash("Status wurde aktualisiert.", "success")
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(
+            url_for(
+                "propagation_run_detail",
+                run_id=run_id,
+            )
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/einheiten/<int:unit_id>/pflanze-erzeugen",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def propagation_unit_create_plant(unit_id):
+        run_id = request.form.get("run_id")
+        user_id, user_name = _current_user_identity()
+
+        try:
+            plant_id = create_plant_from_propagation_unit(
+                unit_id,
+                display_name=request.form.get("display_name"),
+                location=request.form.get("location"),
+                user_id=user_id,
+                user_name=user_name,
+            )
+            plant = get_plant(plant_id)
+
+            _audit(
+                "plants.created_from_propagation",
+                "plant",
+                plant_id,
+                {"propagation_unit_id": unit_id},
+            )
+            _system_journal(
+                f"Pflanze aus Vermehrung erzeugt: {plant['code']}",
+                body=plant["display_name"],
+                category="care",
+                plant_ids=[plant_id],
+                tags="vermehrung,pflanze",
+            )
+
+            flash(
+                "Pflanze wurde erzeugt und ihre Herkunft vollständig verknüpft.",
+                "success",
+            )
+            return redirect(
+                url_for("plant_detail", plant_id=plant_id)
+            )
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(
+            url_for(
+                "propagation_run_detail",
+                run_id=run_id,
+            )
         )
 
 
