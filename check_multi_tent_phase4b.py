@@ -34,7 +34,10 @@ checks = {
     "Globale State-API wird nicht gepollt": 'fetch("/api/state")' not in live,
     "Globale Config-API wird nicht gepollt": 'fetch("/api/config")' not in live,
     "Shadow-Sollzustände werden angezeigt": "shadow_desired" in live and "SHADOW EIN" in live,
-    "Nicht-Default-Detaillinks bleiben sicher gesperrt": "lockLegacyDetailLinks" in live,
+    "Nicht-Default-Detaillinks bleiben sicher getrennt": (
+        "lockLegacyDetailLinks" in live
+        or "grow_control_tent_temperature" in live
+    ),
     "Stationswechsler ist API-dynamisch": 'id="tent-switcher"' in live and "tents.forEach" in live,
     "Polling bleibt bei 2 Sekunden": "setInterval(loadState, 2000)" in live,
     "Backend startet zusätzliche Runtimes generisch": "for extra_runtime in list_runtimes()" in app_source,
