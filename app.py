@@ -14,7 +14,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import init_db, init_diary_db, init_plants_table
 from core.tents import init_tents
-from core.runtime import get_default_runtime, resolve_runtime
+from core.runtime import get_default_runtime, init_runtimes, resolve_runtime
 from core.actuators import set_heating, set_fan, set_vent
 
 from services.watchdog import log_event, watchdog_loop
@@ -83,6 +83,7 @@ def create_flask_app():
     # Die Initialisierung bleibt vor der Routenregistrierung, wie bisher.
     # Phase 1 Multi-Zelt: bestehende Installation wird als tent_1 registriert.
     init_tents()
+    init_runtimes()
     init_db()
     init_diary_db()
     init_plants_table()
