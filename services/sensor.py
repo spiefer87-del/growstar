@@ -1,137 +1,129 @@
+# services/sensor.py
 
 import time
 
-import core.state as state
-import core.context as ctx
-
-from core.config import config
+from core.runtime import resolve_runtime
 from core.helpers import calculate_vpd
 from core.constants import SENSOR_TIMEOUT
-
-from core.actuators import (
-    set_heating,
-    set_fan,
-)
+from core.actuators import set_heating, set_fan
 
 
 # =========================================
-# Sensor Update
+# Sensor Update (Legacy-Direktpfad)
 # =========================================
 
-def update_temperature(temp_raw):
+def update_temperature(temp_raw, runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
+    cfg = rt.config
 
     now = time.time()
+    temp = round(temp_raw + float(cfg.get("TEMP_OFFSET", 0.0)), 2)
 
-    temp = round(
-        temp_raw + float(config.get("TEMP_OFFSET", 0.0)),
-        2
-    )
+    with rt.state_lock:
+        st.last_temp_raw = temp_raw
+        # Legacy-Verhalten beibehalten: interner Direktpfad speichert hier
+        # weiterhin den Rohwert; der Live-Wert enthält den Offset.
+        st.last_ds_temp = temp_raw
+        st.last_ds_time = now
+        st.temp_stale = False
 
-    with ctx.state_lock:
-
-        state.last_ds_temp = temp_raw
-        state.last_ds_time = now
-
-        state.live_state["temp_raw"] = temp_raw
-        state.live_state["temp"] = temp
+        st.live_state["temp_raw"] = temp_raw
+        st.live_state["temp"] = temp
 
 
-def update_humidity(hum_raw):
+def update_humidity(hum_raw, runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
+    cfg = rt.config
 
     now = time.time()
+    hum = round(hum_raw + float(cfg.get("HUM_OFFSET", 0.0)), 2)
 
-    hum = round(
-        hum_raw + float(config.get("HUM_OFFSET", 0.0)),
-        2
-    )
+    with rt.state_lock:
+        st.last_hum_raw = hum_raw
+        # Legacy-Verhalten beibehalten (siehe update_temperature).
+        st.last_hum = hum_raw
+        st.last_dht_time = now
+        st.hum_stale = False
 
-    with ctx.state_lock:
-
-        state.last_hum = hum_raw
-        state.last_dht_time = now
-
-        state.live_state["hum_raw"] = hum_raw
-        state.live_state["hum"] = hum
+        st.live_state["hum_raw"] = hum_raw
+        st.live_state["hum"] = hum
 
 
 # =========================================
 # Sensor Health
 # =========================================
 
-def mark_stale_sensors():
+def mark_stale_sensors(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
     now = time.time()
 
-    with ctx.state_lock:
-        temp_age = now - state.last_ds_time
-        hum_age = now - state.last_dht_time
-
-    # =========================
-    # Temperatur
-    # =========================
+    with rt.state_lock:
+        temp_age = now - st.last_ds_time
+        hum_age = now - st.last_dht_time
 
     if temp_age > SENSOR_TIMEOUT:
+        if not st.temp_stale:
+            print(
+                f"⚠️ [{rt.tent_id}] TEMP SENSOR STALE "
+                f"({int(temp_age)}s ohne Daten)"
+            )
 
-        if not state.temp_stale:
-            print(f"⚠️ TEMP SENSOR STALE ({int(temp_age)}s ohne Daten)")
+        st.temp_stale = True
 
-        state.temp_stale = True
+        with rt.state_lock:
+            st.live_state["temp"] = None
+            st.live_state["temp_raw"] = None
+            st.live_state["vpd"] = None
 
-        state.live_state["temp"] = None
-        state.live_state["temp_raw"] = None
-        state.live_state["vpd"] = None
-
-        set_heating(False, "(TEMP SENSOR STALE)")
+        set_heating(False, "(TEMP SENSOR STALE)", runtime=rt)
 
     else:
-
-        if state.temp_stale:
-            print("✅ TEMP SENSOR wieder da")
-
-        state.temp_stale = False
-
-    # =========================
-    # Luftfeuchte
-    # =========================
+        if st.temp_stale:
+            print(f"✅ [{rt.tent_id}] TEMP SENSOR wieder da")
+        st.temp_stale = False
 
     if hum_age > SENSOR_TIMEOUT:
+        if not st.hum_stale:
+            print(
+                f"⚠️ [{rt.tent_id}] HUM SENSOR STALE "
+                f"({int(hum_age)}s ohne Daten)"
+            )
 
-        if not state.hum_stale:
-            print(f"⚠️ HUM SENSOR STALE ({int(hum_age)}s ohne Daten)")
+        st.hum_stale = True
 
-        state.hum_stale = True
+        with rt.state_lock:
+            st.live_state["hum"] = None
+            st.live_state["hum_raw"] = None
+            st.live_state["vpd"] = None
 
-        state.live_state["hum"] = None
-        state.live_state["hum_raw"] = None
-        state.live_state["vpd"] = None
-
-        set_fan(False, "(HUM SENSOR STALE)")
+        set_fan(False, "(HUM SENSOR STALE)", runtime=rt)
 
     else:
+        if st.hum_stale:
+            print(f"✅ [{rt.tent_id}] HUM SENSOR wieder da")
+        st.hum_stale = False
 
-        if state.hum_stale:
-            print("✅ HUM SENSOR wieder da")
-
-        state.hum_stale = False
-
-    update_vpd()
+    update_vpd(runtime=rt)
 
 
 # =========================================
 # VPD
 # =========================================
 
-def update_vpd():
+def update_vpd(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
-    temp = state.live_state.get("temp")
-    hum = state.live_state.get("hum")
+    with rt.state_lock:
+        temp = st.live_state.get("temp")
+        hum = st.live_state.get("hum")
 
-    if temp is None or hum is None:
+        if temp is None or hum is None:
+            st.live_state["vpd"] = None
+            return
 
-        state.live_state["vpd"] = None
-        return
-
-    state.live_state["vpd"] = calculate_vpd(
-        temp,
-        hum,
-    )
+        st.live_state["vpd"] = calculate_vpd(temp, hum)
