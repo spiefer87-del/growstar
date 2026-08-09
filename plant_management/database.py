@@ -8,6 +8,7 @@ from .constants import (
     STAGE_COLORS,
     PLANT_STATUS_LABELS,
     BATCH_STATUS_LABELS,
+    PLANT_ROLE_LABELS,
 )
 
 DB_FILE = Path(__file__).resolve().parent.parent / "data.db"
@@ -22,6 +23,14 @@ def _db():
 
 def _now():
     return int(time.time())
+
+
+def _table_exists(db, table):
+    row = db.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+        (table,),
+    ).fetchone()
+    return bool(row)
 
 
 def _text(value):
@@ -441,6 +450,8 @@ def _decorate_plant(item):
     item["status_label"] = PLANT_STATUS_LABELS.get(
         item.get("status"), item.get("status")
     )
+    role = item.get("current_role") or "production"
+    item["role_label"] = PLANT_ROLE_LABELS.get(role, role)
     item["age_days"] = _days_between(item.get("started_on"))
     item["stage_days"] = _days_between(item.get("current_stage_started_on"))
     return item
@@ -606,6 +617,26 @@ def save_plant(data, plant_id=None, created_by=None):
                     now,
                 ),
             )
+
+            # Ab Phase 7 wird auch die Pflanzenrolle historisiert. Der Guard
+            # hält den älteren Phase-5-Datenbanktest weiterhin kompatibel.
+            if _table_exists(db, "pm_plant_role_events"):
+                db.execute(
+                    """
+                    INSERT INTO pm_plant_role_events (
+                        plant_id, role, started_on, ended_on,
+                        note, created_by, created_at
+                    )
+                    VALUES (?, 'production', ?, NULL, ?, ?, ?)
+                    """,
+                    (
+                        saved_id,
+                        started_on,
+                        "Initiale Produktionsrolle",
+                        created_by,
+                        now,
+                    ),
+                )
 
         db.commit()
         return saved_id

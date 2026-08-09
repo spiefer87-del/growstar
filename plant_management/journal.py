@@ -554,6 +554,7 @@ def save_journal_entry(
     user_id=None,
     user_name=None,
     entry_id=None,
+    source="manual",
 ):
     category = _text(data.get("category")) or "note"
     severity = _text(data.get("severity")) or "info"
@@ -652,7 +653,7 @@ def save_journal_entry(
                     source, created_by, created_by_name,
                     created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     occurred_at,
@@ -663,6 +664,7 @@ def save_journal_entry(
                     tags,
                     follow_up_required,
                     follow_up_due_on,
+                    _text(source) or "manual",
                     user_id,
                     user_name,
                     now,
