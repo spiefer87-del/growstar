@@ -812,6 +812,7 @@ def list_seed_lots(include_empty=True, include_archived=True, search=None):
                 s.*,
                 c.code AS cultivar_code,
                 c.name AS cultivar_name,
+                c.breeder AS cultivar_breeder,
                 COALESCE((
                     SELECT SUM(m.quantity)
                     FROM pm_seed_movements m
@@ -864,7 +865,8 @@ def get_seed_lot(lot_id):
             SELECT
                 s.*,
                 c.code AS cultivar_code,
-                c.name AS cultivar_name
+                c.name AS cultivar_name,
+                c.breeder AS cultivar_breeder
             FROM pm_seed_lots s
             JOIN pm_cultivars c ON c.id = s.cultivar_id
             WHERE s.id = ?
