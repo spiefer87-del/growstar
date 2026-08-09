@@ -1,10 +1,8 @@
-#core/control.py
+# core/control.py
 
 import time
 
-import core.state as state
-
-from core.config import config
+from core.runtime import resolve_runtime
 from core.profile import get_profile
 from core.ramp import get_ramped_target
 from core.helpers import minutes_now, in_time_window
@@ -18,88 +16,97 @@ from core.devices import (
     get_device_mode,
     get_device_params,
 )
+
+
 # =========================================
 # 🌡️ REGELLOGIK
 # =========================================
 
+def update_humidity_setpoint(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
 
-def update_humidity_setpoint():
-    profile = get_profile()
-
-    if profile == "TAG":
-        base, tol = config["DAY_HUM"], config["DAY_HUM_TOL"]
-    else:
-        base, tol = config["NIGHT_HUM"], config["NIGHT_HUM_TOL"]
-
-    state.live_state["hum_target"] = base
-    state.live_state["hum_tol"] = tol
-
-def update_temperature_setpoint():
-    profile = get_profile()
+    profile = get_profile(runtime=rt)
 
     if profile == "TAG":
-        base = float(config["DAY_TEMP"])
-        tol  = float(config["DAY_TEMP_TOL"])
+        base, tol = cfg["DAY_HUM"], cfg["DAY_HUM_TOL"]
     else:
-        base = float(config["NIGHT_TEMP"])
-        tol  = float(config["NIGHT_TEMP_TOL"])
+        base, tol = cfg["NIGHT_HUM"], cfg["NIGHT_HUM_TOL"]
+
+    st.live_state["hum_target"] = base
+    st.live_state["hum_tol"] = tol
+
+
+def update_temperature_setpoint(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
+
+    profile = get_profile(runtime=rt)
+
+    if profile == "TAG":
+        base = float(cfg["DAY_TEMP"])
+        tol = float(cfg["DAY_TEMP_TOL"])
+    else:
+        base = float(cfg["NIGHT_TEMP"])
+        tol = float(cfg["NIGHT_TEMP_TOL"])
 
     target = base
 
-    if state.ramp_active:
-
-        ramp_target = get_ramped_target()
-
+    if st.ramp_active:
+        ramp_target = get_ramped_target(runtime=rt)
         if ramp_target is not None:
             target = ramp_target
 
-    # 📊 IMMER setzen – auch wenn Regelung deaktiviert
-    state.live_state["temp_target"] = target
-    state.live_state["temp_tol"] = tol
+    st.live_state["temp_target"] = target
+    st.live_state["temp_tol"] = tol
+
     print(
         f"{time.strftime('%H:%M:%S')} "
+        f"[{rt.tent_id}] "
         f"({minutes_now()} min) | "
         f"profile={profile} | "
-        f"ramp={state.ramp_active} | "
-        f"ramp_target={state.ramp_target_temp} | "
+        f"ramp={st.ramp_active} | "
+        f"ramp_target={st.ramp_target_temp} | "
         f"base={base:.2f} | "
         f"target={target:.2f}"
     )
 
-def evaluate_env_conditions(device):
 
-    cfg = config.get("DEVICE_ENV_CONFIG", {}).get(device, {})
-    if not cfg:
+def evaluate_env_conditions(device, runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
+
+    env_cfg = cfg.get("DEVICE_ENV_CONFIG", {}).get(device, {})
+    if not env_cfg:
         return False
 
-    use_temp = cfg.get("use_temp", False)
-    use_hum = cfg.get("use_hum", False)
-    logic = cfg.get("logic", "OR")
-    direction = cfg.get("direction", "HIGH")  # HIGH oder LOW
+    use_temp = env_cfg.get("use_temp", False)
+    use_hum = env_cfg.get("use_hum", False)
+    logic = env_cfg.get("logic", "OR")
+    direction = env_cfg.get("direction", "HIGH")
 
     results = []
 
-    # ================= TEMP =================
     if use_temp:
-        temp = state.live_state.get("temp")
-        target = state.live_state.get("temp_target")
-        tol = state.live_state.get("temp_tol")
+        temp = st.live_state.get("temp")
+        target = st.live_state.get("temp_target")
+        tol = st.live_state.get("temp_tol")
 
         if None not in (temp, target, tol):
-
             if direction == "HIGH":
                 results.append(temp > (target + tol))
-            else:  # LOW
+            else:
                 results.append(temp < (target - tol))
 
-    # ================= HUM =================
     if use_hum:
-        hum = state.live_state.get("hum")
-        target = state.live_state.get("hum_target")
-        tol = state.live_state.get("hum_tol")
+        hum = st.live_state.get("hum")
+        target = st.live_state.get("hum_target")
+        tol = st.live_state.get("hum_tol")
 
         if None not in (hum, target, tol):
-
             if direction == "HIGH":
                 results.append(hum > (target + tol))
             else:
@@ -114,151 +121,135 @@ def evaluate_env_conditions(device):
     return any(results)
 
 
-def control_device(device):
+def control_device(device, runtime=None):
+    rt = resolve_runtime(runtime)
 
-    mode = get_device_mode(device)
-    params = get_device_params(device)
+    mode = get_device_mode(device, runtime=rt)
+    params = get_device_params(device, runtime=rt)
 
     now_min = minutes_now()
 
-    # OFF
     if mode == "OFF":
-        set_device(device, False)
+        set_device(device, False, runtime=rt)
         return
 
-    # Dauerbetrieb
     if mode == "ON":
-        set_device(device, True)
+        set_device(device, True, runtime=rt)
         return
 
-    # Zeitgesteuert
     if mode == "TIME":
         start = int(params.get("start_min", 0))
-        end   = int(params.get("end_min", 0))
+        end = int(params.get("end_min", 0))
         should_run = in_time_window(now_min, start, end)
-        set_device(device, should_run)
+        set_device(device, should_run, runtime=rt)
         return
 
-    # Intervall
     if mode == "INTERVAL":
-        on_t  = int(params.get("interval_on", 300))
+        on_t = int(params.get("interval_on", 300))
         off_t = int(params.get("interval_off", 900))
 
         cycle = on_t + off_t
-        phase = int(time.time()) % cycle
+        if cycle <= 0:
+            set_device(device, False, runtime=rt)
+            return
 
-        set_device(device, phase < on_t)
+        phase = int(time.time()) % cycle
+        set_device(device, phase < on_t, runtime=rt)
         return
 
-    # Umgebung
     if mode == "ENV":
         if device == "heating":
-            control_heating_env()
+            control_heating_env(runtime=rt)
             return
-        
+
         if device == "light":
-            control_light_profile()
+            control_light_profile(runtime=rt)
             return
-        
-        should_run = evaluate_env_conditions(device)
-        set_device(device, should_run)
+
+        should_run = evaluate_env_conditions(device, runtime=rt)
+        set_device(device, should_run, runtime=rt)
         return
-    
-def control_light_profile():
+
+
+def control_light_profile(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+
     now_min = minutes_now()
+    day_start = int(cfg.get("DAY_START_MIN", 360))
+    night_start = int(cfg.get("NIGHT_START_MIN", 1320))
 
-    day_start = int(config.get("DAY_START_MIN", 360))
-    night_start = int(config.get("NIGHT_START_MIN", 1320))
-
-    # Licht an = Tageszeit
     light_on = in_time_window(now_min, day_start, night_start)
+    set_device("light", light_on, runtime=rt)
 
-    set_device("light", light_on)
 
+def control_heating_env(runtime=None):
+    """Temperaturregelung im ENV-Modus mit Profil, Rampe und Hysterese."""
 
-def control_heating_env():
-    """
-    Temperaturregelung im ENV Modus.
-    Nutzt Profil + Rampen + Hysterese.
-    """
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
 
-    temp = state.live_state.get("temp")
+    temp = st.live_state.get("temp")
     if temp is None:
-        set_heating(False)
+        set_heating(False, runtime=rt)
         return
 
-    update_temperature_setpoint()
+    update_temperature_setpoint(runtime=rt)
 
-    target = state.live_state.get("temp_target")
-    tol    = state.live_state.get("temp_tol")
+    target = st.live_state.get("temp_target")
+    tol = st.live_state.get("temp_tol")
 
     if target is None or tol is None:
         return
 
-    min_temp = float(config.get("MIN_TEMP", 18.0))
-    max_temp = float(config.get("MAX_TEMP", 30.0))
+    min_temp = float(cfg.get("MIN_TEMP", 18.0))
+    max_temp = float(cfg.get("MAX_TEMP", 30.0))
 
-    # 🔴 Absolute Sicherheitsgrenzen
     if temp >= max_temp:
-        set_heating(False, "(MAX TEMP Schutz)")
+        set_heating(False, "(MAX TEMP Schutz)", runtime=rt)
         return
 
     if temp <= min_temp:
-        set_heating(True, "(MIN TEMP Schutz)")
+        set_heating(True, "(MIN TEMP Schutz)", runtime=rt)
         return
 
-    # 🟢 Normale Hysterese-Regelung
-    # Einschalten unter Soll - Toleranz
     if temp < (target - tol):
-        set_heating(True, f"(unter Soll {target:.1f}°C)")
-
-    # Ausschalten erst wenn Soll erreicht
+        set_heating(True, f"(unter Soll {target:.1f}°C)", runtime=rt)
     elif temp >= target:
-        set_heating(False, f"(Soll {target:.1f}°C erreicht)")
-
-    #print("HEATING ENV CHECK:",
-      #"Temp:", temp,
-      #"Target:", target,
-      #"Tol:", tol,
-      #"Mode:", get_device_mode("heating"))
+        set_heating(False, f"(Soll {target:.1f}°C erreicht)", runtime=rt)
 
 
-def control_fan_env():
-    should_run = evaluate_env_conditions("fan")
-    set_fan(should_run)
+def control_fan_env(runtime=None):
+    rt = resolve_runtime(runtime)
+    should_run = evaluate_env_conditions("fan", runtime=rt)
+    set_fan(should_run, runtime=rt)
 
 
+def control_ventilator_env(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
 
-def control_ventilator_env():
-    """
-    Umgebungskühlung:
-    Ventilator läuft, wenn Temperatur über Soll + Toleranz.
-    Sollwerte kommen aus aktivem Profil.
-    """
-
-    temp = state.live_state.get("temp")
+    temp = st.live_state.get("temp")
     if temp is None:
-        set_vent(False)
+        set_vent(False, runtime=rt)
         return
 
-    # Aktuelle Zielwerte holen
-    profile = get_profile()
+    profile = get_profile(runtime=rt)
 
     if profile == "TAG":
-        target = float(config.get("DAY_TEMP", 24.0))
-        tol    = float(config.get("DAY_TEMP_TOL", 1.0))
+        target = float(cfg.get("DAY_TEMP", 24.0))
+        tol = float(cfg.get("DAY_TEMP_TOL", 1.0))
     else:
-        target = float(config.get("NIGHT_TEMP", 20.0))
-        tol    = float(config.get("NIGHT_TEMP_TOL", 1.0))
+        target = float(cfg.get("NIGHT_TEMP", 20.0))
+        tol = float(cfg.get("NIGHT_TEMP_TOL", 1.0))
 
-    # Sicherheitsgrenze
-    if temp > config.get("MAX_TEMP", 30.0):
-        set_vent(True, "(MAX TEMP Schutz)")
+    if temp > float(cfg.get("MAX_TEMP", 30.0)):
+        set_vent(True, "(MAX TEMP Schutz)", runtime=rt)
         return
 
-    # Regelung
     if temp > (target + tol):
-        set_vent(True, f"(Kühlung über Soll {target:.1f}°C)")
+        set_vent(True, f"(Kühlung über Soll {target:.1f}°C)", runtime=rt)
     elif temp <= target:
-        set_vent(False, f"(Soll {target:.1f}°C erreicht)")
-
+        set_vent(False, f"(Soll {target:.1f}°C erreicht)", runtime=rt)

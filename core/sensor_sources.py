@@ -1,17 +1,23 @@
 # core/sensor_sources.py
 
-import time
 import math
+import time
 
-import core.state as state
 import core.context as ctx
+import core.state as controller_state
 
-from core.config import config
+from core.runtime import resolve_runtime
+from core.constants import SENSOR_TIMEOUT
 
 
 # ----------------------------------------------------
-# Quelle speichern
+# Architektur Phase 2
 # ----------------------------------------------------
+# Sensorquellen gehören zum Controller, nicht zu einem einzelnen Zelt.
+# MQTT/Bluetooth/Hardware dürfen daher weiterhin ohne Tent-ID Quellen melden.
+# Erst die SENSOR_ASSIGNMENTS einer TentRuntime entscheiden, welche Quelle für
+# Temperatur bzw. Feuchte dieses Zeltes verwendet wird.
+
 
 def update_sensor_source(
     source_id,
@@ -21,26 +27,16 @@ def update_sensor_source(
     humidity=None,
     battery=None,
     rssi=None,
-    raw=None
+    raw=None,
 ):
-
     if not source_id:
-
         return None
 
     now = time.time()
 
     with ctx.state_lock:
-
-        sources = state.live_state.setdefault(
-            "sensor_sources",
-            {}
-        )
-
-        source = sources.get(
-            source_id,
-            {}
-        )
+        sources = controller_state.live_state.setdefault("sensor_sources", {})
+        source = sources.get(source_id, {})
 
         source["id"] = source_id
         source["label"] = label or source.get("label") or source_id
@@ -49,32 +45,22 @@ def update_sensor_source(
         source["online"] = True
 
         if temperature is not None:
-
-            source["temperature"] = float(
-                temperature
-            )
+            source["temperature"] = float(temperature)
 
         if humidity is not None:
-
-            source["humidity"] = float(
-                humidity
-            )
+            source["humidity"] = float(humidity)
 
         if battery is not None:
-
             source["battery"] = battery
 
         if rssi is not None:
-
             source["rssi"] = rssi
 
         if raw is not None:
-
             source["raw"] = raw
 
         sources[source_id] = source
-
-        return source
+        return dict(source)
 
 
 # ----------------------------------------------------
@@ -82,27 +68,23 @@ def update_sensor_source(
 # ----------------------------------------------------
 
 def get_sensor_source(source_id):
-
     if not source_id:
-
         return None
 
-    return state.live_state.get(
-        "sensor_sources",
-        {}
-    ).get(
-        source_id
-    )
+    with ctx.state_lock:
+        source = controller_state.live_state.get("sensor_sources", {}).get(source_id)
+        return dict(source) if source else None
 
 
 def list_sensor_sources():
-
-    return list(
-        state.live_state.get(
-            "sensor_sources",
-            {}
-        ).values()
-    )
+    with ctx.state_lock:
+        return [
+            dict(source)
+            for source in controller_state.live_state.get(
+                "sensor_sources",
+                {},
+            ).values()
+        ]
 
 
 # ----------------------------------------------------
@@ -110,91 +92,47 @@ def list_sensor_sources():
 # ----------------------------------------------------
 
 def _calculate_vpd(temp, hum):
-
     if temp is None or hum is None:
-
         return None
 
     try:
-
-        svp = 0.6108 * math.exp(
-            (17.27 * temp) /
-            (temp + 237.3)
-        )
-
-        avp = svp * (
-            hum / 100.0
-        )
-
-        return round(
-            svp - avp,
-            2
-        )
-
+        svp = 0.6108 * math.exp((17.27 * temp) / (temp + 237.3))
+        avp = svp * (hum / 100.0)
+        return round(svp - avp, 2)
     except Exception:
-
         return None
 
 
-def _read_assignment(sensor_name):
-
-    assignments = config.get(
-        "SENSOR_ASSIGNMENTS",
-        {}
-    )
-
-    return assignments.get(
-        sensor_name,
-        {}
-    )
+def _read_assignment(sensor_name, runtime=None):
+    rt = resolve_runtime(runtime)
+    assignments = rt.config.get("SENSOR_ASSIGNMENTS", {})
+    return assignments.get(sensor_name, {})
 
 
-def _read_assigned_value(sensor_name):
+def _read_assigned_value(sensor_name, runtime=None):
+    assignment = _read_assignment(sensor_name, runtime=runtime)
 
-    assignment = _read_assignment(
-        sensor_name
-    )
-
-    source_id = assignment.get(
-        "source_id"
-    )
-
-    field = assignment.get(
-        "field"
-    )
+    source_id = assignment.get("source_id")
+    field = assignment.get("field")
 
     if not field:
-
         if sensor_name == "temperature":
-
             field = "temperature"
-
         elif sensor_name == "humidity":
-
             field = "humidity"
 
-    source = get_sensor_source(
-        source_id
-    )
+    source = get_sensor_source(source_id)
 
     if source is None:
-
         return None, None, assignment
 
-    value = source.get(
-        field
-    )
-
+    value = source.get(field)
     if value is None:
-
         return None, source, assignment
 
     try:
-
         return float(value), source, assignment
-
     except Exception:
-
         return None, source, assignment
 
 
@@ -202,82 +140,108 @@ def _read_assigned_value(sensor_name):
 # Zentrale Anwendung für Regelung
 # ----------------------------------------------------
 
-def apply_sensor_assignments():
+def _source_last_seen(source):
+    try:
+        return float((source or {}).get("last_seen") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _source_is_fresh(source, now=None):
+    last_seen = _source_last_seen(source)
+    if last_seen <= 0:
+        return False
+
+    current = time.time() if now is None else float(now)
+    return (current - last_seen) <= SENSOR_TIMEOUT
+
+
+def apply_sensor_assignments(runtime=None):
+    """Überträgt frische Controller-Sensorquellen in den State eines Zeltes.
+
+    Der Zeitstempel der Quelle ist die einzige Wahrheit für Sensor-Frische.
+    Ein Main-Loop darf eine alte Quelle deshalb weder erneut als frisch
+    markieren noch den letzten Empfangszeitpunkt künstlich nach vorne setzen.
+    """
+
+    rt = resolve_runtime(runtime)
+    st = rt.state
+    cfg = rt.config
+
+    temp_raw, temp_source, temp_assignment = _read_assigned_value(
+        "temperature",
+        runtime=rt,
+    )
+    hum_raw, hum_source, hum_assignment = _read_assigned_value(
+        "humidity",
+        runtime=rt,
+    )
+
+    now = time.time()
+    temp_last_seen = _source_last_seen(temp_source)
+    hum_last_seen = _source_last_seen(hum_source)
+    temp_fresh = temp_raw is not None and _source_is_fresh(temp_source, now)
+    hum_fresh = hum_raw is not None and _source_is_fresh(hum_source, now)
 
     changed = False
 
-    with ctx.state_lock:
+    with rt.state_lock:
+        # Den echten Empfangszeitpunkt auch dann übernehmen, wenn die Quelle
+        # bereits stale ist. mark_stale_sensors() kann dadurch korrekt über
+        # den Ausfall entscheiden, ohne dass alte Werte kurz wieder im UI
+        # auftauchen.
+        if temp_last_seen > 0:
+            st.last_ds_time = temp_last_seen
 
-        temp_raw, temp_source, temp_assignment = _read_assigned_value(
-            "temperature"
-        )
+        if hum_last_seen > 0:
+            st.last_dht_time = hum_last_seen
 
-        hum_raw, hum_source, hum_assignment = _read_assigned_value(
-            "humidity"
-        )
-
-        if temp_raw is not None:
-
-            temp_offset = float(
-                config.get(
-                    "TEMP_OFFSET",
-                    0.0
-                )
-            )
-
+        if temp_fresh:
+            temp_offset = float(cfg.get("TEMP_OFFSET", 0.0))
             temp = temp_raw + temp_offset
 
-            state.live_state["temp_raw"] = temp_raw
-            state.live_state["temp"] = temp
+            st.live_state["temp_raw"] = temp_raw
+            st.live_state["temp"] = temp
 
-            state.last_temp_raw = temp_raw
-            state.last_ds_temp = temp
-            state.last_ds_time = time.time()
-            state.temp_stale = False
+            st.last_temp_raw = temp_raw
+            st.last_ds_temp = temp
+            st.temp_stale = False
 
-            state.live_state["temp_source"] = (
+            st.live_state["temp_source"] = (
                 temp_assignment.get("label")
-                or temp_source.get("label")
+                or (temp_source or {}).get("label")
                 or temp_assignment.get("source_id")
             )
 
             changed = True
 
-        if hum_raw is not None:
-
-            hum_offset = float(
-                config.get(
-                    "HUM_OFFSET",
-                    0.0
-                )
-            )
-
+        if hum_fresh:
+            hum_offset = float(cfg.get("HUM_OFFSET", 0.0))
             hum = hum_raw + hum_offset
 
-            state.live_state["hum_raw"] = hum_raw
-            state.live_state["hum"] = hum
+            st.live_state["hum_raw"] = hum_raw
+            st.live_state["hum"] = hum
 
-            state.last_hum_raw = hum_raw
-            state.last_hum = hum
-            state.last_dht_time = time.time()
-            state.hum_stale = False
+            st.last_hum_raw = hum_raw
+            st.last_hum = hum
+            st.hum_stale = False
 
-            state.live_state["hum_source"] = (
+            st.live_state["hum_source"] = (
                 hum_assignment.get("label")
-                or hum_source.get("label")
+                or (hum_source or {}).get("label")
                 or hum_assignment.get("source_id")
             )
 
             changed = True
 
-        state.live_state["vpd"] = _calculate_vpd(
-            state.live_state.get("temp"),
-            state.live_state.get("hum")
+        st.live_state["vpd"] = _calculate_vpd(
+            st.live_state.get("temp"),
+            st.live_state.get("hum"),
         )
 
-        state.live_state["sensor_assignments"] = config.get(
+        st.live_state["sensor_assignments"] = cfg.get(
             "SENSOR_ASSIGNMENTS",
-            {}
+            {},
         )
 
     return changed

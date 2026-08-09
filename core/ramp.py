@@ -3,15 +3,12 @@
 import time
 import datetime
 
-import core.state as state
-
-from core.config import config
+from core.runtime import resolve_runtime
 from core.helpers import minutes_now
 from core.profile import get_profile
 
 
 def get_ramp_end_timestamp(end_min):
-
     now = datetime.datetime.now()
 
     end_dt = now.replace(
@@ -26,55 +23,53 @@ def get_ramp_end_timestamp(end_min):
 
     return end_dt.timestamp()
 
-def _restart_ramp(current_temp, target_temp, end_min):
-    """
-    Startet eine bereits laufende Rampe
-    mit neuem Startwert neu.
 
-    Die Ziel-Uhrzeit bleibt erhalten.
-    """
+def _restart_ramp(current_temp, target_temp, end_min, runtime=None):
+    """Startet eine laufende Rampe mit neuem Startwert neu."""
 
-    state.ramp_start_ts = time.time()
-    state.ramp_end_ts = get_ramp_end_timestamp(end_min)
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
-    state.ramp_start_temp = float(current_temp)
-    state.ramp_target_temp = float(target_temp)
+    st.ramp_start_ts = time.time()
+    st.ramp_end_ts = get_ramp_end_timestamp(end_min)
 
-    state.live_state["ramp_target"] = float(target_temp)
+    st.ramp_start_temp = float(current_temp)
+    st.ramp_target_temp = float(target_temp)
+
+    st.live_state["ramp_target"] = float(target_temp)
 
     print(
-        f"🔁 RAMPE UPDATE "
+        f"🔁 [{rt.tent_id}] RAMPE UPDATE "
         f"{current_temp:.2f}°C → {target_temp:.2f}°C "
         f"Ende "
-        f"{datetime.datetime.fromtimestamp(state.ramp_end_ts).strftime('%H:%M')}"
+        f"{datetime.datetime.fromtimestamp(st.ramp_end_ts).strftime('%H:%M')}"
     )
+
 
 # =========================================
 # 🌡️ RAMPE STARTEN
 # =========================================
 
-def start_ramp(start_temp, target_temp, end_min):
+def start_ramp(start_temp, target_temp, end_min, runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
     now = time.time()
 
-    
+    st.ramp_active = True
+    st.ramp_start_ts = now
+    st.ramp_end_ts = get_ramp_end_timestamp(end_min)
+    st.ramp_start_temp = float(start_temp)
+    st.ramp_target_temp = float(target_temp)
 
-    state.ramp_active = True
-
-    state.ramp_start_ts = now
-    
-    state.ramp_end_ts = get_ramp_end_timestamp(end_min)
-    state.ramp_start_temp = float(start_temp)
-    state.ramp_target_temp = float(target_temp)
-
-    state.live_state["ramp_active"] = True
-    state.live_state["ramp_target"] = float(target_temp)
+    st.live_state["ramp_active"] = True
+    st.live_state["ramp_target"] = float(target_temp)
 
     print(
-        f"🌡️ RAMPE START "
+        f"🌡️ [{rt.tent_id}] RAMPE START "
         f"{start_temp:.1f}°C → {target_temp:.1f}°C "
         f"Ende "
-        f"{datetime.datetime.fromtimestamp(state.ramp_end_ts).strftime('%H:%M')}"
+        f"{datetime.datetime.fromtimestamp(st.ramp_end_ts).strftime('%H:%M')}"
     )
 
 
@@ -82,44 +77,30 @@ def start_ramp(start_temp, target_temp, end_min):
 # 🌡️ AKTUELLEN RAMPENWERT BERECHNEN
 # =========================================
 
-def get_ramped_target():
-    """
-    Liefert den aktuell interpolierten Rampenwert.
-    """
+def get_ramped_target(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
-    if not state.ramp_active:
+    if not st.ramp_active:
         return None
 
-    start_ts = state.ramp_start_ts
-    end_ts = state.ramp_end_ts
+    start_ts = st.ramp_start_ts
+    end_ts = st.ramp_end_ts
+    start_temp = st.ramp_start_temp
+    target_temp = st.ramp_target_temp
 
-    start_temp = state.ramp_start_temp
-    target_temp = state.ramp_target_temp
-
-    if None in (
-        start_ts,
-        end_ts,
-        start_temp,
-        target_temp
-    ):
+    if None in (start_ts, end_ts, start_temp, target_temp):
         return target_temp
 
     duration = end_ts - start_ts
-
     if duration <= 0:
         return target_temp
 
     now = time.time()
-
     progress = (now - start_ts) / duration
-
     progress = max(0.0, min(1.0, progress))
 
-    value = (
-        start_temp
-        + (target_temp - start_temp) * progress
-    )
-
+    value = start_temp + (target_temp - start_temp) * progress
     return round(value, 2)
 
 
@@ -127,48 +108,54 @@ def get_ramped_target():
 # 🔄 RAMPE AKTUALISIEREN
 # =========================================
 
-def update_ramp():
+def update_ramp(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
-    if not state.ramp_active:
+    if not st.ramp_active:
         return
 
-    if time.time() < state.ramp_end_ts:
+    if st.ramp_end_ts is None or time.time() < st.ramp_end_ts:
         return
 
-    print(
-        f"✅ RAMPE ENDE ({state.ramp_target_temp:.1f}°C)"
-    )
-    
-    stop_ramp()
+    if st.ramp_target_temp is not None:
+        print(f"✅ [{rt.tent_id}] RAMPE ENDE ({st.ramp_target_temp:.1f}°C)")
+    else:
+        print(f"✅ [{rt.tent_id}] RAMPE ENDE")
+
+    stop_ramp(runtime=rt)
 
 
 # =========================================
 # 🔁 SOLLWERT RESYNC
 # =========================================
 
-def resync_active_ramp():
+def resync_active_ramp(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
+    cfg = rt.config
 
-    if not state.ramp_active:
+    if not st.ramp_active:
         return
 
-    current = get_ramped_target()
-
+    current = get_ramped_target(runtime=rt)
     if current is None:
         return
 
-    profile = get_profile()
+    profile = get_profile(runtime=rt)
 
     if profile == "TAG":
-        target = float(config["DAY_TEMP"])
-        end_min = int(config["DAY_START_MIN"])
+        target = float(cfg["DAY_TEMP"])
+        end_min = int(cfg["DAY_START_MIN"])
     else:
-        target = float(config["NIGHT_TEMP"])
-        end_min = int(config["NIGHT_START_MIN"])
+        target = float(cfg["NIGHT_TEMP"])
+        end_min = int(cfg["NIGHT_START_MIN"])
 
     _restart_ramp(
         current,
         target,
         end_min,
+        runtime=rt,
     )
 
 
@@ -176,112 +163,122 @@ def resync_active_ramp():
 # ⏱️ DAUER RESYNC
 # =========================================
 
-def update_ramp_duration():
+def update_ramp_duration(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
+    cfg = rt.config
 
-    if not state.ramp_active:
+    if not st.ramp_active:
         return
 
-    current = get_ramped_target()
-
+    current = get_ramped_target(runtime=rt)
     if current is None:
         return
 
-    profile = get_profile()
+    profile = get_profile(runtime=rt)
 
     if profile == "TAG":
-        end_min = int(config["DAY_START_MIN"])
+        end_min = int(cfg["DAY_START_MIN"])
     else:
-        end_min = int(config["NIGHT_START_MIN"])
+        end_min = int(cfg["NIGHT_START_MIN"])
 
     _restart_ramp(
         current,
-        state.ramp_target_temp,
+        st.ramp_target_temp,
         end_min,
+        runtime=rt,
     )
+
 
 # =========================================
 # 🛑 RAMPE STOPPEN
 # =========================================
 
-def stop_ramp():
-    """
-    Vollständiger Rampen-Reset.
-    """
+def stop_ramp(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
-    state.ramp_active = False
+    st.ramp_active = False
+    st.ramp_start_ts = None
+    st.ramp_end_ts = None
+    st.ramp_start_temp = None
+    st.ramp_target_temp = None
 
-    state.ramp_start_ts = None
-    state.ramp_end_ts = None
+    st.live_state["ramp_active"] = False
+    st.live_state["ramp_target"] = None
 
-    state.ramp_start_temp = None
-    state.ramp_target_temp = None
+    print(f"🛑 [{rt.tent_id}] RAMPE GESTOPPT")
 
-    state.live_state["ramp_active"] = False
-    state.live_state["ramp_target"] = None
 
-    print("🛑 RAMPE GESTOPPT")
-
-def get_morning_ramp_start():
-    day_start = int(config["DAY_START_MIN"])
-    duration = int(config["RAMP_DURATION_MIN"])
+def get_morning_ramp_start(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    day_start = int(cfg["DAY_START_MIN"])
+    duration = int(cfg["RAMP_DURATION_MIN"])
     return (day_start - duration) % 1440
 
 
-def get_evening_ramp_start():
-    night_start = int(config["NIGHT_START_MIN"])
-    duration = int(config["RAMP_DURATION_MIN"])
+def get_evening_ramp_start(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    night_start = int(cfg["NIGHT_START_MIN"])
+    duration = int(cfg["RAMP_DURATION_MIN"])
     return (night_start - duration) % 1440
 
-def check_ramp_schedule():
 
-    if not config.get("RAMP_ENABLED", 0):
+def check_ramp_schedule(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
+    cfg = rt.config
+
+    if not cfg.get("RAMP_ENABLED", 0):
         return
 
-    if state.ramp_active:
+    if st.ramp_active:
         return
 
     now_min = minutes_now()
     today = datetime.date.today().isoformat()
 
-    day_start = int(config["DAY_START_MIN"])
-    night_start = int(config["NIGHT_START_MIN"])
+    day_start = int(cfg["DAY_START_MIN"])
+    night_start = int(cfg["NIGHT_START_MIN"])
 
-    morning_start = get_morning_ramp_start()
-    evening_start = get_evening_ramp_start()
+    morning_start = get_morning_ramp_start(runtime=rt)
+    evening_start = get_evening_ramp_start(runtime=rt)
 
     # 🌅 Morgenrampe
     if (
         now_min == morning_start
         and (
-            state.last_ramp_trigger_day != today
-            or state.last_ramp_trigger_type != "morning"
+            st.last_ramp_trigger_day != today
+            or st.last_ramp_trigger_type != "morning"
         )
     ):
-
         start_ramp(
-            float(config["NIGHT_TEMP"]),
-            float(config["DAY_TEMP"]),
+            float(cfg["NIGHT_TEMP"]),
+            float(cfg["DAY_TEMP"]),
             day_start,
+            runtime=rt,
         )
 
-        state.last_ramp_trigger_day = today
-        state.last_ramp_trigger_type = "morning"
+        st.last_ramp_trigger_day = today
+        st.last_ramp_trigger_type = "morning"
         return
 
     # 🌙 Abendrampe
     if (
         now_min == evening_start
         and (
-            state.last_ramp_trigger_day != today
-            or state.last_ramp_trigger_type != "evening"
+            st.last_ramp_trigger_day != today
+            or st.last_ramp_trigger_type != "evening"
         )
     ):
-
         start_ramp(
-            float(config["DAY_TEMP"]),
-            float(config["NIGHT_TEMP"]),
+            float(cfg["DAY_TEMP"]),
+            float(cfg["NIGHT_TEMP"]),
             night_start,
+            runtime=rt,
         )
 
-        state.last_ramp_trigger_day = today
-        state.last_ramp_trigger_type = "evening"
+        st.last_ramp_trigger_day = today
+        st.last_ramp_trigger_type = "evening"

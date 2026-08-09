@@ -2,87 +2,100 @@
 
 import os
 import json
-import datetime
 
-import core.state as state
-
-from core.config import config, save_config
+from core.runtime import resolve_runtime
 from core.helpers import (
     minutes_now,
     is_night,
-    minute_distance
 )
 
 
-
-def get_profile():
+def get_profile(runtime=None):
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
 
     now_min = minutes_now()
 
-    day_start = int(config["DAY_START_MIN"])
-    night_start = int(config["NIGHT_START_MIN"])
+    day_start = int(cfg["DAY_START_MIN"])
+    night_start = int(cfg["NIGHT_START_MIN"])
 
     if is_night(now_min, night_start, day_start):
         profile = "NACHT"
     else:
         profile = "TAG"
 
-    if profile != state.current_profile:
+    if profile != st.current_profile:
         print(
-            f"🔄 Profilwechsel: "
-            f"{state.current_profile} -> {profile} "
+            f"🔄 [{rt.tent_id}] Profilwechsel: "
+            f"{st.current_profile} -> {profile} "
             f"({minutes_now()} min)"
         )
-        state.current_profile = profile
+        st.current_profile = profile
 
-    state.live_state["profile"] = profile
+    st.live_state["profile"] = profile
 
     return profile
 
+
 PROFILE_FILE = "profiles.json"
+
 
 def get_active_profile():
     return PROFILES.get("active")
 
+
 def load_profiles():
     if os.path.exists(PROFILE_FILE):
-        with open(PROFILE_FILE, "r") as f:
+        with open(PROFILE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     raise RuntimeError("profiles.json fehlt")
 
+
 def save_profiles(p):
-    with open(PROFILE_FILE, "w") as f:
-        json.dump(p, f, indent=2)
+    with open(PROFILE_FILE, "w", encoding="utf-8") as f:
+        json.dump(p, f, indent=2, ensure_ascii=False)
+
 
 PROFILES = load_profiles()
 
-def apply_profile(name):
+
+def apply_profile(name, runtime=None):
+    """Wendet einen vorhandenen Grow-Preset auf eine Runtime an.
+
+    ``profiles.json`` bleibt in Phase 2 noch der gemeinsame Preset-Katalog.
+    Die eigentliche Config wird jedoch bereits über die Runtime geschrieben.
+    Für tent_1 ist das exakt die bisherige config.json.
+    """
+
     from core.ramp import stop_ramp
+
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
 
     if name not in PROFILES["profiles"]:
         return False
 
+    # Das bisherige globale "active" bleibt für die bestehende UI erhalten.
+    # Eine aktive Preset-Auswahl pro Zelt folgt zusammen mit der persistenten
+    # Multi-Tent-Konfiguration in einer späteren Phase.
     PROFILES["active"] = name
     profile = PROFILES["profiles"][name]
 
-    # 🔁 Profilwerte ins config übernehmen
-    for k, v in profile.items():
-        config[k] = v
+    for key, value in profile.items():
+        cfg[key] = value
 
-    # 💾 speichern
     save_profiles(PROFILES)
-    save_config(config)
+    rt.persist_config()
 
-    # =========================
-    # 🔄 SCHRITT 4: Rampe zurücksetzen
-    # =========================
-    state.ramp_active = False
-    stop_ramp()
+    # Profilwechsel setzt die Rampe nur in der betroffenen Runtime zurück.
+    st.ramp_active = False
+    stop_ramp(runtime=rt)
 
-    state.live_state["ramp_active"] = False
-    state.live_state["ramp_target"] = None
+    st.live_state["ramp_active"] = False
+    st.live_state["ramp_target"] = None
 
-    print(f"🔁 Profilwechsel → Rampe zurückgesetzt ({name})")
+    print(f"🔁 [{rt.tent_id}] Profilwechsel → Rampe zurückgesetzt ({name})")
 
     return True
-

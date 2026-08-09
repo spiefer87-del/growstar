@@ -1,11 +1,11 @@
-#core/actuators.py
+# core/actuators.py
 
 import requests
 
-import core.state as state
-from core.config import config
+from core.runtime import resolve_runtime
 
-def switch_shelly(ip, relay, state, timeout=3):
+
+def switch_shelly(ip, relay, enabled, timeout=3):
     relay = int(relay)
 
     # =========================
@@ -15,12 +15,11 @@ def switch_shelly(ip, relay, state, timeout=3):
         url = f"http://{ip}/rpc/Switch.Set"
         payload = {
             "id": relay,
-            "on": bool(state)
+            "on": bool(enabled),
         }
 
-        r = requests.post(url, json=payload, timeout=timeout)
-
-        if r.status_code == 200:
+        response = requests.post(url, json=payload, timeout=timeout)
+        if response.status_code == 200:
             return True
 
     except Exception:
@@ -30,37 +29,34 @@ def switch_shelly(ip, relay, state, timeout=3):
     # Gen1 Fallback
     # =========================
     try:
-        url = f"http://{ip}/relay/{relay}?turn={'on' if state else 'off'}"
-        r = requests.get(url, timeout=timeout)
+        url = f"http://{ip}/relay/{relay}?turn={'on' if enabled else 'off'}"
+        response = requests.get(url, timeout=timeout)
 
-        if r.status_code == 200:
+        if response.status_code == 200:
             return True
 
-    except Exception as e:
-        print(f"❌ Shelly Fehler {ip} Relay {relay}:", e)
+    except Exception as exc:
+        print(f"❌ Shelly Fehler {ip} Relay {relay}:", exc)
 
     return False
-  
+
+
 def get_shelly_relay_state(ip, relay, timeout=3):
     relay = int(relay)
 
     # ---------- Gen2 / Strip / Pro ----------
     try:
         url = f"http://{ip}/rpc/Switch.GetStatus?id={relay}"
-        r = requests.get(url, timeout=timeout)
+        response = requests.get(url, timeout=timeout)
 
-        if r.status_code != 200:
+        if response.status_code != 200:
             return None
 
-        data = r.json()
-
-        # ❌ Strip antwortet gern mit leerem oder kaputtem JSON
+        data = response.json()
         if not isinstance(data, dict):
             return None
-
         if "output" not in data:
             return None
-
         if not isinstance(data["output"], bool):
             return None
 
@@ -72,16 +68,14 @@ def get_shelly_relay_state(ip, relay, timeout=3):
     # ---------- Gen1 Fallback ----------
     try:
         url = f"http://{ip}/status"
-        r = requests.get(url, timeout=timeout)
+        response = requests.get(url, timeout=timeout)
 
-        if r.status_code != 200:
+        if response.status_code != 200:
             return None
 
-        data = r.json()
-
+        data = response.json()
         if "relays" not in data:
             return None
-
         if relay >= len(data["relays"]):
             return None
 
@@ -90,152 +84,172 @@ def get_shelly_relay_state(ip, relay, timeout=3):
     except Exception:
         return None
 
+
 # =========================================
 # 🔥 AKTOREN
 # =========================================
-def set_heating(enabled, reason=""):
 
-    if enabled == state.heating_on:
+def _set_shelly_device(
+    *,
+    enabled,
+    state_attr,
+    live_key,
+    ip_key,
+    relay_key,
+    on_text,
+    off_text,
+    reason="",
+    runtime=None,
+):
+    rt = resolve_runtime(runtime)
+    st = rt.state
+    cfg = rt.config
+
+    if enabled == getattr(st, state_attr):
         return
 
-    if not switch_shelly(
-        config.get("IP_HEATING"),
-        config.get("RELAY_HEATING"),
-        enabled
-    ):
+    ip = cfg.get(ip_key)
+    relay = cfg.get(relay_key)
+
+    if not ip or relay is None:
+        # Bestehendes Verhalten war bei vollständiger Config ein normaler
+        # Shelly-Aufruf. Bei einer zukünftigen, noch unvollständigen Zelt-
+        # Config verhindern wir hier bewusst einen Request auf "None".
         return
 
-    state.heating_on = enabled
-    state.live_state["heating"] = enabled
-    print(("🔥 HEIZUNG EIN " if enabled else "❄️ HEIZUNG AUS ") + reason)
-
-def set_fan(enabled, reason=""):
-
-    if enabled == state.fan_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_FAN"),
-        config.get("RELAY_FAN"),
-        enabled
-    ):
+    if not switch_shelly(ip, relay, enabled):
         return
 
-    state.fan_on = enabled
-    state.live_state["fan"] = enabled
-    print(("💨 UMLUFT EIN " if enabled else "🛑 UMLUFT AUS ") + reason)
+    setattr(st, state_attr, enabled)
+    st.live_state[live_key] = enabled
+    print((on_text if enabled else off_text) + reason + f" [{rt.tent_id}]")
 
-def set_light(enabled, reason=""):
 
-    if enabled == state.light_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_LIGHT"),
-        config.get("RELAY_LIGHT"),
-        enabled
-    ):
-        return
+def set_heating(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="heating_on",
+        live_key="heating",
+        ip_key="IP_HEATING",
+        relay_key="RELAY_HEATING",
+        on_text="🔥 HEIZUNG EIN ",
+        off_text="❄️ HEIZUNG AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
 
-    state.light_on = enabled
-    state.live_state["light"] = enabled
-    print(("💡 LICHT EIN " if enabled else "🛑 LICHT AUS ") + reason)
 
-def set_vent(enabled, reason=""):
+def set_fan(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="fan_on",
+        live_key="fan",
+        ip_key="IP_FAN",
+        relay_key="RELAY_FAN",
+        on_text="💨 UMLUFT EIN ",
+        off_text="🛑 UMLUFT AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
 
-    if enabled == state.vent_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_VENT"),
-        config.get("RELAY_VENT"),
-        enabled
-    ):
-        return
 
-    state.vent_on = enabled
-    state.live_state["vent"] = enabled
-    print(("🌀 VENTILATOR EIN " if enabled else "🛑 VENTILATOR AUS ") + reason)
+def set_light(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="light_on",
+        live_key="light",
+        ip_key="IP_LIGHT",
+        relay_key="RELAY_LIGHT",
+        on_text="💡 LICHT EIN ",
+        off_text="🛑 LICHT AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
 
-def set_irrigation(enabled, reason=""):
 
-    if enabled == state.irrigation_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_IRRIGATION"),
-        config.get("RELAY_IRRIGATION"),
-        enabled
-    ):
-        return
-            
-    state.irrigation_on = enabled
-    state.live_state["irrigation"] = enabled
-    print(("🚿 BEWÄSSERUNG EIN " if enabled else "🛑 BEWÄSSERUNG AUS ") + reason)
+def set_vent(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="vent_on",
+        live_key="vent",
+        ip_key="IP_VENT",
+        relay_key="RELAY_VENT",
+        on_text="🌀 VENTILATOR EIN ",
+        off_text="🛑 VENTILATOR AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
 
-def set_humidifier(enabled, reason=""):
 
-    if enabled == state.humidifier_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_HUMIDIFIER"),
-        config.get("RELAY_HUMIDIFIER"),
-        enabled
-    ):
-        return
-            
-    state.humidifier_on = enabled
-    state.live_state["humidifier"] = enabled
-    print(("💧 LUFTBEFEUCHTER EIN " if enabled else "🛑 LUFTBEFEUCHTER AUS ") + reason)
+def set_irrigation(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="irrigation_on",
+        live_key="irrigation",
+        ip_key="IP_IRRIGATION",
+        relay_key="RELAY_IRRIGATION",
+        on_text="🚿 BEWÄSSERUNG EIN ",
+        off_text="🛑 BEWÄSSERUNG AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
 
-def set_dehumidifier(enabled, reason=""):
 
-    if enabled == state.dehumidifier_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_DEHUMIDIFIER"),
-        config.get("RELAY_DEHUMIDIFIER"),
-        enabled
-    ):
-        return
-            
-    state.dehumidifier_on = enabled
-    state.live_state["dehumidifier"] = enabled
-    print(("💨 LUFTENTFEUCHTER EIN " if enabled else "🛑 LUFTENTFEUCHTER AUS ") + reason)
+def set_humidifier(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="humidifier_on",
+        live_key="humidifier",
+        ip_key="IP_HUMIDIFIER",
+        relay_key="RELAY_HUMIDIFIER",
+        on_text="💧 LUFTBEFEUCHTER EIN ",
+        off_text="🛑 LUFTBEFEUCHTER AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
 
-def set_light2(enabled, reason=""):
 
-    if enabled == state.light2_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_LIGHT2"),
-        config.get("RELAY_LIGHT2"),
-        enabled
-    ):
-        return
-            
-    state.light2_on = enabled
-    state.live_state["light2"] = enabled
-    print(("💡 LIGHT2 EIN " if enabled else "🛑 LIGHT2 AUS ") + reason)
+def set_dehumidifier(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="dehumidifier_on",
+        live_key="dehumidifier",
+        ip_key="IP_DEHUMIDIFIER",
+        relay_key="RELAY_DEHUMIDIFIER",
+        on_text="💨 LUFTENTFEUCHTER EIN ",
+        off_text="🛑 LUFTENTFEUCHTER AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
 
-def set_vent2(enabled, reason=""):
 
-    if enabled == state.vent2_on:
-        return
-    
-    if not switch_shelly(
-        config.get("IP_VENT2"),
-        config.get("RELAY_VENT2"),
-        enabled
-    ):
-        return
-            
-    state.vent2_on = enabled
-    state.live_state["vent2"] = enabled
-    print(("🌀 VENT2 EIN " if enabled else "🛑 VENT2 AUS ") + reason)
+def set_light2(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="light2_on",
+        live_key="light2",
+        ip_key="IP_LIGHT2",
+        relay_key="RELAY_LIGHT2",
+        on_text="💡 LIGHT2 EIN ",
+        off_text="🛑 LIGHT2 AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
+
+
+def set_vent2(enabled, reason="", runtime=None):
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr="vent2_on",
+        live_key="vent2",
+        ip_key="IP_VENT2",
+        relay_key="RELAY_VENT2",
+        on_text="🌀 VENT2 EIN ",
+        off_text="🛑 VENT2 AUS ",
+        reason=reason,
+        runtime=runtime,
+    )
+
 
 # =========================================
 # 🔌 DEVICE SETTER MAPPING
@@ -253,7 +267,8 @@ DEVICE_SETTERS = {
     "dehumidifier": set_dehumidifier,
 }
 
-def set_device(device, state):
+
+def set_device(device, enabled, runtime=None):
     setter = DEVICE_SETTERS.get(device)
     if setter:
-        setter(state)
+        setter(enabled, runtime=runtime)
