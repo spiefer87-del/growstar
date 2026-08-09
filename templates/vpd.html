@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>VPD</title>
+<title>VPD – {{ tent_name }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -30,7 +30,7 @@ canvas{width:100%!important;height:100%!important}
 
 <header>
   <h1>🌱 VPD</h1>
-  <a href="/" class="back">← Dashboard</a>
+  <a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}" class="back">← {{ tent_name }}</a>
 </header>
 
 <div class="range-bar">
@@ -50,6 +50,7 @@ canvas{width:100%!important;height:100%!important}
 </div>
 
 <script>
+const TENT_ID = {{ tent_id|tojson }};
 const RANGE_SECONDS={"1h":3600,"6h":21600,"24h":86400,"7d":604800};
 let currentRange="24h",chart=null;
 
@@ -67,7 +68,7 @@ function setRange(r,b){
 }
 
 async function load(){
- let data=await (await fetch(`/api/history?range=${currentRange}&type=vpd`)).json();
+ let data=await (await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${currentRange}&type=vpd`)).json();
  if(currentRange==="6h")data=downsample(data,120);
  else if(currentRange==="24h")data=downsample(data,100);
  else if(currentRange==="7d")data=downsample(data,70);

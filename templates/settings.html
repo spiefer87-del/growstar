@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Profileinstellungen</title>
+<title>Profileinstellungen – {{ tent_name }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -182,8 +182,8 @@ input[type="time"].compact-input {
 
 <body>
 
-<a href="/" class="back">← zurück</a>
-<h1>⚙️ Profileinstellungen</h1>
+<a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}" class="back">← {{ tent_name }}</a>
+<h1>⚙️ {{ tent_name }} · Profileinstellungen</h1>
 
 <div class="grid">
 
@@ -208,7 +208,7 @@ input[type="time"].compact-input {
     </div>
 
 <div class="hint" style="text-align:center;">
-    Änderungen werden automatisch im aktiven Profil gespeichert
+    Presets laden Startwerte. Änderungen werden nur in dieser Station gespeichert.
     </div>
 </div>
 
@@ -305,7 +305,7 @@ input[type="time"].compact-input {
         <label>± Tol</label>
         <div class="num-control">
             <button type="button" onclick="step('DAY_HUM_TOL', -1)">−</button>
-            <input type="number
+            <input type="number"
                 step="0.1"
                 id="DAY_HUM_TOL"
                 class="compact-input">
@@ -370,6 +370,10 @@ input[type="time"].compact-input {
 </div>
 
 <script>
+const TENT_ID = {{ tent_id|tojson }};
+const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
+const PROFILE_URL = name => `/api/tents/${encodeURIComponent(TENT_ID)}/profile/${encodeURIComponent(name)}`;
+
 function minToTime(m){
     const h = String(Math.floor(m/60)).padStart(2,"0");
     const min = String(m%60).padStart(2,"0");
@@ -381,7 +385,10 @@ function timeToMin(t){
 }
 
 async function load(){
-    const c = await (await fetch("/api/config")).json();
+    const response = await fetch(CONFIG_URL);
+    if (!response.ok) return;
+    const payload = await response.json();
+    const c = payload.config || payload;
 
     DAY_TEMP.value = c.DAY_TEMP;
     DAY_TEMP_TOL.value = c.DAY_TEMP_TOL;
@@ -399,13 +406,13 @@ async function load(){
     RAMP_ENABLED.checked = !!c.RAMP_ENABLED;
     RAMP_DURATION_MIN.value = c.RAMP_DURATION_MIN;
 
-    highlightActiveProfile(c.ACTIVE_PROFILE);
+    highlightActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
 
     applyLimits(c);
 }
 
 async function save(){
-    await fetch("/api/config", {
+    await fetch(CONFIG_URL, {
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
@@ -427,10 +434,12 @@ async function save(){
 
 async function setProfile(name) {
 
-    const res = await fetch("/api/config");
-    const c = await res.json();
+    const res = await fetch(CONFIG_URL);
+    const payload = await res.json();
+    const c = payload.config || payload;
+    const activeProfile = payload.active_profile ?? c.ACTIVE_PROFILE;
 
-    if (c.ACTIVE_PROFILE === name) {
+    if (activeProfile === name) {
         return; // bereits aktiv → nichts tun
     }
 
@@ -443,7 +452,7 @@ async function setProfile(name) {
 
     if (!ok) return;
 
-    await fetch(`/api/profile/${name}`, { method: "POST" });
+    await fetch(PROFILE_URL(name), { method: "POST" });
     load();
 }
 

@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Sensoren – Grow Control{% endblock %}
+
+{% block head %}
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--accent:#22c55e;--purple:#a78bfa;--border:rgba(148,163,184,.18)}
+body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
+.wrap{max-width:1100px;margin:auto}.top{display:flex;gap:14px;align-items:center;margin-bottom:20px}.back{color:var(--muted);text-decoration:none;font-size:1.4rem}.subtitle{color:var(--muted);margin-top:5px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}.card h2{margin:0 0 4px}.id{font-size:.78rem;color:var(--muted);margin-bottom:14px}.values{display:grid;grid-template-columns:1fr 1fr;gap:10px}.value{padding:10px;border-radius:10px;background:#111827}.value span{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase}.value strong{font-size:1.2rem}.source{font-size:.8rem;color:var(--muted);margin-top:10px;line-height:1.45;word-break:break-word}.action{display:inline-flex;margin-top:15px;padding:9px 12px;border-radius:9px;background:rgba(34,197,94,.14);color:#86efac;text-decoration:none;font-weight:700}.empty{color:var(--muted)}
+@media(max-width:600px){body{padding:12px}.grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block page %}
+<div class="wrap">
+    <div class="top">
+        <a class="back" href="{{ url_for('grow_control_dashboard') }}">←</a>
+        <div>
+            <h1>🧪 Sensoren</h1>
+            <div class="subtitle">Zentrale Übersicht der Sensorzuweisungen aller lokalen Grow-Stationen.</div>
+        </div>
+    </div>
+
+    <div id="sensor-grid" class="grid"><div class="empty">Stationen werden geladen …</div></div>
+</div>
+
+<script>
+(() => {
+    const grid = document.getElementById("sensor-grid");
+    const SENSOR_PAGE_TEMPLATE = {{ url_for('grow_control_tent_sensors', tent_id='__TENT_ID__')|tojson }};
+
+    const fmt = (value, digits=1) => {
+        const n = Number(value);
+        return Number.isFinite(n) ? n.toFixed(digits) : "--";
+    };
+
+    const sensorPageUrl = tentId =>
+        SENSOR_PAGE_TEMPLATE.replace("__TENT_ID__", encodeURIComponent(tentId));
+
+    async function load() {
+        const response = await fetch("/api/tents");
+        if (!response.ok) return;
+        const payload = await response.json();
+        const tents = Array.isArray(payload.tents) ? payload.tents : [];
+
+        grid.innerHTML = "";
+        if (!tents.length) {
+            grid.innerHTML = '<div class="empty">Keine Grow-Station registriert.</div>';
+            return;
+        }
+
+        for (const tent of tents) {
+            const card = document.createElement("article");
+            card.className = "card";
+            card.innerHTML = `
+                <h2 data-role="name"></h2>
+                <div class="id" data-role="id"></div>
+                <div class="values">
+                    <div class="value"><span>Temperatur</span><strong data-role="temp">--</strong></div>
+                    <div class="value"><span>Feuchte</span><strong data-role="hum">--</strong></div>
+                </div>
+                <div class="source" data-role="sources">Sensorzuweisung wird geladen …</div>
+                <a class="action" data-role="action">Zuordnung öffnen →</a>
+            `;
+
+            // Namen/IDs kommen aus der persistenten Tent-Metadatei. Deshalb
+            // niemals per Template-Interpolation in innerHTML einsetzen.
+            card.querySelector('[data-role="name"]').textContent = tent.name || tent.id || "Station";
+            card.querySelector('[data-role="id"]').textContent = tent.id || "--";
+            card.querySelector('[data-role="temp"]').textContent = `${fmt(tent.temp)} °C`;
+            card.querySelector('[data-role="hum"]').textContent = `${fmt(tent.hum)} %`;
+            card.querySelector('[data-role="action"]').href = sensorPageUrl(tent.id);
+
+            grid.appendChild(card);
+
+            if (!tent.runtime_loaded) {
+                card.querySelector('[data-role="sources"]').textContent = "Runtime nicht geladen";
+                continue;
+            }
+
+            fetch(`/api/tents/${encodeURIComponent(tent.id)}/state`)
+                .then(r => r.ok ? r.json() : null)
+                .then(state => {
+                    if (!state) return;
+                    const assignments = state.sensor_assignments || {};
+                    const temp = assignments.temperature?.label || assignments.temperature?.source_id || "--";
+                    const hum = assignments.humidity?.label || assignments.humidity?.source_id || "--";
+                    card.querySelector('[data-role="sources"]').textContent = `Temp: ${temp} · Feuchte: ${hum}`;
+                })
+                .catch(() => {});
+        }
+    }
+
+    load();
+    setInterval(load, 10000);
+})();
+</script>
+{% endblock %}

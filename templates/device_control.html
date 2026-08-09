@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}{{ device_label }} – {{ tent_name }}{% endblock %}
+
+{% block head %}
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--accent:#22c55e;--purple:#a78bfa;--border:#334155}
+body{margin:0;padding:20px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
+.wrap{max-width:720px;margin:auto}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.back{color:var(--muted);text-decoration:none}
+h1{font-size:1.5rem;margin:0}.meta{color:var(--muted);font-size:.82rem;margin-top:4px}
+.card{background:var(--card);border-radius:16px;padding:20px;margin-bottom:14px;box-shadow:0 10px 30px rgba(0,0,0,.22)}
+.row{margin-bottom:14px}label{display:block;margin-bottom:6px;color:var(--muted)}
+select,input{width:100%;padding:10px;border-radius:9px;border:1px solid var(--border);background:#020617;color:var(--text)}
+.checkbox-row{display:flex;gap:16px;flex-wrap:wrap}.checkbox-row label{display:flex;align-items:center;gap:7px}.checkbox-row input{width:auto}
+.section{display:none;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+.section.visible{display:block}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+button{width:100%;border:none;border-radius:10px;padding:11px;background:var(--accent);color:#052e16;font-weight:700;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{padding:12px 14px;border-radius:12px;background:#111827;color:var(--muted);margin-bottom:14px}.status.shadow{background:rgba(124,58,237,.16);color:#ddd6fe}.status.live{background:rgba(34,197,94,.14);color:#bbf7d0}
+.state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}
+@media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}}
+</style>
+{% endblock %}
+
+{% block page %}
+<div class="wrap">
+    <div class="top">
+        <div>
+            <a class="back" href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← {{ tent_name }}</a>
+            <h1>{{ device_icon }} {{ device_label }}</h1>
+            <div class="meta">{{ tent_id }} · {{ device_key }}</div>
+        </div>
+    </div>
+
+    <div id="runtime-status" class="status">Status wird geladen …</div>
+
+    <div class="card">
+        <div class="state-line">
+            <span>Aktueller Ausgang</span>
+            <span id="output-state" class="state-value">--</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="row">
+            <label for="mode">Modus</label>
+            <select id="mode">
+                <option value="OFF">Deaktiviert</option>
+                <option value="ON">Dauerbetrieb</option>
+                <option value="TIME">Zeitgesteuert</option>
+                <option value="INTERVAL">Intervall</option>
+                <option value="ENV">Umgebung / Profil</option>
+            </select>
+        </div>
+
+        <div id="time-section" class="section">
+            <h3>Zeitfenster</h3>
+            <div class="grid2">
+                <div class="row"><label for="start">Start</label><input id="start" type="time"></div>
+                <div class="row"><label for="end">Ende</label><input id="end" type="time"></div>
+            </div>
+        </div>
+
+        <div id="interval-section" class="section">
+            <h3>Intervall</h3>
+            <div class="grid2">
+                <div class="row"><label for="interval-on">EIN (Sekunden)</label><input id="interval-on" type="number" min="1" step="1"></div>
+                <div class="row"><label for="interval-off">AUS (Sekunden)</label><input id="interval-off" type="number" min="1" step="1"></div>
+            </div>
+        </div>
+
+        <div id="env-section" class="section">
+            <h3>Umgebungsregelung</h3>
+            <div id="env-special" class="hint"></div>
+            <div id="env-generic">
+                <div class="checkbox-row">
+                    <label><input type="checkbox" id="use-temp"> Temperatur berücksichtigen</label>
+                    <label><input type="checkbox" id="use-hum"> Luftfeuchtigkeit berücksichtigen</label>
+                </div>
+                <div class="grid2" style="margin-top:12px">
+                    <div class="row">
+                        <label for="logic">Logik</label>
+                        <select id="logic"><option value="OR">ODER</option><option value="AND">UND</option></select>
+                    </div>
+                    <div class="row">
+                        <label for="direction">Richtung</label>
+                        <select id="direction"><option value="HIGH">Bei zu hoch aktivieren</option><option value="LOW">Bei zu niedrig aktivieren</option></select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button id="save-button" onclick="saveDevice()">💾 Für {{ tent_name }} speichern</button>
+        <div id="saved" class="saved">✓ gespeichert</div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const TENT_ID = {{ tent_id|tojson }};
+    const DEVICE = {{ device_key|tojson }};
+    const DEVICE_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/devices/${encodeURIComponent(DEVICE)}`;
+    const CAN_CONFIGURE = {{ 'true' if has_permission('grow.configure') else 'false' }};
+
+    const mode = document.getElementById("mode");
+    const saveButton = document.getElementById("save-button");
+    saveButton.disabled = !CAN_CONFIGURE;
+
+    function timeFromMinutes(value) {
+        const min = Number(value);
+        if (!Number.isFinite(min)) return "";
+        const h = Math.floor(min / 60).toString().padStart(2, "0");
+        const m = Math.floor(min % 60).toString().padStart(2, "0");
+        return `${h}:${m}`;
+    }
+
+    function minutesFromTime(value) {
+        if (!value) return 0;
+        const [h, m] = value.split(":").map(Number);
+        return h * 60 + m;
+    }
+
+    function updateSections() {
+        const current = mode.value;
+        document.getElementById("time-section").classList.toggle("visible", current === "TIME");
+        document.getElementById("interval-section").classList.toggle("visible", current === "INTERVAL");
+        document.getElementById("env-section").classList.toggle("visible", current === "ENV");
+
+        const special = document.getElementById("env-special");
+        const generic = document.getElementById("env-generic");
+        if (DEVICE === "heating") {
+            special.textContent = "Die Heizung nutzt Temperatur-Sollwert, Toleranz, Sicherheitsgrenzen und gegebenenfalls die aktive Rampe dieser Station.";
+            generic.style.display = "none";
+        } else if (DEVICE === "light") {
+            special.textContent = "Das Hauptlicht folgt im ENV-Modus den Tag-/Nacht-Zeiten dieser Station.";
+            generic.style.display = "none";
+        } else {
+            special.textContent = "";
+            generic.style.display = "block";
+        }
+    }
+
+    function renderRuntime(data) {
+        const box = document.getElementById("runtime-status");
+        const output = document.getElementById("output-state");
+
+        if (data.control_enabled) {
+            box.className = "status live";
+            box.textContent = "🟢 LIVE · Änderungen steuern den Regelkreis dieser Station.";
+            output.textContent = data.actual_on ? "EIN" : "AUS";
+        } else if (data.shadow_enabled) {
+            box.className = "status shadow";
+            box.textContent = "🟣 SHADOW · Einstellungen werden berechnet, reale Hardware bleibt gesperrt.";
+            output.textContent = data.shadow_desired == null ? "SHADOW --" : (data.shadow_desired ? "SHADOW EIN" : "SHADOW AUS");
+        } else {
+            box.className = "status";
+            box.textContent = "⚪ BEREIT · Kein aktiver Regelkreis für diese Station.";
+            output.textContent = "--";
+        }
+    }
+
+    async function loadDevice() {
+        const response = await fetch(DEVICE_URL);
+        if (!response.ok) return;
+        const data = await response.json();
+
+        mode.value = data.mode || "OFF";
+        const params = data.params || {};
+        const env = data.env_config || {};
+
+        document.getElementById("start").value = timeFromMinutes(params.start_min);
+        document.getElementById("end").value = timeFromMinutes(params.end_min);
+        document.getElementById("interval-on").value = params.interval_on ?? 300;
+        document.getElementById("interval-off").value = params.interval_off ?? 900;
+        document.getElementById("use-temp").checked = Boolean(env.use_temp);
+        document.getElementById("use-hum").checked = Boolean(env.use_hum);
+        document.getElementById("logic").value = env.logic || "OR";
+        document.getElementById("direction").value = env.direction || "HIGH";
+
+        renderRuntime(data);
+        updateSections();
+    }
+
+    window.saveDevice = async function saveDevice() {
+        if (!CAN_CONFIGURE) return;
+
+        const payload = {
+            mode: mode.value,
+            params: {
+                start_min: minutesFromTime(document.getElementById("start").value),
+                end_min: minutesFromTime(document.getElementById("end").value),
+                interval_on: Number(document.getElementById("interval-on").value || 300),
+                interval_off: Number(document.getElementById("interval-off").value || 900)
+            },
+            env_config: {
+                use_temp: document.getElementById("use-temp").checked,
+                use_hum: document.getElementById("use-hum").checked,
+                logic: document.getElementById("logic").value,
+                direction: document.getElementById("direction").value
+            }
+        };
+
+        const response = await fetch(DEVICE_URL, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            alert("Speichern fehlgeschlagen");
+            return;
+        }
+
+        const data = await response.json();
+        renderRuntime(data);
+        const saved = document.getElementById("saved");
+        saved.classList.add("visible");
+        setTimeout(() => saved.classList.remove("visible"), 1200);
+    };
+
+    mode.addEventListener("change", updateSections);
+    loadDevice();
+    setInterval(loadDevice, 3000);
+})();
+</script>
+{% endblock %}

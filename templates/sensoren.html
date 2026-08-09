@@ -4,7 +4,7 @@
 <head>
 
 <meta charset="UTF-8">
-<title>Sensoren</title>
+<title>Sensoren – {{ tent_name }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <link rel="stylesheet" href="/static/css/growstar.css">
@@ -18,11 +18,11 @@
 <header class="app-header">
 
     <h1 class="app-title">
-        🧪 Sensoren
+        🧪 {{ tent_name }} · Sensoren
     </h1>
 
-    <a href="/system" class="back-link">
-        ← System
+    <a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}" class="back-link">
+        ← Grow Control
     </a>
 
 </header>
@@ -205,6 +205,10 @@
 
 
 <script>
+
+const TENT_ID = {{ tent_id|tojson }};
+const STATE_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/state`;
+const ASSIGNMENTS_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/sensors/assignments`;
 
 let sensorOptions = {
     temperature: [],
@@ -422,47 +426,22 @@ function renderSources(){
 
 async function loadState(){
 
-    const response = await fetch(
-        "/api/state"
-    );
+    const stateResponse = await fetch(STATE_URL);
+    if (!stateResponse.ok) return;
 
-    const s =
-        await response.json();
+    const s = await stateResponse.json();
 
-    document.getElementById("temp_raw").textContent =
-        fmt(
-            s.temp_raw
-        );
-
-    document.getElementById("temp_corr").textContent =
-        fmt(
-            s.temp
-        );
-
-    document.getElementById("hum_raw").textContent =
-        fmt(
-            s.hum_raw
-        );
-
-    document.getElementById("hum_corr").textContent =
-        fmt(
-            s.hum
-        );
-
-    document.getElementById("TEMP_OFFSET").value =
-        s.TEMP_OFFSET ?? 0;
-
-    document.getElementById("HUM_OFFSET").value =
-        s.HUM_OFFSET ?? 0;
+    document.getElementById("temp_raw").textContent = fmt(s.temp_raw);
+    document.getElementById("temp_corr").textContent = fmt(s.temp);
+    document.getElementById("hum_raw").textContent = fmt(s.hum_raw);
+    document.getElementById("hum_corr").textContent = fmt(s.hum);
 
 }
 
 
 async function loadAssignments(){
 
-    const response = await fetch(
-        "/api/sensors/assignments"
-    );
+    const response = await fetch(ASSIGNMENTS_URL);
 
     const data =
         await response.json();
@@ -475,6 +454,10 @@ async function loadAssignments(){
 
     assignments =
         data.assignments || {};
+
+    const offsets = data.offsets || {};
+    document.getElementById("TEMP_OFFSET").value = offsets.TEMP_OFFSET ?? 0;
+    document.getElementById("HUM_OFFSET").value = offsets.HUM_OFFSET ?? 0;
 
     sensorOptions =
         data.options || {
@@ -513,18 +496,23 @@ async function loadAll(){
 
 async function saveOffset(key, value){
 
-    await fetch(
-        "/api/config",
+    const response = await fetch(
+        ASSIGNMENTS_URL,
         {
             method:"POST",
             headers:{
                 "Content-Type":"application/json"
             },
             body:JSON.stringify({
-                [key]: value
+                offsets: { [key]: value }
             })
         }
     );
+
+    if (!response.ok) {
+        alert("Offset konnte nicht gespeichert werden");
+        return;
+    }
 
     const el = document.getElementById(
         key === "TEMP_OFFSET"
@@ -615,7 +603,7 @@ async function saveSensorAssignments(){
         humOption.source_id;
 
     const response = await fetch(
-        "/api/sensors/assignments",
+        ASSIGNMENTS_URL,
         {
             method:"POST",
             headers:{
