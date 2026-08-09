@@ -279,6 +279,60 @@ def _management_requirement(path, method):
     return None
 
 
+
+
+def _grow_control_read_requirement(path):
+    """Feinere Rechte innerhalb des Grow-Control-Moduls."""
+
+    if path == "/grow-control/sensors":
+        return require("hardware.view")
+
+    if not _matches_prefix(path, "/grow-control/tents"):
+        return None
+
+    if path.endswith("/settings"):
+        return require("settings.view")
+
+    if path.endswith("/sensors"):
+        return require("hardware.view")
+
+    return require("grow.view")
+
+
+def _tent_api_read_requirement(path):
+    if not _matches_prefix(path, "/api/tents"):
+        return None
+
+    if "/sensors" in path:
+        return require("hardware.view")
+
+    if path.endswith("/config") or "/profile/" in path:
+        return require("grow.view", "settings.view", mode="any")
+
+    return require("grow.view")
+
+
+def _tent_api_write_requirement(path):
+    if not _matches_prefix(path, "/api/tents"):
+        return None
+
+    if "/sensors" in path:
+        return require("hardware.configure")
+
+    if "/devices/" in path:
+        return require("grow.configure")
+
+    if path.endswith("/config") or "/profile/" in path:
+        return require("grow.configure", "settings.manage", mode="any")
+
+    if path.endswith("/history/reset"):
+        return require("settings.manage")
+
+    # Unbekannte stationsbezogene Schreibzugriffe sind Konfiguration, nicht
+    # bloße Laufzeitbedienung. Das ist absichtlich fail-closed.
+    return require("grow.configure")
+
+
 def permission_requirement(path, method):
     """
     Liefert die für einen Request benötigte Berechtigung.
@@ -309,6 +363,14 @@ def permission_requirement(path, method):
         if exact:
             return exact
 
+        grow_control = _grow_control_read_requirement(path)
+        if grow_control:
+            return grow_control
+
+        tent_api = _tent_api_read_requirement(path)
+        if tent_api:
+            return tent_api
+
         for prefix, requirement in READ_PREFIX:
             if _matches_prefix(path, prefix):
                 return requirement
@@ -324,6 +386,10 @@ def permission_requirement(path, method):
     exact = WRITE_EXACT.get(path)
     if exact:
         return exact
+
+    tent_api = _tent_api_write_requirement(path)
+    if tent_api:
+        return tent_api
 
     hardware = _hardware_write_requirement(path)
     if hardware:
