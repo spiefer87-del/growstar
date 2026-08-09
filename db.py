@@ -1,6 +1,8 @@
 import sqlite3
 import time
 
+from core.tents import DEFAULT_TENT_ID
+
 DB_FILE = "data.db"
 
 
@@ -16,6 +18,7 @@ def init_db():
     c.execute("""
         CREATE TABLE IF NOT EXISTS temp_history (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tent_id TEXT NOT NULL DEFAULT 'tent_1',
             ts INTEGER,
             temp REAL,
             temp_target REAL,
@@ -28,6 +31,9 @@ def init_db():
     # 🔧 Migration für bestehende DBs (ALTER TABLE ist safe)
     existing_cols = [row[1] for row in c.execute("PRAGMA table_info(temp_history)")]
 
+    if "tent_id" not in existing_cols:
+        c.execute("ALTER TABLE temp_history ADD COLUMN tent_id TEXT NOT NULL DEFAULT 'tent_1'")
+
     if "hum" not in existing_cols:
         c.execute("ALTER TABLE temp_history ADD COLUMN hum REAL")
 
@@ -36,6 +42,11 @@ def init_db():
 
     if "vpd" not in existing_cols:
         c.execute("ALTER TABLE temp_history ADD COLUMN vpd REAL")
+
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_temp_history_tent_ts "
+        "ON temp_history (tent_id, ts)"
+    )
 
     db.commit()
     db.close()
@@ -46,7 +57,8 @@ def insert_measurement(
     temp_target,
     hum=None,
     hum_target=None,
-    vpd=None
+    vpd=None,
+    tent_id=DEFAULT_TENT_ID,
 ):
     """
     Speichert einen kompletten Messpunkt:
@@ -60,6 +72,7 @@ def insert_measurement(
     c.execute(
         """
         INSERT INTO temp_history (
+            tent_id,
             ts,
             temp,
             temp_target,
@@ -67,9 +80,10 @@ def insert_measurement(
             hum_target,
             vpd
         )
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
         """,
         (
+            tent_id,
             int(time.time()),
             temp,
             temp_target,
