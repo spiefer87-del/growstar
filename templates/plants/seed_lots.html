@@ -19,9 +19,9 @@
 
 <form class="pm-filterbar" method="get" style="grid-template-columns:minmax(260px,1fr) auto"><input class="pm-input" name="q" value="{{ query }}" placeholder="Lot, Sorte, Lieferant, Lagerort …"><button class="pm-button" type="submit">Suchen</button></form>
 <div class="pm-card"><div class="pm-table-wrap"><table class="pm-table">
-<thead><tr><th>Lot</th><th>Sorte</th><th>Typ</th><th>Bestand</th><th>Verwendet</th><th>Erfolg</th><th>Lagerort</th><th>Status</th></tr></thead><tbody>
-{% for lot in lots %}<tr><td><a href="{{ url_for('seed_lot_detail', lot_id=lot.id) }}"><strong>{{ lot.code }}</strong><br><span class="pm-muted">{{ lot.breeder_lot or '—' }}</span></a></td><td>{{ lot.cultivar_name }}</td><td>{{ lot.seed_type_label }}</td><td><span class="pm-stock {{ 'low' if lot.stock <= 3 else '' }}">{{ lot.stock }}</span></td><td>{{ lot.used_units }}</td><td>{{ lot.success_rate if lot.success_rate is not none else '—' }}{% if lot.success_rate is not none %} %{% endif %}</td><td>{{ lot.storage_location or '—' }}</td><td>{{ lot.status_label }}</td></tr>
-{% else %}<tr><td colspan="8"><div class="pm-empty">Noch keine Saatgut-Lots vorhanden.</div></td></tr>{% endfor %}
+<thead><tr><th>Lot</th><th>Sorte</th><th>Breeder</th><th>Typ</th><th>Bestand</th><th>Verwendet</th><th>Erfolg</th><th>Lagerort</th><th>Status</th></tr></thead><tbody>
+{% for lot in lots %}<tr><td><a href="{{ url_for('seed_lot_detail', lot_id=lot.id) }}"><strong>{{ lot.code }}</strong><br><span class="pm-muted">{{ lot.breeder_lot or '—' }}</span></a></td><td>{{ lot.cultivar_name }}</td><td>{{ lot.cultivar_breeder or '—' }}</td><td>{{ lot.seed_type_label }}</td><td><span class="pm-stock {{ 'low' if lot.stock <= 3 else '' }}">{{ lot.stock }}</span></td><td>{{ lot.used_units }}</td><td>{{ lot.success_rate if lot.success_rate is not none else '—' }}{% if lot.success_rate is not none %} %{% endif %}</td><td>{{ lot.storage_location or '—' }}</td><td>{{ lot.status_label }}</td></tr>
+{% else %}<tr><td colspan="9"><div class="pm-empty">Noch keine Saatgut-Lots vorhanden.</div></td></tr>{% endfor %}
 </tbody></table></div></div>
 </main>
 {% endblock %}

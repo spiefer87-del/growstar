@@ -25,6 +25,7 @@
 </section>
 <section class="pm-grid">
 <article class="pm-card pm-span-5"><div class="pm-card-head"><h2>Lot-Daten</h2></div><div class="pm-card-body"><div class="pm-detail-grid pm-detail-grid-2">
+<div class="pm-detail"><div class="pm-detail-label">Breeder / Züchter</div><div class="pm-detail-value">{{ lot.cultivar_breeder or '—' }}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Typ</div><div class="pm-detail-value">{{ lot.seed_type_label }}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Status</div><div class="pm-detail-value">{{ lot.status_label }}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Lieferant</div><div class="pm-detail-value">{{ lot.supplier or '—' }}</div></div>
