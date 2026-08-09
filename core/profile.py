@@ -2,8 +2,10 @@
 
 import os
 import json
+from copy import deepcopy
 
 from core.runtime import resolve_runtime
+from core.tents import DEFAULT_TENT_ID
 from core.helpers import (
     minutes_now,
     is_night,
@@ -41,8 +43,23 @@ def get_profile(runtime=None):
 PROFILE_FILE = "profiles.json"
 
 
-def get_active_profile():
-    return PROFILES.get("active")
+def get_active_profile(runtime=None):
+    """Aktives Preset pro Runtime.
+
+    Alte Installationen von tent_1 kennen ACTIVE_PROFILE noch nicht in der
+    config.json. Dort bleibt profiles.json als Fallback erhalten. Zusätzliche
+    Stationen verwenden dagegen ausschließlich ihren eigenen Config-Wert.
+    """
+
+    rt = resolve_runtime(runtime)
+    configured = rt.config.get("ACTIVE_PROFILE")
+    if configured:
+        return configured
+
+    if rt.tent_id == DEFAULT_TENT_ID:
+        return PROFILES.get("active")
+
+    return None
 
 
 def load_profiles():
@@ -77,16 +94,19 @@ def apply_profile(name, runtime=None):
     if name not in PROFILES["profiles"]:
         return False
 
-    # Das bisherige globale "active" bleibt für die bestehende UI erhalten.
-    # Eine aktive Preset-Auswahl pro Zelt folgt zusammen mit der persistenten
-    # Multi-Tent-Konfiguration in einer späteren Phase.
-    PROFILES["active"] = name
     profile = PROFILES["profiles"][name]
 
     for key, value in profile.items():
-        cfg[key] = value
+        cfg[key] = deepcopy(value)
 
-    save_profiles(PROFILES)
+    # Die Auswahl selbst gehört zur Station. Nur für tent_1 spiegeln wir den
+    # Namen zusätzlich in profiles.json, damit bestehende Legacy-Aufrufe und
+    # Backups weiterhin denselben aktiven Preset-Namen sehen.
+    cfg["ACTIVE_PROFILE"] = name
+    if rt.tent_id == DEFAULT_TENT_ID:
+        PROFILES["active"] = name
+        save_profiles(PROFILES)
+
     rt.persist_config()
 
     # Profilwechsel setzt die Rampe nur in der betroffenen Runtime zurück.
