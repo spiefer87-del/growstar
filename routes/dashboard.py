@@ -63,6 +63,14 @@ def register(app):
     def grow_control_sensors_dashboard():
         return render_template("grow_control_sensors.html")
 
+    @app.route("/grow-control/setup")
+    def grow_control_setup():
+        return render_template("grow_control_setup.html")
+
+    @app.route("/grow-control/connections")
+    def grow_control_connections():
+        return render_template("connections.html")
+
     @app.route("/grow-control/live")
     def grow_control_live():
         return redirect(
@@ -213,7 +221,15 @@ def register(app):
 
     @app.route("/connections")
     def connections_page():
-        return render_template("connections.html")
+        # Rückwärtskompatibler Einstieg: dieselbe zentrale Multi-Station-Seite,
+        # mit dem Default-Zelt vorausgewählt.
+        return redirect(
+            url_for(
+                "grow_control_connections",
+                tent=tent_manager.default_tent_id(),
+            ),
+            code=302,
+        )
 
     @app.route("/watchdog")
     def watchdog_page():

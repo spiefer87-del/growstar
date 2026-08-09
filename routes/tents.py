@@ -1,13 +1,17 @@
-# routes/tents.py
-
 import time
 
 from flask import jsonify, request
 
 from core.config_update import apply_config_patch, config_snapshot
 from core.devices import DEVICE_NAMES, get_device_mode
+from core.hardware_assignments import (
+    HardwareConflictError,
+    hardware_snapshot,
+    update_hardware_assignments,
+)
 from core.profile import PROFILES, apply_profile, get_active_profile
 from core.runtime import get_runtime, list_runtimes
+from core.tent_config import ensure_tent_config
 from core.tents import manager as tent_manager, validate_tent_id
 
 
@@ -65,6 +69,18 @@ def _find_runtime(tent_id):
             ),
             409,
         )
+
+
+def _find_tent(tent_id):
+    try:
+        tent_id = validate_tent_id(tent_id)
+    except ValueError:
+        return None, (jsonify(success=False, error="invalid_tent_id"), 400)
+
+    tent = tent_manager.get(tent_id)
+    if tent is None:
+        return None, (jsonify(success=False, error="tent_not_found"), 404)
+    return tent, None
 
 
 def _age(last_seen):
@@ -155,38 +171,129 @@ def _config_payload(runtime):
     }
 
 
+def _tent_list_payload():
+    runtimes = _runtime_map()
+    result = []
+
+    for tent in tent_manager.list_tents():
+        runtime = runtimes.get(tent["id"])
+        item = dict(tent)
+
+        # Konfigurierter Zustand und tatsächlich laufender Zustand werden
+        # getrennt ausgegeben. Änderungen an enabled/shadow greifen bewusst
+        # erst nach einem Backend-Neustart und dürfen den Hub vorher nicht
+        # fälschlich als bereits aktiv darstellen.
+        item["configured_enabled"] = bool(tent.get("enabled", True))
+        item["configured_shadow_enabled"] = bool(tent.get("shadow_enabled", False))
+        item.update({
+            "runtime_loaded": runtime is not None,
+            "runtime_mode": runtime.loop_mode if runtime else "unloaded",
+            "last_loop_ts": runtime.last_loop_ts if runtime else None,
+            "enabled": bool(runtime.enabled) if runtime else bool(tent.get("enabled", True)),
+            "shadow_enabled": bool(runtime.shadow_enabled) if runtime else False,
+            "control_enabled": bool(runtime.control_enabled) if runtime else False,
+            "hardware_actuation_blocked": (
+                not runtime.control_enabled if runtime else True
+            ),
+        })
+
+        if runtime is not None:
+            item["name"] = runtime.name
+            with runtime.state_lock:
+                item["temp"] = runtime.state.live_state.get("temp")
+                item["hum"] = runtime.state.live_state.get("hum")
+                item["vpd"] = runtime.state.live_state.get("vpd")
+
+        result.append(item)
+
+    return {
+        "success": True,
+        "default_tent_id": tent_manager.default_tent_id(),
+        "tents": result,
+    }
+
+
 def register(app):
     """Generische Multi-Station-API für beliebig viele lokale Runtimes."""
 
-    @app.route("/api/tents", methods=["GET"])
+    @app.route("/api/tents", methods=["GET", "POST"])
     def api_tents():
-        runtimes = _runtime_map()
-        result = []
+        if request.method == "GET":
+            return jsonify(_tent_list_payload())
 
-        for tent in tent_manager.list_tents():
-            runtime = runtimes.get(tent["id"])
-            item = dict(tent)
-            item.update({
-                "runtime_loaded": runtime is not None,
-                "runtime_mode": runtime.loop_mode if runtime else "unloaded",
-                "last_loop_ts": runtime.last_loop_ts if runtime else None,
-                "hardware_actuation_blocked": (
-                    not runtime.control_enabled if runtime else True
-                ),
-            })
-
-            if runtime is not None:
-                with runtime.state_lock:
-                    item["temp"] = runtime.state.live_state.get("temp")
-                    item["hum"] = runtime.state.live_state.get("hum")
-                    item["vpd"] = runtime.state.live_state.get("vpd")
-
-            result.append(item)
+        data = request.get_json(silent=True) or {}
+        try:
+            tent_id = validate_tent_id(data.get("tent_id", ""))
+            item = tent_manager.add_tent(
+                tent_id,
+                name=data.get("name") or tent_id,
+                enabled=bool(data.get("enabled", True)),
+                shadow_enabled=bool(data.get("shadow_enabled", False)),
+                control_enabled=False,
+            )
+            ensure_tent_config(tent_id)
+        except (TypeError, ValueError) as exc:
+            return jsonify(success=False, error=str(exc)), 400
 
         return jsonify({
             "success": True,
-            "default_tent_id": tent_manager.default_tent_id(),
-            "tents": result,
+            "tent": item,
+            "restart_required": True,
+            "message": "Station angelegt. Backend-Neustart erforderlich, damit die Runtime geladen wird.",
+        }), 201
+
+    @app.route("/api/tents/<tent_id>", methods=["GET", "PATCH"])
+    def api_tent_meta(tent_id):
+        tent, error = _find_tent(tent_id)
+        if error:
+            return error
+
+        if request.method == "GET":
+            return jsonify(success=True, tent=tent)
+
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data, dict):
+            return jsonify(success=False, error="invalid_payload"), 400
+
+        allowed = {"name", "enabled", "shadow_enabled"}
+        unknown = sorted(set(data) - allowed)
+        if unknown:
+            return jsonify(
+                success=False,
+                error="Unbekannte Stationsfelder: " + ", ".join(unknown),
+            ), 400
+
+        restart_required = "enabled" in data or "shadow_enabled" in data
+        try:
+            tent = tent_manager.update_tent(
+                tent_id,
+                name=data.get("name") if "name" in data else None,
+                enabled=data.get("enabled") if "enabled" in data else None,
+                shadow_enabled=(
+                    data.get("shadow_enabled")
+                    if "shadow_enabled" in data
+                    else None
+                ),
+            )
+
+            # Eine reine Umbenennung kann sofort in die geladene Runtime
+            # gespiegelt werden. enabled/shadow bleiben bis zum Neustart
+            # bewusst nur konfigurierte Metadaten.
+            if "name" in data:
+                try:
+                    get_runtime(tent_id).name = tent["name"]
+                except KeyError:
+                    pass
+
+        except KeyError:
+            return jsonify(success=False, error="tent_not_found"), 404
+        except ValueError as exc:
+            return jsonify(success=False, error=str(exc)), 400
+
+        return jsonify({
+            "success": True,
+            "tent": tent,
+            "restart_required": restart_required,
         })
 
     @app.route("/api/tents/<tent_id>/state", methods=["GET"])
@@ -230,3 +337,35 @@ def register(app):
             ), 404
 
         return jsonify(_config_payload(runtime))
+
+    @app.route("/api/tents/<tent_id>/hardware", methods=["GET", "POST"])
+    def api_tent_hardware(tent_id):
+        tent, error = _find_tent(tent_id)
+        if error:
+            return error
+
+        if request.method == "GET":
+            try:
+                return jsonify(hardware_snapshot(tent_id))
+            except (KeyError, ValueError) as exc:
+                return jsonify(success=False, error=str(exc)), 400
+
+        data = request.get_json(silent=True) or {}
+        try:
+            return jsonify(update_hardware_assignments(tent_id, data))
+        except PermissionError as exc:
+            return jsonify(
+                success=False,
+                error="live_hardware_edit_blocked",
+                message=str(exc),
+            ), 409
+        except HardwareConflictError as exc:
+            return jsonify(
+                success=False,
+                error="hardware_endpoint_conflict",
+                message=str(exc),
+                endpoint=exc.endpoint,
+                owner=exc.owner,
+            ), 409
+        except (TypeError, ValueError) as exc:
+            return jsonify(success=False, error=str(exc)), 400
