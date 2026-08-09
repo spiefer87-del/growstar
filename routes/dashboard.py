@@ -18,6 +18,11 @@ def register(app):
 
     @app.route("/grow-control")
     def grow_control_dashboard():
+        return render_template("grow_control_dashboard.html")
+
+
+    @app.route("/grow-control/live")
+    def grow_control_live():
         return render_template("grow_control.html")
 
 
