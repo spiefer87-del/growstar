@@ -60,10 +60,12 @@ def _atomic_write_json(path, data):
 class TentManager:
     """Persistente Metadaten aller Grow-Zelte dieses Controllers.
 
-    Phase 3 führt mehrere Zelte als echte persistente Objekte ein. Ein neues
-    Zelt wird absichtlich mit ``control_enabled=False`` angelegt. Dadurch kann
-    es konfiguriert und als Runtime geladen werden, ohne dass Growstar bereits
-    einen Hardware-Regelkreis dafür startet.
+    Phase 3B unterscheidet bewusst drei Zustände:
+
+    - ``enabled``: Runtime wird geladen.
+    - ``shadow_enabled``: Regelkreis darf rechnen, aber keine Hardware schalten.
+    - ``control_enabled``: echte Hardware-Aktorik. Diese bleibt in Phase 3B
+      ausschließlich für ``tent_1`` aktiv.
     """
 
     def __init__(self, path=TENTS_FILE):
@@ -79,6 +81,7 @@ class TentManager:
             "id": DEFAULT_TENT_ID,
             "name": DEFAULT_TENT_NAME,
             "enabled": True,
+            "shadow_enabled": False,
             "control_enabled": True,
             "controller_id": DEFAULT_CONTROLLER_ID,
         }
@@ -93,6 +96,7 @@ class TentManager:
             or (DEFAULT_TENT_NAME if tent_id == DEFAULT_TENT_ID else tent_id)
         ).strip()
         item["enabled"] = bool(item.get("enabled", True))
+        item["shadow_enabled"] = bool(item.get("shadow_enabled", False))
         item["control_enabled"] = bool(
             item.get("control_enabled", tent_id == DEFAULT_TENT_ID)
         )
@@ -100,10 +104,17 @@ class TentManager:
             item.get("controller_id") or DEFAULT_CONTROLLER_ID
         ).strip()
 
-        # Das Default-Zelt bleibt für die Rückwärtskompatibilität aktiv.
+        # Das Default-Zelt bleibt für die Rückwärtskompatibilität produktiv.
         if tent_id == DEFAULT_TENT_ID:
             item["enabled"] = True
+            item["shadow_enabled"] = False
             item["control_enabled"] = True
+        else:
+            # Phase-3B-Sicherheitsgrenze: zusätzliche Zelte besitzen noch
+            # grundsätzlich KEINE physische Hardware-Freigabe. Selbst ein
+            # manuell gesetztes control_enabled=true in tents.json wird beim
+            # Laden wieder auf False normalisiert.
+            item["control_enabled"] = False
 
         return item
 
@@ -204,6 +215,7 @@ class TentManager:
         *,
         name=None,
         enabled=True,
+        shadow_enabled=False,
         control_enabled=False,
         controller_id=DEFAULT_CONTROLLER_ID,
     ):
@@ -213,6 +225,11 @@ class TentManager:
 
         if tent_id == DEFAULT_TENT_ID:
             raise ValueError(f"{DEFAULT_TENT_ID} existiert bereits als Default-Zelt")
+
+        if control_enabled:
+            raise ValueError(
+                "Zusätzliche Hardware-Regelkreise sind in Phase 3B noch gesperrt"
+            )
 
         with self._lock:
             if tent_id in self._data.setdefault("tents", {}):
@@ -224,7 +241,8 @@ class TentManager:
                     "id": tent_id,
                     "name": name or tent_id,
                     "enabled": enabled,
-                    "control_enabled": control_enabled,
+                    "shadow_enabled": shadow_enabled,
+                    "control_enabled": False,
                     "controller_id": controller_id,
                 },
             )
@@ -244,6 +262,47 @@ class TentManager:
             self._data["tents"][tent_id]["name"] = name
             self.save()
             return dict(self._data["tents"][tent_id])
+
+    def set_shadow_enabled(self, tent_id, enabled):
+        """Aktiviert/deaktiviert nur den hardwarelosen Shadow-Regelkreis.
+
+        Der tatsächliche Thread wird erst beim nächsten Backend-Start erzeugt.
+        """
+
+        tent_id = validate_tent_id(tent_id)
+        if tent_id == DEFAULT_TENT_ID:
+            raise ValueError("tent_1 ist der produktive Regelkreis und kein Shadow-Zelt")
+
+        with self._lock:
+            if tent_id not in self._data.get("tents", {}):
+                raise KeyError(f"Unbekanntes Zelt '{tent_id}'")
+
+            tent = self._data["tents"][tent_id]
+            tent["shadow_enabled"] = bool(enabled)
+
+            # Sicherheitsinvariante der Phase 3B.
+            tent["control_enabled"] = False
+
+            self.save()
+            return dict(tent)
+
+    def set_enabled(self, tent_id, enabled):
+        tent_id = validate_tent_id(tent_id)
+        if tent_id == DEFAULT_TENT_ID:
+            raise ValueError("tent_1 kann nicht deaktiviert werden")
+
+        with self._lock:
+            if tent_id not in self._data.get("tents", {}):
+                raise KeyError(f"Unbekanntes Zelt '{tent_id}'")
+
+            tent = self._data["tents"][tent_id]
+            tent["enabled"] = bool(enabled)
+            if not tent["enabled"]:
+                tent["shadow_enabled"] = False
+            tent["control_enabled"] = False
+
+            self.save()
+            return dict(tent)
 
 
 manager = TentManager()

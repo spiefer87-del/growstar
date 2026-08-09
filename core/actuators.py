@@ -105,6 +105,27 @@ def _set_shelly_device(
     st = rt.state
     cfg = rt.config
 
+    # -------------------------------------------------
+    # Phase 3B: harte Shadow-Sicherheitsbarriere
+    # -------------------------------------------------
+    # Zusätzliche Zelte dürfen bereits denselben Regelalgorithmus ausführen,
+    # aber solange control_enabled=False ist, darf diese Funktion NIEMALS
+    # einen Netzwerk-Schaltbefehl senden. Der berechnete Sollzustand wird
+    # getrennt vom realen Relaiszustand in shadow_outputs protokolliert.
+    if not rt.control_enabled:
+        desired = bool(enabled)
+
+        with rt.state_lock:
+            previous = rt.shadow_outputs.get(live_key)
+            rt.shadow_outputs[live_key] = desired
+
+        if previous != desired:
+            print(
+                f"🧪 [{rt.tent_id}] SHADOW {live_key}: "
+                f"{'EIN' if desired else 'AUS'} {reason}"
+            )
+        return
+
     if enabled == getattr(st, state_attr):
         return
 

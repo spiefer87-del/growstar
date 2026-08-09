@@ -3,6 +3,7 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
 import threading
+import time
 
 import core.context as ctx
 import core.state as legacy_state
@@ -33,8 +34,17 @@ class TentRuntime:
     energy_state: dict = field(default_factory=dict)
     energy_lock: object = field(default_factory=threading.RLock)
     enabled: bool = True
+    shadow_enabled: bool = False
     control_enabled: bool = False
     controller_id: str = "local"
+
+    # Phase 3B: Shadow-Ausgänge werden bewusst getrennt vom realen
+    # Gerätezustand gespeichert. Ein Shadow-Loop darf dadurch Entscheidungen
+    # berechnen, ohne den tatsächlichen State eines Shelly-Relais vorzutäuschen.
+    shadow_outputs: dict = field(default_factory=dict)
+    loop_mode: str = "inactive"
+    last_loop_ts: object = None
+
     _save_config_callback: object = None
 
     def persist_config(self):
@@ -45,6 +55,10 @@ class TentRuntime:
 
         self._save_config_callback(self.config)
         return True
+
+    def mark_loop(self, mode):
+        self.loop_mode = mode
+        self.last_loop_ts = time.time()
 
 
 _registry_lock = threading.RLock()
@@ -58,6 +72,7 @@ def _tent_meta(tent_id):
             DEFAULT_TENT_NAME if tent_id == DEFAULT_TENT_ID else tent_id
         ),
         "enabled": bool(tent.get("enabled", True)),
+        "shadow_enabled": bool(tent.get("shadow_enabled", False)),
         "control_enabled": bool(
             tent.get("control_enabled", tent_id == DEFAULT_TENT_ID)
         ),
@@ -76,6 +91,7 @@ def _build_default_runtime():
         energy_state=ctx.energy_state,
         energy_lock=ctx.energy_lock,
         enabled=True,
+        shadow_enabled=False,
         control_enabled=True,
         controller_id=meta["controller_id"],
         _save_config_callback=save_config,
@@ -93,6 +109,7 @@ def get_default_runtime():
         else:
             runtime.name = meta["name"]
             runtime.enabled = True
+            runtime.shadow_enabled = False
             runtime.control_enabled = True
             runtime.controller_id = meta["controller_id"]
 
@@ -164,6 +181,7 @@ def create_isolated_runtime(
     config_data=None,
     save_config_callback=None,
     enabled=True,
+    shadow_enabled=False,
     control_enabled=False,
     controller_id="local",
 ):
@@ -184,6 +202,7 @@ def create_isolated_runtime(
         energy_state={},
         energy_lock=threading.RLock(),
         enabled=bool(enabled),
+        shadow_enabled=bool(shadow_enabled),
         control_enabled=bool(control_enabled),
         controller_id=controller_id or "local",
         _save_config_callback=save_config_callback,
@@ -197,9 +216,11 @@ def _save_callback_for(tent_id):
 def init_runtimes():
     """Lädt alle aktivierten Zelte als getrennte Runtimes in den Prozess.
 
-    Phase 3 startet für zusätzliche Runtimes ausdrücklich noch keinen Main-
-    Loop. ``control_enabled`` ist bereits Metadatum, wird aber erst in einer
-    späteren Phase für echten Hardware-Autostart verwendet.
+    Phase 3B erlaubt für zusätzliche Zelte ausschließlich Shadow-Control.
+    Selbst wenn ``tents.json`` versehentlich/manuell ``control_enabled=true``
+    enthält, wird die Runtime hier noch hart auf ``False`` gesetzt. Erst eine
+    spätere, ausdrücklich getestete Phase darf diese Sicherheitsbarriere
+    entfernen.
     """
 
     loaded_ids = {DEFAULT_TENT_ID}
@@ -218,21 +239,31 @@ def init_runtimes():
         ensure_tent_config(tent_id)
         cfg = load_tent_config(tent_id)
 
+        requested_control = bool(tent.get("control_enabled", False))
+        if requested_control:
+            print(
+                f"🚫 [{tent_id}] Hardware-Control angefordert, "
+                "aber in Phase 3B weiterhin gesperrt"
+            )
+
         runtime = create_isolated_runtime(
             tent_id,
             name=tent.get("name") or tent_id,
             config_data=cfg,
             save_config_callback=_save_callback_for(tent_id),
             enabled=True,
-            control_enabled=bool(tent.get("control_enabled", False)),
+            shadow_enabled=bool(tent.get("shadow_enabled", False)),
+            # Harte Phase-3B-Sicherheitsbarriere:
+            control_enabled=False,
             controller_id=tent.get("controller_id") or "local",
         )
         register_runtime(runtime, replace=True)
         loaded_ids.add(tent_id)
 
+        mode = "Shadow bereit" if runtime.shadow_enabled else "inaktiv"
         print(
             f"🧩 [{tent_id}] Runtime geladen "
-            f"(Hardware-Control in Phase 3 nicht gestartet)"
+            f"({mode}; Hardware-Control gesperrt)"
         )
 
     # Runtimes entfernen, deren Zelt aus tents.json verschwunden/disabled ist.
