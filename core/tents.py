@@ -1,5 +1,7 @@
 import json
 import os
+import re
+import tempfile
 import threading
 
 
@@ -9,12 +11,59 @@ DEFAULT_TENT_ID = "tent_1"
 DEFAULT_TENT_NAME = "Zelt 1"
 DEFAULT_CONTROLLER_ID = "local"
 
+_TENT_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def validate_tent_id(tent_id):
+    """Prüft eine Zelt-ID, bevor sie als Dateiname/Registry-Key verwendet wird."""
+
+    if not isinstance(tent_id, str):
+        raise ValueError("tent_id muss ein String sein")
+
+    tent_id = tent_id.strip()
+    if not tent_id:
+        raise ValueError("tent_id darf nicht leer sein")
+
+    if not _TENT_ID_RE.fullmatch(tent_id):
+        raise ValueError(
+            "tent_id darf nur Buchstaben, Zahlen, '_' und '-' enthalten"
+        )
+
+    return tent_id
+
+
+def _atomic_write_json(path, data):
+    directory = os.path.dirname(os.path.abspath(path)) or "."
+    os.makedirs(directory, exist_ok=True)
+
+    fd, temp_path = tempfile.mkstemp(
+        prefix=".tents-",
+        suffix=".tmp",
+        dir=directory,
+        text=True,
+    )
+
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temp_path, path)
+    except Exception:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            pass
+        raise
+
 
 class TentManager:
-    """Verwaltet die Zelt-Metadaten.
+    """Persistente Metadaten aller Grow-Zelte dieses Controllers.
 
-    In Phase 1 wird nur das bestehende Growstar-System als ``tent_1``
-    registriert. State, Config und Regelung bleiben zunächst unverändert.
+    Phase 3 führt mehrere Zelte als echte persistente Objekte ein. Ein neues
+    Zelt wird absichtlich mit ``control_enabled=False`` angelegt. Dadurch kann
+    es konfiguriert und als Runtime geladen werden, ohne dass Growstar bereits
+    einen Hardware-Regelkreis dafür startet.
     """
 
     def __init__(self, path=TENTS_FILE):
@@ -30,11 +79,41 @@ class TentManager:
             "id": DEFAULT_TENT_ID,
             "name": DEFAULT_TENT_NAME,
             "enabled": True,
+            "control_enabled": True,
             "controller_id": DEFAULT_CONTROLLER_ID,
         }
 
+    def _normalize_tent(self, tent_id, tent):
+        tent_id = validate_tent_id(tent_id)
+        item = dict(tent or {})
+
+        item["id"] = tent_id
+        item["name"] = str(
+            item.get("name")
+            or (DEFAULT_TENT_NAME if tent_id == DEFAULT_TENT_ID else tent_id)
+        ).strip()
+        item["enabled"] = bool(item.get("enabled", True))
+        item["control_enabled"] = bool(
+            item.get("control_enabled", tent_id == DEFAULT_TENT_ID)
+        )
+        item["controller_id"] = str(
+            item.get("controller_id") or DEFAULT_CONTROLLER_ID
+        ).strip()
+
+        # Das Default-Zelt bleibt für die Rückwärtskompatibilität aktiv.
+        if tent_id == DEFAULT_TENT_ID:
+            item["enabled"] = True
+            item["control_enabled"] = True
+
+        return item
+
     def load(self):
         with self._lock:
+            loaded = {
+                "default_tent_id": DEFAULT_TENT_ID,
+                "tents": {},
+            }
+
             if os.path.exists(self.path):
                 try:
                     with open(self.path, "r", encoding="utf-8") as f:
@@ -52,21 +131,37 @@ class TentManager:
                         if not isinstance(tents, dict):
                             tents = {}
 
-                        self._data = {
+                        normalized = {}
+                        for raw_id, raw_tent in tents.items():
+                            try:
+                                tent = self._normalize_tent(raw_id, raw_tent)
+                                normalized[tent["id"]] = tent
+                            except ValueError as exc:
+                                print(
+                                    "⚠️ Ungültiger tents.json-Eintrag übersprungen:",
+                                    raw_id,
+                                    exc,
+                                )
+
+                        loaded = {
                             "default_tent_id": data.get(
                                 "default_tent_id",
                                 DEFAULT_TENT_ID,
                             ),
-                            "tents": tents,
+                            "tents": normalized,
                         }
 
                 except Exception as exc:
                     print("⚠️ tents.json konnte nicht gelesen werden:", exc)
 
+            self._data = loaded
             self._data.setdefault("tents", {})
-            self._data["tents"].setdefault(
+            self._data["tents"][DEFAULT_TENT_ID] = self._normalize_tent(
                 DEFAULT_TENT_ID,
-                self._default_tent(),
+                self._data["tents"].get(
+                    DEFAULT_TENT_ID,
+                    self._default_tent(),
+                ),
             )
 
             default_id = self._data.get("default_tent_id")
@@ -77,13 +172,7 @@ class TentManager:
 
     def save(self):
         with self._lock:
-            with open(self.path, "w", encoding="utf-8") as f:
-                json.dump(
-                    self._data,
-                    f,
-                    indent=2,
-                    ensure_ascii=False,
-                )
+            _atomic_write_json(self.path, self._data)
 
     def snapshot(self):
         with self._lock:
@@ -97,6 +186,7 @@ class TentManager:
             ]
 
     def get(self, tent_id):
+        tent_id = validate_tent_id(tent_id)
         with self._lock:
             tent = self._data.get("tents", {}).get(tent_id)
             return dict(tent) if tent else None
@@ -107,6 +197,53 @@ class TentManager:
                 "default_tent_id",
                 DEFAULT_TENT_ID,
             )
+
+    def add_tent(
+        self,
+        tent_id,
+        *,
+        name=None,
+        enabled=True,
+        control_enabled=False,
+        controller_id=DEFAULT_CONTROLLER_ID,
+    ):
+        """Legt Zelt-Metadaten an; Hardware-Control bleibt standardmäßig AUS."""
+
+        tent_id = validate_tent_id(tent_id)
+
+        if tent_id == DEFAULT_TENT_ID:
+            raise ValueError(f"{DEFAULT_TENT_ID} existiert bereits als Default-Zelt")
+
+        with self._lock:
+            if tent_id in self._data.setdefault("tents", {}):
+                raise ValueError(f"Zelt '{tent_id}' existiert bereits")
+
+            item = self._normalize_tent(
+                tent_id,
+                {
+                    "id": tent_id,
+                    "name": name or tent_id,
+                    "enabled": enabled,
+                    "control_enabled": control_enabled,
+                    "controller_id": controller_id,
+                },
+            )
+            self._data["tents"][tent_id] = item
+            self.save()
+            return dict(item)
+
+    def rename_tent(self, tent_id, name):
+        tent_id = validate_tent_id(tent_id)
+        name = str(name or "").strip()
+        if not name:
+            raise ValueError("name darf nicht leer sein")
+
+        with self._lock:
+            if tent_id not in self._data.get("tents", {}):
+                raise KeyError(f"Unbekanntes Zelt '{tent_id}'")
+            self._data["tents"][tent_id]["name"] = name
+            self.save()
+            return dict(self._data["tents"][tent_id])
 
 
 manager = TentManager()
