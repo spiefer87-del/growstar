@@ -1,4 +1,24 @@
-from flask import render_template
+from flask import abort, redirect, render_template, url_for
+
+from core.tents import manager as tent_manager, validate_tent_id
+
+
+def _tent_page_context(tent_id):
+    """Liefert ausschließlich sichere Metadaten für die Zelt-Ansicht."""
+    try:
+        tent_id = validate_tent_id(tent_id)
+    except ValueError:
+        abort(404)
+
+    tent = tent_manager.get(tent_id)
+    if tent is None:
+        abort(404)
+
+    return {
+        "tent_id": tent_id,
+        "tent_name": tent.get("name") or tent_id,
+        "default_tent_id": tent_manager.default_tent_id(),
+    }
 
 
 def register(app):
@@ -21,9 +41,28 @@ def register(app):
         return render_template("grow_control_dashboard.html")
 
 
+    # Kompatibler Einstieg für bestehende Links / Bookmarks.
+    # Er zeigt weiterhin das Default-Zelt, jetzt aber über dieselbe
+    # zeltbezogene Template-Logik wie alle weiteren Zelte.
     @app.route("/grow-control/live")
     def grow_control_live():
-        return render_template("grow_control.html")
+        # Rückwärtskompatibler Alias. Kanonisch benutzen ALLE Grow-Einheiten
+        # dieselbe generische Route.
+        return redirect(
+            url_for(
+                "grow_control_tent",
+                tent_id=tent_manager.default_tent_id(),
+            ),
+            code=302,
+        )
+
+
+    @app.route("/grow-control/tents/<tent_id>")
+    def grow_control_tent(tent_id):
+        return render_template(
+            "grow_control.html",
+            **_tent_page_context(tent_id),
+        )
 
 
     @app.route("/settings")
