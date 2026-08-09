@@ -6,6 +6,7 @@ import core.state as state
 import core.context as ctx
 
 from core.constants import DB_INTERVAL
+from core.tents import DEFAULT_TENT_ID
 
 from db import insert_measurement
 
@@ -105,6 +106,7 @@ def main_loop():
                         hum=hum_val,
                         hum_target=hum_target,
                         vpd=vpd,
+                        tent_id=DEFAULT_TENT_ID,
                     )
 
                 except Exception as e:
