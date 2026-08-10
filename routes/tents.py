@@ -10,9 +10,11 @@ from core.hardware_assignments import (
     update_hardware_assignments,
 )
 from core.profile import PROFILES, apply_profile, get_active_profile
+from core.live_preflight import evaluate_live_preflight
 from core.runtime import get_runtime, list_runtimes
 from core.tent_config import ensure_tent_config
 from core.tents import manager as tent_manager, validate_tent_id
+from services.live_control import LiveTransitionError, request_live, request_shadow
 
 
 _DEVICE_NAMES = DEVICE_NAMES
@@ -114,6 +116,8 @@ def _state_snapshot(runtime):
         "last_loop_ts": runtime.last_loop_ts,
         "control_enabled": runtime.control_enabled,
         "shadow_enabled": runtime.shadow_enabled,
+        "live_requested": bool(getattr(runtime, "live_requested", False)),
+        "arming": bool(getattr(runtime, "arming", False)),
         "hardware_actuation_blocked": not runtime.control_enabled,
 
         # Sensoren / Sollwerte
@@ -164,6 +168,8 @@ def _config_payload(runtime):
         "name": runtime.name,
         "control_enabled": runtime.control_enabled,
         "shadow_enabled": runtime.shadow_enabled,
+        "live_requested": bool(getattr(runtime, "live_requested", False)),
+        "arming": bool(getattr(runtime, "arming", False)),
         "hardware_actuation_blocked": not runtime.control_enabled,
         "active_profile": get_active_profile(runtime=runtime),
         "profiles": sorted((PROFILES.get("profiles") or {}).keys()),
@@ -185,6 +191,7 @@ def _tent_list_payload():
         # fälschlich als bereits aktiv darstellen.
         item["configured_enabled"] = bool(tent.get("enabled", True))
         item["configured_shadow_enabled"] = bool(tent.get("shadow_enabled", False))
+        item["configured_control_enabled"] = bool(tent.get("control_enabled", False))
         item.update({
             "runtime_loaded": runtime is not None,
             "runtime_mode": runtime.loop_mode if runtime else "unloaded",
@@ -192,6 +199,8 @@ def _tent_list_payload():
             "enabled": bool(runtime.enabled) if runtime else bool(tent.get("enabled", True)),
             "shadow_enabled": bool(runtime.shadow_enabled) if runtime else False,
             "control_enabled": bool(runtime.control_enabled) if runtime else False,
+            "live_requested": bool(getattr(runtime, "live_requested", False)) if runtime else bool(tent.get("control_enabled", False)),
+            "arming": bool(getattr(runtime, "arming", False)) if runtime else False,
             "hardware_actuation_blocked": (
                 not runtime.control_enabled if runtime else True
             ),
@@ -302,6 +311,45 @@ def register(app):
         if error:
             return error
         return jsonify(_state_snapshot(runtime))
+
+    @app.route("/api/tents/<tent_id>/live-preflight", methods=["GET"])
+    def api_tent_live_preflight(tent_id):
+        runtime, error = _find_runtime(tent_id)
+        if error:
+            return error
+        return jsonify(evaluate_live_preflight(runtime))
+
+    @app.route("/api/tents/<tent_id>/live", methods=["POST"])
+    def api_tent_live_transition(tent_id):
+        runtime, error = _find_runtime(tent_id)
+        if error:
+            return error
+
+        data = request.get_json(silent=True) or {}
+        enabled = data.get("enabled")
+        if not isinstance(enabled, bool):
+            return jsonify(
+                success=False,
+                error="invalid_payload",
+                message="enabled muss true oder false sein",
+            ), 400
+
+        try:
+            result = request_live(runtime.tent_id) if enabled else request_shadow(runtime.tent_id)
+        except LiveTransitionError as exc:
+            return jsonify(
+                success=False,
+                error=exc.code,
+                message=str(exc),
+                preflight=exc.preflight,
+            ), 409
+        except (KeyError, ValueError) as exc:
+            return jsonify(success=False, error=str(exc)), 400
+
+        payload = dict(result)
+        payload["state"] = _state_snapshot(get_runtime(runtime.tent_id))
+        payload["tent"] = tent_manager.get(runtime.tent_id)
+        return jsonify(payload)
 
     @app.route("/api/tents/<tent_id>/config", methods=["GET", "POST"])
     def api_tent_config(tent_id):
