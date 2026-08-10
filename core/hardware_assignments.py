@@ -186,7 +186,7 @@ def hardware_snapshot(tent_id):
         "control_enabled": control_enabled,
         "shadow_enabled": bool(runtime.shadow_enabled) if runtime else bool(tent.get("shadow_enabled", False)),
         "hardware_actuation_blocked": not control_enabled,
-        "editable": not control_enabled,
+        "editable": True,
         "assignments": assignments,
     }
 
@@ -211,12 +211,19 @@ def _normalize_patch(data):
         host = _normalize_host(raw.get("ip", raw.get("host")))
         relay = _normalize_relay(raw.get("relay"))
 
-        if not host and relay is None:
+        # Ein nicht verwendeter Aktor darf vollständig offen bleiben.
+        # Das UI kann bei einem leeren IP-Feld trotzdem noch Relay 0 anzeigen;
+        # ohne Host existiert bewusst keine Hardware-Zuordnung.
+        if not host:
             normalized[device] = None
             continue
 
-        if not host or relay is None:
-            raise ValueError(f"{device}: IP/Hostname und Relay müssen gemeinsam gesetzt werden")
+        # Shelly Plug / Plug S und viele 1-Kanal-Shellys verwenden Relay 0.
+        # Wird nur eine IP/Hostname angegeben, ist Relay 0 daher der sichere
+        # und rückwärtskompatible Standard. Mehrkanal-Geräte können weiterhin
+        # explizit Relay 1..15 wählen.
+        if relay is None:
+            relay = 0
 
         normalized[device] = (host, relay)
 
@@ -261,8 +268,10 @@ def _endpoint_owners(*, exclude_tent_id=None, candidate_cfg=None):
 def update_hardware_assignments(tent_id, data):
     """Ändert IP-/Relay-Zuordnungen einer Station sicher und atomar.
 
-    Phase 4D erlaubt absichtlich nur Stationen ohne aktive Hardware-Aktorik.
-    Das produktive LIVE-Zelt bleibt während dieser Phase schreibgeschützt.
+    Die Zuordnung darf auch bei einer LIVE-Station bearbeitet werden.
+    Die Änderung betrifft ausschließlich die gespeicherte Zieladresse des
+    Aktors; sie löst in dieser Funktion niemals selbst einen Shelly-Schaltbefehl
+    aus. Der globale Doppelbelegungsschutz bleibt aktiv.
     """
 
     tent_id = validate_tent_id(tent_id)
@@ -272,11 +281,6 @@ def update_hardware_assignments(tent_id, data):
 
     runtime_map = _runtime_map()
     cfg, runtime = _registered_config(tent_id, runtime_map)
-    control_enabled = bool(runtime.control_enabled) if runtime else bool(tent.get("control_enabled", False))
-    if control_enabled:
-        raise PermissionError(
-            "Hardware-Zuordnung einer LIVE-Station ist in Phase 4D gesperrt"
-        )
 
     normalized = _normalize_patch(data)
     working = deepcopy(cfg)
