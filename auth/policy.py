@@ -310,6 +310,9 @@ def _tent_api_read_requirement(path):
     if not _matches_prefix(path, "/api/tents"):
         return None
 
+    if path.endswith("/live-preflight"):
+        return require("grow.view", "hardware.view")
+
     if "/sensors" in path or path.endswith("/hardware"):
         return require("hardware.view")
 
@@ -322,6 +325,11 @@ def _tent_api_read_requirement(path):
 def _tent_api_write_requirement(path):
     if not _matches_prefix(path, "/api/tents"):
         return None
+
+    # LIVE opens/closes real hardware actuation and therefore requires BOTH
+    # runtime Grow control and explicit hardware control rights.
+    if path.endswith("/live"):
+        return require("grow.control", "hardware.control")
 
     if "/sensors" in path or path.endswith("/hardware"):
         return require("hardware.configure")
