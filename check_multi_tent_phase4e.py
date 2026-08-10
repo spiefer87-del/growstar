@@ -37,7 +37,14 @@ def static_checks():
     check("last_loop_ts" in health, "Regelkreis-Heartbeat wird pro Runtime ausgewertet")
     check("SENSOR_ASSIGNMENTS" in health, "Sensorzustand wird stationsbezogen ausgewertet")
     check("DEVICE_HARDWARE" in health, "Hardware-Zuordnung wird stationsbezogen zusammengefasst")
-    check('"reachability_checked": False' in health, "Watchdog sendet keine versteckten Hardware-Pings")
+    check(
+        "get_endpoint_health" in health
+        and "get_shelly_relay_state" not in health
+        and "requests.get" not in health
+        and "requests.post" not in health
+        and "switch_shelly(" not in health,
+        "Watchdog sendet keine versteckten Hardware-Pings",
+    )
     check("watchdog_cycle" in service, "Watchdog-Zyklus ist separat testbar")
     check("[{tent_id}]" in service, "Watchdog-Log kennzeichnet Stationswarnungen")
     check('"stations"' in health, "Status-Snapshot enthält beliebig viele Stationen")
