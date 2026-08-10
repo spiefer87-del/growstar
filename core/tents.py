@@ -60,12 +60,13 @@ def _atomic_write_json(path, data):
 class TentManager:
     """Persistente Metadaten aller Grow-Zelte dieses Controllers.
 
-    Phase 3B unterscheidet bewusst drei Zustände:
+    Die Metadaten unterscheiden drei Zustände:
 
     - ``enabled``: Runtime wird geladen.
-    - ``shadow_enabled``: Regelkreis darf rechnen, aber keine Hardware schalten.
-    - ``control_enabled``: echte Hardware-Aktorik. Diese bleibt in Phase 3B
-      ausschließlich für ``tent_1`` aktiv.
+    - ``shadow_enabled``: Regelkreis rechnet hardwaregesperrt.
+    - ``control_enabled``: persistierter LIVE-Wunsch. Für zusätzliche Stationen
+      öffnet Phase 4H das echte Runtime-Hardware-Gate nach jedem Boot trotzdem
+      erst nach einem erfolgreichen Preflight/ARMING.
     """
 
     def __init__(self, path=TENTS_FILE):
@@ -110,11 +111,14 @@ class TentManager:
             item["shadow_enabled"] = False
             item["control_enabled"] = True
         else:
-            # Phase-3B-Sicherheitsgrenze: zusätzliche Zelte besitzen noch
-            # grundsätzlich KEINE physische Hardware-Freigabe. Selbst ein
-            # manuell gesetztes control_enabled=true in tents.json wird beim
-            # Laden wieder auf False normalisiert.
-            item["control_enabled"] = False
+            if not item["enabled"]:
+                item["shadow_enabled"] = False
+                item["control_enabled"] = False
+            elif item["control_enabled"]:
+                # LIVE und SHADOW sind persistente Zielmodi und schließen sich
+                # gegenseitig aus. Das echte Hardware-Gate öffnet trotzdem erst
+                # im Runtime-Preflight nach dem Start.
+                item["shadow_enabled"] = False
 
         return item
 
@@ -226,10 +230,10 @@ class TentManager:
         if tent_id == DEFAULT_TENT_ID:
             raise ValueError(f"{DEFAULT_TENT_ID} existiert bereits als Default-Zelt")
 
+        # Neue Stationen starten immer sicher ohne LIVE-Freigabe. LIVE wird
+        # ausschließlich über den speziellen Phase-4H-Preflight aktiviert.
         if control_enabled:
-            raise ValueError(
-                "Zusätzliche Hardware-Regelkreise sind in Phase 3B noch gesperrt"
-            )
+            raise ValueError("Neue Stationen müssen zuerst im Shadow-Betrieb geprüft werden")
 
         with self._lock:
             if tent_id in self._data.setdefault("tents", {}):
@@ -251,10 +255,10 @@ class TentManager:
             return dict(item)
 
     def update_tent(self, tent_id, *, name=None, enabled=None, shadow_enabled=None):
-        """Aktualisiert Stations-Metadaten atomar in einem einzigen Save.
+        """Aktualisiert allgemeine Stations-Metadaten atomar.
 
-        ``None`` bedeutet bei booleschen Feldern "nicht ändern". Zusätzliche
-        Stationen bleiben weiterhin grundsätzlich ohne Hardware-Control.
+        LIVE-Transitions werden absichtlich NICHT über diese generische Methode
+        durchgeführt, sondern über ``set_control_enabled`` nach Preflight.
         """
 
         tent_id = validate_tent_id(tent_id)
@@ -284,11 +288,25 @@ class TentManager:
                 working["shadow_enabled"] = False
                 working["control_enabled"] = True
             else:
+                currently_live = bool(working.get("control_enabled", False))
+                if currently_live and (
+                    (enabled is not None and not requested_enabled)
+                    or (shadow_enabled is not None and requested_shadow)
+                ):
+                    raise ValueError(
+                        "LIVE-Stationen müssen über die kontrollierte LIVE/SHADOW-Transition umgeschaltet werden"
+                    )
+
                 if not requested_enabled and requested_shadow:
                     raise ValueError("Shadow kann für eine deaktivierte Station nicht aktiviert werden")
+
                 working["enabled"] = requested_enabled
-                working["shadow_enabled"] = requested_shadow if requested_enabled else False
-                working["control_enabled"] = False
+                if currently_live:
+                    working["shadow_enabled"] = False
+                    working["control_enabled"] = True
+                else:
+                    working["shadow_enabled"] = requested_shadow if requested_enabled else False
+                    working["control_enabled"] = False
 
             # Erst nach vollständiger Validierung ersetzen und genau einmal speichern.
             self._data["tents"][tent_id] = self._normalize_tent(tent_id, working)
@@ -323,10 +341,13 @@ class TentManager:
                 raise KeyError(f"Unbekanntes Zelt '{tent_id}'")
 
             tent = self._data["tents"][tent_id]
+            if tent.get("control_enabled") and enabled:
+                raise ValueError(
+                    "LIVE-Stationen müssen über die kontrollierte LIVE/SHADOW-Transition umgeschaltet werden"
+                )
             tent["shadow_enabled"] = bool(enabled)
-
-            # Sicherheitsinvariante der Phase 3B.
-            tent["control_enabled"] = False
+            if enabled:
+                tent["control_enabled"] = False
 
             self.save()
             return dict(tent)
@@ -341,13 +362,48 @@ class TentManager:
                 raise KeyError(f"Unbekanntes Zelt '{tent_id}'")
 
             tent = self._data["tents"][tent_id]
+            if tent.get("control_enabled") and not enabled:
+                raise ValueError(
+                    "Eine LIVE-Station muss vor dem Deaktivieren kontrolliert auf SHADOW gesetzt werden"
+                )
             tent["enabled"] = bool(enabled)
             if not tent["enabled"]:
                 tent["shadow_enabled"] = False
-            tent["control_enabled"] = False
+                tent["control_enabled"] = False
 
             self.save()
             return dict(tent)
+
+    def set_control_enabled(self, tent_id, enabled, *, shadow_when_disabled=True):
+        """Persistiert den LIVE-Zielmodus nach einer kontrollierten Transition.
+
+        Diese Methode führt selbst KEINEN Preflight und KEINE Hardware-Aktion
+        aus. Sie wird deshalb nur vom Phase-4H-Live-Control-Service verwendet.
+        """
+
+        tent_id = validate_tent_id(tent_id)
+        if tent_id == DEFAULT_TENT_ID:
+            if not enabled:
+                raise ValueError("tent_1 bleibt die Default-LIVE-Station")
+            return self.get(DEFAULT_TENT_ID)
+
+        with self._lock:
+            if tent_id not in self._data.get("tents", {}):
+                raise KeyError(f"Unbekanntes Zelt '{tent_id}'")
+
+            tent = self._data["tents"][tent_id]
+            if not tent.get("enabled", True) and enabled:
+                raise ValueError("Eine deaktivierte Station kann nicht LIVE werden")
+
+            tent["control_enabled"] = bool(enabled)
+            if enabled:
+                tent["shadow_enabled"] = False
+            else:
+                tent["shadow_enabled"] = bool(shadow_when_disabled and tent.get("enabled", True))
+
+            self._data["tents"][tent_id] = self._normalize_tent(tent_id, tent)
+            self.save()
+            return dict(self._data["tents"][tent_id])
 
 
 manager = TentManager()

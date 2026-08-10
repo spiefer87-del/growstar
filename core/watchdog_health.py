@@ -33,6 +33,7 @@ _THREAD_SPECS = (
     ("hardware", "Hardware", ("growstar-hardware",)),
     ("shelly", "Shelly", ("growstar-shelly",)),
     ("hardware_recovery", "Hardware Recovery", ("growstar-hw-recovery",)),
+    ("live_arming", "LIVE Arming", ("growstar-live-arming",)),
 )
 
 
@@ -221,7 +222,10 @@ def _hardware_health(rt, *, now):
 
     return {
         "state": state,
-        "mode": "live" if rt.control_enabled else ("shadow" if rt.shadow_enabled else "inactive"),
+        "mode": "live" if rt.control_enabled else (
+            "arming" if (getattr(rt, "arming", False) or getattr(rt, "live_requested", False))
+            else ("shadow" if rt.shadow_enabled else "inactive")
+        ),
         "assigned": assigned,
         "online": online,
         "offline": offline,
@@ -234,7 +238,15 @@ def _hardware_health(rt, *, now):
 
 
 def _loop_health(rt, *, now):
-    expected = bool(rt.enabled and (rt.control_enabled or rt.shadow_enabled))
+    expected = bool(
+        rt.enabled
+        and (
+            rt.control_enabled
+            or rt.shadow_enabled
+            or getattr(rt, "live_requested", False)
+            or getattr(rt, "arming", False)
+        )
+    )
     age = _safe_age(now, getattr(rt, "last_loop_ts", None))
     stale = bool(expected and (age is None or age > CONTROL_LOOP_STALE_SEC))
 
@@ -288,9 +300,13 @@ def station_health(rt, *, now=None):
         "enabled": bool(rt.enabled),
         "control_enabled": bool(rt.control_enabled),
         "shadow_enabled": bool(rt.shadow_enabled),
+        "live_requested": bool(getattr(rt, "live_requested", False)),
+        "arming": bool(getattr(rt, "arming", False)),
         "runtime_mode": "live" if rt.control_enabled else (
-            "shadow" if rt.shadow_enabled else "inactive"
+            "arming" if (getattr(rt, "arming", False) or getattr(rt, "live_requested", False))
+            else ("shadow" if rt.shadow_enabled else "inactive")
         ),
+        "live_preflight": getattr(rt, "last_live_preflight", None),
         "overall": overall,
         "loop": loop,
         "temperature": temperature,

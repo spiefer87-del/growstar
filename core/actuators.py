@@ -112,7 +112,7 @@ def _set_shelly_device(
     # aber solange control_enabled=False ist, darf diese Funktion NIEMALS
     # einen Netzwerk-Schaltbefehl senden. Der berechnete Sollzustand wird
     # getrennt vom realen Relaiszustand in shadow_outputs protokolliert.
-    if not rt.control_enabled:
+    if not rt.control_enabled or getattr(rt, "disarming", False):
         desired = bool(enabled)
 
         with rt.state_lock:

@@ -302,3 +302,13 @@ def update_hardware_assignments(tent_id, data):
 
     _save_registered_config(tent_id, working, runtime=runtime)
     return hardware_snapshot(tent_id)
+
+
+def validate_hardware_assignments():
+    """Validiert die globale Host/Relay-Eindeutigkeit read-only.
+
+    Wird vom LIVE-Preflight verwendet, damit auch manuell veränderte Configs
+    niemals an der normalen Zuordnungs-API vorbei in den LIVE-Betrieb gelangen.
+    """
+    _endpoint_owners()
+    return True
