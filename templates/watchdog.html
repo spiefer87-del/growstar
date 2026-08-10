@@ -142,6 +142,15 @@ function renderController(controller){
     cards.push(`<article class="card"><h3>MQTT Verkehr</h3>${badge(mqtt.stale ? "KEINE AKTUELLEN DATEN" : "AKTIV", mqtt.state)}<div class="meta">Letzte Nachricht ${ageText(mqtt.age)}</div></article>`);
     const energy = controller.energy || {};
     cards.push(`<article class="card"><h3>Energie</h3>${badge(energy.stale ? "KEINE DATEN" : "AKTIV", energy.state)}<div class="meta">${Number(energy.devices || 0)} Geräte im Poll</div></article>`);
+
+    const recovery = controller.hardware_recovery || {};
+    const recoveryState = recovery.healthy ? "ok" : (recovery.running ? "warn" : "warn");
+    const recoveryText = recovery.healthy ? "BEREIT" : (recovery.running ? "RECOVERY" : "UNVOLLSTÄNDIG");
+    const missing = (recovery.missing_ble_devices || []).length
+        ? ` · fehlt: ${(recovery.missing_ble_devices || []).map(esc).join(", ")}`
+        : "";
+    cards.push(`<article class="card"><h3>Hardware Auto-Recovery</h3>${badge(recoveryText, recoveryState)}<div class="meta">Gateways ${Number(recovery.online_gateways || 0)}/${Number(recovery.known_gateways || 0)} · BLE ${Number(recovery.online_ble_devices || 0)}/${Number(recovery.expected_ble_devices || 0)}${missing}</div></article>`);
+
     grid.innerHTML = cards.join("");
 }
 
