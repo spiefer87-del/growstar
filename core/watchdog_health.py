@@ -3,8 +3,8 @@
 """Read-only health snapshots for the Growstar multi-station watchdog.
 
 This module performs no relay switching and no network probes. It only reads
-already available runtime/controller state. That keeps the watchdog safe and
-cheap even when the UI polls it every few seconds.
+already available runtime/controller state. Network reachability is supplied by
+the central hardware poll and consumed here from a thread-safe cache.
 """
 
 from __future__ import annotations
@@ -16,9 +16,10 @@ import core.context as ctx
 
 from core.constants import SENSOR_TIMEOUT
 from core.devices import DEVICE_MODES
+from core.hardware.actuator_health import actuator_poll_status, get_endpoint_health
 from core.hardware_assignments import DEVICE_HARDWARE
 from core.runtime import list_runtimes
-from core.tents import DEFAULT_TENT_ID, manager as tent_manager
+from core.tents import DEFAULT_TENT_ID
 
 
 CONTROL_LOOP_STALE_SEC = 10
@@ -126,7 +127,6 @@ def _config_health(rt):
         host = str(cfg.get(meta["ip_key"]) or "").strip()
         relay = cfg.get(meta["relay_key"])
 
-        # Nicht verwendete Aktoren dürfen vollständig offen sein.
         if not host and relay in (None, ""):
             continue
 
@@ -154,9 +154,9 @@ def _config_health(rt):
     }
 
 
-def _hardware_health(rt):
+def _hardware_health(rt, *, now):
     cfg = rt.config
-    assigned = []
+    endpoints = []
 
     for device, meta in DEVICE_HARDWARE.items():
         host = str(cfg.get(meta["ip_key"]) or "").strip()
@@ -169,28 +169,67 @@ def _hardware_health(rt):
         except (TypeError, ValueError):
             continue
 
-        assigned.append({
+        cached = get_endpoint_health(host, relay, now=now)
+        if cached is None:
+            endpoint_state = "unknown"
+            reachable = None
+            actual_state = None
+            check_age = None
+            success_age = None
+            failures = 0
+            last_error = None
+            latency_ms = None
+        else:
+            endpoint_state = cached.get("state", "unknown")
+            reachable = cached.get("reachable")
+            actual_state = cached.get("actual_state")
+            check_age = cached.get("check_age")
+            success_age = cached.get("success_age")
+            failures = int(cached.get("consecutive_failures") or 0)
+            last_error = cached.get("last_error")
+            latency_ms = cached.get("latency_ms")
+
+        endpoints.append({
             "device": device,
             "label": meta["label"],
             "ip": host,
             "relay": relay,
+            "state": endpoint_state,
+            "reachable": reachable,
+            "actual_state": actual_state,
+            "check_age": check_age,
+            "success_age": success_age,
+            "consecutive_failures": failures,
+            "last_error": last_error,
+            "latency_ms": latency_ms,
         })
 
-    if not assigned:
+    assigned = len(endpoints)
+    online = sum(1 for item in endpoints if item["state"] == "ok")
+    offline = sum(1 for item in endpoints if item["state"] == "error")
+    stale = sum(1 for item in endpoints if item["state"] == "warn")
+    unknown = sum(1 for item in endpoints if item["state"] == "unknown")
+
+    if not endpoints:
         state = "none"
-    elif not rt.control_enabled:
-        state = "shadow"
+    elif offline:
+        state = "error"
+    elif stale or unknown:
+        state = "warn"
     else:
-        # Phase 4E intentionally does not send additional network requests.
-        # Reachability will later be sourced from the central hardware poll.
-        state = "assigned"
+        state = "ok"
 
     return {
         "state": state,
-        "assigned": len(assigned),
-        "endpoints": assigned,
+        "mode": "live" if rt.control_enabled else ("shadow" if rt.shadow_enabled else "inactive"),
+        "assigned": assigned,
+        "online": online,
+        "offline": offline,
+        "stale": stale,
+        "unknown": unknown,
+        "endpoints": endpoints,
         "actuation_blocked": not bool(rt.control_enabled),
-        "reachability_checked": False,
+        "reachability_checked": bool(assigned and not unknown),
     }
 
 
@@ -226,11 +265,14 @@ def station_health(rt, *, now=None):
     humidity = _sensor_health(rt, "humidity", now=now)
     loop = _loop_health(rt, now=now)
     config = _config_health(rt)
-    hardware = _hardware_health(rt)
+    hardware = _hardware_health(rt, now=now)
 
     sensor_failsafe = bool(temperature["stale"] or humidity["stale"])
 
     states = [loop["state"], temperature["state"], humidity["state"], config["state"]]
+    if hardware["state"] in ("error", "warn"):
+        states.append(hardware["state"])
+
     if not rt.enabled:
         overall = "inactive"
     elif "error" in states:
@@ -278,7 +320,6 @@ def _thread_snapshot():
     return result
 
 
-
 def _hardware_recovery_snapshot():
     try:
         from services.hardware_recovery import get_hardware_recovery_status
@@ -295,6 +336,7 @@ def _hardware_recovery_snapshot():
             "online_ble_devices": 0,
             "missing_ble_devices": [],
         }
+
 
 def controller_health(*, now=None):
     now = time.time() if now is None else float(now)
@@ -325,6 +367,7 @@ def controller_health(*, now=None):
             "state": "warn" if len(energy) == 0 else "ok",
         },
         "hardware_recovery": _hardware_recovery_snapshot(),
+        "actuator_poll": actuator_poll_status(now=now),
     }
 
 
@@ -335,8 +378,6 @@ def build_watchdog_snapshot(*, now=None):
     stations = [station_health(runtime, now=now) for runtime in runtimes]
     controller = controller_health(now=now)
 
-    # Legacy fields keep existing API consumers functional. They mirror the
-    # default station plus the existing controller MQTT/Energy status.
     default_station = next(
         (item for item in stations if item["id"] == DEFAULT_TENT_ID),
         stations[0] if stations else None,
