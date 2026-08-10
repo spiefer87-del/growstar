@@ -1,6 +1,7 @@
 import time
 
 from core.hardware.manager import manager
+from services.actuator_health import poll_assigned_actuators
 from services.hardware import hardware
 
 
@@ -13,6 +14,20 @@ def hardware_loop():
     while True:
         try:
             hardware.refresh()
+
+            # Phase 4G: Ein zentraler read-only Poll prüft alle tatsächlich
+            # zugeordneten Shelly-Aktor-Endpunkte über alle lokalen Stationen.
+            # Der Regelkreis und der Watchdog selbst senden dadurch keine
+            # zusätzlichen Reachability-Anfragen.
+            try:
+                result = poll_assigned_actuators()
+                if result.get("endpoints"):
+                    print(
+                        "🔌 Aktor-Health: "
+                        f"{result.get('online', 0)}/{result.get('endpoints', 0)} erreichbar"
+                    )
+            except Exception as exc:
+                print("⚠️ Aktor-Health-Poll Fehler:", exc)
 
             # Der normale Hardware-Poll hält gleichzeitig die persistente
             # Recovery-Kopie aktuell. Merge schützt gegen temporäre Scanner-
