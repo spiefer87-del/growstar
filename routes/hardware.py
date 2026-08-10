@@ -1,6 +1,7 @@
 from flask import jsonify, request
 
 from services.hardware import hardware
+from core.mqtt_sensor_devices import list_mqtt_sensor_devices
 
 
 def register(app):
@@ -35,7 +36,12 @@ def register(app):
             "actuators": [
                 actuator.to_dict()
                 for actuator in hardware.actuators()
-            ]
+            ],
+
+            # Controller-weite MQTT-Sensorcontroller (Pico etc.).
+            # Sie gehören bewusst zu keinem Zelt; die Zuordnung erfolgt erst
+            # über SENSOR_ASSIGNMENTS.
+            "mqtt_devices": list_mqtt_sensor_devices(),
 
         })
 

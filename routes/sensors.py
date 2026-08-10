@@ -3,6 +3,7 @@
 from flask import jsonify, request
 
 from core.runtime import get_default_runtime, get_runtime
+from core.mqtt_sensor_devices import list_mqtt_sensor_devices
 from core.sensor_sources import (
     apply_sensor_assignments,
     list_sensor_sources,
@@ -79,16 +80,43 @@ def _hardware_sources():
     return sources
 
 
-def _sensor_options():
-    """Controller-weite Quellen; Zuweisung erfolgt erst pro Runtime."""
+def _mqtt_controller_sources():
+    """Bekannte MQTT-Sensorcontroller auch offline als Quelle anbieten."""
+    result = []
 
+    for device in list_mqtt_sensor_devices():
+        source_id = device.get("source_id") or ("mqtt:" + str(device.get("id") or ""))
+        if not source_id or source_id == "mqtt:":
+            continue
+
+        result.append({
+            "id": source_id,
+            "label": device.get("name") or source_id,
+            "type": "mqtt",
+            "temperature": device.get("temperature"),
+            "humidity": device.get("humidity"),
+            "battery": device.get("battery"),
+            "rssi": device.get("rssi"),
+            "last_seen": device.get("last_seen") or device.get("last_state"),
+            "online": bool(device.get("online")),
+            "capabilities": list(device.get("capabilities") or []),
+            "device_id": device.get("id"),
+            "transport": "mqtt",
+        })
+
+    return result
+
+
+def _source_map():
+    """Alle controllerweiten Sensorquellen ohne Stationsbindung."""
     sources = {}
 
     for source in list_sensor_sources():
         source_id = source.get("id")
         if source_id:
-            sources[source_id] = source
+            sources[source_id] = dict(source)
 
+    # Legacy-Quellen bleiben sichtbar, auch wenn noch kein Paket angekommen ist.
     sources.setdefault(
         "mqtt:ds18b20",
         {
@@ -99,6 +127,7 @@ def _sensor_options():
             "humidity": None,
             "battery": None,
             "rssi": None,
+            "capabilities": ["temperature"],
         },
     )
     sources.setdefault(
@@ -111,8 +140,19 @@ def _sensor_options():
             "humidity": None,
             "battery": None,
             "rssi": None,
+            "capabilities": ["humidity"],
         },
     )
+
+    for source in _mqtt_controller_sources():
+        source_id = source.get("id")
+        existing = sources.get(source_id, {})
+        existing.update({k: v for k, v in source.items() if v is not None})
+        # False/[] müssen erhalten bleiben.
+        existing["online"] = source.get("online", existing.get("online"))
+        if source.get("capabilities"):
+            existing["capabilities"] = source["capabilities"]
+        sources[source_id] = existing
 
     for source in _hardware_sources():
         source_id = source.get("id")
@@ -122,6 +162,33 @@ def _sensor_options():
         existing.update(source)
         sources[source_id] = existing
 
+    return sources
+
+
+def _supports(source, field):
+    capabilities = {
+        str(item).lower()
+        for item in (source.get("capabilities") or [])
+    }
+
+    if field in capabilities:
+        return True
+
+    if source.get(field) is not None:
+        return True
+
+    source_id = source.get("id")
+    if field == "temperature" and source_id == "mqtt:ds18b20":
+        return True
+    if field == "humidity" and source_id == "mqtt:dht22":
+        return True
+
+    return False
+
+
+def _sensor_options():
+    """Controller-weite Quellen; Zuweisung erfolgt erst pro Runtime."""
+    sources = _source_map()
     temperature = []
     humidity = []
 
@@ -129,7 +196,7 @@ def _sensor_options():
         source_id = source.get("id")
         label = source.get("label") or source_id
 
-        if source.get("temperature") is not None or source_id == "mqtt:ds18b20":
+        if _supports(source, "temperature"):
             temperature.append({
                 "source_id": source_id,
                 "field": "temperature",
@@ -138,7 +205,7 @@ def _sensor_options():
                 "type": source.get("type"),
             })
 
-        if source.get("humidity") is not None or source_id == "mqtt:dht22":
+        if _supports(source, "humidity"):
             humidity.append({
                 "source_id": source_id,
                 "field": "humidity",
@@ -152,6 +219,22 @@ def _sensor_options():
         "humidity": humidity,
     }
 
+
+def _sources_payload():
+    sources = _source_map()
+    result = []
+
+    for source in sources.values():
+        item = dict(source)
+        item["fields"] = [
+            field
+            for field in ("temperature", "humidity")
+            if _supports(source, field)
+        ]
+        result.append(item)
+
+    result.sort(key=lambda item: (str(item.get("type") or ""), str(item.get("label") or item.get("id") or "")))
+    return result
 
 def _normalize_assignment(sensor_name, data):
     if not isinstance(data, dict):
@@ -204,7 +287,7 @@ def _assignments_payload(runtime):
         "assignments": runtime.config.get("SENSOR_ASSIGNMENTS", {}),
         "offsets": _offsets(runtime),
         "options": _sensor_options(),
-        "sources": list_sensor_sources(),
+        "sources": _sources_payload(),
     }
 
 
@@ -267,6 +350,13 @@ def _save_assignments(runtime, data):
 
 
 def register(app):
+
+    @app.get("/api/sensors/sources")
+    def api_sensor_sources():
+        return jsonify({
+            "success": True,
+            "sources": _sources_payload(),
+        })
 
     # ------------------------------------------------------------------
     # Legacy tent_1 API
