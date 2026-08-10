@@ -1,13 +1,15 @@
-# config.py
-
-# ===== WLAN =====
+# WLAN
 SSID = "FRITZ!Box 6660 Cable DD"
 PASSWORD = "47720959337135414729"
 
-# ===== MQTT =====
-MQTT_BROKER = "192.168.178.65"
+# MQTT
+MQTT_BROKER = "192.168.178.66"
 MQTT_PORT = 1883
-
-# ===== MQTT TOPICS =====
-TOPIC_DHT22 = b"sensor/dht22"
 CLIENT_ID = "pico_dht22"
+
+# MQTT Topics
+TOPIC_DHT22 = b"sensor/dht22"
+TOPIC_DS18B20 = b"sensor/ds18b20"
+
+# Messintervall
+PUBLISH_INTERVAL_SEC = 5
