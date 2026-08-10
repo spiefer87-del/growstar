@@ -5,11 +5,21 @@
 {% block head %}
 <style>
 *,*::before,*::after{box-sizing:border-box}
-:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--accent:#22c55e;--purple:#a78bfa;--border:rgba(148,163,184,.18)}
+:root{--bg:#0f172a;--card:#1e293b;--card2:#111827;--text:#e5e7eb;--muted:#94a3b8;--accent:#22c55e;--purple:#a78bfa;--blue:#38bdf8;--danger:#f87171;--border:rgba(148,163,184,.18)}
 body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
-.wrap{max-width:1100px;margin:auto}.top{display:flex;gap:14px;align-items:center;margin-bottom:20px}.back{color:var(--muted);text-decoration:none;font-size:1.4rem}.subtitle{color:var(--muted);margin-top:5px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px}.card h2{margin:0 0 4px}.id{font-size:.78rem;color:var(--muted);margin-bottom:14px}.values{display:grid;grid-template-columns:1fr 1fr;gap:10px}.value{padding:10px;border-radius:10px;background:#111827}.value span{display:block;color:var(--muted);font-size:.72rem;text-transform:uppercase}.value strong{font-size:1.2rem}.source{font-size:.8rem;color:var(--muted);margin-top:10px;line-height:1.45;word-break:break-word}.action{display:inline-flex;margin-top:15px;padding:9px 12px;border-radius:9px;background:rgba(34,197,94,.14);color:#86efac;text-decoration:none;font-weight:700}.empty{color:var(--muted)}
-@media(max-width:600px){body{padding:12px}.grid{grid-template-columns:1fr}}
+.wrap{max-width:1180px;margin:auto}.top{display:flex;gap:14px;align-items:center;margin-bottom:20px}.back{color:var(--muted);text-decoration:none;font-size:1.4rem}.subtitle{color:var(--muted);margin-top:5px;line-height:1.45}
+h2.section{margin:28px 0 12px;font-size:.9rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.source-grid,.station-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px}
+.source-card,.station-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+.source-card{cursor:grab;user-select:none;transition:.15s transform,.15s border-color,.15s opacity}.source-card:active{cursor:grabbing}.source-card.dragging{opacity:.45;border-color:var(--accent)}
+.drag-handle{display:inline-flex;margin-top:10px;padding:6px 9px;border-radius:8px;background:rgba(148,163,184,.12);color:#cbd5e1;font-size:.72rem;font-weight:800;touch-action:none;cursor:grab}.source-head,.station-head{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}.source-title,.station-title{font-weight:800;font-size:1.05rem}.source-id,.station-id{font-size:.75rem;color:var(--muted);word-break:break-all;margin-top:4px}
+.badge{display:inline-flex;padding:5px 9px;border-radius:999px;font-size:.7rem;font-weight:800;white-space:nowrap}.badge.online{background:rgba(34,197,94,.18);color:#86efac}.badge.offline{background:rgba(148,163,184,.14);color:#cbd5e1}.badge.mqtt{background:rgba(56,189,248,.15);color:#7dd3fc}.badge.hardware{background:rgba(167,139,250,.16);color:#c4b5fd}
+.metrics{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.metric{background:var(--card2);padding:7px 9px;border-radius:9px;font-size:.78rem}.metric strong{font-size:.9rem}.hint{color:var(--muted);font-size:.78rem;margin-top:11px;line-height:1.4}
+.drop-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.drop-zone{min-height:112px;background:var(--card2);border:2px dashed rgba(148,163,184,.30);border-radius:13px;padding:12px;display:flex;flex-direction:column;justify-content:center;transition:.12s border-color,.12s background,.12s transform}.drop-zone.compatible{border-color:rgba(34,197,94,.65)}.drop-zone.over{border-color:var(--accent);background:rgba(34,197,94,.10);transform:scale(1.015)}.drop-zone.incompatible{opacity:.45}
+.drop-label{font-size:.7rem;text-transform:uppercase;color:var(--muted);letter-spacing:.06em}.drop-current{font-weight:800;margin-top:6px;word-break:break-word}.drop-source{font-size:.7rem;color:var(--muted);margin-top:4px;word-break:break-all}.station-action{display:inline-flex;margin-top:12px;padding:8px 10px;border-radius:9px;background:rgba(167,139,250,.14);color:#c4b5fd;text-decoration:none;font-size:.78rem;font-weight:800}
+.empty{color:var(--muted);padding:16px;background:var(--card);border-radius:14px}.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);opacity:0;pointer-events:none;background:#020617;border:1px solid var(--border);padding:11px 14px;border-radius:11px;transition:.18s;z-index:1000;max-width:min(90vw,560px);text-align:center}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.drag-ghost{position:fixed;z-index:9999;pointer-events:none;width:min(300px,75vw);opacity:.9;transform:translate(-50%,-50%) rotate(1deg);box-shadow:0 18px 40px rgba(0,0,0,.45)}
+@media(max-width:650px){body{padding:12px}.drop-grid{grid-template-columns:1fr}.source-grid,.station-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -19,17 +29,36 @@ body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:sy
         <a class="back" href="{{ url_for('grow_control_dashboard') }}">←</a>
         <div>
             <h1>🧪 Sensoren</h1>
-            <div class="subtitle">Zentrale Übersicht der Sensorzuweisungen aller lokalen Grow-Stationen.</div>
+            <div class="subtitle">Sensorcontroller gehören zum Raspberry – nicht zu einem Zelt. Ziehe eine Quelle einfach auf Temperatur oder Luftfeuchte der gewünschten Station.</div>
         </div>
     </div>
 
-    <div id="sensor-grid" class="grid"><div class="empty">Stationen werden geladen …</div></div>
+    <h2 class="section">Verfügbare Sensorquellen</h2>
+    <div id="source-grid" class="source-grid"><div class="empty">Sensorquellen werden geladen …</div></div>
+
+    <h2 class="section">Grow-Stationen · Drag &amp; Drop</h2>
+    <div id="station-grid" class="station-grid"><div class="empty">Stationen werden geladen …</div></div>
 </div>
+<div id="toast" class="toast"></div>
 
 <script>
 (() => {
-    const grid = document.getElementById("sensor-grid");
+    const sourceGrid = document.getElementById("source-grid");
+    const stationGrid = document.getElementById("station-grid");
+    const toast = document.getElementById("toast");
     const SENSOR_PAGE_TEMPLATE = {{ url_for('grow_control_tent_sensors', tent_id='__TENT_ID__')|tojson }};
+
+    let sources = [];
+    let sourceById = new Map();
+    let tents = [];
+    let tentAssignments = new Map();
+    let desktopDragSourceId = null;
+    let pointerDrag = null;
+
+    const escapeHtml = value => String(value ?? "")
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
     const fmt = (value, digits=1) => {
         const n = Number(value);
@@ -39,57 +68,263 @@ body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:sy
     const sensorPageUrl = tentId =>
         SENSOR_PAGE_TEMPLATE.replace("__TENT_ID__", encodeURIComponent(tentId));
 
-    async function load() {
-        const response = await fetch("/api/tents");
-        if (!response.ok) return;
-        const payload = await response.json();
-        const tents = Array.isArray(payload.tents) ? payload.tents : [];
+    function showToast(message) {
+        toast.textContent = message;
+        toast.classList.add("show");
+        clearTimeout(showToast.timer);
+        showToast.timer = setTimeout(() => toast.classList.remove("show"), 1800);
+    }
 
-        grid.innerHTML = "";
+    function supports(source, field) {
+        return Array.isArray(source?.fields) && source.fields.includes(field);
+    }
+
+    function sourceStatus(source) {
+        if (source.online === true) return ["online", "Online"];
+        if (source.online === false) return ["offline", "Offline"];
+        const seen = Number(source.last_seen || 0);
+        if (seen > 0 && (Date.now()/1000 - seen) < 90) return ["online", "Aktiv"];
+        return ["offline", "Unbekannt"];
+    }
+
+    function renderSources() {
+        sourceGrid.innerHTML = "";
+        if (!sources.length) {
+            sourceGrid.innerHTML = '<div class="empty">Noch keine Sensorquellen verfügbar.</div>';
+            return;
+        }
+
+        for (const source of sources) {
+            const [statusClass, statusText] = sourceStatus(source);
+            const card = document.createElement("article");
+            card.className = "source-card";
+            card.draggable = true;
+            card.dataset.sourceId = source.id;
+            card.innerHTML = `
+                <div class="source-head">
+                    <div>
+                        <div class="source-title">${escapeHtml(source.label || source.id)}</div>
+                        <div class="source-id">${escapeHtml(source.id)}</div>
+                    </div>
+                    <div>
+                        <span class="badge ${escapeHtml(source.type || "mqtt")}">${escapeHtml((source.type || "sensor").toUpperCase())}</span>
+                        <span class="badge ${statusClass}">${statusText}</span>
+                    </div>
+                </div>
+                <div class="metrics">
+                    ${supports(source,"temperature") ? `<div class="metric">🌡️ <strong>${fmt(source.temperature)} °C</strong></div>` : ""}
+                    ${supports(source,"humidity") ? `<div class="metric">💧 <strong>${fmt(source.humidity)} %</strong></div>` : ""}
+                    ${source.rssi !== null && source.rssi !== undefined ? `<div class="metric">📶 ${escapeHtml(source.rssi)} dBm</div>` : ""}
+                </div>
+                <div class="drag-handle" data-role="drag-handle">⠿ Ziehen</div>
+                <div class="hint">Desktop: Karte ziehen · Handy: am Ziehen-Griff anfassen und ablegen.</div>
+            `;
+
+            card.addEventListener("dragstart", event => {
+                desktopDragSourceId = source.id;
+                card.classList.add("dragging");
+                event.dataTransfer.effectAllowed = "copy";
+                event.dataTransfer.setData("text/plain", source.id);
+                updateCompatibleZones(source);
+            });
+            card.addEventListener("dragend", () => {
+                desktopDragSourceId = null;
+                card.classList.remove("dragging");
+                clearZoneHighlights();
+            });
+
+            // Mobiles echtes Pointer-Drag&Drop. Aktivierung erst nach etwas
+            // Bewegung, damit ein kurzer Tap nicht versehentlich zuweist.
+            card.querySelector('[data-role="drag-handle"]')
+                .addEventListener("pointerdown", event => beginPointerDrag(event, source, card));
+            sourceGrid.appendChild(card);
+        }
+    }
+
+    function renderStations() {
+        stationGrid.innerHTML = "";
         if (!tents.length) {
-            grid.innerHTML = '<div class="empty">Keine Grow-Station registriert.</div>';
+            stationGrid.innerHTML = '<div class="empty">Keine Grow-Station registriert.</div>';
             return;
         }
 
         for (const tent of tents) {
+            const assignments = tentAssignments.get(tent.id) || {};
             const card = document.createElement("article");
-            card.className = "card";
+            card.className = "station-card";
             card.innerHTML = `
-                <h2 data-role="name"></h2>
-                <div class="id" data-role="id"></div>
-                <div class="values">
-                    <div class="value"><span>Temperatur</span><strong data-role="temp">--</strong></div>
-                    <div class="value"><span>Feuchte</span><strong data-role="hum">--</strong></div>
+                <div class="station-head">
+                    <div>
+                        <div class="station-title"></div>
+                        <div class="station-id"></div>
+                    </div>
                 </div>
-                <div class="source" data-role="sources">Sensorzuweisung wird geladen …</div>
-                <a class="action" data-role="action">Zuordnung öffnen →</a>
+                <div class="drop-grid">
+                    ${dropZoneHtml(tent.id, "temperature", "🌡️ Temperatur", assignments.temperature)}
+                    ${dropZoneHtml(tent.id, "humidity", "💧 Luftfeuchte", assignments.humidity)}
+                </div>
+                <a class="station-action" href="${sensorPageUrl(tent.id)}">Offsets &amp; Details →</a>
             `;
+            card.querySelector(".station-title").textContent = tent.name || tent.id;
+            card.querySelector(".station-id").textContent = tent.id;
+            stationGrid.appendChild(card);
+        }
 
-            // Namen/IDs kommen aus der persistenten Tent-Metadatei. Deshalb
-            // niemals per Template-Interpolation in innerHTML einsetzen.
-            card.querySelector('[data-role="name"]').textContent = tent.name || tent.id || "Station";
-            card.querySelector('[data-role="id"]').textContent = tent.id || "--";
-            card.querySelector('[data-role="temp"]').textContent = `${fmt(tent.temp)} °C`;
-            card.querySelector('[data-role="hum"]').textContent = `${fmt(tent.hum)} %`;
-            card.querySelector('[data-role="action"]').href = sensorPageUrl(tent.id);
+        stationGrid.querySelectorAll(".drop-zone").forEach(zone => {
+            zone.addEventListener("dragover", event => {
+                const source = sourceById.get(desktopDragSourceId || event.dataTransfer.getData("text/plain"));
+                if (!source || !supports(source, zone.dataset.field)) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "copy";
+                zone.classList.add("over");
+            });
+            zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+            zone.addEventListener("drop", event => {
+                event.preventDefault();
+                const sourceId = event.dataTransfer.getData("text/plain") || desktopDragSourceId;
+                zone.classList.remove("over");
+                assignSource(zone.dataset.tentId, zone.dataset.field, sourceId);
+            });
+        });
+    }
 
-            grid.appendChild(card);
+    function dropZoneHtml(tentId, field, title, assignment) {
+        const current = assignment?.label || assignment?.source_id || "Noch keine Quelle";
+        const sid = assignment?.source_id || "Quelle hier ablegen";
+        return `
+            <div class="drop-zone" data-tent-id="${escapeHtml(tentId)}" data-field="${field}">
+                <div class="drop-label">${title}</div>
+                <div class="drop-current">${escapeHtml(current)}</div>
+                <div class="drop-source">${escapeHtml(sid)}</div>
+            </div>
+        `;
+    }
 
-            if (!tent.runtime_loaded) {
-                card.querySelector('[data-role="sources"]').textContent = "Runtime nicht geladen";
-                continue;
-            }
+    function updateCompatibleZones(source) {
+        document.querySelectorAll(".drop-zone").forEach(zone => {
+            zone.classList.toggle("compatible", supports(source, zone.dataset.field));
+            zone.classList.toggle("incompatible", !supports(source, zone.dataset.field));
+        });
+    }
 
-            fetch(`/api/tents/${encodeURIComponent(tent.id)}/state`)
-                .then(r => r.ok ? r.json() : null)
-                .then(state => {
-                    if (!state) return;
-                    const assignments = state.sensor_assignments || {};
-                    const temp = assignments.temperature?.label || assignments.temperature?.source_id || "--";
-                    const hum = assignments.humidity?.label || assignments.humidity?.source_id || "--";
-                    card.querySelector('[data-role="sources"]').textContent = `Temp: ${temp} · Feuchte: ${hum}`;
-                })
-                .catch(() => {});
+    function clearZoneHighlights() {
+        document.querySelectorAll(".drop-zone").forEach(zone =>
+            zone.classList.remove("compatible", "incompatible", "over")
+        );
+    }
+
+    function beginPointerDrag(event, source, card) {
+        if (event.pointerType === "mouse") return;
+        pointerDrag = {
+            pointerId: event.pointerId,
+            source,
+            card,
+            startX: event.clientX,
+            startY: event.clientY,
+            started: false,
+            ghost: null,
+            zone: null,
+        };
+        card.setPointerCapture?.(event.pointerId);
+    }
+
+    document.addEventListener("pointermove", event => {
+        const drag = pointerDrag;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+
+        const distance = Math.hypot(event.clientX-drag.startX, event.clientY-drag.startY);
+        if (!drag.started && distance < 8) return;
+
+        if (!drag.started) {
+            drag.started = true;
+            drag.card.classList.add("dragging");
+            drag.ghost = drag.card.cloneNode(true);
+            drag.ghost.classList.add("drag-ghost");
+            drag.ghost.classList.remove("dragging");
+            document.body.appendChild(drag.ghost);
+            updateCompatibleZones(drag.source);
+        }
+
+        event.preventDefault();
+        drag.ghost.style.left = `${event.clientX}px`;
+        drag.ghost.style.top = `${event.clientY}px`;
+
+        if (drag.zone) drag.zone.classList.remove("over");
+        const target = document.elementFromPoint(event.clientX, event.clientY)?.closest?.(".drop-zone");
+        drag.zone = target && supports(drag.source, target.dataset.field) ? target : null;
+        if (drag.zone) drag.zone.classList.add("over");
+    }, {passive:false});
+
+    document.addEventListener("pointerup", event => {
+        const drag = pointerDrag;
+        if (!drag || drag.pointerId !== event.pointerId) return;
+        const target = drag.zone;
+        if (drag.ghost) drag.ghost.remove();
+        drag.card.classList.remove("dragging");
+        pointerDrag = null;
+        clearZoneHighlights();
+        if (drag.started && target) {
+            assignSource(target.dataset.tentId, target.dataset.field, drag.source.id);
+        }
+    });
+
+    async function assignSource(tentId, field, sourceId) {
+        const source = sourceById.get(sourceId);
+        if (!source || !supports(source, field)) {
+            showToast("Diese Quelle unterstützt das Ziel nicht.");
+            return;
+        }
+
+        const payload = {};
+        payload[field] = {
+            source_id: source.id,
+            field,
+            label: source.label || source.id,
+        };
+
+        try {
+            const response = await fetch(`/api/tents/${encodeURIComponent(tentId)}/sensors/assignments`, {
+                method: "POST",
+                headers: {"Content-Type":"application/json"},
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            if (!response.ok || !data.success) throw new Error(data.error || "Speichern fehlgeschlagen");
+            showToast(`${source.label || source.id} → ${tentId} / ${field === "temperature" ? "Temperatur" : "Feuchte"}`);
+            await loadAssignmentsForTent(tentId);
+            renderStations();
+        } catch (error) {
+            console.error(error);
+            showToast("Sensor-Zuweisung konnte nicht gespeichert werden.");
+        }
+    }
+
+    async function loadAssignmentsForTent(tentId) {
+        const response = await fetch(`/api/tents/${encodeURIComponent(tentId)}/sensors/assignments`);
+        if (!response.ok) return;
+        const data = await response.json();
+        if (data.success) tentAssignments.set(tentId, data.assignments || {});
+    }
+
+    async function load() {
+        try {
+            const [sourceResponse, tentResponse] = await Promise.all([
+                fetch("/api/sensors/sources"),
+                fetch("/api/tents"),
+            ]);
+            const sourcePayload = await sourceResponse.json();
+            const tentPayload = await tentResponse.json();
+
+            sources = Array.isArray(sourcePayload.sources) ? sourcePayload.sources : [];
+            sourceById = new Map(sources.map(source => [source.id, source]));
+            tents = Array.isArray(tentPayload.tents) ? tentPayload.tents.filter(t => t.runtime_loaded) : [];
+
+            await Promise.all(tents.map(t => loadAssignmentsForTent(t.id)));
+            renderSources();
+            renderStations();
+        } catch (error) {
+            console.error(error);
+            showToast("Sensorübersicht konnte nicht geladen werden.");
         }
     }
 
