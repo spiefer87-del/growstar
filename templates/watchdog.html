@@ -44,6 +44,7 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .warn{background:rgba(245,158,11,.14);color:#fcd34d;border-color:rgba(245,158,11,.25)}
 .err{background:rgba(239,68,68,.14);color:#fca5a5;border-color:rgba(239,68,68,.25)}
 .shadow{background:rgba(167,139,250,.14);color:#c4b5fd;border-color:rgba(167,139,250,.25)}
+.arming{background:rgba(245,158,11,.14);color:#fcd34d;border-color:rgba(245,158,11,.25)}
 .inactive,.neutral{background:rgba(148,163,184,.12);color:#cbd5e1;border-color:rgba(148,163,184,.18)}
 .station-list{display:grid;gap:16px}
 .station-card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:20px;padding:18px;box-shadow:0 14px 32px rgba(0,0,0,.2)}
@@ -129,6 +130,7 @@ function cls(state){
     if(state === "error") return "err";
     if(state === "warn" || state === "unconfigured") return "warn";
     if(state === "shadow") return "shadow";
+    if(state === "arming") return "arming";
     return "inactive";
 }
 function badge(text,state){return `<span class="badge ${cls(state)}">${esc(text)}</span>`;}
@@ -164,7 +166,7 @@ function renderStations(stations){
     const root = document.getElementById("stations");
     if(!stations || !stations.length){root.innerHTML='<div class="empty">Keine Runtime geladen.</div>';return;}
     root.innerHTML = stations.map(s => {
-        const modeState = s.runtime_mode === "live" ? "ok" : (s.runtime_mode === "shadow" ? "shadow" : "inactive");
+        const modeState = s.runtime_mode === "live" ? "ok" : (s.runtime_mode === "arming" ? "arming" : (s.runtime_mode === "shadow" ? "shadow" : "inactive"));
         const modeText = String(s.runtime_mode || "inactive").toUpperCase();
         const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {};
         const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";

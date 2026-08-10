@@ -98,6 +98,11 @@ h3 {
     background: rgba(34,197,94,.16);
     color: #86efac;
 }
+.runtime-badge.arming {
+    border-color: rgba(245,158,11,.35);
+    background: rgba(245,158,11,.16);
+    color: #fcd34d;
+}
 .runtime-badge.shadow {
     border-color: rgba(167,139,250,.38);
     background: rgba(167,139,250,.16);
@@ -388,7 +393,12 @@ h3 {
             tents.forEach(tent => {
                 const option = document.createElement("option");
                 option.value = tent.id;
-                option.textContent = `${tent.name || tent.id}${tent.shadow_enabled ? " · SHADOW" : tent.control_enabled ? " · LIVE" : ""}`;
+                const tentMode = tent.control_enabled
+                    ? "LIVE"
+                    : (tent.arming || tent.live_requested || (tent.configured_control_enabled && tent.runtime_loaded))
+                        ? "ARMING"
+                        : tent.shadow_enabled ? "SHADOW" : "";
+                option.textContent = `${tent.name || tent.id}${tentMode ? ` · ${tentMode}` : ""}`;
                 option.selected = tent.id === TENT_ID;
                 option.disabled = !tent.runtime_loaded;
                 select.appendChild(option);
@@ -480,10 +490,20 @@ h3 {
             badge.textContent = "LIVE";
             badge.className = "runtime-badge live";
             banner?.classList.remove("visible");
+        } else if (state.arming || state.live_requested) {
+            badge.textContent = "ARMING";
+            badge.className = "runtime-badge arming";
+            if (banner) {
+                banner.textContent = "🟠 ARMING: LIVE ist angefordert, aber die Hardware-Aktorik bleibt bis zu einem frischen erfolgreichen Preflight gesperrt.";
+                banner.classList.add("visible");
+            }
         } else if (state.shadow_enabled) {
             badge.textContent = "SHADOW";
             badge.className = "runtime-badge shadow";
-            banner?.classList.add("visible");
+            if (banner) {
+                banner.textContent = "🟣 Shadow-Modus: Growstar berechnet Sollzustände für diese Station, aber die Hardware-Aktorik bleibt gesperrt.";
+                banner.classList.add("visible");
+            }
         } else {
             badge.textContent = "BEREIT";
             badge.className = "runtime-badge";
@@ -499,7 +519,8 @@ h3 {
 
         const device = state.devices?.[name] || {};
         const mode = device.mode ?? state.device_modes?.[name] ?? "OFF";
-        const isShadow = Boolean(state.shadow_enabled && !state.control_enabled);
+        const isArming = Boolean(!state.control_enabled && (state.arming || state.live_requested));
+        const isShadow = Boolean(!state.control_enabled && (state.shadow_enabled || isArming));
 
         if (modeEl) modeEl.textContent = MODE_LABELS[mode] || mode;
 
@@ -511,14 +532,15 @@ h3 {
 
         if (isShadow) {
             const desired = device.shadow_desired;
+            const prefix = isArming ? "ARMING" : "SHADOW";
             if (desired === null || desired === undefined) {
-                label.textContent = "SHADOW --";
+                label.textContent = `${prefix} --`;
                 card.className = "card device shadow-off";
             } else if (desired) {
-                label.textContent = "SHADOW EIN";
+                label.textContent = `${prefix} EIN`;
                 card.className = "card device shadow-on";
             } else {
-                label.textContent = "SHADOW AUS";
+                label.textContent = `${prefix} AUS`;
                 card.className = "card device shadow-off";
             }
             return;

@@ -5,23 +5,24 @@
 {% block head %}
 <style>
 :root{
-    --bg:#0f172a; --card:#1e293b; --card2:#111827; --text:#e5e7eb;
-    --muted:#94a3b8; --green:#22c55e; --purple:#a78bfa; --amber:#f59e0b;
-    --red:#f87171; --blue:#38bdf8;
+    --bg:#0f172a;--card:#1e293b;--card2:#111827;--text:#e5e7eb;
+    --muted:#94a3b8;--green:#22c55e;--purple:#a78bfa;--amber:#f59e0b;
+    --red:#f87171;--blue:#38bdf8;
 }
 *{box-sizing:border-box}
 body{margin:0;padding:24px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
-.wrap{max-width:1100px;margin:auto}
-.topbar{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+.wrap{max-width:1100px;margin:auto}.topbar{display:flex;align-items:center;gap:14px;margin-bottom:26px}
 .back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}
 h1{margin:0;font-size:1.75rem}.subtitle{margin:5px 0 0;color:var(--muted);font-size:.9rem}
 .notice{margin:0 0 20px;padding:13px 15px;border-radius:12px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.22);color:#bae6fd;font-size:.88rem;line-height:1.5}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
 .card{background:var(--card);border:1px solid rgba(148,163,184,.15);border-radius:18px;padding:18px;box-shadow:0 10px 28px rgba(0,0,0,.22)}
-.card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.id{color:var(--muted);font-size:.78rem;margin-top:3px}.badge{padding:5px 9px;border-radius:999px;font-size:.7rem;font-weight:800}.live{background:rgba(34,197,94,.14);color:#86efac}.shadow{background:rgba(167,139,250,.14);color:#c4b5fd}.ready{background:rgba(148,163,184,.13);color:#cbd5e1}.restart{background:rgba(245,158,11,.14);color:#fcd34d}
+.card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.id{color:var(--muted);font-size:.78rem;margin-top:3px}
+.badge{padding:5px 9px;border-radius:999px;font-size:.7rem;font-weight:800;border:1px solid transparent}.live{background:rgba(34,197,94,.14);color:#86efac;border-color:rgba(34,197,94,.25)}.shadow{background:rgba(167,139,250,.14);color:#c4b5fd;border-color:rgba(167,139,250,.25)}.arming{background:rgba(245,158,11,.14);color:#fcd34d;border-color:rgba(245,158,11,.25)}.ready{background:rgba(148,163,184,.13);color:#cbd5e1}.restart{background:rgba(245,158,11,.14);color:#fcd34d}
 label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-input,.id-input{width:100%;border:1px solid #334155;border-radius:9px;padding:9px 10px;background:#020617;color:var(--text);font:inherit}.id-input{color:var(--muted)}
 .toggle-row{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px}.toggle{display:flex;align-items:center;gap:7px;color:var(--text);font-size:.86rem}.toggle input{width:18px;height:18px}
-.actions{display:flex;gap:9px;margin-top:16px}.btn{border:0;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer}.btn.primary{background:var(--green);color:#052e16}.btn:disabled{opacity:.45;cursor:not-allowed}.feedback{min-height:20px;margin-top:10px;color:var(--muted);font-size:.8rem}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.btn{border:0;border-radius:9px;padding:9px 12px;font-weight:750;cursor:pointer}.btn.primary{background:var(--green);color:#052e16}.btn.live-btn{background:#16a34a;color:white}.btn.shadow-btn{background:#7c3aed;color:white}.btn:disabled{opacity:.42;cursor:not-allowed}.feedback{min-height:20px;margin-top:10px;color:var(--muted);font-size:.8rem}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
+.preflight{margin-top:16px;padding:13px;border-radius:13px;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.13)}.preflight-title{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.82rem;font-weight:800}.preflight-list{display:grid;gap:6px;margin-top:10px;font-size:.78rem}.pf-row{display:flex;justify-content:space-between;gap:12px;color:var(--muted)}.pf-row strong{color:var(--text);text-align:right}.pf-ok{color:#86efac!important}.pf-err{color:#fca5a5!important}.pf-muted{color:var(--muted)!important}.blockers{margin:10px 0 0;padding-left:18px;color:#fca5a5;font-size:.76rem;line-height:1.45}
 .add-card{margin-top:24px;background:rgba(30,41,59,.75);border:1px dashed rgba(148,163,184,.28);border-radius:18px;padding:18px}.add-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.add-grid .field label{margin-top:0}.section-title{margin:0 0 13px;font-size:1.05rem}
 @media(max-width:650px){body{padding:14px}.add-grid{grid-template-columns:1fr}.btn{width:100%}}
 </style>
@@ -35,9 +36,10 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     </div>
 
     <div class="notice">
-        Alle Stationen laufen auf demselben Raspberry. Eine neue Station startet sicher ohne Hardware-Control.
-        Änderungen an <strong>Aktiv</strong> oder <strong>Shadow</strong> werden nach einem Growstar-Neustart wirksam;
-        reine Umbenennungen sofort.
+        Zusätzliche Stationen werden zuerst im <strong>SHADOW</strong>-Betrieb geprüft. Eine LIVE-Freigabe ist nur möglich,
+        wenn Regelkreis, benötigte Sensoren, Konfiguration und alle tatsächlich aktiven Aktoren bereit sind.
+        Nach einem Neustart startet eine gespeicherte LIVE-Station erneut sicher in <strong>ARMING</strong> und öffnet ihr
+        Hardware-Gate erst nach einem neuen erfolgreichen Preflight.
     </div>
 
     <div id="station-grid" class="grid"><div class="card">Stationen werden geladen …</div></div>
@@ -59,12 +61,15 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
 (() => {
     const API = "/api/tents";
     const CAN_CONFIGURE = {{ has_permission('grow.configure')|tojson }};
+    const CAN_LIVE = {{ (has_permission('grow.control') and has_permission('hardware.control'))|tojson }};
     const grid = document.getElementById("station-grid");
+    let defaultTentId = "tent_1";
 
     const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
     function mode(t){
         if(t.control_enabled) return ["LIVE","live"];
+        if(t.arming || t.live_requested || (t.configured_control_enabled && t.runtime_loaded)) return ["ARMING","arming"];
         if(t.shadow_enabled) return ["SHADOW","shadow"];
         if(!t.runtime_loaded && t.configured_enabled) return ["NEUSTART","restart"];
         return [t.configured_enabled ? "BEREIT" : "INAKTIV","ready"];
@@ -73,9 +78,23 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     function card(t, defaultId){
         const [modeText, modeCls] = mode(t);
         const isDefault = t.id === defaultId;
+        const isLiveLike = Boolean(t.control_enabled || t.arming || t.live_requested || t.configured_control_enabled);
         const enabled = t.configured_enabled ?? t.enabled;
         const shadow = t.configured_shadow_enabled ?? t.shadow_enabled;
-        const disabledAttr = (!CAN_CONFIGURE || isDefault) ? "disabled" : "";
+        const disabledAttr = (!CAN_CONFIGURE || isDefault || isLiveLike) ? "disabled" : "";
+        const preflight = (!isDefault && t.runtime_loaded && enabled)
+            ? '<div class="preflight js-preflight"><div class="preflight-title"><span>LIVE Preflight</span><span>prüfe …</span></div></div>'
+            : '';
+
+        let liveAction = '';
+        if(!isDefault && CAN_LIVE && t.runtime_loaded){
+            if(t.control_enabled){
+                liveAction = '<button class="btn shadow-btn js-shadow-now" type="button">Zu SHADOW</button>';
+            }else if(!t.arming && !t.live_requested){
+                liveAction = '<button class="btn live-btn js-live-now" type="button" disabled>LIVE freigeben</button>';
+            }
+        }
+
         return `
         <article class="card" data-id="${esc(t.id)}">
             <div class="card-head">
@@ -90,8 +109,10 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
                 <label class="toggle"><input class="js-enabled" type="checkbox" ${enabled ? "checked" : ""} ${disabledAttr}> Aktiv</label>
                 <label class="toggle"><input class="js-shadow" type="checkbox" ${shadow ? "checked" : ""} ${disabledAttr}> Shadow-Regelkreis</label>
             </div>
-            ${isDefault ? '<div class="feedback">Default-Station bleibt LIVE und kann hier nicht deaktiviert werden.</div>' : ''}
-            ${CAN_CONFIGURE ? '<div class="actions"><button class="btn primary js-save" type="button">Speichern</button></div>' : ''}
+            ${isDefault ? '<div class="feedback">Default-Station bleibt LIVE.</div>' : ''}
+            ${isLiveLike && !isDefault ? '<div class="feedback">LIVE/ARMING wird nur über die kontrollierte Transition geändert.</div>' : ''}
+            ${preflight}
+            ${CAN_CONFIGURE || liveAction ? `<div class="actions">${CAN_CONFIGURE ? '<button class="btn primary js-save" type="button">Speichern</button>' : ''}${liveAction}</div>` : ''}
             <div class="feedback js-feedback"></div>
         </article>`;
     }
@@ -100,20 +121,74 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         const res = await fetch(API);
         if(!res.ok){ grid.innerHTML='<div class="card">Stationen konnten nicht geladen werden.</div>'; return; }
         const data = await res.json();
-        grid.innerHTML = (data.tents || []).map(t => card(t, data.default_tent_id)).join("") || '<div class="card">Keine Stationen.</div>';
+        defaultTentId = data.default_tent_id || "tent_1";
+        grid.innerHTML = (data.tents || []).map(t => card(t, defaultTentId)).join("") || '<div class="card">Keine Stationen.</div>';
         bind();
+        refreshPreflights();
     }
 
     function bind(){
         grid.querySelectorAll(".card[data-id]").forEach(el => {
             const enabled = el.querySelector(".js-enabled");
             const shadow = el.querySelector(".js-shadow");
-            if(enabled && shadow){
-                enabled.addEventListener("change", () => { if(!enabled.checked) shadow.checked = false; shadow.disabled = !enabled.checked || !CAN_CONFIGURE; });
+            if(enabled && shadow && !enabled.disabled){
+                enabled.addEventListener("change", () => {
+                    if(!enabled.checked) shadow.checked = false;
+                    shadow.disabled = !enabled.checked || !CAN_CONFIGURE;
+                });
                 shadow.disabled = !enabled.checked || shadow.disabled;
             }
             el.querySelector(".js-save")?.addEventListener("click", () => saveCard(el));
+            el.querySelector(".js-live-now")?.addEventListener("click", () => setLive(el, true));
+            el.querySelector(".js-shadow-now")?.addEventListener("click", () => setLive(el, false));
         });
+    }
+
+    function pfRow(label, ok, detail, optional=false){
+        const cls = optional ? "pf-muted" : (ok ? "pf-ok" : "pf-err");
+        const icon = optional ? "–" : (ok ? "✓" : "✕");
+        return `<div class="pf-row"><span>${esc(label)}</span><strong class="${cls}">${icon} ${esc(detail)}</strong></div>`;
+    }
+
+    async function refreshPreflight(el){
+        const id = el.dataset.id;
+        if(id === defaultTentId) return;
+        const box = el.querySelector(".js-preflight");
+        if(!box) return;
+
+        try{
+            const res = await fetch(`${API}/${encodeURIComponent(id)}/live-preflight`);
+            const p = await res.json().catch(()=>({}));
+            if(!res.ok){
+                box.innerHTML='<div class="preflight-title"><span>LIVE Preflight</span><span class="pf-err">nicht verfügbar</span></div>';
+                return;
+            }
+
+            const temp = p.sensors?.temperature || {};
+            const hum = p.sensors?.humidity || {};
+            const hw = p.hardware || {};
+            const rows = [
+                pfRow("Regelkreis", p.loop?.ok, p.loop?.age == null ? "kein Heartbeat" : `${p.loop.age}s`),
+                pfRow("Konfiguration", p.config?.ok, p.config?.ok ? "gültig" : "Fehler"),
+                pfRow("Temperatur", temp.ok, temp.required ? (temp.ok ? "frisch" : "nicht bereit") : "nicht benötigt", !temp.required),
+                pfRow("Luftfeuchte", hum.ok, hum.required ? (hum.ok ? "frisch" : "nicht bereit") : "nicht benötigt", !hum.required),
+                pfRow("Aktive Aktoren", hw.ok, `${Number(hw.required || 0)} erforderlich`),
+                pfRow("Doppelbelegung", p.conflicts?.ok, p.conflicts?.ok ? "keine" : "Konflikt"),
+            ].join("");
+            const blockers = (p.blockers || []).length
+                ? `<ul class="blockers">${p.blockers.map(b=>`<li>${esc(b)}</li>`).join("")}</ul>`
+                : '';
+            box.innerHTML = `<div class="preflight-title"><span>LIVE Preflight</span><span class="${p.ready ? 'pf-ok':'pf-err'}">${p.ready ? 'BEREIT':'GESPERRT'}</span></div><div class="preflight-list">${rows}</div>${blockers}`;
+
+            const button = el.querySelector(".js-live-now");
+            if(button) button.disabled = !Boolean(p.ready && CAN_LIVE);
+        }catch(_){
+            box.innerHTML='<div class="preflight-title"><span>LIVE Preflight</span><span class="pf-err">Fehler</span></div>';
+        }
+    }
+
+    function refreshPreflights(){
+        grid.querySelectorAll(".card[data-id]").forEach(refreshPreflight);
     }
 
     async function saveCard(el){
@@ -126,8 +201,35 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         fb.className="feedback"; fb.textContent="Speichere …";
         const res = await fetch(`${API}/${encodeURIComponent(id)}`, {method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
         const data = await res.json().catch(()=>({}));
-        if(!res.ok){ fb.className="feedback err"; fb.textContent=data.error || "Speichern fehlgeschlagen"; return; }
+        if(!res.ok){ fb.className="feedback err"; fb.textContent=data.error || data.message || "Speichern fehlgeschlagen"; return; }
         fb.className="feedback ok"; fb.textContent=data.restart_required ? "Gespeichert · Neustart erforderlich" : "Gespeichert";
+        setTimeout(load, 700);
+    }
+
+    async function setLive(el, enabled){
+        const id = el.dataset.id;
+        const fb = el.querySelector(".js-feedback");
+        const question = enabled
+            ? "LIVE freigeben? Diese Station darf danach ihre zugeordneten Shelly-Aktoren real schalten."
+            : "Auf SHADOW wechseln? Growstar schaltet zuerst alle zugeordneten Relais sicher AUS und verifiziert den Zustand.";
+        if(!confirm(question)) return;
+
+        fb.className="feedback";
+        fb.textContent = enabled ? "LIVE-Preflight und Arming …" : "Schalte Relais sicher AUS …";
+        const res = await fetch(`${API}/${encodeURIComponent(id)}/live`, {
+            method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({enabled})
+        });
+        const data = await res.json().catch(()=>({}));
+        if(!res.ok){
+            fb.className="feedback err";
+            const blockers = data.preflight?.blockers || [];
+            fb.textContent = data.message || data.error || "Transition fehlgeschlagen";
+            if(blockers.length) fb.textContent += " · " + blockers.join(" · ");
+            refreshPreflight(el);
+            return;
+        }
+        fb.className="feedback ok";
+        fb.textContent = enabled ? "LIVE freigegeben" : "Shadow aktiv · Relais sicher AUS";
         setTimeout(load, 700);
     }
 
@@ -139,12 +241,13 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         const res = await fetch(API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({tent_id:id,name})});
         const data = await res.json().catch(()=>({}));
         if(!res.ok){ fb.className="feedback err"; fb.textContent=data.error || "Anlegen fehlgeschlagen"; return; }
-        fb.className="feedback ok"; fb.textContent="Station angelegt · Growstar-Neustart erforderlich";
+        fb.className="feedback ok"; fb.textContent="Station angelegt · zunächst Shadow konfigurieren und Growstar neu starten";
         document.getElementById("new-id").value=""; document.getElementById("new-name").value="";
         load();
     });
 
     load();
+    setInterval(refreshPreflights, 5000);
 })();
 </script>
 {% endblock %}
