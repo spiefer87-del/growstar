@@ -55,6 +55,9 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .health-cell strong{display:block;margin-top:5px;font-size:.9rem;overflow:hidden;text-overflow:ellipsis}
 .health-detail{margin-top:4px;color:var(--muted);font-size:.72rem;line-height:1.35}
 .issue-list{margin:10px 0 0;padding-left:18px;color:#fca5a5;font-size:.78rem}
+.endpoint-list{margin-top:12px;display:grid;gap:7px}
+.endpoint-row{display:grid;grid-template-columns:minmax(120px,1.25fr) minmax(120px,1fr) auto;gap:10px;align-items:center;background:rgba(2,6,23,.28);border-radius:11px;padding:9px 11px;font-size:.78rem}
+.endpoint-name{font-weight:700}.endpoint-address{color:var(--muted);overflow:hidden;text-overflow:ellipsis}.endpoint-meta{color:var(--muted);font-size:.7rem;margin-top:2px}
 .empty{padding:18px;border:1px dashed rgba(148,163,184,.22);border-radius:14px;color:var(--muted)}
 .log-card{margin-top:16px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -63,7 +66,7 @@ button,select{border:1px solid rgba(148,163,184,.18);border-radius:10px;padding:
 button{cursor:pointer}.logbox{margin-top:12px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:.8rem;line-height:1.45;background:#020617;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;max-height:52vh;overflow:auto}
 .error-text{color:#fca5a5}
 @media(max-width:850px){.station-health{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:520px){body{padding:16px}.station-health{grid-template-columns:1fr}.status-time{display:none}}
+@media(max-width:520px){body{padding:16px}.station-health{grid-template-columns:1fr}.endpoint-row{grid-template-columns:1fr auto}.endpoint-address{grid-column:1/-1}.status-time{display:none}}
 </style>
 {% endblock %}
 
@@ -144,13 +147,16 @@ function renderController(controller){
     cards.push(`<article class="card"><h3>Energie</h3>${badge(energy.stale ? "KEINE DATEN" : "AKTIV", energy.state)}<div class="meta">${Number(energy.devices || 0)} Geräte im Poll</div></article>`);
 
     const recovery = controller.hardware_recovery || {};
-    const recoveryState = recovery.healthy ? "ok" : (recovery.running ? "warn" : "warn");
-    const recoveryText = recovery.healthy ? "BEREIT" : (recovery.running ? "RECOVERY" : "UNVOLLSTÄNDIG");
-    const missing = (recovery.missing_ble_devices || []).length
-        ? ` · fehlt: ${(recovery.missing_ble_devices || []).map(esc).join(", ")}`
-        : "";
-    cards.push(`<article class="card"><h3>Hardware Auto-Recovery</h3>${badge(recoveryText, recoveryState)}<div class="meta">Gateways ${Number(recovery.online_gateways || 0)}/${Number(recovery.known_gateways || 0)} · BLE ${Number(recovery.online_ble_devices || 0)}/${Number(recovery.expected_ble_devices || 0)}${missing}</div></article>`);
+    const recoveryState = recovery.healthy ? "ok" : (recovery.running ? "warn" : "error");
+    const recoveryText = recovery.healthy ? "BEREIT" : (recovery.running ? "RECOVERY" : "FEHLER");
+    cards.push(`<article class="card"><h3>Hardware Auto-Recovery</h3>${badge(recoveryText, recoveryState)}<div class="meta">Gateways ${Number(recovery.online_gateways || 0)}/${Number(recovery.known_gateways || 0)} · BLE ${Number(recovery.online_ble_devices || 0)}/${Number(recovery.expected_ble_devices || 0)}</div></article>`);
 
+    const actuator = controller.actuator_poll || {};
+    let actuatorState = "warn", actuatorText = "NOCH KEIN POLL";
+    if(actuator.last_error){actuatorState="error";actuatorText="POLL-FEHLER";}
+    else if(Number(actuator.offline || 0) > 0){actuatorState="error";actuatorText="AKTOR OFFLINE";}
+    else if(actuator.age != null){actuatorState="ok";actuatorText="AKTIV";}
+    cards.push(`<article class="card"><h3>Aktor-Erreichbarkeit</h3>${badge(actuatorText, actuatorState)}<div class="meta">${Number(actuator.online || 0)}/${Number(actuator.endpoints || 0)} erreichbar · letzter Poll ${ageText(actuator.age)}</div></article>`);
     grid.innerHTML = cards.join("");
 }
 
@@ -162,8 +168,30 @@ function renderStations(stations){
         const modeText = String(s.runtime_mode || "inactive").toUpperCase();
         const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {};
         const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";
-        const hwText = hw.assigned ? `${hw.assigned} zugeordnet` : "keine Zuordnung";
-        const hwState = hw.state === "shadow" ? "shadow" : (hw.assigned ? "ok" : "inactive");
+
+        let hwText = "keine Zuordnung";
+        if(hw.assigned){
+            if(Number(hw.offline || 0) > 0) hwText = `${hw.offline} OFFLINE`;
+            else if(Number(hw.unknown || 0) > 0 || Number(hw.stale || 0) > 0) hwText = `${hw.online || 0}/${hw.assigned} geprüft`;
+            else hwText = `${hw.online || 0}/${hw.assigned} online`;
+        }
+        const hwState = hw.state === "error" ? "error" : (hw.state === "warn" ? "warn" : (hw.assigned ? "ok" : "inactive"));
+
+        const endpoints = (hw.endpoints || []).map(ep => {
+            let text = "UNGEPRÜFT";
+            if(ep.state === "ok") text = ep.actual_state === true ? "ONLINE · EIN" : (ep.actual_state === false ? "ONLINE · AUS" : "ONLINE");
+            else if(ep.state === "error") text = "OFFLINE";
+            else if(ep.state === "warn") text = "STALE";
+            const detail = ep.state === "error"
+                ? `${esc(ep.last_error || "nicht erreichbar")} · Fehler ${Number(ep.consecutive_failures || 0)}x`
+                : `Prüfung ${ageText(ep.check_age)}${ep.latency_ms != null ? ` · ${Number(ep.latency_ms).toFixed(0)} ms` : ""}`;
+            return `<div class="endpoint-row">
+                <div><div class="endpoint-name">${esc(ep.label || ep.device)}</div><div class="endpoint-meta">${detail}</div></div>
+                <div class="endpoint-address">${esc(ep.ip)} / Relay ${esc(ep.relay)}</div>
+                <div>${badge(text, ep.state)}</div>
+            </div>`;
+        }).join("");
+
         return `<article class="station-card">
             <div class="station-head">
                 <div class="station-title"><strong>${esc(s.name)}</strong><span class="station-id">${esc(s.id)}</span></div>
@@ -173,9 +201,10 @@ function renderStations(stations){
                 <div class="health-cell"><span>Regelkreis</span><strong>${badge(loop.stale ? "STALE" : (loop.expected ? "OK" : "INAKTIV"), loop.state)}</strong><div class="health-detail">Heartbeat ${ageText(loop.age)}</div></div>
                 <div class="health-cell"><span>Temperatur</span><strong>${valueText(temp.value," °C")}</strong><div class="health-detail">${temp.configured ? `${esc(temp.label || temp.source_id || "Sensor")} · ${ageText(temp.age)}` : "nicht zugeordnet"}</div></div>
                 <div class="health-cell"><span>Feuchte</span><strong>${valueText(hum.value," %")}</strong><div class="health-detail">${hum.configured ? `${esc(hum.label || hum.source_id || "Sensor")} · ${ageText(hum.age)}` : "nicht zugeordnet"}</div></div>
-                <div class="health-cell"><span>Hardware</span><strong>${badge(hwText, hwState)}</strong><div class="health-detail">${hw.actuation_blocked ? "Aktorik gesperrt" : "Aktorik freigegeben"}; keine Zusatz-Pings</div></div>
+                <div class="health-cell"><span>Hardware</span><strong>${badge(hwText, hwState)}</strong><div class="health-detail">${hw.actuation_blocked ? "Aktorik gesperrt" : "Aktorik freigegeben"}; zentraler Read-only Poll</div></div>
                 <div class="health-cell"><span>Config / Failsafe</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
             </div>
+            ${endpoints ? `<div class="endpoint-list">${endpoints}</div>` : ""}
         </article>`;
     }).join("");
 }
