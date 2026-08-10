@@ -31,6 +31,7 @@ _THREAD_SPECS = (
     ("blu", "Bluetooth", ("growstar-blu",)),
     ("hardware", "Hardware", ("growstar-hardware",)),
     ("shelly", "Shelly", ("growstar-shelly",)),
+    ("hardware_recovery", "Hardware Recovery", ("growstar-hw-recovery",)),
 )
 
 
@@ -277,6 +278,24 @@ def _thread_snapshot():
     return result
 
 
+
+def _hardware_recovery_snapshot():
+    try:
+        from services.hardware_recovery import get_hardware_recovery_status
+        return get_hardware_recovery_status()
+    except Exception as exc:
+        return {
+            "running": False,
+            "phase": "unavailable",
+            "healthy": False,
+            "last_error": str(exc),
+            "known_gateways": 0,
+            "online_gateways": 0,
+            "expected_ble_devices": 0,
+            "online_ble_devices": 0,
+            "missing_ble_devices": [],
+        }
+
 def controller_health(*, now=None):
     now = time.time() if now is None else float(now)
 
@@ -305,6 +324,7 @@ def controller_health(*, now=None):
             "stale": len(energy) == 0,
             "state": "warn" if len(energy) == 0 else "ok",
         },
+        "hardware_recovery": _hardware_recovery_snapshot(),
     }
 
 
