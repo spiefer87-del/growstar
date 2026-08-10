@@ -127,6 +127,7 @@ def start_blu_thread():
     _thread_started = True
 
     thread = threading.Thread(
+        name="growstar-blu",
         target=blu_loop,
         daemon=True
     )
