@@ -70,9 +70,13 @@ def main():
         "IP und Relay bleiben manuell zuweisbar": 'IP / Host' in connections and 'Relay' in connections,
         "Alle bekannten Aktoren sind zentral definiert": all(name in hardware_core for name in ('heating','fan','light','vent','irrigation','humidifier','dehumidifier','light2','vent2')),
         "Doppelbelegung IP+Relay wird geprüft": 'HardwareConflictError' in hardware_core and '_endpoint_owners' in hardware_core,
-        "LIVE-Zuordnung ist Phase 4D schreibgeschützt": 'Hardware-Zuordnung einer LIVE-Station ist in Phase 4D gesperrt' in hardware_core,
+        "LIVE-Zuordnung ist bearbeitbar": '"editable": True' in hardware_core and 'Hardware-Zuordnung einer LIVE-Station ist in Phase 4D gesperrt' not in hardware_core,
+        "Nicht verwendete Aktoren dürfen offen bleiben": 'if not host:' in hardware_core and 'normalized[device] = None' in hardware_core,
+        "Relay 0 ist Standard bei gesetzter IP": 'if relay is None:' in hardware_core and 'relay = 0' in hardware_core,
         "Shadow-Zuordnung schaltet keine Hardware": 'switch_shelly' not in hardware_core,
-        "Connections kennzeichnet LIVE-Lock": 'LIVE-Hardware bleibt in dieser Phase schreibgeschützt' in connections,
+        "Connections erlaubt LIVE-Bearbeitung": 'LIVE. Hardware-Zuordnungen sind bearbeitbar' in connections and 'schreibgeschützt' not in connections,
+        "Connections ignoriert Relay bei leerer IP": 'relay: ip ? relay : ""' in connections,
+        "Offene Aktoren zeigen Relay-Strich statt 0": 'const hasSelection = selected !== null' in connections and 'hasSelection && Number(selected)===i' in connections,
     }
 
     spec = importlib.util.spec_from_file_location("phase4d_policy", ROOT / "auth" / "policy.py")
@@ -145,7 +149,27 @@ def main():
                 invalid_meta_blocked = False
             checks["Ungültiges Meta-Update bleibt atomar"] = invalid_meta_blocked and manager.get("phase4d_b") == before
 
-            checks["Default-LIVE-Station bleibt Hardware-readonly"] = hardware_snapshot("tent_1")["editable"] is False
+            # Nicht verwendete Geräte dürfen trotz Relay-Vorauswahl leer bleiben.
+            snap_a = update_hardware_assignments(
+                "phase4d_a",
+                {"assignments": {"heating": {"ip": "", "relay": 0}}},
+            )
+            checks["Leere IP entfernt eine vorhandene Zuordnung trotz Relay 0"] = (
+                snap_a["assignments"]["heating"]["configured"] is False
+                and snap_a["assignments"]["heating"]["ip"] == ""
+                and snap_a["assignments"]["heating"]["relay"] is None
+            )
+
+            snap_a = update_hardware_assignments(
+                "phase4d_a",
+                {"assignments": {"heating": {"ip": "192.0.2.20", "relay": ""}}},
+            )
+            checks["IP ohne Relay verwendet automatisch Relay 0"] = (
+                snap_a["assignments"]["heating"]["ip"] == "192.0.2.20"
+                and snap_a["assignments"]["heating"]["relay"] == 0
+            )
+
+            checks["Default-LIVE-Station ist für Hardwarezuordnung editierbar"] = hardware_snapshot("tent_1")["editable"] is True
     finally:
         os.chdir(old_cwd)
         manager.path = old_path
@@ -158,7 +182,7 @@ def main():
     if failed:
         raise SystemExit("Phase 4D fehlgeschlagen: " + ", ".join(failed))
 
-    print("✅ Phase 4D: Setup + sichere manuelle Hardware-Zuordnung für beliebig viele lokale Grow-Stationen vollständig")
+    print("✅ Phase 4D.1: optionale Aktoren + Shelly-Relay-0 + LIVE-Bearbeitung vollständig")
 
 
 if __name__ == "__main__":
