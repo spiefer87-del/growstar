@@ -24,8 +24,8 @@
         <span id="feedback" class="feedback"></span>
     </div>
     <div class="legend">
-        Ein Shelly kann mehrere Relays derselben oder verschiedener Stationen bereitstellen. Gesperrt wird nur eine echte Doppelbelegung derselben Kombination <strong>IP/Hostname + Relay</strong>.
-        LIVE-Hardware bleibt in dieser Phase schreibgeschützt; Shadow-/inaktive Stationen können sicher vorbereitet werden.
+        Nicht verwendete Aktoren können einfach ohne IP/Hostname bleiben. Bei einer gesetzten IP und leerem Relay wird automatisch <strong>Relay 0</strong> verwendet – passend für Shelly-Steckdosen.
+        Gesperrt wird nur eine echte Doppelbelegung derselben Kombination <strong>IP/Hostname + Relay</strong>.
     </div>
 </div>
 
@@ -44,16 +44,17 @@
     const hwUrl = id => `/api/tents/${encodeURIComponent(id)}/hardware`;
 
     function relayOptions(selected){
-        let html='<option value="">–</option>';
-        for(let i=0;i<=15;i++) html += `<option value="${i}" ${Number(selected)===i ? 'selected' : ''}>${i}</option>`;
+        const hasSelection = selected !== null && selected !== undefined && selected !== "";
+        let html=`<option value="" ${hasSelection ? '' : 'selected'}>–</option>`;
+        for(let i=0;i<=15;i++) html += `<option value="${i}" ${hasSelection && Number(selected)===i ? 'selected' : ''}>${i}</option>`;
         return html;
     }
 
     function render(snapshot){
         current = snapshot;
-        const editable = CAN_CONFIGURE && snapshot.editable;
+        const editable = CAN_CONFIGURE;
         banner.className = "banner" + (snapshot.control_enabled ? " live" : snapshot.shadow_enabled ? " shadow" : "");
-        if(snapshot.control_enabled) banner.textContent = `${snapshot.name}: LIVE. Die laufende Hardware-Zuordnung ist zum Schutz des aktiven Regelkreises hier schreibgeschützt.`;
+        if(snapshot.control_enabled) banner.textContent = `${snapshot.name}: LIVE. Hardware-Zuordnungen sind bearbeitbar; Änderungen gelten ab dem Speichern für den laufenden Regelkreis.`;
         else if(snapshot.shadow_enabled) banner.textContent = `${snapshot.name}: SHADOW. Zuordnungen werden gespeichert, reale Aktorik bleibt weiterhin gesperrt.`;
         else banner.textContent = `${snapshot.name}: Hardware-Control ist gesperrt. Die Station kann vorbereitet werden, ohne Relais zu schalten.`;
 
@@ -89,10 +90,14 @@
     select.addEventListener("change",()=>loadHardware(select.value));
 
     saveButton?.addEventListener("click", async () => {
-        if(!current || !current.editable) return;
+        if(!current || !CAN_CONFIGURE) return;
         const assignments={};
         grid.querySelectorAll(".card[data-device]").forEach(card => {
-            assignments[card.dataset.device]={ip:card.querySelector(".js-ip").value.trim(), relay:card.querySelector(".js-relay").value};
+            const ip = card.querySelector(".js-ip").value.trim();
+            const relay = card.querySelector(".js-relay").value;
+            // Leere IP = Aktor wird nicht verwendet. Ein eventuell noch
+            // sichtbarer Relay-Wert darf daraus keine Teilzuordnung machen.
+            assignments[card.dataset.device]={ip, relay: ip ? relay : ""};
         });
         feedback.className="feedback"; feedback.textContent="Speichere …";
         const res = await fetch(hwUrl(select.value),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({assignments})});
