@@ -11,6 +11,7 @@ from core.watchdog_health import build_watchdog_snapshot
 WATCHDOG_INTERVAL = 5
 WARN_REPEAT_SEC = 60
 CONFIG_WARN_REPEAT_SEC = 300
+HARDWARE_WARN_FAILURES = 2
 
 _last_warning = {}
 
@@ -38,10 +39,7 @@ def _rate_limited_log(key, message, *, level="WARN", repeat=WARN_REPEAT_SEC, now
 
 
 def watchdog_cycle(*, now=None):
-    """Führt genau einen read-only Watchdog-Zyklus aus.
-
-    Die Funktion ist separat testbar und schaltet niemals Hardware.
-    """
+    """Führt genau einen read-only Watchdog-Zyklus aus."""
 
     now = time.time() if now is None else float(now)
     ctx.WATCHDOG_LAST_LOOP = now
@@ -62,9 +60,7 @@ def watchdog_cycle(*, now=None):
 
         for sensor_key, label in (("temperature", "TEMP"), ("humidity", "HUM")):
             sensor = station[sensor_key]
-            if not sensor["configured"]:
-                continue
-            if not sensor["stale"]:
+            if not sensor["configured"] or not sensor["stale"]:
                 continue
 
             age = sensor["age"]
@@ -83,7 +79,25 @@ def watchdog_cycle(*, now=None):
                 now=now,
             )
 
-    # Bestehenden Energie-Hinweis beibehalten, jedoch controllerweit nur einmal.
+        # Phase 4G: Hardwarefehler stammen ausschließlich aus dem zentralen
+        # Hardware-Poll. Der Watchdog selbst sendet weiterhin keine Pings.
+        for endpoint in station.get("hardware", {}).get("endpoints", []):
+            if endpoint.get("state") != "error":
+                continue
+            failures = int(endpoint.get("consecutive_failures") or 0)
+            if failures < HARDWARE_WARN_FAILURES:
+                continue
+
+            device = endpoint.get("label") or endpoint.get("device") or "Aktor"
+            host = endpoint.get("ip") or "?"
+            relay = endpoint.get("relay")
+            error = endpoint.get("last_error") or "nicht erreichbar"
+            _rate_limited_log(
+                (tent_id, "hardware", endpoint.get("device"), host, relay),
+                f"[{tent_id}] HARDWARE {device} {host}/R{relay} nicht erreichbar: {error}",
+                now=now,
+            )
+
     if snapshot["controller"]["energy"]["stale"]:
         _rate_limited_log(
             ("controller", "energy"),
