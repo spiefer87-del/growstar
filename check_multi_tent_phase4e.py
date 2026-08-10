@@ -45,6 +45,8 @@ def static_checks():
     check('/api/watchdog/status' in route, "Bestehende Watchdog-Status-API bleibt vorhanden")
     check('/api/watchdog/log/clear' in route, "Bestehende Watchdog-Log-API bleibt vorhanden")
     check('id="stations"' in template, "Watchdog-Seite rendert Stationsliste dynamisch")
+    check("{% block page %}" in template, "Watchdog nutzt den von base.html gerenderten page-Block")
+    check("{% block content %}" not in template, "Watchdog verwendet keinen wirkungslosen content-Block")
     check('/api/watchdog/status' in template, "Watchdog-Seite liest zentrale Status-API")
     check('/grow-control/watchdog' in dashboard, "Watchdog besitzt kanonische Grow-Control-Route")
     check("grow_control_watchdog" in hub, "Grow-Control-Hub verlinkt kanonischen Watchdog")
