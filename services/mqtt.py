@@ -16,10 +16,6 @@ from core.sensor_sources import update_sensor_source
 MQTT_BROKER = "localhost"
 MQTT_PORT = 1883
 
-# Bestehende Topics bleiben vollständig kompatibel.
-TOPIC_DS = "sensor/ds18b20"
-TOPIC_DHT = "sensor/dht22"
-
 # Portable Sensorcontroller. Die Geräte-ID beschreibt Hardware, kein Zelt.
 TOPIC_SENSOR_STATE = "growstar/sensors/+/state"
 TOPIC_SENSOR_STATUS = "growstar/sensors/+/status"
@@ -65,41 +61,6 @@ def _decode_payload(msg):
         return None
 
     return data
-
-
-def _handle_legacy_message(topic, data):
-    """Bestehende Legacy-Topics unverändert weiter unterstützen."""
-    if topic == TOPIC_DS and "temp" in data:
-        temperature = _float_or_none(data.get("temp"))
-        if temperature is None:
-            print("❌ MQTT Temperatur ungültig")
-            return True
-
-        update_sensor_source(
-            "mqtt:ds18b20",
-            label="Alter Temperatursensor",
-            source_type="mqtt",
-            temperature=temperature,
-            raw=data,
-        )
-        return True
-
-    if topic == TOPIC_DHT and "hum" in data:
-        humidity = _float_or_none(data.get("hum"))
-        if humidity is None:
-            print("❌ MQTT Feuchte ungültig")
-            return True
-
-        update_sensor_source(
-            "mqtt:dht22",
-            label="Alter Feuchtesensor",
-            source_type="mqtt",
-            humidity=humidity,
-            raw=data,
-        )
-        return True
-
-    return topic in (TOPIC_DS, TOPIC_DHT)
 
 
 def _handle_sensor_status(topic, data):
@@ -182,15 +143,13 @@ def on_connect(client, userdata, flags, reason_code, properties):
     print("✅ MQTT verbunden")
 
     client.subscribe([
-        (TOPIC_DS, 0),
-        (TOPIC_DHT, 0),
         (TOPIC_SENSOR_STATE, 0),
         (TOPIC_SENSOR_STATUS, 0),
     ])
 
     print(
         "📡 MQTT Sensor-Topics aktiv: "
-        f"{TOPIC_DS}, {TOPIC_DHT}, {TOPIC_SENSOR_STATE}, {TOPIC_SENSOR_STATUS}"
+        f"{TOPIC_SENSOR_STATE}, {TOPIC_SENSOR_STATUS}"
     )
 
 
@@ -204,8 +163,6 @@ def on_message(client, userdata, msg):
     topic = str(msg.topic or "")
 
     try:
-        if _handle_legacy_message(topic, data):
-            return
         if _handle_sensor_status(topic, data):
             return
         if _handle_generic_sensor_message(topic, data):
