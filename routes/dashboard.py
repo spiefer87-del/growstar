@@ -71,6 +71,10 @@ def register(app):
     def grow_control_connections():
         return render_template("connections.html")
 
+    @app.route("/grow-control/watchdog")
+    def grow_control_watchdog():
+        return render_template("watchdog.html")
+
     @app.route("/grow-control/live")
     def grow_control_live():
         return redirect(
@@ -233,7 +237,7 @@ def register(app):
 
     @app.route("/watchdog")
     def watchdog_page():
-        return render_template("watchdog.html")
+        return redirect(url_for("grow_control_watchdog"), code=302)
 
     @app.route("/devices")
     def devices():

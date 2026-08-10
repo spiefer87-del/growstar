@@ -1,131 +1,76 @@
+# routes/watchdog.py
+
 import datetime
 import os
-import time
 
 from flask import jsonify, request, send_file
 
-import core.state as state
 import core.context as ctx
 
-from core.constants import SENSOR_TIMEOUT
+from core.watchdog_health import build_watchdog_snapshot
 from services.watchdog import log_event
+
+
+def _safe_int_arg(name, default, minimum=1, maximum=5000):
+    try:
+        value = int(request.args.get(name, default))
+    except (TypeError, ValueError):
+        value = default
+    return max(minimum, min(maximum, value))
+
 
 def register(app):
 
     @app.route("/api/watchdog/log")
     def api_watchdog_log():
-
-        lines = int(request.args.get("lines", 300))
-        level = request.args.get("level", "ALL")
+        lines = _safe_int_arg("lines", 300)
+        level = str(request.args.get("level", "ALL") or "ALL").upper()
+        if level not in {"ALL", "INFO", "WARN", "ERROR"}:
+            level = "ALL"
 
         if not os.path.exists(ctx.LOG_FILE):
             return jsonify({"lines": []})
 
         try:
-            with open(ctx.LOG_FILE, "r") as f:
+            with open(ctx.LOG_FILE, "r", encoding="utf-8") as f:
                 all_lines = f.readlines()
 
-            filtered = []
+            if level == "ALL":
+                filtered = all_lines
+            else:
+                filtered = [line for line in all_lines if f"{level}:" in line]
 
-            for line in all_lines:
+            return jsonify({"lines": filtered[-lines:]})
 
-                if level == "ALL":
-                    filtered.append(line)
-
-                elif f"{level}:" in line:
-                    filtered.append(line)
-
-            return jsonify({
-                "lines": filtered[-lines:]
-            })
-
-        except Exception as e:
-
-            return jsonify({
-                "lines": [f"❌ Fehler beim Lesen: {e}"]
-            })
+        except Exception as exc:
+            return jsonify({"lines": [f"❌ Fehler beim Lesen: {exc}"]})
 
     @app.route("/api/watchdog/log/clear", methods=["POST"])
     def api_watchdog_log_clear():
-
         try:
-
-            open(ctx.LOG_FILE, "w").close()
+            os.makedirs(os.path.dirname(ctx.LOG_FILE) or ".", exist_ok=True)
+            with open(ctx.LOG_FILE, "w", encoding="utf-8"):
+                pass
 
             log_event("Log wurde manuell geleert")
+            return jsonify(status="ok")
 
-            return {"status": "ok"}
-
-        except Exception as e:
-
-            return {
-                "status": "error",
-                "message": str(e)
-            }, 500
+        except Exception as exc:
+            return jsonify(status="error", message=str(exc)), 500
 
     @app.route("/api/watchdog/log/download")
     def api_watchdog_log_download():
-
         if not os.path.exists(ctx.LOG_FILE):
-            return {"error": "Kein Log vorhanden"}, 404
+            return jsonify(error="Kein Log vorhanden"), 404
 
         return send_file(
             ctx.LOG_FILE,
             as_attachment=True,
-            download_name="infolog.txt"
+            download_name="infolog.txt",
         )
 
     @app.route("/api/watchdog/status")
     def api_watchdog_status():
-
-        now = time.time()
-
-        with ctx.state_lock:
-
-            ds_age = (
-                now - state.last_ds_time
-                if state.last_ds_time
-                else 999999
-            )
-
-            dht_age = (
-                now - state.last_dht_time
-                if state.last_dht_time
-                else 999999
-            )
-
-        with ctx.energy_lock:
-            energy = dict(ctx.energy_state)
-        
-        ecount = len(energy)
-
-        mqtt_age = (
-            now - ctx.MQTT_LAST_MSG
-            if ctx.MQTT_LAST_MSG
-            else 999999
-        )
-
-        return jsonify({
-
-            "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-
-            "temp": {
-                "age": int(ds_age),
-                "stale": ds_age > SENSOR_TIMEOUT
-            },
-
-            "hum": {
-                "age": int(dht_age),
-                "stale": dht_age > SENSOR_TIMEOUT
-            },
-
-            "mqtt": {
-                "age": int(mqtt_age),
-                "stale": mqtt_age > 30
-            },
-
-            "energy": {
-                "devices": ecount,
-                "stale": ecount == 0
-            }
-        })
+        snapshot = build_watchdog_snapshot()
+        snapshot["time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        return jsonify(snapshot)
