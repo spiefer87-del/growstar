@@ -4,6 +4,7 @@ import time
 
 from core.constants import DB_INTERVAL
 from core.runtime import resolve_runtime
+from core.devices import DEVICE_NAMES
 
 from db import insert_measurement
 
@@ -41,11 +42,19 @@ def run_control_cycle(runtime=None, *, now=None, shadow=None):
         shadow = not rt.control_enabled
 
     # Eine Runtime ohne Hardwarefreigabe darf auch bei einem versehentlich
-    # falschen Aufruf nur als Shadow laufen.
+    # falschen Aufruf niemals physische Aktorik erreichen. Während ein nach
+    # Neustart persistiertes LIVE auf seinen Preflight wartet, wird der Zyklus
+    # sichtbar als ARMING markiert, rechnet intern aber weiterhin shadow-safe.
     if not rt.control_enabled:
         shadow = True
 
-    loop_mode = "shadow" if shadow else "live"
+    if rt.control_enabled:
+        loop_mode = "live"
+    elif getattr(rt, "arming", False) or getattr(rt, "live_requested", False):
+        loop_mode = "arming"
+    else:
+        loop_mode = "shadow" if shadow else "inactive"
+
     rt.mark_loop(loop_mode)
 
     current_time = time.time() if now is None else float(now)
@@ -118,10 +127,11 @@ def run_control_cycle(runtime=None, *, now=None, shadow=None):
     # Regelung
     # =========================================
 
-    control_device("fan", runtime=rt)
-    control_device("vent", runtime=rt)
-    control_device("heating", runtime=rt)
-    control_device("light", runtime=rt)
+    # Alle bekannten Geräte laufen durch dieselbe generische Regelung.
+    # Dadurch ist auch eine zukünftige dritte/vierte Station nicht auf die
+    # ursprünglichen vier Aktoren beschränkt. Geräte im Modus OFF bleiben AUS.
+    for device in DEVICE_NAMES:
+        control_device(device, runtime=rt)
 
     return {
         "tent_id": rt.tent_id,
@@ -135,28 +145,34 @@ def run_control_cycle(runtime=None, *, now=None, shadow=None):
 def main_loop(runtime=None, *, shadow=None):
     """Regelkreis für genau eine TentRuntime.
 
-    ``tent_1`` läuft weiterhin produktiv. Zusätzliche Runtimes werden in
-    Phase 3B nur mit ``shadow=True`` gestartet. Selbst wenn dieser Parameter
-    falsch gesetzt würde, verhindert ``control_enabled=False`` in der Runtime
-    jede physische Aktorik.
+    ``tent_1`` läuft weiterhin produktiv. Zusätzliche Runtimes verwenden
+    denselben Thread für SHADOW, ARMING und LIVE. Solange das Runtime-Gate
+    ``control_enabled`` geschlossen ist, bleibt physische Aktorik gesperrt.
     """
 
     rt = resolve_runtime(runtime)
 
-    if shadow is None:
-        shadow = not rt.control_enabled
+    dynamic_mode = shadow is None
 
-    if not rt.control_enabled:
-        shadow = True
-
-    if shadow:
+    if rt.control_enabled and shadow is not True:
+        print(f"🧠 [{rt.tent_id}] Regelkreis gestartet")
+    elif getattr(rt, "live_requested", False):
+        print(
+            f"🟠 [{rt.tent_id}] ARMING-Regelkreis gestartet "
+            "(Hardware-Aktorik bis Preflight gesperrt)"
+        )
+    else:
         print(
             f"🧪 [{rt.tent_id}] Shadow-Regelkreis gestartet "
             "(Hardware-Aktorik gesperrt)"
         )
-    else:
-        print(f"🧠 [{rt.tent_id}] Regelkreis gestartet")
 
     while True:
-        run_control_cycle(runtime=rt, shadow=shadow)
+        # ``shadow=None`` means dynamic mode: after a successful LIVE arming the
+        # very same thread automatically changes from shadow-safe calculations
+        # to real actuation. No second controller thread is ever started.
+        run_control_cycle(
+            runtime=rt,
+            shadow=None if dynamic_mode else shadow,
+        )
         time.sleep(2)
