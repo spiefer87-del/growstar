@@ -14,21 +14,10 @@ from services.hardware import hardware
 
 
 _OFFSET_KEYS = ("TEMP_OFFSET", "HUM_OFFSET")
-
-
-def _default_assignments():
-    return {
-        "temperature": {
-            "source_id": "mqtt:ds18b20",
-            "field": "temperature",
-            "label": "Alter Temperatursensor",
-        },
-        "humidity": {
-            "source_id": "mqtt:dht22",
-            "field": "humidity",
-            "label": "Alter Feuchtesensor",
-        },
-    }
+_RETIRED_SOURCE_IDS = {
+    "mqtt:ds18b20",
+    "mqtt:dht22",
+}
 
 
 def _hardware_sources():
@@ -113,42 +102,16 @@ def _source_map():
 
     for source in list_sensor_sources():
         source_id = source.get("id")
-        if source_id:
+        if source_id and source_id not in _RETIRED_SOURCE_IDS:
             sources[source_id] = dict(source)
-
-    # Legacy-Quellen bleiben sichtbar, auch wenn noch kein Paket angekommen ist.
-    sources.setdefault(
-        "mqtt:ds18b20",
-        {
-            "id": "mqtt:ds18b20",
-            "label": "Alter Temperatursensor",
-            "type": "mqtt",
-            "temperature": None,
-            "humidity": None,
-            "battery": None,
-            "rssi": None,
-            "capabilities": ["temperature"],
-        },
-    )
-    sources.setdefault(
-        "mqtt:dht22",
-        {
-            "id": "mqtt:dht22",
-            "label": "Alter Feuchtesensor",
-            "type": "mqtt",
-            "temperature": None,
-            "humidity": None,
-            "battery": None,
-            "rssi": None,
-            "capabilities": ["humidity"],
-        },
-    )
 
     for source in _mqtt_controller_sources():
         source_id = source.get("id")
+        if not source_id or source_id in _RETIRED_SOURCE_IDS:
+            continue
+
         existing = sources.get(source_id, {})
         existing.update({k: v for k, v in source.items() if v is not None})
-        # False/[] müssen erhalten bleiben.
         existing["online"] = source.get("online", existing.get("online"))
         if source.get("capabilities"):
             existing["capabilities"] = source["capabilities"]
@@ -174,16 +137,7 @@ def _supports(source, field):
     if field in capabilities:
         return True
 
-    if source.get(field) is not None:
-        return True
-
-    source_id = source.get("id")
-    if field == "temperature" and source_id == "mqtt:ds18b20":
-        return True
-    if field == "humidity" and source_id == "mqtt:dht22":
-        return True
-
-    return False
+    return source.get(field) is not None
 
 
 def _sensor_options():
@@ -233,8 +187,14 @@ def _sources_payload():
         ]
         result.append(item)
 
-    result.sort(key=lambda item: (str(item.get("type") or ""), str(item.get("label") or item.get("id") or "")))
+    result.sort(
+        key=lambda item: (
+            str(item.get("type") or ""),
+            str(item.get("label") or item.get("id") or ""),
+        )
+    )
     return result
+
 
 def _normalize_assignment(sensor_name, data):
     if not isinstance(data, dict):
@@ -246,6 +206,9 @@ def _normalize_assignment(sensor_name, data):
 
     if not source_id:
         raise ValueError(f"source_id für {sensor_name} fehlt")
+
+    if str(source_id) in _RETIRED_SOURCE_IDS:
+        raise ValueError(f"{source_id} ist eine stillgelegte Legacy-Sensorquelle")
 
     if not field:
         field = "temperature" if sensor_name == "temperature" else "humidity"
@@ -295,10 +258,12 @@ def _save_assignments(runtime, data):
     if not isinstance(data, dict):
         raise TypeError("Sensor-Update muss ein JSON-Objekt sein")
 
-    # Atomar in einer Kopie arbeiten. Dadurch kann ein fehlerhaftes zweites
-    # Feld keine halbfertige Sensorzuweisung im Regelkreis hinterlassen.
     current_assignments = runtime.config.get("SENSOR_ASSIGNMENTS", {})
-    assignments = dict(current_assignments) if isinstance(current_assignments, dict) else {}
+    assignments = (
+        dict(current_assignments)
+        if isinstance(current_assignments, dict)
+        else {}
+    )
 
     if "temperature" in data:
         assignments["temperature"] = _normalize_assignment(
@@ -330,6 +295,7 @@ def _save_assignments(runtime, data):
 
     if "temperature" in data or "humidity" in data:
         runtime.config["SENSOR_ASSIGNMENTS"] = assignments
+
     for key, value in new_offsets.items():
         runtime.config[key] = value
 
@@ -358,10 +324,7 @@ def register(app):
             "sources": _sources_payload(),
         })
 
-    # ------------------------------------------------------------------
-    # Legacy tent_1 API
-    # ------------------------------------------------------------------
-
+    # Legacy-URL bleibt nur als Alias für tent_1 erhalten.
     @app.get("/api/sensors/assignments")
     def get_sensor_assignments():
         return jsonify(_assignments_payload(get_default_runtime()))
@@ -378,18 +341,16 @@ def register(app):
     def apply_sensors():
         runtime = get_default_runtime()
         changed = apply_sensor_assignments(runtime=runtime)
+
         with runtime.state_lock:
             snapshot = dict(runtime.state.live_state)
+
         return jsonify({
             "success": True,
             "tent_id": runtime.tent_id,
             "changed": changed,
             "state": snapshot,
         })
-
-    # ------------------------------------------------------------------
-    # Generische Multi-Station API
-    # ------------------------------------------------------------------
 
     @app.route(
         "/api/tents/<tent_id>/sensors/assignments",
@@ -416,6 +377,7 @@ def register(app):
             return error
 
         changed = apply_sensor_assignments(runtime=runtime)
+
         with runtime.state_lock:
             snapshot = dict(runtime.state.live_state)
 
