@@ -1,252 +1,211 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Watchdog</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
 
+{% block title %}Watchdog – Growstar{% endblock %}
+
+{% block head %}
 <style>
 :root{
     --bg:#0f172a;
     --card:#1e293b;
+    --card2:#111c31;
     --text:#e5e7eb;
     --muted:#94a3b8;
     --ok:#22c55e;
     --warn:#f59e0b;
     --err:#ef4444;
+    --purple:#a78bfa;
+    --blue:#38bdf8;
 }
+*{box-sizing:border-box}
 body{
     margin:0;
-    padding:20px;
-    background:var(--bg);
+    padding:24px;
+    background:radial-gradient(circle at top left,rgba(56,189,248,.08),transparent 34rem),var(--bg);
     color:var(--text);
-    font-family:system-ui;
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
 }
-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:20px;
-}
-h1{margin:0;font-size:1.6rem}
-a.back{color:var(--muted);text-decoration:none}
-
-.grid{
-    display:grid;
-    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-    gap:14px;
-    margin-bottom:20px;
-}
-
-.card{
-    background:var(--card);
-    border-radius:16px;
-    padding:16px;
-    box-shadow:0 10px 30px rgba(0,0,0,.3);
-}
-
-.card h3{
-    margin:0 0 8px;
-    font-size:.9rem;
-    color:var(--muted);
-    text-transform:uppercase;
-    letter-spacing:.08em;
-}
-
-.badge{
-    display:inline-block;
-    padding:5px 10px;
-    border-radius:999px;
-    font-size:.85rem;
-    font-weight:600;
-}
-
-.ok{background:rgba(34,197,94,.15); color:var(--ok)}
-.warn{background:rgba(245,158,11,.15); color:var(--warn)}
-.err{background:rgba(239,68,68,.15); color:var(--err)}
-
-.meta{
-    margin-top:10px;
-    font-size:.9rem;
-    color:var(--muted);
-}
-
-.logbox{
-    margin-top:10px;
-    white-space:pre-wrap;
-    font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    font-size:.85rem;
-    line-height:1.4;
-    background:#020617;
-    border:1px solid rgba(255,255,255,.08);
-    border-radius:14px;
-    padding:14px;
-    max-height:60vh;
-    overflow:auto;
-}
-
-.row{
-    display:flex;
-    justify-content:space-between;
-    gap:10px;
-    margin-bottom:10px;
-}
-
-button{
-    border:none;
-    border-radius:10px;
-    padding:10px 12px;
-    cursor:pointer;
-    background:#334155;
-    color:var(--text);
-    font-weight:600;
-}
-button:hover{filter:brightness(1.1)}
+.wrap{max-width:1180px;margin:0 auto}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:22px}
+.header-left{display:flex;align-items:center;gap:12px}
+.back{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:11px;border:1px solid rgba(148,163,184,.2);background:var(--card);color:var(--text);text-decoration:none}
+h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
+.subtitle{margin:5px 0 0;color:var(--muted);font-size:.9rem}
+.status-time{color:var(--muted);font-size:.82rem;text-align:right}
+.section{margin-top:26px}
+.section h2{margin:0 0 5px;font-size:1.08rem}
+.section-intro{margin:0 0 14px;color:var(--muted);font-size:.87rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:17px;padding:16px;box-shadow:0 12px 28px rgba(0,0,0,.18)}
+.card h3{margin:0 0 9px;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.big{font-size:1.08rem;font-weight:750}
+.meta{margin-top:7px;color:var(--muted);font-size:.82rem;line-height:1.45}
+.badge{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:.72rem;font-weight:800;letter-spacing:.04em;border:1px solid transparent}
+.ok{background:rgba(34,197,94,.14);color:#86efac;border-color:rgba(34,197,94,.25)}
+.warn{background:rgba(245,158,11,.14);color:#fcd34d;border-color:rgba(245,158,11,.25)}
+.err{background:rgba(239,68,68,.14);color:#fca5a5;border-color:rgba(239,68,68,.25)}
+.shadow{background:rgba(167,139,250,.14);color:#c4b5fd;border-color:rgba(167,139,250,.25)}
+.inactive,.neutral{background:rgba(148,163,184,.12);color:#cbd5e1;border-color:rgba(148,163,184,.18)}
+.station-list{display:grid;gap:16px}
+.station-card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:20px;padding:18px;box-shadow:0 14px 32px rgba(0,0,0,.2)}
+.station-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.station-title strong{display:block;font-size:1.08rem}.station-id{display:block;margin-top:3px;color:var(--muted);font-size:.76rem}
+.station-health{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.health-cell{min-width:0;background:rgba(2,6,23,.28);border-radius:13px;padding:11px}
+.health-cell span{display:block;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
+.health-cell strong{display:block;margin-top:5px;font-size:.9rem;overflow:hidden;text-overflow:ellipsis}
+.health-detail{margin-top:4px;color:var(--muted);font-size:.72rem;line-height:1.35}
+.issue-list{margin:10px 0 0;padding-left:18px;color:#fca5a5;font-size:.78rem}
+.empty{padding:18px;border:1px dashed rgba(148,163,184,.22);border-radius:14px;color:var(--muted)}
+.log-card{margin-top:16px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button,select{border:1px solid rgba(148,163,184,.18);border-radius:10px;padding:9px 11px;background:#334155;color:var(--text);font:inherit;font-weight:650}
+button{cursor:pointer}.logbox{margin-top:12px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:.8rem;line-height:1.45;background:#020617;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;max-height:52vh;overflow:auto}
+.error-text{color:#fca5a5}
+@media(max-width:850px){.station-health{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){body{padding:16px}.station-health{grid-template-columns:1fr}.status-time{display:none}}
 </style>
-</head>
+{% endblock %}
 
-<body>
-
+{% block content %}
+<div class="wrap">
 <header>
-    <h1>🐶 Watchdog</h1>
-    <a href="/system" class="back">← zurück</a>
+    <div class="header-left">
+        <a class="back" href="{{ url_for('grow_control_dashboard') }}" aria-label="Zurück">←</a>
+        <div>
+            <h1>🐶 Watchdog</h1>
+            <p class="subtitle">Controller- und Stationszustand auf einem Raspberry Pi</p>
+        </div>
+    </div>
+    <div class="status-time" id="time">Lade Status…</div>
 </header>
 
-<div class="grid">
+<section class="section">
+    <h2>Raspberry Pi / Controller</h2>
+    <p class="section-intro">Thread-Status ist controllerweit. MQTT-Verkehr und Energie sind davon getrennt bewertet.</p>
+    <div class="grid" id="controller-grid"><div class="empty">Lade Controllerstatus…</div></div>
+</section>
 
-    <div class="card">
-        <h3>🌡️ Temperatur Sensor</h3>
-        <div id="temp-badge" class="badge">...</div>
-        <div class="meta" id="temp-meta"></div>
-    </div>
+<section class="section">
+    <h2>Grow-Stationen</h2>
+    <p class="section-intro">Jede geladene Runtime besitzt ihren eigenen Regelkreis-Heartbeat und eigene Sensorzustände.</p>
+    <div class="station-list" id="stations"><div class="empty">Lade Stationen…</div></div>
+</section>
 
-    <div class="card">
-        <h3>💧 Luftfeuchte Sensor</h3>
-        <div id="hum-badge" class="badge">...</div>
-        <div class="meta" id="hum-meta"></div>
-    </div>
-
-    <div class="card">
-        <h3>📡 MQTT</h3>
-        <div id="mqtt-badge" class="badge">...</div>
-        <div class="meta" id="mqtt-meta"></div>
-    </div>
-
-    <div class="card">
-        <h3>⚡ Energie</h3>
-        <div id="energy-badge" class="badge">...</div>
-        <div class="meta" id="energy-meta"></div>
-    </div>
-
-</div>
-
-<div class="card">
-    <div class="row">
-        <div>
-            <h3 style="margin:0">📜 Infolog</h3>
-            <div class="meta" id="time"></div>
+<section class="section">
+    <div class="card log-card">
+        <div class="row">
+            <div>
+                <h3 style="margin:0">📜 Infolog</h3>
+                <div class="meta">Bestehendes Growstar-Watchdog-Log</div>
+            </div>
+            <div class="actions">
+                <select id="filter">
+                    <option value="ALL">Alle</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARN">WARN</option>
+                    <option value="ERROR">ERROR</option>
+                </select>
+                <button type="button" onclick="loadLog()">🔄</button>
+                <button type="button" onclick="clearLog()">🧹</button>
+                <button type="button" onclick="downloadLog()">⬇</button>
+            </div>
         </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <select id="filter">
-                <option value="ALL">Alle</option>
-                <option value="INFO">INFO</option>
-                <option value="WARN">WARN</option>
-                <option value="ERROR">ERROR</option>
-            </select>
-
-            <button onclick="loadLog()">🔄</button>
-            <button onclick="clearLog()">🧹</button>
-            <button onclick="downloadLog()">⬇</button>
-        </div>
+        <label class="meta"><input type="checkbox" id="autoscroll" checked> Auto Scroll</label>
+        <div id="log" class="logbox">Lade Log…</div>
     </div>
-
-    <div style="margin:8px 0">
-        <label>
-            <input type="checkbox" id="autoscroll" checked>
-            Auto Scroll
-        </label>
-    </div>
-
-    <div id="log" class="logbox">Lade Log...</div>
+</section>
 </div>
-
 
 <script>
-
 let currentLevel = "ALL";
+const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 
-document.getElementById("filter").addEventListener("change", e=>{
-    currentLevel = e.target.value;
-    loadLog();
-});
+function cls(state){
+    if(state === "ok") return "ok";
+    if(state === "error") return "err";
+    if(state === "warn" || state === "unconfigured") return "warn";
+    if(state === "shadow") return "shadow";
+    return "inactive";
+}
+function badge(text,state){return `<span class="badge ${cls(state)}">${esc(text)}</span>`;}
+function ageText(age){return age == null ? "noch kein Update" : `vor ${Number(age).toFixed(age < 10 ? 1 : 0)}s`;}
+function valueText(value,suffix){return value == null ? "--" : `${Number(value).toFixed(1)}${suffix}`;}
 
-function setBadge(id, ok, warn, err){
-    const el = document.getElementById(id);
+function renderController(controller){
+    const grid = document.getElementById("controller-grid");
+    const cards = [];
+    Object.values(controller.threads || {}).forEach(t => {
+        cards.push(`<article class="card"><h3>${esc(t.label)} Thread</h3>${badge(t.alive ? "LÄUFT" : "GESTOPPT", t.state)}<div class="meta">Prozess-Thread</div></article>`);
+    });
+    const mqtt = controller.mqtt || {};
+    cards.push(`<article class="card"><h3>MQTT Verkehr</h3>${badge(mqtt.stale ? "KEINE AKTUELLEN DATEN" : "AKTIV", mqtt.state)}<div class="meta">Letzte Nachricht ${ageText(mqtt.age)}</div></article>`);
+    const energy = controller.energy || {};
+    cards.push(`<article class="card"><h3>Energie</h3>${badge(energy.stale ? "KEINE DATEN" : "AKTIV", energy.state)}<div class="meta">${Number(energy.devices || 0)} Geräte im Poll</div></article>`);
+    grid.innerHTML = cards.join("");
+}
 
-    if(err){
-        el.className="badge err";
-        el.textContent="FEHLER";
-    }else if(warn){
-        el.className="badge warn";
-        el.textContent="WARNUNG";
-    }else if(ok){
-        el.className="badge ok";
-        el.textContent="OK";
-    }else{
-        el.className="badge warn";
-        el.textContent="UNBEKANNT";
-    }
+function renderStations(stations){
+    const root = document.getElementById("stations");
+    if(!stations || !stations.length){root.innerHTML='<div class="empty">Keine Runtime geladen.</div>';return;}
+    root.innerHTML = stations.map(s => {
+        const modeState = s.runtime_mode === "live" ? "ok" : (s.runtime_mode === "shadow" ? "shadow" : "inactive");
+        const modeText = String(s.runtime_mode || "inactive").toUpperCase();
+        const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {};
+        const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";
+        const hwText = hw.assigned ? `${hw.assigned} zugeordnet` : "keine Zuordnung";
+        const hwState = hw.state === "shadow" ? "shadow" : (hw.assigned ? "ok" : "inactive");
+        return `<article class="station-card">
+            <div class="station-head">
+                <div class="station-title"><strong>${esc(s.name)}</strong><span class="station-id">${esc(s.id)}</span></div>
+                <div>${badge(modeText, modeState)} ${badge(String(s.overall || "").toUpperCase(), s.overall)}</div>
+            </div>
+            <div class="station-health">
+                <div class="health-cell"><span>Regelkreis</span><strong>${badge(loop.stale ? "STALE" : (loop.expected ? "OK" : "INAKTIV"), loop.state)}</strong><div class="health-detail">Heartbeat ${ageText(loop.age)}</div></div>
+                <div class="health-cell"><span>Temperatur</span><strong>${valueText(temp.value," °C")}</strong><div class="health-detail">${temp.configured ? `${esc(temp.label || temp.source_id || "Sensor")} · ${ageText(temp.age)}` : "nicht zugeordnet"}</div></div>
+                <div class="health-cell"><span>Feuchte</span><strong>${valueText(hum.value," %")}</strong><div class="health-detail">${hum.configured ? `${esc(hum.label || hum.source_id || "Sensor")} · ${ageText(hum.age)}` : "nicht zugeordnet"}</div></div>
+                <div class="health-cell"><span>Hardware</span><strong>${badge(hwText, hwState)}</strong><div class="health-detail">${hw.actuation_blocked ? "Aktorik gesperrt" : "Aktorik freigegeben"}; keine Zusatz-Pings</div></div>
+                <div class="health-cell"><span>Config / Failsafe</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
+            </div>
+        </article>`;
+    }).join("");
 }
 
 async function loadStatus(){
-    const s = await fetch("/api/watchdog/status").then(r=>r.json());
-
-    document.getElementById("time").textContent = "Stand: " + s.time;
-
-    setBadge("temp-badge", !s.temp.stale, s.temp.age > 10 && !s.temp.stale, s.temp.stale);
-    document.getElementById("temp-meta").textContent = `Letztes Update vor ${s.temp.age}s`;
-
-    setBadge("hum-badge", !s.hum.stale, s.hum.age > 10 && !s.hum.stale, s.hum.stale);
-    document.getElementById("hum-meta").textContent = `Letztes Update vor ${s.hum.age}s`;
-
-    setBadge("mqtt-badge", !s.mqtt.stale, s.mqtt.age > 10 && !s.mqtt.stale, s.mqtt.stale);
-    document.getElementById("mqtt-meta").textContent = `Letztes MQTT Signal vor ${s.mqtt.age}s`;
-
-    setBadge("energy-badge", !s.energy.stale, false, s.energy.stale);
-    document.getElementById("energy-meta").textContent = `${s.energy.devices} Geräte im Poll`;
+    try{
+        const response = await fetch("/api/watchdog/status", {cache:"no-store"});
+        if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const s = await response.json();
+        document.getElementById("time").textContent = "Stand: " + (s.time || "--");
+        renderController(s.controller || {});
+        renderStations(s.stations || []);
+    }catch(err){
+        document.getElementById("controller-grid").innerHTML = `<div class="empty error-text">Statusfehler: ${esc(err.message)}</div>`;
+    }
 }
 
+document.getElementById("filter").addEventListener("change", e=>{currentLevel=e.target.value;loadLog();});
+
 async function loadLog(){
-    const data = await fetch(`/api/watchdog/log?lines=300&level=${currentLevel}`)
-        .then(r=>r.json());
-
-    const logEl = document.getElementById("log");
-    logEl.textContent = (data.lines || []).join("");
-
-    if(document.getElementById("autoscroll").checked){
-        logEl.scrollTop = logEl.scrollHeight;
-    }
+    try{
+        const response = await fetch(`/api/watchdog/log?lines=300&level=${encodeURIComponent(currentLevel)}`, {cache:"no-store"});
+        const data = await response.json();
+        const logEl = document.getElementById("log");
+        logEl.textContent = (data.lines || []).join("");
+        if(document.getElementById("autoscroll").checked) logEl.scrollTop = logEl.scrollHeight;
+    }catch(err){document.getElementById("log").textContent = "Fehler: " + err.message;}
 }
 
 async function clearLog(){
     if(!confirm("Log wirklich löschen?")) return;
-
-    await fetch("/api/watchdog/log/clear", {method:"POST"});
+    const response = await fetch("/api/watchdog/log/clear", {method:"POST"});
+    if(!response.ok){alert("Log konnte nicht gelöscht werden.");return;}
     loadLog();
 }
+function downloadLog(){window.location="/api/watchdog/log/download";}
 
-function downloadLog(){
-    window.location = "/api/watchdog/log/download";
-}
-
-loadStatus();
-loadLog();
-
+loadStatus();loadLog();
 setInterval(loadStatus, 3000);
 setInterval(loadLog, 7000);
-
 </script>
-
-
-</body>
-</html>
+{% endblock %}
