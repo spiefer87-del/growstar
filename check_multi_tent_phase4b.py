@@ -33,7 +33,7 @@ checks = {
     "Live-Ansicht liest stationsbezogene Config": "/api/tents/${encodeURIComponent(TENT_ID)}/config" in live,
     "Globale State-API wird nicht gepollt": 'fetch("/api/state")' not in live,
     "Globale Config-API wird nicht gepollt": 'fetch("/api/config")' not in live,
-    "Shadow-Sollzustände werden angezeigt": "shadow_desired" in live and "SHADOW EIN" in live,
+    "Shadow-Sollzustände werden angezeigt": "shadow_desired" in live and "SHADOW" in live and "prefix" in live,
     "Nicht-Default-Detaillinks bleiben sicher getrennt": (
         "lockLegacyDetailLinks" in live
         or "grow_control_tent_temperature" in live
@@ -62,7 +62,7 @@ with tempfile.TemporaryDirectory() as tmp:
         item.get("controller_id") == mod.DEFAULT_CONTROLLER_ID
         for item in snapshot["tents"].values()
     )
-    checks["Zusätzliche Stationen bleiben hardwaregesperrt"] = all(
+    checks["Neue zusätzliche Stationen starten hardwaregesperrt"] = all(
         item["id"] == mod.DEFAULT_TENT_ID or not item.get("control_enabled", False)
         for item in snapshot["tents"].values()
     )

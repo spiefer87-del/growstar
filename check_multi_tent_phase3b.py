@@ -43,8 +43,9 @@ def main():
             require(meta["shadow_enabled"] is False, "Shadow muss standardmäßig AUS sein")
             require(meta["control_enabled"] is False, "Hardware-Control muss AUS sein")
 
-            # Selbst eine manuelle Manipulation der Datei darf Phase 3B nicht
-            # in einen echten zweiten Hardware-Regelkreis verwandeln.
+            # Phase 4H erlaubt einen persistenten LIVE-Zielmodus, aber ein
+            # solcher Eintrag darf nach einem Neustart das echte Hardware-Gate
+            # niemals blind öffnen. Er muss zunächst als ARMING laden.
             raw = manager.snapshot()
             raw["tents"]["tent_2"]["control_enabled"] = True
             Path("tents.json").write_text(
@@ -53,10 +54,19 @@ def main():
             )
             init_tents()
             require(
-                manager.get("tent_2")["control_enabled"] is False,
-                "manuelles control_enabled=true wurde nicht neutralisiert",
+                manager.get("tent_2")["control_enabled"] is True,
+                "persistenter LIVE-Zielmodus wurde nicht erhalten",
             )
 
+            init_runtimes()
+            arming_rt = get_runtime("tent_2")
+            require(arming_rt.control_enabled is False, "ARMING öffnete Hardware beim Boot")
+            require(arming_rt.live_requested is True, "LIVE-Zielmodus fehlt in Runtime")
+            require(arming_rt.arming is True, "persistiertes LIVE startet nicht als ARMING")
+
+            # Für die historischen Phase-3B-Shadow-Checks die Station wieder
+            # kontrolliert auf einen normalen Shadow-Zielmodus setzen.
+            manager.set_control_enabled("tent_2", False)
             manager.set_shadow_enabled("tent_2", True)
             init_runtimes()
 
@@ -188,7 +198,8 @@ def main():
             require(cfg2.get("SENSOR_ASSIGNMENTS") == {}, "Test veränderte echte Tent-Datei")
 
             print("✅ Phase 3B Shadow-Metadaten persistent und sicher")
-            print("✅ Zusätzliche Zelte erzwingen control_enabled=False")
+            print("✅ Zusätzliche Zelte öffnen Hardware weiterhin nur über das Runtime-Gate")
+            print("✅ Persistiertes LIVE startet nach Reboot sicher als ARMING")
             print("✅ Shadow-Aktorik sendet selbst mit IP/Relay keinen Netzwerkbefehl")
             print("✅ Vollständiger tent_2 Regelzyklus rechnet Sensoren/Sollwerte getrennt")
             print("✅ Reale Gerätezustände bleiben im Shadow-Modus unverändert")

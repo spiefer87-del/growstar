@@ -20,7 +20,8 @@ from core.runtime import (
     list_runtimes,
     resolve_runtime,
 )
-from core.actuators import set_heating, set_fan, set_vent
+from core.actuators import set_device
+from core.devices import DEVICE_NAMES
 
 from services.watchdog import log_event, watchdog_loop
 from services.shelly import sync_relay
@@ -31,6 +32,7 @@ from threads.main import main_loop
 from threads.hardware import hardware_loop
 from threads.blu import start_blu_thread
 from services.hardware_recovery import start_hardware_recovery_thread
+from services.live_control import live_arming_loop
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.plant_management import register as register_plant_management_routes
@@ -245,35 +247,52 @@ def start_backend():
             )
             print("🧠 Main Control Thread gestartet")
 
-            # Phase 3B: zusätzliche Zelte dürfen ausschließlich als Shadow-
-            # Regelkreis laufen. Es findet weder Relay-Sync noch Failsafe-
-            # Hardwarezugriff für diese Runtimes statt.
+            # Phase 4H: jede zusätzliche aktive Station besitzt weiterhin genau
+            # EINEN Regelkreis-Thread. Shadow und ARMING starten hardwaregesperrt;
+            # nach erfolgreichem Preflight kann derselbe Thread dynamisch LIVE
+            # werden. Inaktive Stationen bekommen weiterhin keinen Thread.
             for extra_runtime in list_runtimes():
                 if extra_runtime.tent_id == runtime.tent_id:
                     continue
-                if not extra_runtime.enabled or not extra_runtime.shadow_enabled:
+                if not extra_runtime.enabled:
+                    continue
+                if not (extra_runtime.shadow_enabled or extra_runtime.live_requested):
                     continue
 
-                # Zweite Sicherheitsbarriere neben core.actuators.
-                extra_runtime.control_enabled = False
-
                 _start_daemon_thread(
-                    f"growstar-shadow-{extra_runtime.tent_id}",
+                    f"growstar-control-{extra_runtime.tent_id}",
                     lambda rt=extra_runtime: main_loop(
                         runtime=rt,
-                        shadow=True,
+                        shadow=None,
                     ),
                 )
-                print(
-                    f"🧪 [{extra_runtime.tent_id}] "
-                    "Shadow Control Thread gestartet"
-                )
+
+                if extra_runtime.live_requested:
+                    print(
+                        f"🟠 [{extra_runtime.tent_id}] "
+                        "ARMING Control Thread gestartet"
+                    )
+                else:
+                    print(
+                        f"🧪 [{extra_runtime.tent_id}] "
+                        "Shadow Control Thread gestartet"
+                    )
 
             _start_daemon_thread(
                 "growstar-hardware",
                 hardware_loop,
             )
             print("🧠 Hardware Thread gestartet")
+
+            # The arming thread only consumes runtime state + the read-only
+            # actuator-health cache. Starting it after hardware_loop ensures
+            # that persisted LIVE stations cannot open their gate before the
+            # central hardware poll has produced a fresh result.
+            _start_daemon_thread(
+                "growstar-live-arming",
+                live_arming_loop,
+            )
+            print("🟠 LIVE-Arming Thread gestartet")
 
             # Phase 4F: bekannte Gateways/BLE-Sensoren nach Neustart
             # automatisch wiederherstellen. Der Recovery-Thread arbeitet
@@ -302,17 +321,22 @@ def shutdown_backend():
         _backend_started = False
         print("🛑 Grow-Backend wird beendet")
 
-        runtime = get_default_runtime()
+        # Every actually armed LIVE runtime gets the same controlled shutdown.
+        # Shadow/ARMING runtimes cannot write hardware through core.actuators.
+        # All known devices are driven OFF so later-added local stations do not
+        # depend on the historical heating/fan/vent-only shutdown list.
+        for runtime in list_runtimes():
+            if not runtime.control_enabled:
+                continue
 
-        for action in (
-            lambda: set_heating(False, "(Shutdown)", runtime=runtime),
-            lambda: set_fan(False, "(Shutdown)", runtime=runtime),
-            lambda: set_vent(False, "(Shutdown)", runtime=runtime),
-        ):
-            try:
-                action()
-            except Exception as exc:
-                print(f"⚠️ Fehler beim Shutdown: {exc}")
+            for device in DEVICE_NAMES:
+                try:
+                    set_device(device, False, runtime=runtime)
+                except Exception as exc:
+                    print(
+                        f"⚠️ [{runtime.tent_id}] Shutdown {device} fehlgeschlagen:",
+                        exc,
+                    )
 
 
 atexit.register(shutdown_backend)
