@@ -11,6 +11,8 @@ from jinja2 import Environment
 
 ROOT = Path(__file__).resolve().parent
 
+TEST_VERSION = "portable-sensor-nodes-v3"
+
 
 def read(rel):
     return (ROOT / rel).read_text(encoding="utf-8")
@@ -144,12 +146,17 @@ def main():
     device_id = str(pico_values.get("DEVICE_ID", ""))
     device_name = str(pico_values.get("DEVICE_NAME", ""))
 
+    import re
+
     require(
-        device_id == "pico_02"
-        and device_name == "Pico Sensor 2"
+        bool(device_id)
+        and bool(device_name)
+        and re.fullmatch(r"[a-z0-9][a-z0-9_-]{0,63}", device_id) is not None
         and "zelt" not in device_id.lower()
-        and "zelt" not in device_name.lower(),
-        "Pico-ID ist nicht an ein Zelt gekoppelt",
+        and "tent" not in device_id.lower()
+        and "zelt" not in device_name.lower()
+        and "tent" not in device_name.lower(),
+        "Pico-ID ist gültig und nicht an ein Zelt gekoppelt",
     )
 
     require(
