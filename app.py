@@ -30,6 +30,7 @@ from threads.shelly import shelly_background_loop
 from threads.main import main_loop
 from threads.hardware import hardware_loop
 from threads.blu import start_blu_thread
+from services.hardware_recovery import start_hardware_recovery_thread
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.plant_management import register as register_plant_management_routes
@@ -273,6 +274,12 @@ def start_backend():
                 hardware_loop,
             )
             print("🧠 Hardware Thread gestartet")
+
+            # Phase 4F: bekannte Gateways/BLE-Sensoren nach Neustart
+            # automatisch wiederherstellen. Der Recovery-Thread arbeitet
+            # vollständig parallel; er blockiert den Regelungsstart nicht.
+            start_hardware_recovery_thread()
+            print("♻️ Hardware Auto-Recovery Thread gestartet")
 
             _backend_started = True
             print("✅ Grow-Backend läuft")
