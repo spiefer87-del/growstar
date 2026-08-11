@@ -55,6 +55,14 @@ class TentRuntime:
     loop_mode: str = "inactive"
     last_loop_ts: object = None
 
+    # Phase 4I: stationsbezogener Safety-Supervisor. Overrides gelten nur
+    # in-process und werden nach jedem Neustart frisch aus Runtime-State,
+    # Sensor-Freshness und zentralem Aktor-Health-Cache berechnet.
+    safety_overrides: dict = field(default_factory=dict)
+    safety_status: object = None
+    last_safety_ts: object = None
+    safety_lock: object = field(default_factory=threading.RLock)
+
     _save_config_callback: object = None
 
     def persist_config(self):

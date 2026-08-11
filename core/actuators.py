@@ -126,6 +126,37 @@ def _set_shelly_device(
             )
         return
 
+    # -------------------------------------------------
+    # Phase 4I: harte stationsbezogene Safety-Barriere
+    # -------------------------------------------------
+    # Der unabhaengige Safety-Supervisor schreibt nur Runtime-Overrides.
+    # Hier liegt die letzte Barriere direkt vor jedem realen Shelly-Befehl:
+    # - block_on verhindert neue EIN-Befehle bei unverifizierter Hardware.
+    # - force_off verwandelt einen angeforderten EIN-Zustand in AUS, z.B. bei
+    #   stale Sensor oder stale Regelkreis.
+    safety_lock = getattr(rt, "safety_lock", None)
+    if safety_lock is None:
+        override = dict((getattr(rt, "safety_overrides", {}) or {}).get(live_key) or {})
+    else:
+        with safety_lock:
+            override = dict((getattr(rt, "safety_overrides", {}) or {}).get(live_key) or {})
+
+    requested_enabled = bool(enabled)
+    if requested_enabled and override.get("force_off"):
+        # Ist der Endpunkt aktuell nicht sicher erreichbar, darf hier weder
+        # ein EIN- noch ein wiederholter AUS-Request erzeugt werden. Der
+        # Override bleibt bestehen; services/safety.py schaltet AUS, sobald
+        # der zentrale Health-Cache Hardware wieder als erreichbar meldet.
+        if not override.get("can_attempt_off"):
+            return
+        enabled = False
+        safety_reason = override.get("reason") or "Safety-Failsafe"
+        reason = f"{reason} (SAFETY: {safety_reason})"
+    elif requested_enabled and override.get("block_on"):
+        # Hardware-/Konfigurationsproblem: kein neuer EIN-Befehl. AUS bleibt
+        # weiterhin erlaubt, damit ein normaler Safe-Off nicht blockiert wird.
+        return
+
     if enabled == getattr(st, state_attr):
         return
 
@@ -289,7 +320,7 @@ DEVICE_SETTERS = {
 }
 
 
-def set_device(device, enabled, runtime=None):
+def set_device(device, enabled, runtime=None, reason=""):
     setter = DEVICE_SETTERS.get(device)
     if setter:
-        setter(enabled, runtime=runtime)
+        setter(enabled, reason=reason, runtime=runtime)

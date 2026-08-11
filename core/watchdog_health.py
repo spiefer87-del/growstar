@@ -105,6 +105,34 @@ def _sensor_health(rt, key, *, now):
     }
 
 
+
+
+def _safety_health(rt, *, now):
+    """Safety-Status robust und weiterhin netzwerkfrei einlesen.
+
+    Der Import ist absichtlich lazy: alte isolierte Watchdog-Regressionstests
+    koennen core.runtime stubs verwenden, ohne den produktiven Safety-Core
+    initialisieren zu muessen. Im Produktivbetrieb markiert ein fehlender oder
+    defekter Safety-Core eine LIVE-Station klar als Fehler.
+    """
+
+    try:
+        from core.safety import get_runtime_safety_snapshot
+        return get_runtime_safety_snapshot(rt, now=now)
+    except Exception as exc:
+        live = bool(getattr(rt, "control_enabled", False))
+        return {
+            "state": "error" if live else "inactive",
+            "active": live,
+            "live": live,
+            "stale": live,
+            "age": None,
+            "blocked_devices": [],
+            "devices": {},
+            "overrides": {},
+            "reason": f"Safety-Status nicht verfuegbar: {exc}" if live else None,
+        }
+
 def _config_health(rt):
     cfg = rt.config
     issues = []
@@ -278,12 +306,17 @@ def station_health(rt, *, now=None):
     loop = _loop_health(rt, now=now)
     config = _config_health(rt)
     hardware = _hardware_health(rt, now=now)
+    safety = _safety_health(rt, now=now)
 
+    # Legacy-Anzeige bleibt kompatibel. Phase 4I besitzt zusaetzlich die
+    # abhaengigkeitsbewusste Safety-Matrix pro aktivem Geraet.
     sensor_failsafe = bool(temperature["stale"] or humidity["stale"])
 
     states = [loop["state"], temperature["state"], humidity["state"], config["state"]]
     if hardware["state"] in ("error", "warn"):
         states.append(hardware["state"])
+    if safety.get("state") in ("error", "warn"):
+        states.append(safety.get("state"))
 
     if not rt.enabled:
         overall = "inactive"
@@ -313,6 +346,7 @@ def station_health(rt, *, now=None):
         "humidity": humidity,
         "config": config,
         "hardware": hardware,
+        "safety": safety,
         "sensor_failsafe": {
             "active": sensor_failsafe,
             "state": "error" if sensor_failsafe else "ok",
