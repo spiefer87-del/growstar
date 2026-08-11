@@ -11,10 +11,12 @@ from services.energy import (
     do_energy_day_reset,
 )
 from services.shelly import run_failsafe
+from services.safety import run_all_live_safety
 
 
 ENERGY_INTERVAL = 30
 FAILSAFE_INTERVAL = 30
+SAFETY_INTERVAL = 2
 
 
 def _run_all_live_failsafes():
@@ -32,12 +34,27 @@ def _run_all_live_failsafes():
 
 
 def shelly_background_loop():
+    last_safety_poll = 0.0
+
     while True:
         try:
             now = time.time()
 
             # =========================================
-            # 🛡️ FAILSAFE – now multi-station
+            # 🚨 STATIONS-SAFETY – unabhaengig vom Regelkreis
+            # =========================================
+            # Dieser 2-Sekunden-Supervisor lebt im separaten Shelly-Thread.
+            # Er verwendet nur gecachte Health-Daten und schaltet ausschliesslich
+            # notwendige Safe-Offs. Ein Fehler in einer Runtime beendet nicht die
+            # Safety-Bewertung der anderen Stationen.
+            if now - last_safety_poll >= SAFETY_INTERVAL:
+                last_safety_poll = now
+
+                with ctx.shelly_lock:
+                    run_all_live_safety(now=now, enforce=True)
+
+            # =========================================
+            # 🛡️ RELAY-SYNC FAILSAFE – multi-station
             # =========================================
             if now - ctx.last_failsafe_poll >= FAILSAFE_INTERVAL:
                 ctx.last_failsafe_poll = now
