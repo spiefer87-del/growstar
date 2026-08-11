@@ -50,7 +50,7 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .station-card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:20px;padding:18px;box-shadow:0 14px 32px rgba(0,0,0,.2)}
 .station-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
 .station-title strong{display:block;font-size:1.08rem}.station-id{display:block;margin-top:3px;color:var(--muted);font-size:.76rem}
-.station-health{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.station-health{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
 .health-cell{min-width:0;background:rgba(2,6,23,.28);border-radius:13px;padding:11px}
 .health-cell span{display:block;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
 .health-cell strong{display:block;margin-top:5px;font-size:.9rem;overflow:hidden;text-overflow:ellipsis}
@@ -168,8 +168,14 @@ function renderStations(stations){
     root.innerHTML = stations.map(s => {
         const modeState = s.runtime_mode === "live" ? "ok" : (s.runtime_mode === "arming" ? "arming" : (s.runtime_mode === "shadow" ? "shadow" : "inactive"));
         const modeText = String(s.runtime_mode || "inactive").toUpperCase();
-        const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {};
+        const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {}, safety = s.safety || {};
         const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";
+        const safetyDevices = (safety.blocked_devices || []).map(String);
+        const safetyState = safety.state === "error" ? "error" : (safety.state === "warn" ? "warn" : (safety.state === "inactive" ? "inactive" : "ok"));
+        const safetyText = safety.stale ? "SUPERVISOR STALE" : (safety.active ? "FAILSAFE" : (safety.state === "inactive" ? "INAKTIV" : "NORMAL"));
+        const safetyDetail = safety.active
+            ? `${safetyDevices.length ? esc(safetyDevices.join(", ")) : "Safety aktiv"}${safety.reason ? ` · ${esc(safety.reason)}` : ""}`
+            : `Supervisor ${ageText(safety.age)}`;
 
         let hwText = "keine Zuordnung";
         if(hw.assigned){
@@ -204,7 +210,8 @@ function renderStations(stations){
                 <div class="health-cell"><span>Temperatur</span><strong>${valueText(temp.value," °C")}</strong><div class="health-detail">${temp.configured ? `${esc(temp.label || temp.source_id || "Sensor")} · ${ageText(temp.age)}` : "nicht zugeordnet"}</div></div>
                 <div class="health-cell"><span>Feuchte</span><strong>${valueText(hum.value," %")}</strong><div class="health-detail">${hum.configured ? `${esc(hum.label || hum.source_id || "Sensor")} · ${ageText(hum.age)}` : "nicht zugeordnet"}</div></div>
                 <div class="health-cell"><span>Hardware</span><strong>${badge(hwText, hwState)}</strong><div class="health-detail">${hw.actuation_blocked ? "Aktorik gesperrt" : "Aktorik freigegeben"}; zentraler Read-only Poll</div></div>
-                <div class="health-cell"><span>Config / Failsafe</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
+                <div class="health-cell"><span>Safety</span><strong>${badge(safetyText, safetyState)}</strong><div class="health-detail">${safetyDetail}</div></div>
+                <div class="health-cell"><span>Config</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Legacy Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
             </div>
             ${endpoints ? `<div class="endpoint-list">${endpoints}</div>` : ""}
         </article>`;
