@@ -232,8 +232,20 @@ function renderStations(stations){
     const root = document.getElementById("stations");
     if(!stations || !stations.length){root.innerHTML='<div class="empty">Keine Runtime geladen.</div>';return;}
     root.innerHTML = stations.map(s => {
-        const modeState = s.runtime_mode === "live" ? "ok" : (s.runtime_mode === "shadow" ? "shadow" : "inactive");
-        const modeText = String(s.runtime_mode || "inactive").toUpperCase();
+        const runtimeMode = String(s.runtime_mode || "inactive").toLowerCase();
+        const modeLabels = {
+            live: "LIVE",
+            shadow: "SHADOW",
+            arming: "ARMING",
+            disarming: "DISARMING",
+            inactive: "INAKTIV"
+        };
+        const modeState = runtimeMode === "live"
+            ? "ok"
+            : (runtimeMode === "shadow"
+                ? "shadow"
+                : ((runtimeMode === "arming" || runtimeMode === "disarming") ? "warn" : "inactive"));
+        const modeText = modeLabels[runtimeMode] || runtimeMode.toUpperCase();
         const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {}, safety = s.safety || {};
         const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";
 
