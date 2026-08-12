@@ -35,6 +35,11 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .section h2{margin:0 0 5px;font-size:1.08rem}
 .section-intro{margin:0 0 14px;color:var(--muted);font-size:.87rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
+.summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.summary-card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}
+.summary-card span{display:block;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
+.summary-card strong{display:block;margin-top:5px;font-size:1.12rem}
+.summary-card .summary-detail{margin-top:5px;color:var(--muted);font-size:.75rem;line-height:1.35}
 .card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:17px;padding:16px;box-shadow:0 12px 28px rgba(0,0,0,.18)}
 .card h3{margin:0 0 9px;font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
 .big{font-size:1.08rem;font-weight:750}
@@ -44,7 +49,6 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .warn{background:rgba(245,158,11,.14);color:#fcd34d;border-color:rgba(245,158,11,.25)}
 .err{background:rgba(239,68,68,.14);color:#fca5a5;border-color:rgba(239,68,68,.25)}
 .shadow{background:rgba(167,139,250,.14);color:#c4b5fd;border-color:rgba(167,139,250,.25)}
-.arming{background:rgba(245,158,11,.14);color:#fcd34d;border-color:rgba(245,158,11,.25)}
 .inactive,.neutral{background:rgba(148,163,184,.12);color:#cbd5e1;border-color:rgba(148,163,184,.18)}
 .station-list{display:grid;gap:16px}
 .station-card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:20px;padding:18px;box-shadow:0 14px 32px rgba(0,0,0,.2)}
@@ -54,11 +58,20 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .health-cell{min-width:0;background:rgba(2,6,23,.28);border-radius:13px;padding:11px}
 .health-cell span{display:block;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.04em}
 .health-cell strong{display:block;margin-top:5px;font-size:.9rem;overflow:hidden;text-overflow:ellipsis}
-.health-detail{margin-top:4px;color:var(--muted);font-size:.72rem;line-height:1.35}
+.health-detail{margin-top:4px;color:var(--muted);font-size:.72rem;line-height:1.35;overflow-wrap:anywhere}
 .issue-list{margin:10px 0 0;padding-left:18px;color:#fca5a5;font-size:.78rem}
 .endpoint-list{margin-top:12px;display:grid;gap:7px}
 .endpoint-row{display:grid;grid-template-columns:minmax(120px,1.25fr) minmax(120px,1fr) auto;gap:10px;align-items:center;background:rgba(2,6,23,.28);border-radius:11px;padding:9px 11px;font-size:.78rem}
 .endpoint-name{font-weight:700}.endpoint-address{color:var(--muted);overflow:hidden;text-overflow:ellipsis}.endpoint-meta{color:var(--muted);font-size:.7rem;margin-top:2px}
+.diagnostics{margin-top:12px;border:1px solid rgba(148,163,184,.14);border-radius:13px;background:rgba(2,6,23,.22);overflow:hidden}
+.diagnostics summary{cursor:pointer;padding:11px 13px;font-weight:750;font-size:.8rem;color:#cbd5e1;list-style:none}
+.diagnostics summary::-webkit-details-marker{display:none}
+.diagnostics summary::before{content:"＋";display:inline-block;margin-right:8px;color:var(--blue)}
+.diagnostics[open] summary::before{content:"−"}
+.diagnostic-body{padding:0 13px 13px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.diag-item{border:1px solid rgba(148,163,184,.12);border-radius:10px;padding:9px;background:rgba(15,23,42,.42)}
+.diag-item strong{display:block;font-size:.76rem}
+.diag-item span{display:block;margin-top:4px;color:var(--muted);font-size:.72rem;line-height:1.4}
 .empty{padding:18px;border:1px dashed rgba(148,163,184,.22);border-radius:14px;color:var(--muted)}
 .log-card{margin-top:16px}
 .row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
@@ -66,8 +79,9 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 button,select{border:1px solid rgba(148,163,184,.18);border-radius:10px;padding:9px 11px;background:#334155;color:var(--text);font:inherit;font-weight:650}
 button{cursor:pointer}.logbox{margin-top:12px;white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:.8rem;line-height:1.45;background:#020617;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px;max-height:52vh;overflow:auto}
 .error-text{color:#fca5a5}
-@media(max-width:850px){.station-health{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:520px){body{padding:16px}.station-health{grid-template-columns:1fr}.endpoint-row{grid-template-columns:1fr auto}.endpoint-address{grid-column:1/-1}.status-time{display:none}}
+@media(max-width:1050px){.summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.station-health{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.station-health{grid-template-columns:repeat(2,minmax(0,1fr))}.diagnostic-body{grid-template-columns:1fr}}
+@media(max-width:520px){body{padding:16px}.summary-grid,.station-health{grid-template-columns:1fr}.endpoint-row{grid-template-columns:1fr auto}.endpoint-address{grid-column:1/-1}.status-time{display:none}}
 </style>
 {% endblock %}
 
@@ -85,14 +99,20 @@ button{cursor:pointer}.logbox{margin-top:12px;white-space:pre-wrap;font-family:u
 </header>
 
 <section class="section">
+    <h2>Betriebsübersicht</h2>
+    <p class="section-intro">Kompakte Zusammenfassung aller geladenen Grow-Stationen. Diese Ansicht ist vollständig read-only.</p>
+    <div class="summary-grid" id="summary-grid"><div class="empty">Lade Übersicht…</div></div>
+</section>
+
+<section class="section">
     <h2>Raspberry Pi / Controller</h2>
-    <p class="section-intro">Thread-Status ist controllerweit. MQTT-Verkehr und Energie sind davon getrennt bewertet.</p>
+    <p class="section-intro">Thread-Status ist controllerweit. MQTT-Verkehr, Hardware-Recovery und Aktor-Poll werden getrennt bewertet.</p>
     <div class="grid" id="controller-grid"><div class="empty">Lade Controllerstatus…</div></div>
 </section>
 
 <section class="section">
     <h2>Grow-Stationen</h2>
-    <p class="section-intro">Jede geladene Runtime besitzt ihren eigenen Regelkreis-Heartbeat und eigene Sensorzustände.</p>
+    <p class="section-intro">Jede Runtime besitzt ihren eigenen Regelkreis-, Sensor-, Hardware- und Safety-Zustand.</p>
     <div class="station-list" id="stations"><div class="empty">Lade Stationen…</div></div>
 </section>
 
@@ -101,7 +121,7 @@ button{cursor:pointer}.logbox{margin-top:12px;white-space:pre-wrap;font-family:u
         <div class="row">
             <div>
                 <h3 style="margin:0">📜 Infolog</h3>
-                <div class="meta">Bestehendes Growstar-Watchdog-Log</div>
+                <div class="meta">Rate-limitierte Warnungen; der normale 2-Sekunden-Regelkreis wird hier nicht gespiegelt.</div>
             </div>
             <div class="actions">
                 <select id="filter">
@@ -130,12 +150,38 @@ function cls(state){
     if(state === "error") return "err";
     if(state === "warn" || state === "unconfigured") return "warn";
     if(state === "shadow") return "shadow";
-    if(state === "arming") return "arming";
     return "inactive";
 }
 function badge(text,state){return `<span class="badge ${cls(state)}">${esc(text)}</span>`;}
 function ageText(age){return age == null ? "noch kein Update" : `vor ${Number(age).toFixed(age < 10 ? 1 : 0)}s`;}
 function valueText(value,suffix){return value == null ? "--" : `${Number(value).toFixed(1)}${suffix}`;}
+
+function renderSummary(snapshot){
+    const root = document.getElementById("summary-grid");
+    const stations = snapshot.stations || [];
+    const live = stations.filter(s => s.runtime_mode === "live").length;
+    const shadow = stations.filter(s => s.runtime_mode === "shadow").length;
+    const safetyIssues = stations.filter(s => {
+        const safety = s.safety || {};
+        return safety.active || safety.stale || safety.state === "error";
+    }).length;
+    const sensorIssues = stations.filter(s =>
+        (s.temperature && s.temperature.configured && s.temperature.stale) ||
+        (s.humidity && s.humidity.configured && s.humidity.stale)
+    ).length;
+    const controller = snapshot.controller || {};
+    const threads = Object.values(controller.threads || {});
+    const stoppedThreads = threads.filter(t => !t.alive).length;
+    const controllerState = stoppedThreads ? "error" : "ok";
+
+    root.innerHTML = [
+        `<div class="summary-card"><span>Stationen</span><strong>${stations.length}</strong><div class="summary-detail">${live} LIVE · ${shadow} SHADOW</div></div>`,
+        `<div class="summary-card"><span>Safety</span><strong>${badge(safetyIssues ? `${safetyIssues} FEHLER` : "NORMAL", safetyIssues ? "error" : "ok")}</strong><div class="summary-detail">${safetyIssues ? "Mindestens eine Station braucht Aufmerksamkeit" : "Kein aktiver stationsbezogener Failsafe"}</div></div>`,
+        `<div class="summary-card"><span>Sensoren</span><strong>${badge(sensorIssues ? `${sensorIssues} STALE` : "FRISCH", sensorIssues ? "error" : "ok")}</strong><div class="summary-detail">Nur zugeordnete Temperatur-/Feuchtequellen</div></div>`,
+        `<div class="summary-card"><span>Controller</span><strong>${badge(stoppedThreads ? `${stoppedThreads} THREAD STOP` : "THREADS OK", controllerState)}</strong><div class="summary-detail">${threads.length} überwachte Worker</div></div>`,
+        `<div class="summary-card"><span>MQTT</span><strong>${badge(controller.mqtt?.stale ? "STALE" : "AKTIV", controller.mqtt?.stale ? "warn" : "ok")}</strong><div class="summary-detail">Letzte Nachricht ${ageText(controller.mqtt?.age)}</div></div>`
+    ].join("");
+}
 
 function renderController(controller){
     const grid = document.getElementById("controller-grid");
@@ -162,20 +208,34 @@ function renderController(controller){
     grid.innerHTML = cards.join("");
 }
 
+function renderSafetyDiagnostics(s){
+    const safety = s.safety || {};
+    const blocked = (safety.blocked_devices || []).map(String);
+    const current = blocked.length
+        ? `Aktuell blockiert: ${blocked.map(esc).join(", ")}`
+        : "Aktuell keine Geräte durch Safety blockiert.";
+
+    return `<details class="diagnostics">
+        <summary>Safety-Vorschau / Diagnose</summary>
+        <div class="diagnostic-body">
+            <div class="diag-item"><strong>Temperatursensor fällt aus</strong><span>Temperaturabhängige ENV-Aktoren dieser Station werden gegen EIN gesperrt bzw. SAFE AUS angefordert. Zeitgesteuerte, nicht temperaturabhängige Aktoren bleiben unabhängig.</span></div>
+            <div class="diag-item"><strong>Feuchtesensor fällt aus</strong><span>Nur ENV-Aktoren mit Feuchte-Abhängigkeit werden gesperrt bzw. SAFE AUS angefordert.</span></div>
+            <div class="diag-item"><strong>Regelkreis hängt</strong><span>Alle aktiven Aktor-Modi dieser LIVE-Station werden stationsbezogen SAFE AUS erzwungen. Andere Stationen bleiben unabhängig.</span></div>
+            <div class="diag-item"><strong>Aktor nicht erreichbar</strong><span>Nur der betroffene Endpunkt wird gegen neue EIN-Befehle gesperrt. Growstar behauptet bei Nichterreichbarkeit keinen bestätigten AUS-Zustand.</span></div>
+            <div class="diag-item"><strong>Aktueller Safety-Zustand</strong><span>${current}${safety.reason ? `<br>Grund: ${esc(safety.reason)}` : ""}</span></div>
+            <div class="diag-item"><strong>Supervisor</strong><span>${safety.live ? `LIVE-Safety aktiv · Heartbeat ${ageText(safety.age)}` : "Für diese Runtime derzeit keine LIVE-Safety-Aktorik."}</span></div>
+        </div>
+    </details>`;
+}
+
 function renderStations(stations){
     const root = document.getElementById("stations");
     if(!stations || !stations.length){root.innerHTML='<div class="empty">Keine Runtime geladen.</div>';return;}
     root.innerHTML = stations.map(s => {
-        const modeState = s.runtime_mode === "live" ? "ok" : (s.runtime_mode === "arming" ? "arming" : (s.runtime_mode === "shadow" ? "shadow" : "inactive"));
+        const modeState = s.runtime_mode === "live" ? "ok" : (s.runtime_mode === "shadow" ? "shadow" : "inactive");
         const modeText = String(s.runtime_mode || "inactive").toUpperCase();
         const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {}, safety = s.safety || {};
         const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";
-        const safetyDevices = (safety.blocked_devices || []).map(String);
-        const safetyState = safety.state === "error" ? "error" : (safety.state === "warn" ? "warn" : (safety.state === "inactive" ? "inactive" : "ok"));
-        const safetyText = safety.stale ? "SUPERVISOR STALE" : (safety.active ? "FAILSAFE" : (safety.state === "inactive" ? "INAKTIV" : "NORMAL"));
-        const safetyDetail = safety.active
-            ? `${safetyDevices.length ? esc(safetyDevices.join(", ")) : "Safety aktiv"}${safety.reason ? ` · ${esc(safety.reason)}` : ""}`
-            : `Supervisor ${ageText(safety.age)}`;
 
         let hwText = "keine Zuordnung";
         if(hw.assigned){
@@ -184,6 +244,23 @@ function renderStations(stations){
             else hwText = `${hw.online || 0}/${hw.assigned} online`;
         }
         const hwState = hw.state === "error" ? "error" : (hw.state === "warn" ? "warn" : (hw.assigned ? "ok" : "inactive"));
+
+        const safetyDevices = (safety.blocked_devices || []).map(String);
+        let safetyText = "INAKTIV";
+        let safetyState = "inactive";
+        if(safety.stale){
+            safetyText = "SUPERVISOR STALE";
+            safetyState = "error";
+        }else if(safety.active){
+            safetyText = "FAILSAFE";
+            safetyState = "error";
+        }else if(safety.live){
+            safetyText = "NORMAL";
+            safetyState = "ok";
+        }
+        const safetyDetail = safety.active
+            ? `${safetyDevices.length ? safetyDevices.map(esc).join(", ") : "Station"}${safety.reason ? ` · ${esc(safety.reason)}` : ""}`
+            : (safety.live ? `Supervisor ${ageText(safety.age)}` : "Keine LIVE-Safety-Aktorik");
 
         const endpoints = (hw.endpoints || []).map(ep => {
             let text = "UNGEPRÜFT";
@@ -211,9 +288,10 @@ function renderStations(stations){
                 <div class="health-cell"><span>Feuchte</span><strong>${valueText(hum.value," %")}</strong><div class="health-detail">${hum.configured ? `${esc(hum.label || hum.source_id || "Sensor")} · ${ageText(hum.age)}` : "nicht zugeordnet"}</div></div>
                 <div class="health-cell"><span>Hardware</span><strong>${badge(hwText, hwState)}</strong><div class="health-detail">${hw.actuation_blocked ? "Aktorik gesperrt" : "Aktorik freigegeben"}; zentraler Read-only Poll</div></div>
                 <div class="health-cell"><span>Safety</span><strong>${badge(safetyText, safetyState)}</strong><div class="health-detail">${safetyDetail}</div></div>
-                <div class="health-cell"><span>Config</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Legacy Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
+                <div class="health-cell"><span>Config / Failsafe</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Legacy Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
             </div>
             ${endpoints ? `<div class="endpoint-list">${endpoints}</div>` : ""}
+            ${renderSafetyDiagnostics(s)}
         </article>`;
     }).join("");
 }
@@ -224,9 +302,11 @@ async function loadStatus(){
         if(!response.ok) throw new Error(`HTTP ${response.status}`);
         const s = await response.json();
         document.getElementById("time").textContent = "Stand: " + (s.time || "--");
+        renderSummary(s);
         renderController(s.controller || {});
         renderStations(s.stations || []);
     }catch(err){
+        document.getElementById("summary-grid").innerHTML = `<div class="empty error-text">Statusfehler: ${esc(err.message)}</div>`;
         document.getElementById("controller-grid").innerHTML = `<div class="empty error-text">Statusfehler: ${esc(err.message)}</div>`;
     }
 }
