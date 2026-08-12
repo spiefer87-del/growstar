@@ -911,18 +911,35 @@ class HardwareService:
         # Temperatur/Luftfeuchte daraus retten
         # ------------------------------------------------
     
-        try:
-    
-            self._apply_raw_sensor_values(
-                device
-            )
-    
-        except Exception as e:
-    
-            print(
-                "Raw Sensor Werte Fehler:",
-                e
-            )
+        # ------------------------------------------------
+        # Direkten BTHome-Read als erfolgreich bestätigen
+        # ------------------------------------------------
+        #
+        # Persistierte Geräte starten nach einem Prozess-/Raspberry-Neustart
+        # absichtlich mit online=False. Ein erfolgreicher direkter Read über
+        # BTHomeDevice/BTHomeSensor muss das Gerät deshalb wieder online
+        # markieren. Sonst hält die Auto-Recovery den bekannten Sensor
+        # fälschlich für "fehlend" und startet unnötig eine BLE-Discovery.
+        #
+        # Wichtig: Wir setzen hier KEIN neues last_seen. Die Sensor-Freshness
+        # soll weiterhin ausschließlich von echten Sensor-Zeitstempeln kommen.
+
+        direct_read_confirmed = bool(
+            cache_applied
+            or sensor_values_applied
+            or status is not None
+            or config is not None
+            or known_objects is not None
+        )
+
+        if direct_read_confirmed:
+
+            device.online = True
+            props["online"] = True
+
+        # Der frühere Legacy-Raw-Fallback wurde entfernt. Temperatur/Feuchte
+        # werden bereits über den Event-Cache und _apply_known_objects_values()
+        # normalisiert übernommen.
     
         props = device.properties
     
@@ -942,6 +959,7 @@ class HardwareService:
             "listen": listen_result,
             "cache_applied": cache_applied,
             "sensor_values_applied": sensor_values_applied,
+            "direct_read_confirmed": direct_read_confirmed,
             "sensor_source": sensor_source
         }
         
