@@ -44,6 +44,8 @@ def main():
 
     check("Betriebsübersicht" in template and "renderSummary" in template,
           "Watchdog besitzt controllerweite Betriebsübersicht")
+    check('"ARMING"' in template and '"DISARMING"' in template,
+          "Watchdog zeigt ARMING und DISARMING weiterhin explizit")
     check("<span>Safety</span>" in template and "FAILSAFE" in template
           and "SUPERVISOR STALE" in template,
           "Phase-4I-Safety-Anzeige bleibt sichtbar")
