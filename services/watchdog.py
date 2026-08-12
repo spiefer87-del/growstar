@@ -12,6 +12,8 @@ WATCHDOG_INTERVAL = 5
 WARN_REPEAT_SEC = 60
 CONFIG_WARN_REPEAT_SEC = 300
 HARDWARE_WARN_FAILURES = 2
+SAFETY_WARN_REPEAT_SEC = 60
+SAFETY_SUPERVISOR_WARN_REPEAT_SEC = 30
 
 _last_warning = {}
 
@@ -39,7 +41,11 @@ def _rate_limited_log(key, message, *, level="WARN", repeat=WARN_REPEAT_SEC, now
 
 
 def watchdog_cycle(*, now=None):
-    """Führt genau einen read-only Watchdog-Zyklus aus."""
+    """Führt genau einen read-only Watchdog-Zyklus aus.
+
+    Phase 4J ergänzt ausschließlich Diagnose/Logging. Diese Funktion sendet
+    weiterhin keine Netzwerkrequests und schaltet keine Hardware.
+    """
 
     now = time.time() if now is None else float(now)
     ctx.WATCHDOG_LAST_LOOP = now
@@ -95,6 +101,30 @@ def watchdog_cycle(*, now=None):
             _rate_limited_log(
                 (tent_id, "hardware", endpoint.get("device"), host, relay),
                 f"[{tent_id}] HARDWARE {device} {host}/R{relay} nicht erreichbar: {error}",
+                now=now,
+            )
+
+        # Phase 4J: den bereits von Phase 4I berechneten Safety-Status nur
+        # lesen und verständlich in das Watchdog-Infolog übernehmen.
+        safety = station.get("safety") or {}
+        if safety.get("stale"):
+            _rate_limited_log(
+                (tent_id, "safety-supervisor"),
+                f"[{tent_id}] SAFETY SUPERVISOR STALE: "
+                + (safety.get("reason") or "kein frischer Safety-Heartbeat"),
+                level="ERROR",
+                repeat=SAFETY_SUPERVISOR_WARN_REPEAT_SEC,
+                now=now,
+            )
+        elif safety.get("active"):
+            blocked = ", ".join(str(x) for x in (safety.get("blocked_devices") or []))
+            reason = safety.get("reason") or "stationsbezogener Failsafe aktiv"
+            suffix = f" · blockiert: {blocked}" if blocked else ""
+            _rate_limited_log(
+                (tent_id, "safety-failsafe"),
+                f"[{tent_id}] SAFETY FAILSAFE: {reason}{suffix}",
+                level="ERROR",
+                repeat=SAFETY_WARN_REPEAT_SEC,
                 now=now,
             )
 
