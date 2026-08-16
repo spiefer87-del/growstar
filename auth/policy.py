@@ -331,6 +331,11 @@ def _tent_api_write_requirement(path):
     if path.endswith("/live"):
         return require("grow.control", "hardware.control")
 
+    # Energy counter resets change only accounting offsets of this station.
+    # They are configuration actions and never direct relay control.
+    if "/energy/reset_" in path:
+        return require("grow.configure")
+
     if "/sensors" in path or path.endswith("/hardware"):
         return require("hardware.configure")
 
