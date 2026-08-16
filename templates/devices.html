@@ -343,6 +343,15 @@ id="device-grid">
 
 
 
+<h3>MQTT Sensorcontroller</h3>
+
+<div
+class="grid"
+id="mqtt-device-grid">
+
+</div>
+
+
 <h3>Aktoren</h3>
 
 <div
@@ -392,6 +401,24 @@ class="debug-value">
 <div class="sub">
 
 Bluetooth Geräte
+
+</div>
+
+</div>
+
+<div>
+
+<div
+id="mqtt-device-count"
+class="debug-value">
+
+0
+
+</div>
+
+<div class="sub">
+
+MQTT Sensoren
 
 </div>
 
@@ -517,6 +544,10 @@ async function loadHardware(){
 
         renderDevices(
             data.devices || []
+        );
+
+        renderMqttDevices(
+            data.mqtt_devices || []
         );
 
         renderActuators(
@@ -717,6 +748,76 @@ function renderDevices(devices){
 
 }
 
+
+
+function formatUptime(seconds){
+
+    const value = Number(seconds);
+
+    if(!Number.isFinite(value)) return "--";
+
+    if(value < 60) return Math.round(value) + " s";
+    if(value < 3600) return Math.floor(value / 60) + " min";
+    if(value < 86400) return Math.floor(value / 3600) + " h";
+
+    return Math.floor(value / 86400) + " d " + Math.floor((value % 86400) / 3600) + " h";
+
+}
+
+
+function renderMqttDevices(devices){
+
+    const grid = document.getElementById("mqtt-device-grid");
+
+    grid.innerHTML = "";
+
+    if(devices.length === 0){
+
+        grid.innerHTML = `
+            <div class="card">
+                <h2>Noch keine MQTT Sensorcontroller</h2>
+                <div class="sub">Pico-Sensoren erscheinen hier automatisch, sobald sie sich per MQTT melden.</div>
+            </div>
+        `;
+
+    }
+
+    devices.forEach(device=>{
+
+        const fields = Array.isArray(device.capabilities)
+            ? device.capabilities.join(" · ")
+            : "";
+
+        const card = document.createElement("a");
+        card.href = "/grow-control/sensors";
+        card.className = "card-link";
+
+        card.innerHTML = `
+            <div class="card">
+                <h2>📡 ${escapeHtml(device.name || device.id)}</h2>
+                <div class="sub">${escapeHtml(device.model || "MQTT Sensorcontroller")}</div>
+                <div class="badge ${device.online ? "online":"offline"}">
+                    ${device.online ? "Online":"Offline"}
+                </div>
+                <div class="device-meta">
+                    <div class="sub">Geräte-ID ${escapeHtml(device.id || "--")}</div>
+                    <div class="sub">Quelle ${escapeHtml(device.source_id || "--")}</div>
+                    <div class="sub">Temperatur ${device.temperature ?? "--"} °C · Feuchte ${device.humidity ?? "--"} %</div>
+                    <div class="sub">RSSI ${device.rssi ?? "--"} dBm · Uptime ${formatUptime(device.uptime)}</div>
+                    ${fields ? `<div class="sub">Sensoren ${escapeHtml(fields)}</div>` : ""}
+                    <div class="sub">Antippen zum Zuordnen →</div>
+                </div>
+            </div>
+        `;
+
+        grid.appendChild(card);
+
+    });
+
+    document.getElementById("mqtt-device-count")
+        .textContent = devices.length;
+
+}
 
 
 function renderActuators(actuators){
