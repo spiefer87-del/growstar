@@ -3,7 +3,7 @@ import time
 
 import core.context as ctx
 
-from core.config import config, save_config
+from core.config import config
 from core.runtime import list_runtimes
 
 from services.energy import (
@@ -43,10 +43,6 @@ def shelly_background_loop():
             # =========================================
             # 🚨 STATIONS-SAFETY – unabhaengig vom Regelkreis
             # =========================================
-            # Dieser 2-Sekunden-Supervisor lebt im separaten Shelly-Thread.
-            # Er verwendet nur gecachte Health-Daten und schaltet ausschliesslich
-            # notwendige Safe-Offs. Ein Fehler in einer Runtime beendet nicht die
-            # Safety-Bewertung der anderen Stationen.
             if now - last_safety_poll >= SAFETY_INTERVAL:
                 last_safety_poll = now
 
@@ -63,10 +59,11 @@ def shelly_background_loop():
                     _run_all_live_failsafes()
 
             # =========================================
-            # ⚡ ENERGY POLLING
+            # ⚡ ENERGY POLLING – controllerweit, stationsbezogen verteilt
             # =========================================
-            # Energy is still the legacy/default-station subsystem. Phase 4H
-            # deliberately changes only hardware-control safety here.
+            # A single poll cycle iterates all loaded runtimes, deduplicates
+            # physical (host, relay) endpoints and writes each result only into
+            # the owning runtime.energy_state. UI/API reads never poll Shellys.
             if now - ctx.last_energy_poll >= ENERGY_INTERVAL:
                 ctx.last_energy_poll = now
 
@@ -74,7 +71,7 @@ def shelly_background_loop():
                     refresh_energy_state()
 
             # =========================================
-            # 📅 AUTO DAY RESET
+            # 📅 AUTO DAY RESET – one schedule, all loaded stations
             # =========================================
             reset_min = int(config.get("ENERGY_DAY_RESET_MIN", 0))
             now_dt = datetime.datetime.now()
@@ -85,16 +82,14 @@ def shelly_background_loop():
                 now_min >= reset_min
                 and config.get("ENERGY_LAST_DAY_RESET") != today
             ):
-                print(
-                    f"📅 AUTO RESET "
-                    f"({now_dt.hour:02d}:{now_dt.minute:02d})"
-                )
-
                 with ctx.shelly_lock:
-                    do_energy_day_reset()
+                    reset_done = do_energy_day_reset()
 
-                config["ENERGY_LAST_DAY_RESET"] = today
-                save_config(config)
+                if reset_done:
+                    print(
+                        f"📅 AUTO RESET abgeschlossen "
+                        f"({now_dt.hour:02d}:{now_dt.minute:02d})"
+                    )
 
         except Exception as exc:
             print("❌ Shelly Background Thread Fehler:", exc)
