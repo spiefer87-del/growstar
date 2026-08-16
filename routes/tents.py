@@ -472,6 +472,7 @@ def register(app):
                 message=str(exc),
                 endpoint=exc.endpoint,
                 owner=exc.owner,
+                contender=exc.contender,
             ), 409
         except (TypeError, ValueError) as exc:
             return jsonify(success=False, error=str(exc)), 400
