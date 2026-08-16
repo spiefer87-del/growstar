@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # =========================================
-# 🌱 GROW BACKEND v3.6 Alpha – MQTT + REGELUNG + FLASK
+# 🌱 GROW BACKEND – MQTT + REGELUNG + FLASK
 # Gunicorn-kompatible Fassung
+# Die laufende Version kommt ausschließlich aus core.release.
 # =========================================
 
 import atexit
@@ -22,6 +23,7 @@ from core.runtime import (
 )
 from core.actuators import set_device
 from core.devices import DEVICE_NAMES
+from core.release import GROWSTAR_VERSION
 
 from services.watchdog import log_event, watchdog_loop
 from services.shelly import sync_relay
@@ -50,6 +52,7 @@ from routes.sensors import register as register_sensor_routes
 from routes.tents import register as register_tent_routes
 from routes.auth import register as register_auth_routes
 from routes.admin import register as register_admin_routes
+from routes.release import register as register_release_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -106,12 +109,14 @@ def create_flask_app():
         SECRET_KEY=_load_or_create_secret_key(),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
+        GROWSTAR_VERSION=GROWSTAR_VERSION,
         # Erst auf 1 setzen, wenn ausschließlich HTTPS verwendet wird.
         SESSION_COOKIE_SECURE=os.getenv("GROWSTAR_HTTPS_ONLY") == "1",
     )
 
     register_auth_routes(app)
     register_admin_routes(app)
+    register_release_routes(app)
     register_dashboard_routes(app)
     register_plant_management_routes(app)
     register_state_routes(app)
@@ -210,7 +215,7 @@ def start_backend():
             print("ℹ️ Grow-Backend läuft bereits")
             return
 
-        print("🌱 Grow-Backend wird gestartet")
+        print(f"🌱 Growstar v{GROWSTAR_VERSION} Backend wird gestartet")
 
         runtime = get_default_runtime()
 
