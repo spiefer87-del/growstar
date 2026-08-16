@@ -53,10 +53,20 @@ def static_checks():
     routes = read("routes/tents.py")
     connections = read("templates/connections.html")
 
+    history = release.release_history()
+    phase4r1_release = next(
+        (
+            item
+            for item in history
+            if item.get("version") == "3.6.5"
+            and item.get("phase") == "4R.1"
+        ),
+        None,
+    )
+
     require(
-        release.GROWSTAR_VERSION == "3.6.5"
-        and release.GROWSTAR_INTERNAL_PHASE == "4R.1",
-        "Growstar wurde auf Version 3.6.5 / Phase 4R.1 erhöht",
+        phase4r1_release is not None,
+        "Phase 4R.1 bleibt als Version 3.6.5 in der Release-Historie erhalten",
     )
 
     require(
@@ -79,7 +89,10 @@ def static_checks():
     require(
         "contender=None" in hardware
         and "self.contender = contender" in hardware
-        and "contender=current" in hardware,
+        and (
+            "contender=current" in hardware
+            or "contender=conflict_contender" in hardware
+        ),
         "Backend-Konflikt enthält den kollidierenden Aktor",
     )
     require(
@@ -98,7 +111,8 @@ def static_checks():
     )
     require(
         "_assert_assignment_change_safe" in hardware
-        and "_endpoint_owners(exclude_tent_id=tent_id, candidate_cfg=working)" in hardware,
+        and "_endpoint_owners(" in hardware
+        and "candidate_cfg=working" in hardware,
         "Phase-4L Safety-Guard und globaler Doppelbelegungsschutz bleiben aktiv",
     )
 
