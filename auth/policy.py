@@ -55,7 +55,6 @@ READ_EXACT = {
     "/light-level": require("grow.view"),
     "/diagrams": require("grow.view"),
     "/energie": require("grow.view"),
-    "/energie/diagramme": require("grow.view"),
     "/licht": require("grow.view"),
     "/heizung": require("grow.view"),
     "/abluft": require("grow.view"),
@@ -301,6 +300,9 @@ def _grow_control_read_requirement(path):
     if path.endswith("/settings"):
         return require("settings.view")
 
+    if path.endswith("/design"):
+        return require("settings.view")
+
     if path.endswith("/sensors"):
         return require("hardware.view")
 
@@ -331,11 +333,6 @@ def _tent_api_write_requirement(path):
     # runtime Grow control and explicit hardware control rights.
     if path.endswith("/live"):
         return require("grow.control", "hardware.control")
-
-    # Energy counter resets change only accounting offsets of this station.
-    # They are configuration actions and never direct relay control.
-    if "/energy/reset_" in path:
-        return require("grow.configure")
 
     if "/sensors" in path or path.endswith("/hardware"):
         return require("hardware.configure")
