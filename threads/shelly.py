@@ -8,6 +8,7 @@ from core.runtime import list_runtimes
 
 from services.energy import (
     refresh_energy_state,
+    record_energy_history,
     do_energy_day_reset,
 )
 from services.shelly import run_failsafe
@@ -69,6 +70,10 @@ def shelly_background_loop():
 
                 with ctx.shelly_lock:
                     refresh_energy_state()
+                    # Phase 4M: keine zusätzlichen Shelly-Reads. Verlauf und
+                    # Peaks werden ausschließlich aus dem soeben aktualisierten
+                    # Runtime-Energie-State persistiert.
+                    record_energy_history()
 
             # =========================================
             # 📅 AUTO DAY RESET – one schedule, all loaded stations
