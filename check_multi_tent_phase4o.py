@@ -97,6 +97,17 @@ def static_checks():
         "Hardware/Aktoren zeigt stationsbezogene Zuordnung und Gateway-Details",
     )
     require(
+        "mqtt-device-grid" in devices
+        and "MQTT Sensorcontroller" in devices
+        and "data.mqtt_devices || []" in devices
+        and "renderMqttDevices" in devices,
+        "Bestehende Pico/MQTT-Sensorcontroller bleiben in der Hardware-Uebersicht erhalten",
+    )
+    require(
+        "function formatUptime(seconds)" in devices,
+        "Gemeinsamer Uptime-Formatter fuer MQTT-Sensoren und Aktor-Gatewaydetails bleibt vorhanden",
+    )
+    require(
         "Zugeordnet, aber die IP ist momentan keinem erkannten Gateway" in devices,
         "Manuelle unbekannte IP bleibt auf Hardwareseite sichtbar statt zu verschwinden",
     )
