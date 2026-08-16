@@ -1,0 +1,611 @@
+{% extends "base.html" %}
+
+{% block title %}Energie-Diagramme – Growstar{% endblock %}
+
+{% block head %}
+<style>
+:root{
+    --ed-bg:#0f172a;
+    --ed-card:#1e293b;
+    --ed-card2:#111c31;
+    --ed-text:#e5e7eb;
+    --ed-muted:#94a3b8;
+    --ed-blue:#38bdf8;
+    --ed-green:#22c55e;
+    --ed-warn:#f59e0b;
+    --ed-border:#334155;
+}
+*{box-sizing:border-box}
+body{
+    margin:0;
+    background:var(--ed-bg);
+    color:var(--ed-text);
+    font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+}
+.diagram-wrap{
+    max-width:1580px;
+    margin:0 auto;
+    padding:20px clamp(14px,2.4vw,34px) 42px;
+}
+.top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+}
+.title-row{display:flex;align-items:center;gap:12px}
+.back{
+    width:46px;height:46px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid rgba(148,163,184,.18);
+    border-radius:13px;
+    background:var(--ed-card);
+    color:var(--ed-text);
+    text-decoration:none;
+}
+h1{margin:0;font-size:clamp(1.6rem,4vw,2.35rem)}
+.sub{margin-top:4px;color:var(--ed-muted);font-size:.85rem;line-height:1.4}
+.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.link,.range-btn{
+    border:1px solid rgba(148,163,184,.18);
+    background:var(--ed-card);
+    color:var(--ed-text);
+    border-radius:10px;
+    padding:9px 12px;
+    font-weight:720;
+    text-decoration:none;
+    font-size:.8rem;
+}
+.badge{
+    display:inline-flex;
+    align-items:center;
+    border-radius:999px;
+    padding:6px 10px;
+    border:1px solid rgba(148,163,184,.18);
+    background:rgba(148,163,184,.10);
+    color:#cbd5e1;
+    font-size:.72rem;
+    font-weight:800;
+}
+.error{
+    margin-bottom:14px;
+    padding:13px 14px;
+    border-radius:12px;
+    border:1px solid rgba(239,68,68,.35);
+    background:rgba(127,29,29,.20);
+    color:#fecaca;
+}
+.kpis{
+    display:grid;
+    grid-template-columns:repeat(5,minmax(0,1fr));
+    gap:10px;
+    margin-bottom:18px;
+}
+.kpi{
+    min-width:0;
+    padding:14px 15px;
+    border-radius:16px;
+    background:linear-gradient(145deg,var(--ed-card),var(--ed-card2));
+    border:1px solid rgba(148,163,184,.13);
+}
+.kpi span{
+    display:block;
+    color:var(--ed-muted);
+    font-size:.67rem;
+    text-transform:uppercase;
+    letter-spacing:.055em;
+}
+.kpi strong{
+    display:block;
+    margin-top:6px;
+    font-size:clamp(1.05rem,2.2vw,1.42rem);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+.kpi small{
+    display:block;
+    color:var(--ed-muted);
+    margin-top:4px;
+    font-size:.68rem;
+    line-height:1.35;
+}
+.toolbar{
+    position:sticky;
+    top:8px;
+    z-index:5;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:10px;
+    margin-bottom:14px;
+    border:1px solid rgba(148,163,184,.15);
+    border-radius:14px;
+    background:rgba(15,23,42,.92);
+    backdrop-filter:blur(10px);
+}
+.range-buttons{display:flex;gap:6px;flex-wrap:wrap}
+.range-btn{cursor:pointer;padding:8px 11px;color:var(--ed-muted)}
+.range-btn.active{
+    color:#bae6fd;
+    border-color:rgba(56,189,248,.36);
+    background:rgba(56,189,248,.13);
+}
+.filter-wrap{display:flex;align-items:center;gap:8px;color:var(--ed-muted);font-size:.76rem}
+.filter-wrap select{
+    min-width:160px;
+    border:1px solid rgba(148,163,184,.18);
+    background:#020617;
+    color:var(--ed-text);
+    border-radius:9px;
+    padding:8px 10px;
+}
+.section{
+    margin:22px 0 10px;
+}
+.section h2{margin:0;font-size:1.02rem}
+.section p{margin:4px 0 0;color:var(--ed-muted);font-size:.77rem;line-height:1.45}
+.full-grid{display:grid;grid-template-columns:1fr;gap:14px}
+.half-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.chart-card{
+    min-width:0;
+    padding:16px;
+    border-radius:19px;
+    border:1px solid rgba(148,163,184,.14);
+    background:linear-gradient(145deg,var(--ed-card),var(--ed-card2));
+    box-shadow:0 14px 30px rgba(0,0,0,.16);
+}
+.chart-head{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+}
+.chart-head h3{margin:0;font-size:.98rem}
+.chart-head p{margin:4px 0 0;color:var(--ed-muted);font-size:.72rem;line-height:1.4}
+.chart-root{min-height:360px}
+.chart-empty{
+    min-height:360px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    color:var(--ed-muted);
+    font-size:.83rem;
+    padding:24px;
+}
+.chart-svg{
+    width:100%;
+    height:auto;
+    display:block;
+    overflow:visible;
+}
+.legend{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:8px;
+    color:var(--ed-muted);
+    font-size:.72rem;
+}
+.legend-item{display:flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:999px;display:inline-block}
+.bar-list{display:grid;gap:11px;padding-top:4px}
+.bar-item{
+    display:grid;
+    grid-template-columns:minmax(130px,1fr) 2fr auto;
+    gap:11px;
+    align-items:center;
+    font-size:.76rem;
+}
+.bar-name{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+.track{
+    height:12px;
+    overflow:hidden;
+    border-radius:999px;
+    background:#020617;
+}
+.fill{
+    height:100%;
+    min-width:2px;
+    border-radius:999px;
+    background:linear-gradient(90deg,var(--ed-blue),var(--ed-green));
+}
+.bar-value{font-weight:780;white-space:nowrap}
+.note{
+    margin-top:18px;
+    padding:12px 14px;
+    border-radius:12px;
+    color:var(--ed-muted);
+    background:rgba(2,6,23,.28);
+    font-size:.72rem;
+    line-height:1.5;
+}
+@media(max-width:1050px){
+    .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .half-grid{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+    .diagram-wrap{padding:14px 12px 32px}
+    .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .toolbar{position:static}
+    .filter-wrap{width:100%;justify-content:space-between}
+    .filter-wrap select{min-width:0;flex:1}
+    .chart-card{padding:12px}
+    .chart-root,.chart-empty{min-height:290px}
+    .bar-item{grid-template-columns:minmax(90px,1fr) 1.25fr auto;gap:7px;font-size:.69rem}
+}
+@media(max-width:440px){
+    .kpis{grid-template-columns:1fr 1fr}
+    .actions{width:100%}
+    .link{flex:1;text-align:center}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="diagram-wrap">
+    <header class="top">
+        <div class="title-row">
+            <a class="back" href="/energie" aria-label="Zur Energieübersicht">←</a>
+            <div>
+                <h1>📊 Energie-Diagramme</h1>
+                <div class="sub">Große Auswertung für Gesamtanlage, Stationen und einzelne Verbraucher.</div>
+            </div>
+        </div>
+        <div class="actions">
+            <span class="badge" id="pollBadge">Poll --</span>
+            <span class="badge" id="historyBadge">Historie --</span>
+            <a class="link" href="/energie">⚡ Übersicht</a>
+            <a class="link" href="/energie/settings">⚙️ Einstellungen</a>
+        </div>
+    </header>
+
+    <div id="errorBox"></div>
+
+    <section class="kpis" id="kpis">
+        <article class="kpi"><span>Aktuelle Leistung</span><strong>-- W</strong></article>
+        <article class="kpi"><span>Tagesmaximum</span><strong>-- W</strong></article>
+        <article class="kpi"><span>Verbrauch heute</span><strong>-- kWh</strong></article>
+        <article class="kpi"><span>Kosten heute</span><strong>-- €</strong></article>
+        <article class="kpi"><span>Höchster Geräte-Peak</span><strong>-- W</strong></article>
+    </section>
+
+    <div class="toolbar">
+        <div class="range-buttons">
+            <button class="range-btn active" data-range="today" type="button">Heute</button>
+            <button class="range-btn" data-range="24h" type="button">24 h</button>
+            <button class="range-btn" data-range="7d" type="button">7 Tage</button>
+            <button class="range-btn" data-range="30d" type="button">30 Tage</button>
+        </div>
+        <label class="filter-wrap">
+            <span>Gerätefilter</span>
+            <select id="stationFilter">
+                <option value="">Alle Stationen</option>
+            </select>
+        </label>
+    </div>
+
+    <div class="section">
+        <h2>Leistungsverlauf</h2>
+        <p>Große Verlaufsgrafiken aus der lokal gespeicherten Phase-4M-Historie.</p>
+    </div>
+
+    <section class="full-grid">
+        <article class="chart-card">
+            <div class="chart-head">
+                <div>
+                    <h3>⚡ Gesamtleistung der Anlage</h3>
+                    <p>Gemittelte Wattwerte der Gesamtanlage im gewählten Zeitraum.</p>
+                </div>
+                <span class="badge" id="controllerPeakBadge">Max heute -- W</span>
+            </div>
+            <div id="controllerChart" class="chart-empty">Lade Verlauf…</div>
+        </article>
+
+        <article class="chart-card">
+            <div class="chart-head">
+                <div>
+                    <h3>🏕️ Leistungsverlauf je Grow-Station</h3>
+                    <p>Jede Station als eigene Linie; dadurch lassen sich Lastverschiebungen schnell erkennen.</p>
+                </div>
+            </div>
+            <div id="stationChart" class="chart-empty">Lade Verlauf…</div>
+        </article>
+    </section>
+
+    <div class="section">
+        <h2>Tagesauswertung</h2>
+        <p>Verbrauch und gemessene Tagesmaxima nach Station.</p>
+    </div>
+
+    <section class="half-grid">
+        <article class="chart-card">
+            <div class="chart-head">
+                <div>
+                    <h3>🔋 Verbrauch heute nach Station</h3>
+                    <p>Aktueller Anteil am Tagesverbrauch in kWh.</p>
+                </div>
+            </div>
+            <div id="stationTodayBars" class="chart-empty">Lade Daten…</div>
+        </article>
+
+        <article class="chart-card">
+            <div class="chart-head">
+                <div>
+                    <h3>📈 Tagesmaximum nach Station</h3>
+                    <p>Höchster vom Energiepoll erfasster Gesamtwert jeder Station heute.</p>
+                </div>
+            </div>
+            <div id="stationPeakBars" class="chart-empty">Lade Daten…</div>
+        </article>
+    </section>
+
+    <div class="section">
+        <h2>Geräteauswertung</h2>
+        <p>Mit dem Filter können alle Verbraucher oder nur die Geräte einer Station betrachtet werden.</p>
+    </div>
+
+    <section class="half-grid">
+        <article class="chart-card">
+            <div class="chart-head">
+                <div>
+                    <h3>🔌 Aktuelle Geräteleistung</h3>
+                    <p>Momentane Leistungsaufnahme aller erreichbaren Messpunkte.</p>
+                </div>
+            </div>
+            <div id="deviceNowBars" class="chart-empty">Lade Daten…</div>
+        </article>
+
+        <article class="chart-card">
+            <div class="chart-head">
+                <div>
+                    <h3>🏆 Geräte-Maximum heute</h3>
+                    <p>Höchster heute erfasster Wattwert je Verbraucher.</p>
+                </div>
+            </div>
+            <div id="devicePeakBars" class="chart-empty">Lade Daten…</div>
+        </article>
+    </section>
+
+    <div class="note">
+        Tagesmaxima entsprechen dem höchsten Wert, den Growstars 30-Sekunden-Energiepoll tatsächlich gesehen hat.
+        Sehr kurze elektrische Einschaltspitzen zwischen zwei Polls werden nicht als eigener Messpunkt erfasst.
+        Die Verlaufshistorie wird in 2-Minuten-Buckets gespeichert.
+    </div>
+</div>
+
+<script>
+const COLORS=['#38bdf8','#22c55e','#f59e0b','#a78bfa','#f472b6','#fb7185','#2dd4bf','#facc15'];
+const esc=value=>String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const num=(value,digits=1)=>Number.isFinite(Number(value))?Number(value).toFixed(digits):'--';
+let currentRange='today';
+let overview=null;
+
+function ageText(ts){
+    if(!ts)return 'noch kein Poll';
+    const sec=Math.max(0,Date.now()/1000-Number(ts));
+    return sec<60?`vor ${Math.round(sec)}s`:`vor ${Math.round(sec/60)} min`;
+}
+function timeText(ts){
+    if(!ts)return '--';
+    return new Date(Number(ts)*1000).toLocaleString([],{
+        day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'
+    });
+}
+
+function renderKpis(data){
+    const t=data.totals||{};
+    const stats=data.statistics||{};
+    const devicePeak=stats.max_device_peak_today;
+    document.getElementById('kpis').innerHTML=`
+        <article class="kpi"><span>Aktuelle Leistung</span><strong>${num(t.power,1)} W</strong><small>Gesamtanlage</small></article>
+        <article class="kpi"><span>Tagesmaximum</span><strong>${num(t.max_power_today,1)} W</strong><small>${t.max_power_today_ts?timeText(t.max_power_today_ts):'Noch kein Peak gespeichert'}</small></article>
+        <article class="kpi"><span>Verbrauch heute</span><strong>${num(t.today,3)} kWh</strong><small>Alle Stationen</small></article>
+        <article class="kpi"><span>Kosten heute</span><strong>${num(t.cost_today,2)} €</strong><small>${num(data.settings?.power_price,2)} €/kWh</small></article>
+        <article class="kpi"><span>Höchster Geräte-Peak</span><strong>${num(devicePeak?.power,1)} W</strong><small>${devicePeak?`${esc(devicePeak.tent_name)} · ${esc(devicePeak.label)} · ${timeText(devicePeak.ts)}`:'Noch keine Daten'}</small></article>`;
+    document.getElementById('controllerPeakBadge').textContent=`Max heute ${num(t.max_power_today,1)} W`;
+    document.getElementById('pollBadge').textContent=`Poll ${ageText(data.last_poll)}`;
+}
+
+function fillStationFilter(data){
+    const select=document.getElementById('stationFilter');
+    const previous=select.value;
+    const options=(data.stations||[]).map(st=>`<option value="${esc(st.tent_id)}">${esc(st.name)}</option>`).join('');
+    select.innerHTML=`<option value="">Alle Stationen</option>${options}`;
+    if([...select.options].some(o=>o.value===previous))select.value=previous;
+}
+
+function lineChart(rootId,series){
+    const root=document.getElementById(rootId);
+    const valid=(series||[]).filter(s=>(s.points||[]).length);
+    if(!valid.length){
+        root.className='chart-empty';
+        root.textContent='Noch keine gespeicherten Messpunkte für diesen Zeitraum.';
+        return;
+    }
+
+    const width=1320,height=390,left=62,right=22,top=20,bottom=44;
+    const all=valid.flatMap(s=>s.points||[]);
+    const minTs=Math.min(...all.map(p=>Number(p.ts)));
+    const maxRaw=Math.max(...all.map(p=>Number(p.ts)));
+    const maxTs=maxRaw<=minTs?minTs+1:maxRaw;
+    const maxValue=Math.max(1,...all.map(p=>Number(p.power||0)));
+    const plotW=width-left-right,plotH=height-top-bottom;
+    const x=ts=>left+((Number(ts)-minTs)/(maxTs-minTs))*plotW;
+    const y=v=>top+plotH-(Number(v||0)/maxValue)*plotH;
+
+    let grid='';
+    for(let i=0;i<=5;i++){
+        const value=maxValue*(1-i/5);
+        const yy=top+plotH*(i/5);
+        grid+=`<line x1="${left}" y1="${yy}" x2="${width-right}" y2="${yy}" stroke="rgba(148,163,184,.15)" stroke-width="1"/>`;
+        grid+=`<text x="${left-8}" y="${yy+4}" text-anchor="end" fill="#94a3b8" font-size="12">${num(value,0)}</text>`;
+    }
+
+    let labels='';
+    for(let i=0;i<=6;i++){
+        const ts=minTs+(maxTs-minTs)*(i/6);
+        const xx=x(ts);
+        const label=new Date(ts*1000).toLocaleString([],currentRange==='today'||currentRange==='24h'
+            ?{hour:'2-digit',minute:'2-digit'}
+            :{day:'2-digit',month:'2-digit'});
+        labels+=`<text x="${xx}" y="${height-12}" text-anchor="${i===0?'start':(i===6?'end':'middle')}" fill="#94a3b8" font-size="11">${esc(label)}</text>`;
+    }
+
+    const paths=valid.map((s,index)=>{
+        const color=COLORS[index%COLORS.length];
+        const points=(s.points||[]).map(p=>`${x(p.ts).toFixed(1)},${y(p.power).toFixed(1)}`).join(' ');
+        return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }).join('');
+
+    const legend=valid.map((s,index)=>`
+        <span class="legend-item"><span class="dot" style="background:${COLORS[index%COLORS.length]}"></span>${esc(s.name)}</span>
+    `).join('');
+
+    root.className='chart-root';
+    root.innerHTML=`
+        <svg class="chart-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Energie-Leistungsverlauf">
+            ${grid}
+            <line x1="${left}" y1="${top}" x2="${left}" y2="${height-bottom}" stroke="rgba(148,163,184,.35)"/>
+            <line x1="${left}" y1="${height-bottom}" x2="${width-right}" y2="${height-bottom}" stroke="rgba(148,163,184,.35)"/>
+            ${paths}
+            ${labels}
+            <text x="12" y="${top+8}" fill="#94a3b8" font-size="11">W</text>
+        </svg>
+        <div class="legend">${legend}</div>`;
+}
+
+function barChart(rootId,items,{unit='W',digits=1}={}){
+    const root=document.getElementById(rootId);
+    const sorted=(items||[])
+        .filter(item=>Number.isFinite(Number(item.value))&&Number(item.value)>0)
+        .sort((a,b)=>Number(b.value)-Number(a.value));
+
+    if(!sorted.length){
+        root.className='chart-empty';
+        root.textContent='Noch keine positiven Messwerte vorhanden.';
+        return;
+    }
+
+    const max=Math.max(...sorted.map(item=>Number(item.value)));
+    root.className='bar-list';
+    root.innerHTML=sorted.map(item=>{
+        const pct=max>0?Math.max(2,Number(item.value)/max*100):0;
+        const detail=item.detail?` title="${esc(item.detail)}"`:'';
+        return `<div class="bar-item"${detail}>
+            <div class="bar-name">${esc(item.name)}</div>
+            <div class="track"><div class="fill" style="width:${pct}%"></div></div>
+            <div class="bar-value">${num(item.value,digits)} ${esc(unit)}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderBars(){
+    if(!overview)return;
+    const stations=overview.stations||[];
+    const filter=document.getElementById('stationFilter').value;
+
+    barChart('stationTodayBars',
+        stations.map(st=>({name:st.name,value:Number(st.totals?.today||0)})),
+        {unit:'kWh',digits:3}
+    );
+
+    barChart('stationPeakBars',
+        stations.map(st=>({
+            name:st.name,
+            value:Number(st.max_power_today||0),
+            detail:st.max_power_today_ts?timeText(st.max_power_today_ts):''
+        })),
+        {unit:'W',digits:1}
+    );
+
+    const nowItems=[];
+    const peakItems=[];
+
+    stations
+        .filter(st=>!filter||st.tent_id===filter)
+        .forEach(st=>{
+            Object.entries(st.devices||{}).forEach(([device,item])=>{
+                const label=`${st.name} · ${item.label||device}`;
+                if(item.available){
+                    nowItems.push({name:label,value:Number(item.power||0)});
+                }
+                if(Number(item.max_power_today)>0){
+                    peakItems.push({
+                        name:label,
+                        value:Number(item.max_power_today),
+                        detail:item.max_power_today_ts?timeText(item.max_power_today_ts):''
+                    });
+                }
+            });
+        });
+
+    barChart('deviceNowBars',nowItems,{unit:'W',digits:1});
+    barChart('devicePeakBars',peakItems,{unit:'W',digits:1});
+}
+
+async function loadOverview(){
+    try{
+        const response=await fetch('/api/energy/overview',{cache:'no-store'});
+        if(!response.ok)throw new Error(`HTTP ${response.status}`);
+        const data=await response.json();
+        if(data.success===false)throw new Error(data.error||'Energie-API Fehler');
+
+        overview=data;
+        document.getElementById('errorBox').innerHTML='';
+        renderKpis(data);
+        fillStationFilter(data);
+        renderBars();
+    }catch(err){
+        document.getElementById('errorBox').innerHTML=
+            `<div class="error">Energieübersicht konnte nicht geladen werden: ${esc(err.message)}</div>`;
+    }
+}
+
+async function loadHistory(){
+    try{
+        const response=await fetch(`/api/energy/history?range=${encodeURIComponent(currentRange)}`,{cache:'no-store'});
+        if(!response.ok)throw new Error(`HTTP ${response.status}`);
+        const data=await response.json();
+        if(data.success===false)throw new Error(data.error||'History API Fehler');
+
+        document.getElementById('historyBadge').textContent=
+            `${data.label} · ${Math.round(Number(data.sample_interval_sec||120)/60)}-Min-Speicher`;
+
+        lineChart('controllerChart',(data.series||[]).filter(s=>s.controller));
+        lineChart('stationChart',(data.series||[]).filter(s=>!s.controller));
+    }catch(err){
+        document.getElementById('controllerChart').className='chart-empty';
+        document.getElementById('controllerChart').textContent=`Historie nicht verfügbar: ${err.message}`;
+        document.getElementById('stationChart').className='chart-empty';
+        document.getElementById('stationChart').textContent='Historie nicht verfügbar.';
+    }
+}
+
+document.querySelectorAll('.range-btn').forEach(button=>{
+    button.addEventListener('click',()=>{
+        currentRange=button.dataset.range||'today';
+        document.querySelectorAll('.range-btn').forEach(b=>b.classList.toggle('active',b===button));
+        loadHistory();
+    });
+});
+
+document.getElementById('stationFilter').addEventListener('change',renderBars);
+
+loadOverview();
+loadHistory();
+setInterval(loadOverview,5000);
+setInterval(loadHistory,30000);
+</script>
+{% endblock %}
