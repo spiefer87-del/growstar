@@ -9,6 +9,9 @@ reset state is isolated between tents.
 from __future__ import annotations
 
 import datetime
+import os
+import sqlite3
+import threading
 import time
 from copy import deepcopy
 
@@ -26,6 +29,20 @@ from core.runtime import (
 
 DEFAULT_POWER_PRICE = 0.43
 ENERGY_REQUEST_TIMEOUT_SEC = 3
+
+# Phase 4M – Historie / Statistik
+#
+# Die Shellys werden weiterhin ausschließlich im bestehenden 30-s-Energiepoll
+# gelesen. Historie und Peaks verwenden nur die bereits eingelesenen Runtime-
+# Werte und verursachen deshalb KEINE zusätzlichen Netzwerkrequests.
+ENERGY_DB_FILE = os.getenv("GROWSTAR_DB_FILE", "data.db")
+ENERGY_HISTORY_SAMPLE_SEC = 120
+ENERGY_HISTORY_RETENTION_DAYS = 90
+ENERGY_CONTROLLER_ID = "__controller__"
+
+_HISTORY_SCHEMA_LOCK = threading.RLock()
+_HISTORY_SCHEMA_READY = False
+_HISTORY_LAST_CLEANUP_DAY = None
 
 
 def _safe_float(value, default=None):
@@ -282,6 +299,506 @@ def refresh_energy_state(runtimes=None):
     }
 
 
+def _energy_db_connect():
+    db = sqlite3.connect(
+        ENERGY_DB_FILE,
+        timeout=5,
+        check_same_thread=False,
+    )
+    db.execute("PRAGMA busy_timeout = 5000")
+    return db
+
+
+def _ensure_energy_history_schema():
+    """Legt die neuen Tabellen idempotent an.
+
+    Absichtlich nicht in db.py: Phase 4M bleibt damit ein isolierter
+    Energie-Patch und verändert die bestehende Klima-/Tagebuch-Migration nicht.
+    """
+
+    global _HISTORY_SCHEMA_READY
+
+    if _HISTORY_SCHEMA_READY:
+        return
+
+    with _HISTORY_SCHEMA_LOCK:
+        if _HISTORY_SCHEMA_READY:
+            return
+
+        db = _energy_db_connect()
+        try:
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS energy_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ts INTEGER NOT NULL,
+                    bucket_ts INTEGER NOT NULL,
+                    tent_id TEXT NOT NULL,
+                    power_w REAL NOT NULL,
+                    today_kwh REAL NOT NULL,
+                    UNIQUE(bucket_ts, tent_id)
+                )
+                """
+            )
+            db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_energy_history_tent_ts
+                ON energy_history (tent_id, ts)
+                """
+            )
+            db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS energy_daily_peaks (
+                    day TEXT NOT NULL,
+                    scope TEXT NOT NULL,
+                    tent_id TEXT NOT NULL DEFAULT '',
+                    device TEXT NOT NULL DEFAULT '',
+                    max_power_w REAL NOT NULL,
+                    ts INTEGER NOT NULL,
+                    PRIMARY KEY (day, scope, tent_id, device)
+                )
+                """
+            )
+            db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_energy_daily_peaks_day
+                ON energy_daily_peaks (day, scope)
+                """
+            )
+            db.commit()
+            _HISTORY_SCHEMA_READY = True
+        finally:
+            db.close()
+
+
+def _cleanup_energy_history(now_ts):
+    global _HISTORY_LAST_CLEANUP_DAY
+
+    day = datetime.datetime.fromtimestamp(now_ts).date().isoformat()
+    if _HISTORY_LAST_CLEANUP_DAY == day:
+        return
+
+    cutoff = int(now_ts) - ENERGY_HISTORY_RETENTION_DAYS * 86400
+    peak_cutoff_day = (
+        datetime.datetime.fromtimestamp(now_ts).date()
+        - datetime.timedelta(days=ENERGY_HISTORY_RETENTION_DAYS)
+    ).isoformat()
+
+    db = _energy_db_connect()
+    try:
+        db.execute(
+            "DELETE FROM energy_history WHERE ts < ?",
+            (cutoff,),
+        )
+        db.execute(
+            "DELETE FROM energy_daily_peaks WHERE day < ?",
+            (peak_cutoff_day,),
+        )
+        db.commit()
+        _HISTORY_LAST_CLEANUP_DAY = day
+    finally:
+        db.close()
+
+
+def _upsert_daily_peak(db, *, day, scope, power, ts, tent_id="", device=""):
+    power = max(0.0, _safe_float(power, 0.0) or 0.0)
+
+    db.execute(
+        """
+        INSERT INTO energy_daily_peaks (
+            day,
+            scope,
+            tent_id,
+            device,
+            max_power_w,
+            ts
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(day, scope, tent_id, device)
+        DO UPDATE SET
+            max_power_w = excluded.max_power_w,
+            ts = excluded.ts
+        WHERE excluded.max_power_w > energy_daily_peaks.max_power_w
+        """,
+        (
+            day,
+            str(scope),
+            str(tent_id or ""),
+            str(device or ""),
+            float(power),
+            int(ts),
+        ),
+    )
+
+
+def record_energy_history(runtimes=None, *, now=None):
+    """Persistiert Verlauf + Tagespeaks aus dem bereits vorhandenen Energy-State.
+
+    Aufruf erfolgt direkt NACH refresh_energy_state() im Shelly-Background-
+    Thread. Diese Funktion fragt keine Shellys ab und schaltet keine Hardware.
+
+    Verlauf:
+      - ein Punkt je Station + Controller pro 2-Minuten-Bucket
+      - 90 Tage Aufbewahrung
+
+    Peaks:
+      - jeder 30-s-Poll kann das Tagesmaximum aktualisieren
+      - Controller, Station und einzelnes Gerät
+    """
+
+    runtimes = list(runtimes) if runtimes is not None else list_runtimes()
+    runtimes = [rt for rt in runtimes if getattr(rt, "enabled", True)]
+    now = int(time.time() if now is None else now)
+    day = datetime.datetime.fromtimestamp(now).date().isoformat()
+    bucket_ts = now - (now % ENERGY_HISTORY_SAMPLE_SEC)
+
+    station_rows = []
+    device_peaks = []
+    controller_power = 0.0
+    controller_today = 0.0
+    controller_available = 0
+
+    for rt in runtimes:
+        devices = get_runtime_energy_snapshot(rt)
+
+        station_power = 0.0
+        station_today = 0.0
+        station_available = 0
+
+        for device, item in devices.items():
+            if not item.get("available"):
+                continue
+
+            power = max(0.0, _safe_float(item.get("power"), 0.0) or 0.0)
+            today_kwh = max(0.0, _safe_float(item.get("today"), 0.0) or 0.0)
+
+            station_power += power
+            station_today += today_kwh
+            station_available += 1
+
+            device_peaks.append(
+                (
+                    rt.tent_id,
+                    device,
+                    power,
+                )
+            )
+
+        # Keine künstlichen 0-W-Werte erzeugen, wenn eine Station aktuell
+        # überhaupt keinen erfolgreichen Energie-Messpunkt besitzt.
+        if station_available <= 0:
+            continue
+
+        station_rows.append(
+            (
+                rt.tent_id,
+                round(station_power, 1),
+                round(station_today, 6),
+            )
+        )
+        controller_power += station_power
+        controller_today += station_today
+        controller_available += station_available
+
+    if controller_available <= 0:
+        return {
+            "success": True,
+            "recorded": False,
+            "reason": "no_available_energy_points",
+        }
+
+    _ensure_energy_history_schema()
+
+    db = _energy_db_connect()
+    try:
+        # Verlauf: UPSERT im 2-Minuten-Bucket. Der letzte Poll innerhalb des
+        # Buckets gewinnt, wodurch die DB auch bei 30-s-Poll klein bleibt.
+        for tent_id, power, today_kwh in station_rows:
+            db.execute(
+                """
+                INSERT INTO energy_history (
+                    ts,
+                    bucket_ts,
+                    tent_id,
+                    power_w,
+                    today_kwh
+                )
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(bucket_ts, tent_id)
+                DO UPDATE SET
+                    ts = excluded.ts,
+                    power_w = excluded.power_w,
+                    today_kwh = excluded.today_kwh
+                """,
+                (
+                    now,
+                    bucket_ts,
+                    tent_id,
+                    power,
+                    today_kwh,
+                ),
+            )
+
+        db.execute(
+            """
+            INSERT INTO energy_history (
+                ts,
+                bucket_ts,
+                tent_id,
+                power_w,
+                today_kwh
+            )
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(bucket_ts, tent_id)
+            DO UPDATE SET
+                ts = excluded.ts,
+                power_w = excluded.power_w,
+                today_kwh = excluded.today_kwh
+            """,
+            (
+                now,
+                bucket_ts,
+                ENERGY_CONTROLLER_ID,
+                round(controller_power, 1),
+                round(controller_today, 6),
+            ),
+        )
+
+        # Tagespeaks bleiben genauer als der Verlauf: jeder Energie-Poll darf
+        # den Maximalwert aktualisieren.
+        _upsert_daily_peak(
+            db,
+            day=day,
+            scope="controller",
+            power=controller_power,
+            ts=now,
+        )
+
+        for tent_id, power, _today_kwh in station_rows:
+            _upsert_daily_peak(
+                db,
+                day=day,
+                scope="station",
+                tent_id=tent_id,
+                power=power,
+                ts=now,
+            )
+
+        for tent_id, device, power in device_peaks:
+            _upsert_daily_peak(
+                db,
+                day=day,
+                scope="device",
+                tent_id=tent_id,
+                device=device,
+                power=power,
+                ts=now,
+            )
+
+        db.commit()
+    finally:
+        db.close()
+
+    _cleanup_energy_history(now)
+
+    return {
+        "success": True,
+        "recorded": True,
+        "bucket_ts": bucket_ts,
+        "stations": len(station_rows),
+        "controller_power": round(controller_power, 1),
+    }
+
+
+def _read_daily_peak_rows(day):
+    # Read-only: kein Schema während Regression/API-Lesezugriff erzwingen.
+    # Nach dem ersten produktiven History-Poll existieren die Tabellen.
+    if not os.path.exists(ENERGY_DB_FILE):
+        return []
+
+    db = _energy_db_connect()
+    try:
+        try:
+            return db.execute(
+                """
+                SELECT scope, tent_id, device, max_power_w, ts
+                FROM energy_daily_peaks
+                WHERE day = ?
+                """,
+                (day,),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            return []
+    finally:
+        db.close()
+
+
+def get_daily_energy_peaks(*, day=None):
+    day = day or datetime.date.today().isoformat()
+    result = {
+        "day": day,
+        "controller": None,
+        "stations": {},
+        "devices": {},
+    }
+
+    for scope, tent_id, device, power, ts in _read_daily_peak_rows(day):
+        item = {
+            "power": round(float(power), 1),
+            "ts": int(ts),
+        }
+
+        if scope == "controller":
+            result["controller"] = item
+        elif scope == "station":
+            result["stations"][tent_id] = item
+        elif scope == "device":
+            result["devices"].setdefault(tent_id, {})[device] = item
+
+    return result
+
+
+_HISTORY_RANGES = {
+    "today": {
+        "seconds": None,
+        "bucket": 300,
+        "label": "Heute",
+    },
+    "24h": {
+        "seconds": 24 * 3600,
+        "bucket": 300,
+        "label": "24 Stunden",
+    },
+    "7d": {
+        "seconds": 7 * 86400,
+        "bucket": 1800,
+        "label": "7 Tage",
+    },
+    "30d": {
+        "seconds": 30 * 86400,
+        "bucket": 7200,
+        "label": "30 Tage",
+    },
+}
+
+
+def _history_window(range_key, now):
+    spec = _HISTORY_RANGES.get(range_key)
+    if spec is None:
+        raise ValueError(
+            "range muss today, 24h, 7d oder 30d sein"
+        )
+
+    now_dt = datetime.datetime.fromtimestamp(now)
+
+    if range_key == "today":
+        start_dt = now_dt.replace(
+            hour=0,
+            minute=0,
+            second=0,
+            microsecond=0,
+        )
+        start = int(start_dt.timestamp())
+    else:
+        start = int(now - int(spec["seconds"]))
+
+    return {
+        "range": range_key,
+        "label": spec["label"],
+        "start": start,
+        "end": int(now),
+        "bucket": int(spec["bucket"]),
+    }
+
+
+def get_energy_history(range_key="today", *, now=None):
+    """Aggregierte Leistungs-Historie ohne Hardwarezugriff."""
+
+    now = int(time.time() if now is None else now)
+    window = _history_window(
+        str(range_key or "today").lower(),
+        now,
+    )
+
+    rows = []
+
+    if os.path.exists(ENERGY_DB_FILE):
+        db = _energy_db_connect()
+        try:
+            try:
+                rows = db.execute(
+                    """
+                    SELECT
+                        tent_id,
+                        CAST(ts / ? AS INTEGER) * ? AS grouped_ts,
+                        AVG(power_w) AS avg_power,
+                        MAX(today_kwh) AS today_kwh
+                    FROM energy_history
+                    WHERE ts BETWEEN ? AND ?
+                    GROUP BY tent_id, grouped_ts
+                    ORDER BY grouped_ts ASC
+                    """,
+                    (
+                        window["bucket"],
+                        window["bucket"],
+                        window["start"],
+                        window["end"],
+                    ),
+                ).fetchall()
+            except sqlite3.OperationalError:
+                rows = []
+        finally:
+            db.close()
+
+    by_tent = {}
+    for tent_id, ts, avg_power, today_kwh in rows:
+        by_tent.setdefault(tent_id, []).append({
+            "ts": int(ts),
+            "power": round(float(avg_power or 0.0), 1),
+            "today": round(float(today_kwh or 0.0), 4),
+        })
+
+    runtime_names = {
+        rt.tent_id: rt.name
+        for rt in list_runtimes()
+        if getattr(rt, "enabled", True)
+    }
+
+    series = []
+    controller_points = by_tent.pop(ENERGY_CONTROLLER_ID, [])
+    series.append({
+        "tent_id": ENERGY_CONTROLLER_ID,
+        "name": "Gesamtanlage",
+        "controller": True,
+        "points": controller_points,
+    })
+
+    for tent_id, name in runtime_names.items():
+        series.append({
+            "tent_id": tent_id,
+            "name": name,
+            "controller": False,
+            "points": by_tent.pop(tent_id, []),
+        })
+
+    # Historische Daten einer inzwischen deaktivierten Station nicht verlieren.
+    for tent_id, points in sorted(by_tent.items()):
+        series.append({
+            "tent_id": tent_id,
+            "name": tent_id,
+            "controller": False,
+            "points": points,
+        })
+
+    return {
+        "success": True,
+        **window,
+        "sample_interval_sec": ENERGY_HISTORY_SAMPLE_SEC,
+        "retention_days": ENERGY_HISTORY_RETENTION_DAYS,
+        "series": series,
+    }
+
+
 def get_runtime_energy_snapshot(runtime=None):
     rt = resolve_runtime(runtime)
     with rt.energy_lock:
@@ -381,6 +898,7 @@ def build_energy_overview(runtimes=None):
     runtimes = [rt for rt in runtimes if getattr(rt, "enabled", True)]
     settings = get_energy_settings()
     price = float(settings["power_price"])
+    daily_peaks = get_daily_energy_peaks()
 
     stations = []
     global_devices = []
@@ -389,6 +907,13 @@ def build_energy_overview(runtimes=None):
         devices = get_runtime_energy_snapshot(rt)
         totals = _energy_totals(devices, price)
 
+        station_peak = daily_peaks["stations"].get(rt.tent_id)
+
+        for device, item in devices.items():
+            peak = daily_peaks["devices"].get(rt.tent_id, {}).get(device)
+            item["max_power_today"] = peak["power"] if peak else None
+            item["max_power_today_ts"] = peak["ts"] if peak else None
+
         station = {
             "tent_id": rt.tent_id,
             "name": rt.name,
@@ -396,6 +921,8 @@ def build_energy_overview(runtimes=None):
             "control_enabled": bool(getattr(rt, "control_enabled", False)),
             "devices": devices,
             "totals": totals,
+            "max_power_today": station_peak["power"] if station_peak else None,
+            "max_power_today_ts": station_peak["ts"] if station_peak else None,
         }
         stations.append(station)
 
@@ -427,6 +954,25 @@ def build_energy_overview(runtimes=None):
     top_today = max(top_today_candidates, key=lambda x: x["today"], default=None)
     top_power = max(top_power_candidates, key=lambda x: x["power"], default=None)
 
+    controller_peak = daily_peaks.get("controller")
+
+    max_device_peak_today = None
+    for rt in runtimes:
+        for device, peak in daily_peaks["devices"].get(rt.tent_id, {}).items():
+            candidate = {
+                "tent_id": rt.tent_id,
+                "tent_name": rt.name,
+                "device": device,
+                "label": (DEVICE_HARDWARE.get(device) or {}).get("label") or device,
+                "power": peak["power"],
+                "ts": peak["ts"],
+            }
+            if (
+                max_device_peak_today is None
+                or candidate["power"] > max_device_peak_today["power"]
+            ):
+                max_device_peak_today = candidate
+
     for station in stations:
         if controller_totals["today"] > 0:
             station["today_share_pct"] = round(
@@ -449,11 +995,18 @@ def build_energy_overview(runtimes=None):
         "generated_at": time.time(),
         "last_poll": ctx.last_energy_poll or None,
         "settings": settings,
-        "totals": controller_totals,
+        "totals": {
+            **controller_totals,
+            "max_power_today": controller_peak["power"] if controller_peak else None,
+            "max_power_today_ts": controller_peak["ts"] if controller_peak else None,
+        },
         "statistics": {
             "station_count": len(stations),
             "top_today": top_today,
             "top_power": top_power,
+            "max_power_today": controller_peak,
+            "max_device_peak_today": max_device_peak_today,
+            "peak_day": daily_peaks.get("day"),
         },
         "stations": stations,
     }
