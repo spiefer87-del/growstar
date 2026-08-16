@@ -1,6 +1,6 @@
 import core.context as ctx
 
-from flask import jsonify, request
+from flask import jsonify, render_template, request
 
 from core.runtime import get_default_runtime, get_runtime
 from services.energy import (
@@ -42,6 +42,10 @@ def _reset_response(runtime, mode, device=None):
 
 
 def register(app):
+
+    @app.route("/energie/diagramme")
+    def energie_diagramme_page():
+        return render_template("energie_diagramme.html")
 
     # ------------------------------------------------------------------
     # Legacy/default-station compatibility
