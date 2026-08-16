@@ -15,6 +15,31 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.6.6",
+        "date": "2026-08-16",
+        "phase": "4R.2",
+        "title": "Doppelbelegung nennt Anforderer und Besitzer korrekt",
+        "summary": (
+            "Bei einer echten IP-/Relay-Doppelbelegung wird jetzt der tatsächlich "
+            "bearbeitete Aktor als Anforderer und die bereits vorhandene Zuordnung "
+            "als blockierender Besitzer gemeldet."
+        ),
+        "changes": (
+            "Konfliktrichtung wird aus der tatsächlich geänderten Zuordnung statt aus der Geräte-Reihenfolge abgeleitet.",
+            "Der bearbeitete Aktor wird immer als 'möchte ...' gemeldet.",
+            "Der bereits belegende Aktor wird immer als bestehender Besitzer gemeldet.",
+            "Die Geräte-Reihenfolge in DEVICE_HARDWARE beeinflusst die Fehlermeldung nicht mehr.",
+            "Der bestehende globale IP/Relay-Doppelbelegungsschutz bleibt unverändert aktiv.",
+        ),
+        "tests": (
+            "Entfeuchter besitzt einen Endpoint, Ventilator fordert ihn an: Ventilator muss als Anforderer erscheinen.",
+            "Ventilator besitzt einen Endpoint, Entfeuchter fordert ihn an: Entfeuchter muss als Anforderer erscheinen.",
+            "Identische unveränderte Zuordnung desselben Aktors bleibt konfliktfrei.",
+            "Eine echte Doppelbelegung bleibt weiterhin atomar gesperrt.",
+            "/api/system/version meldet Version 3.6.6 und Build-Kennung 4R.2.",
+        ),
+    },
+    {
         "version": "3.6.5",
         "date": "2026-08-16",
         "phase": "4R.1",

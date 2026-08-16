@@ -380,9 +380,15 @@ def _normalize_patch(data):
     return normalized
 
 
-def _endpoint_owners(*, exclude_tent_id=None, candidate_cfg=None):
+def _endpoint_owners(
+    *,
+    exclude_tent_id=None,
+    candidate_cfg=None,
+    preferred_contenders=None,
+):
     runtime_map = _runtime_map()
     owners = {}
+    preferred_contenders = set(preferred_contenders or ())
 
     for tent in tent_manager.list_tents():
         tent_id = tent["id"]
@@ -404,13 +410,38 @@ def _endpoint_owners(*, exclude_tent_id=None, candidate_cfg=None):
             endpoint = (host.lower(), relay)
             owner = owners.get(endpoint)
             current = {"tent_id": tent_id, "device": device}
+
             if owner is not None and owner != current:
+                # Bei einem Update bestimmt der tatsächlich geänderte Aktor
+                # die Richtung der Fehlermeldung: contender = Anforderer,
+                # owner = bereits bestehende Belegung. Ohne Update-Kontext
+                # bleibt die bisherige deterministische Reihenfolge erhalten.
+                conflict_owner = owner
+                conflict_contender = current
+
+                owner_key = (
+                    str(owner.get("tent_id") or ""),
+                    str(owner.get("device") or ""),
+                )
+                current_key = (
+                    str(current.get("tent_id") or ""),
+                    str(current.get("device") or ""),
+                )
+
+                owner_requested = owner_key in preferred_contenders
+                current_requested = current_key in preferred_contenders
+
+                if owner_requested and not current_requested:
+                    conflict_owner = current
+                    conflict_contender = owner
+
                 raise HardwareConflictError(
                     f"Hardware-Endpunkt {host} / Relay {relay} ist mehrfach belegt",
                     endpoint={"ip": host, "relay": relay},
-                    owner=owner,
-                    contender=current,
+                    owner=conflict_owner,
+                    contender=conflict_contender,
                 )
+
             owners[endpoint] = current
 
     return owners
@@ -435,6 +466,28 @@ def update_hardware_assignments(tent_id, data):
 
     normalized = _normalize_patch(data)
     current_snapshot = hardware_snapshot(tent_id)
+
+    # Nur wirklich geänderte Endpoints bestimmen die Konfliktrichtung.
+    # Dadurch kann auch ein API-Client unveränderte Werte mitsenden, ohne
+    # fälschlich zum Anforderer zu werden.
+    changed_devices = set()
+
+    for device, endpoint in normalized.items():
+        current_endpoint = _endpoint_tuple(
+            current_snapshot["assignments"][device]
+        )
+        requested_endpoint = (
+            None
+            if endpoint is None
+            else (
+                str(endpoint[0]).strip().lower(),
+                int(endpoint[1]),
+            )
+        )
+
+        if current_endpoint != requested_endpoint:
+            changed_devices.add(device)
+
     _assert_assignment_change_safe(
         tent_id,
         runtime,
@@ -456,7 +509,14 @@ def update_hardware_assignments(tent_id, data):
 
     # Prüft sowohl Doppelbelegungen innerhalb der Station als auch zwischen
     # allen registrierten Stationen, inklusive aktuell deaktivierter Runtimes.
-    _endpoint_owners(exclude_tent_id=tent_id, candidate_cfg=working)
+    _endpoint_owners(
+        exclude_tent_id=tent_id,
+        candidate_cfg=working,
+        preferred_contenders={
+            (tent_id, device)
+            for device in changed_devices
+        },
+    )
 
     _save_registered_config(tent_id, working, runtime=runtime)
     return hardware_snapshot(tent_id)
