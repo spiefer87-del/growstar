@@ -1,295 +1,97 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Energie Einstellungen</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
 
+{% block title %}Energie-Einstellungen – Growstar{% endblock %}
+
+{% block head %}
 <style>
-:root{
-    --bg:#0f172a;
-    --card:#1e293b;
-    --text:#e5e7eb;
-    --muted:#94a3b8;
-    --accent:#22c55e;
-    --danger:#ef4444;
-}
-body{
-    margin:0;
-    padding:20px;
-    background:var(--bg);
-    color:var(--text);
-    font-family:system-ui;
-}
-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:18px;
-}
-h1{margin:0}
-a.back{color:var(--muted);text-decoration:none}
-
-.card{
-    background:var(--card);
-    border-radius:16px;
-    padding:20px;
-    max-width:1000px;
-    box-shadow:0 10px 30px rgba(0,0,0,.3);
-    margin-bottom:18px;
-}
-
-h2{
-    margin:0 0 12px;
-    font-size:.95rem;
-    color:var(--muted);
-    text-transform:uppercase;
-    letter-spacing:.08em;
-}
-
-.row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    gap:12px;
-    padding:10px 0;
-    border-bottom:1px solid #334155;
-    flex-wrap:wrap;
-}
-.row:last-child{border-bottom:none}
-
-input{
-    background:#020617;
-    color:var(--text);
-    border:1px solid rgba(255,255,255,.15);
-    border-radius:10px;
-    padding:8px 10px;
-    font-size:.95rem;
-    width:160px;
-    text-align:center;
-}
-
-button{
-    border:none;
-    border-radius:12px;
-    padding:10px 14px;
-    font-weight:700;
-    cursor:pointer;
-}
-
-.btn{
-    background:var(--accent);
-    color:#022c22;
-}
-.btn-danger{
-    background:rgba(239,68,68,.15);
-    color:var(--danger);
-    border:1px solid rgba(239,68,68,.3);
-}
-.small{
-    font-size:.9rem;
-    padding:8px 12px;
-}
-
-.table{
-    display:grid;
-    grid-template-columns: 1.5fr 1fr 1fr;
-    gap:10px;
-    align-items:center;
-}
-.header{
-    color:var(--muted);
-    font-weight:700;
-    border-bottom:2px solid #334155;
-    padding-bottom:10px;
-    margin-bottom:6px;
-}
-.right{text-align:right}
-.muted{color:var(--muted)}
+:root{--bg:#0f172a;--card:#1e293b;--card2:#111c31;--text:#e5e7eb;--muted:#94a3b8;--accent:#22c55e;--danger:#ef4444;--border:#334155;--warn:#f59e0b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}.wrap{max-width:1050px;margin:0 auto;padding:20px}.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:20px}.title{display:flex;align-items:center;gap:12px}.back{width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:var(--card);border:1px solid rgba(148,163,184,.18);border-radius:12px;color:var(--text);text-decoration:none}h1{margin:0;font-size:clamp(1.45rem,4vw,2rem)}.sub,.muted{color:var(--muted);font-size:.82rem}.card{background:linear-gradient(145deg,var(--card),var(--card2));border:1px solid rgba(148,163,184,.14);border-radius:18px;padding:18px;margin-bottom:15px}.card h2{margin:0 0 13px;font-size:.92rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(148,163,184,.13);flex-wrap:wrap}.row:last-child{border-bottom:0}.controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}input{background:#020617;border:1px solid rgba(148,163,184,.25);color:var(--text);border-radius:10px;padding:9px 10px;font:inherit;width:155px}.btn{border:0;border-radius:10px;padding:9px 12px;font-weight:750;cursor:pointer;background:var(--accent);color:#052e16}.danger{background:rgba(239,68,68,.13);color:#fca5a5;border:1px solid rgba(239,68,68,.3)}.warning{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:#fcd34d;border-radius:12px;padding:11px;font-size:.8rem;line-height:1.45;margin-top:11px}.station-list{display:grid;gap:14px}.station-card{background:linear-gradient(145deg,var(--card),var(--card2));border:1px solid rgba(148,163,184,.14);border-radius:18px;padding:17px}.station-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.station-head h3{margin:0;font-size:1.05rem}.station-id{display:block;color:var(--muted);font-size:.72rem;margin-top:3px}.device-grid{margin-top:12px;display:grid;gap:7px}.device-row{display:grid;grid-template-columns:minmax(160px,1.4fr) minmax(140px,1fr) auto auto;gap:9px;align-items:center;background:rgba(2,6,23,.28);border-radius:11px;padding:10px}.device-name{font-weight:700}.device-endpoint{color:var(--muted);font-size:.72rem;overflow-wrap:anywhere}.small{font-size:.76rem;padding:7px 9px}.empty{padding:14px;border:1px dashed rgba(148,163,184,.22);border-radius:12px;color:var(--muted)}.status{min-height:24px;margin:5px 0 12px;font-size:.82rem}.ok-text{color:#86efac}.err-text{color:#fca5a5}
+@media(max-width:700px){.device-row{grid-template-columns:1fr 1fr}.device-name,.device-endpoint{grid-column:1/-1}.device-row .btn{width:100%}}
 </style>
-</head>
+{% endblock %}
 
-<body>
-
-<header>
-    <h1>⚙️ Energie Einstellungen</h1>
-    <a href="/energie" class="back">← zurück</a>
-</header>
-
-<div class="card">
-    <h2>Strompreis</h2>
-
-    <div class="row">
-        <div>💶 Strompreis (€/kWh)</div>
-        <div style="display:flex;gap:10px;align-items:center">
-            <input id="price" type="number" step="0.01">
-            <button class="btn small" onclick="savePrice()">Speichern</button>
-        </div>
+{% block page %}
+<div class="wrap">
+    <div class="top">
+        <div class="title"><a href="/energie" class="back">←</a><div><h1>⚙️ Energie-Einstellungen</h1><div class="sub">Globale Abrechnung + stationsbezogene Zähler-Offsets</div></div></div>
     </div>
 
-    <div class="muted" style="margin-top:10px;font-size:.9rem">
-        Dieser Wert wird im Backend gespeichert und gilt für alle Geräte.
-    </div>
-</div>
+    <div id="status" class="status"></div>
 
-<div class="card">
-    <h2>Automatischer Tagesreset</h2>
+    <section class="card">
+        <h2>Controllerweite Abrechnung</h2>
+        <div class="row"><div><strong>💶 Strompreis</strong><div class="muted">Gilt für alle Stationen und Geräte.</div></div><div class="controls"><input id="price" type="number" min="0" max="10" step="0.01"><span>€/kWh</span><button class="btn" onclick="saveSettings('price')">Speichern</button></div></div>
+        <div class="row"><div><strong>🕛 Automatischer Tagesreset</strong><div class="muted">Ein Zeitplan für alle geladenen Stationen.</div></div><div class="controls"><input id="resetTime" type="time"><button class="btn" onclick="saveSettings('time')">Speichern</button></div></div>
+    </section>
 
-    <div class="row">
-        <div>🕛 Reset Uhrzeit</div>
-        <div style="display:flex;gap:10px;align-items:center">
-            <input id="resetTime" type="time">
-            <button class="btn small" onclick="saveResetTime()">Speichern</button>
-        </div>
-    </div>
+    <section class="card">
+        <h2>Alle Stationen</h2>
+        <div class="row"><div><strong>Heute zurücksetzen</strong><div class="muted">Setzt die Tages-Offsets aller aktuell geladenen Stationen auf den vorhandenen Rohzählerstand.</div></div><button class="btn danger" onclick="resetController('today')">Heute Reset</button></div>
+        <div class="row"><div><strong>Gesamt zurücksetzen</strong><div class="muted">Setzt die Gesamt-Offsets aller aktuell geladenen Stationen zurück.</div></div><button class="btn danger" onclick="resetController('total')">Gesamt Reset</button></div>
+        <div class="warning">⚠️ Reset verändert keinen physischen Shelly-Energiezähler. Growstar speichert nur einen neuen Abrechnungs-Offset. Ein nicht erreichbarer Messpunkt wird beim nächsten erfolgreichen Messwert auf die neue Basis gesetzt.</div>
+    </section>
 
-    <div class="muted" style="margin-top:10px;font-size:.9rem">
-        Wird als ENERGY_DAY_RESET_MIN gespeichert.
-    </div>
-</div>
-
-<div class="card">
-    <h2>Reset Funktionen</h2>
-
-    <div class="row">
-        <div>🔁 Heute zurücksetzen (alle Geräte)</div>
-        <button class="btn-danger" onclick="resetTodayAll()">Heute Reset</button>
-    </div>
-
-    <div class="row">
-        <div>♻️ Gesamt zurücksetzen (alle Geräte)</div>
-        <button class="btn-danger" onclick="resetTotalAll()">Gesamt Reset</button>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Reset pro Gerät</h2>
-
-    <div class="table header">
-        <div>Gerät</div>
-        <div class="right">Heute</div>
-        <div class="right">Gesamt</div>
-    </div>
-
-    <div id="rows"></div>
+    <div class="muted" style="margin:24px 0 9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em">Stationen & Geräte</div>
+    <div class="station-list" id="stations"><div class="empty">Lade Stationen…</div></div>
 </div>
 
 <script>
-const DEVICE_LABELS = {
-    heating: "🔥 Heizung",
-    light: "💡 Licht",
-    fan: "💨 Lüfter",
-    vent: "🌀 Ventilator",
-    irrigation: "🚿 Bewässerung",
-    humidifier: "💧 Luftbefeuchter",
-    dehumidifier: "🌵 Luftentfeuchter",
-    light2: "💡 Licht 2",
-    vent2: "🌀 Ventilator 2"
-};
+const esc = value => String(value ?? '').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const ICONS={heating:'🔥',light:'💡',fan:'💨',vent:'🌀',irrigation:'🚿',humidifier:'💧',dehumidifier:'🌵',light2:'💡',vent2:'🌀'};
+let overview=null;
+function minutesToTime(m){m=Math.max(0,Math.min(1439,Number(m)||0));return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`}
+function timeToMinutes(t){const parts=String(t||'').split(':').map(Number);if(parts.length!==2||parts.some(Number.isNaN))return null;return parts[0]*60+parts[1]}
+function setStatus(text,error=false){const el=document.getElementById('status');el.textContent=text||'';el.className=`status ${error?'err-text':'ok-text'}`}
+async function jsonRequest(url,options={}){const res=await fetch(url,options);let data={};try{data=await res.json()}catch{}if(!res.ok||data.success===false)throw new Error(data.error||`HTTP ${res.status}`);return data}
 
-function minutesToTime(m){
-    const hh = String(Math.floor(m/60)).padStart(2,"0");
-    const mm = String(m%60).padStart(2,"0");
-    return `${hh}:${mm}`;
-}
-function timeToMinutes(t){
-    const [h,m] = t.split(":").map(x=>parseInt(x));
-    return h*60+m;
-}
-
-async function loadConfig(){
-    const cfg = await fetch("/api/config").then(r=>r.json());
-
-    document.getElementById("price").value =
-        parseFloat(cfg.POWER_PRICE ?? 0.45).toFixed(2);
-
-    const m = cfg.ENERGY_DAY_RESET_MIN ?? 0;
-    document.getElementById("resetTime").value = minutesToTime(m);
+async function load(){
+    try{
+        const [settingsPayload,energyPayload]=await Promise.all([
+            jsonRequest('/api/energy/settings',{cache:'no-store'}),
+            jsonRequest('/api/energy/overview',{cache:'no-store'})
+        ]);
+        const s=settingsPayload.settings||{}; overview=energyPayload;
+        document.getElementById('price').value=Number(s.power_price??0.43).toFixed(2);
+        document.getElementById('resetTime').value=minutesToTime(s.day_reset_min??0);
+        renderStations();
+    }catch(err){setStatus(`Fehler: ${err.message}`,true)}
 }
 
-async function savePrice(){
-    const price = parseFloat(document.getElementById("price").value || "0.45");
-
-    await fetch("/api/config",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ POWER_PRICE: price })
-    });
-
-    alert("✅ Strompreis gespeichert");
-}
-
-async function saveResetTime(){
-    const t = document.getElementById("resetTime").value;
-    const m = timeToMinutes(t);
-
-    await fetch("/api/config",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ ENERGY_DAY_RESET_MIN: m })
-    });
-
-    alert("✅ Tagesreset Uhrzeit gespeichert");
-}
-
-async function resetTodayAll(){
-    if(!confirm("Heute-Verbrauch für ALLE Geräte zurücksetzen?")) return;
-    await fetch("/api/energy/reset_today_all", {method:"POST"});
-    alert("✅ Heute-Verbrauch zurückgesetzt");
-}
-
-async function resetTotalAll(){
-    if(!confirm("Gesamtverbrauch für ALLE Geräte zurücksetzen?")) return;
-    await fetch("/api/energy/reset_total_all", { method:"POST" });
-    alert("✅ Gesamt Reset ausgeführt");
-}
-
-async function resetTodayDevice(device){
-    if(!confirm(`Heute-Verbrauch für ${device} zurücksetzen?`)) return;
-    await fetch(`/api/energy/reset_today/${device}`, { method:"POST" });
-    alert(`✅ Heute Reset: ${device}`);
-}
-
-async function resetTotalDevice(device){
-    if(!confirm(`Gesamtverbrauch für ${device} zurücksetzen?`)) return;
-    await fetch(`/api/energy/reset_total/${device}`, { method:"POST" });
-    alert(`✅ Gesamt Reset: ${device}`);
-}
-
-async function loadDevices(){
-    const data = await fetch("/api/energy").then(r=>r.json());
-    const wrap = document.getElementById("rows");
-    wrap.innerHTML = "";
-
-    const keys = Object.keys(data);
-    keys.sort((a,b)=>{
-        const A = Object.keys(DEVICE_LABELS).indexOf(a);
-        const B = Object.keys(DEVICE_LABELS).indexOf(b);
-        return (A<0?999:A) - (B<0?999:B);
-    });
-
-    for(const key of keys){
-        const row = document.createElement("div");
-        row.className = "table";
-        row.style.padding = "10px 0";
-        row.style.borderBottom = "1px solid #334155";
-
-        row.innerHTML = `
-            <div>${DEVICE_LABELS[key] ?? key}</div>
-            <div class="right">
-                <button class="btn-danger small" onclick="resetTodayDevice('${key}')">Heute</button>
-            </div>
-            <div class="right">
-                <button class="btn-danger small" onclick="resetTotalDevice('${key}')">Gesamt</button>
-            </div>
-        `;
-        wrap.appendChild(row);
+async function saveSettings(part){
+    const payload={};
+    if(part==='price') payload.power_price=Number(document.getElementById('price').value);
+    if(part==='time'){
+        const value=timeToMinutes(document.getElementById('resetTime').value);
+        if(value===null){setStatus('Ungültige Uhrzeit',true);return}
+        payload.day_reset_min=value;
     }
+    try{await jsonRequest('/api/energy/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});setStatus('✅ Energie-Einstellung gespeichert');await load()}catch(err){setStatus(`Fehler: ${err.message}`,true)}
 }
 
-loadConfig();
-loadDevices();
-</script>
+async function resetController(mode){
+    const label=mode==='today'?'heutigen Verbrauch':'Gesamtverbrauch';
+    if(!confirm(`${label} für ALLE geladenen Stationen zurücksetzen?`))return;
+    try{await jsonRequest(`/api/energy/reset_${mode}_all`,{method:'POST'});setStatus(`✅ ${label} aller Stationen zurückgesetzt`);await load()}catch(err){setStatus(`Fehler: ${err.message}`,true)}
+}
 
-</body>
-</html>
+async function resetStation(tentId,mode,device=null){
+    const scope=device?`${device} in ${tentId}`:`alle Geräte in ${tentId}`;
+    if(!confirm(`${mode==='today'?'Heute':'Gesamt'} für ${scope} zurücksetzen?`))return;
+    const suffix=device?`reset_${mode}/${encodeURIComponent(device)}`:`reset_${mode}_all`;
+    try{await jsonRequest(`/api/tents/${encodeURIComponent(tentId)}/energy/${suffix}`,{method:'POST'});setStatus(`✅ Reset ausgeführt: ${scope}`);await load()}catch(err){setStatus(`Fehler: ${err.message}`,true)}
+}
+
+function renderStations(){
+    const root=document.getElementById('stations'); const stations=overview?.stations||[];
+    if(!stations.length){root.innerHTML='<div class="empty">Keine geladene Station.</div>';return}
+    root.innerHTML=stations.map(st=>{
+        const entries=Object.entries(st.devices||{});
+        const rows=entries.map(([device,item])=>`<div class="device-row"><div class="device-name">${esc(ICONS[device]||'⚡')} ${esc(item.label||device)}</div><div class="device-endpoint">${esc(item.host||'--')} / Relay ${esc(item.relay??'--')}</div><button class="btn danger small" data-tent="${esc(st.tent_id)}" data-mode="today" data-device="${esc(device)}">Heute</button><button class="btn danger small" data-tent="${esc(st.tent_id)}" data-mode="total" data-device="${esc(device)}">Gesamt</button></div>`).join('');
+        return `<article class="station-card"><div class="station-head"><div><h3>${esc(st.name)}</h3><span class="station-id">${esc(st.tent_id)}</span></div><div class="controls"><button class="btn danger small" data-tent="${esc(st.tent_id)}" data-mode="today">Heute alle</button><button class="btn danger small" data-tent="${esc(st.tent_id)}" data-mode="total">Gesamt alle</button></div></div>${rows?`<div class="device-grid">${rows}</div>`:'<div class="empty" style="margin-top:12px">Keine Energie-Hardware zugeordnet.</div>'}</article>`;
+    }).join('');
+    root.querySelectorAll('button[data-tent]').forEach(btn=>btn.addEventListener('click',()=>resetStation(btn.dataset.tent,btn.dataset.mode,btn.dataset.device||null)));
+}
+
+load();
+</script>
+{% endblock %}

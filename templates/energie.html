@@ -1,211 +1,172 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Energie</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
 
+{% block title %}Energie & Statistik – Growstar{% endblock %}
+
+{% block head %}
 <style>
-:root{
-    --bg:#0f172a;
-    --card:#1e293b;
-    --text:#e5e7eb;
-    --muted:#94a3b8;
-    --accent:#22c55e;
-}
-body{
-    margin:0;
-    padding:20px;
-    background:var(--bg);
-    color:var(--text);
-    font-family:system-ui;
-}
-header{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin-bottom:16px;
-}
-h1{margin:0}
-a.link{color:var(--muted);text-decoration:none;font-size:.95rem}
-
-.card{
-    background:var(--card);
-    border-radius:16px;
-    padding:20px;
-    max-width:1200px;
-    box-shadow:0 10px 30px rgba(0,0,0,.3);
-}
-
-h3{
-    margin-top:0;
-    font-size:.9rem;
-    color:var(--muted);
-    text-transform:uppercase;
-    letter-spacing:.08em;
-}
-
-.table{
-    display:grid;
-    grid-template-columns: 1.6fr 0.9fr 0.9fr 0.9fr 0.9fr 0.9fr;
-    gap:10px;
-    align-items:center;
-    font-size:.95rem;
-}
-.row{
-    padding:10px 0;
-    border-bottom:1px solid #334155;
-}
-.header{
-    color:var(--muted);
-    font-weight:600;
-    border-bottom:2px solid #334155;
-}
-.right{text-align:right}
-
-.total{
-    margin-top:16px;
-    padding-top:12px;
-    border-top:2px solid var(--accent);
-    font-weight:700;
-}
-
-.badge{
-    background:#020617;
-    border-radius:10px;
-    padding:6px 10px;
-    font-size:.85rem;
-    color:var(--muted);
-}
+:root{--energy-bg:#0f172a;--energy-card:#1e293b;--energy-card2:#111c31;--energy-text:#e5e7eb;--energy-muted:#94a3b8;--energy-accent:#22c55e;--energy-blue:#38bdf8;--energy-warn:#f59e0b;--energy-error:#ef4444;--energy-border:#334155}
+*{box-sizing:border-box}
+body{margin:0;background:var(--energy-bg);color:var(--energy-text);font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
+.energy-wrap{max-width:1220px;margin:0 auto;padding:20px}
+.energy-top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:22px;flex-wrap:wrap}
+.energy-title{display:flex;align-items:center;gap:12px}.energy-back{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(148,163,184,.18);border-radius:12px;background:var(--energy-card);color:var(--energy-text);text-decoration:none}
+h1{margin:0;font-size:clamp(1.55rem,4vw,2.1rem)}.sub{color:var(--energy-muted);font-size:.84rem;margin-top:4px}.top-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.energy-link{color:var(--energy-text);text-decoration:none;border:1px solid rgba(148,163,184,.18);background:var(--energy-card);padding:9px 12px;border-radius:10px;font-size:.84rem}
+.badge{display:inline-flex;align-items:center;border-radius:999px;padding:5px 9px;font-size:.72rem;font-weight:800;border:1px solid transparent}.ok{background:rgba(34,197,94,.14);color:#86efac;border-color:rgba(34,197,94,.25)}.warn{background:rgba(245,158,11,.14);color:#fcd34d;border-color:rgba(245,158,11,.25)}.neutral{background:rgba(148,163,184,.12);color:#cbd5e1;border-color:rgba(148,163,184,.18)}.live{background:rgba(34,197,94,.14);color:#86efac}.shadow{background:rgba(167,139,250,.14);color:#c4b5fd}.arming{background:rgba(245,158,11,.14);color:#fcd34d}
+.summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:24px}.summary-card{background:linear-gradient(145deg,var(--energy-card),var(--energy-card2));border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:16px;min-width:0}.summary-card span{display:block;color:var(--energy-muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}.summary-card strong{display:block;margin-top:7px;font-size:1.25rem;overflow:hidden;text-overflow:ellipsis}.summary-card small{display:block;color:var(--energy-muted);margin-top:5px;font-size:.72rem;line-height:1.35}
+.section-title{margin:28px 0 12px}.section-title h2{margin:0;font-size:1.05rem}.section-title p{margin:5px 0 0;color:var(--energy-muted);font-size:.82rem}
+.station-list{display:grid;gap:16px}.station-card{background:linear-gradient(145deg,var(--energy-card),var(--energy-card2));border:1px solid rgba(148,163,184,.14);border-radius:20px;padding:18px;box-shadow:0 14px 32px rgba(0,0,0,.18)}.station-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}.station-head h3{margin:0;font-size:1.08rem}.station-id{display:block;color:var(--energy-muted);font-size:.74rem;margin-top:3px}.station-totals{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:9px;margin-top:14px}.metric{background:rgba(2,6,23,.28);border-radius:12px;padding:11px;min-width:0}.metric span{display:block;color:var(--energy-muted);font-size:.68rem;text-transform:uppercase}.metric strong{display:block;margin-top:5px;font-size:.92rem}
+.share{margin:12px 0}.share-row{display:flex;justify-content:space-between;gap:10px;color:var(--energy-muted);font-size:.75rem;margin-bottom:5px}.share-track{height:7px;background:#020617;border-radius:999px;overflow:hidden}.share-bar{height:100%;background:var(--energy-accent);border-radius:999px;min-width:0}
+.device-table{margin-top:14px;border-top:1px solid rgba(148,163,184,.14)}.device-row{display:grid;grid-template-columns:1.4fr repeat(5,minmax(90px,.8fr));gap:10px;align-items:center;padding:11px 0;border-bottom:1px solid rgba(148,163,184,.12);font-size:.83rem}.device-row.header{color:var(--energy-muted);font-weight:700;font-size:.72rem;text-transform:uppercase}.right{text-align:right}.device-name{font-weight:750}.device-meta{display:block;color:var(--energy-muted);font-size:.68rem;margin-top:3px}.unavailable{color:#fca5a5}.empty{border:1px dashed rgba(148,163,184,.22);border-radius:14px;padding:16px;color:var(--energy-muted);font-size:.84rem}.stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.stat-card{background:linear-gradient(145deg,var(--energy-card),var(--energy-card2));border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:15px}.stat-card span{color:var(--energy-muted);font-size:.72rem;text-transform:uppercase}.stat-card strong{display:block;margin-top:6px;font-size:1rem}.stat-card small{display:block;color:var(--energy-muted);font-size:.72rem;margin-top:4px}.error-box{border:1px solid rgba(239,68,68,.35);background:rgba(239,68,68,.1);color:#fca5a5;border-radius:14px;padding:14px}
+@media(max-width:950px){.summary{grid-template-columns:repeat(3,minmax(0,1fr))}.station-totals{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:720px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.station-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.device-row.header{display:none}.device-row{grid-template-columns:repeat(2,minmax(0,1fr));background:rgba(2,6,23,.24);border:0;border-radius:12px;padding:12px;margin-top:9px}.device-row>div:first-child{grid-column:1/-1}.right{text-align:left}.device-row .right::before{display:block;color:var(--energy-muted);font-size:.62rem;text-transform:uppercase;margin-bottom:2px}.device-row .power::before{content:"Aktuell"}.device-row .today::before{content:"Heute"}.device-row .total-kwh::before{content:"Gesamt"}.device-row .cost-today::before{content:"€ Heute"}.device-row .cost-total::before{content:"€ Gesamt"}.stats-grid{grid-template-columns:1fr}}
+@media(max-width:480px){.energy-wrap{padding:15px}.summary,.station-totals{grid-template-columns:1fr 1fr}.summary-card:last-child{grid-column:1/-1}}
 </style>
-</head>
+{% endblock %}
 
-<body>
+{% block page %}
+<div class="energy-wrap">
+    <div class="energy-top">
+        <div class="energy-title">
+            <a class="energy-back" href="/grow-control" aria-label="Zurück">←</a>
+            <div>
+                <h1>⚡ Energie & Statistik</h1>
+                <div class="sub">Controllerweite Übersicht aller geladenen Grow-Stationen</div>
+            </div>
+        </div>
+        <div class="top-actions">
+            <span class="badge neutral" id="priceBadge">-- €/kWh</span>
+            <span class="badge neutral" id="pollBadge">Poll --</span>
+            <a class="energy-link" href="/energie/settings">⚙️ Einstellungen</a>
+        </div>
+    </div>
 
-<header>
-    <h1>⚡ Energieverbrauch</h1>
-    <a class="link" href="/energie/settings">⚙️ Einstellungen</a>
-    <a class="link" href="/">← zurück</a>
-</header>
+    <div id="errorBox"></div>
 
-<div class="card">
+    <div class="summary" id="summary">
+        <div class="summary-card"><span>Aktuelle Leistung</span><strong>-- W</strong></div>
+        <div class="summary-card"><span>Heute</span><strong>-- kWh</strong></div>
+        <div class="summary-card"><span>Kosten heute</span><strong>-- €</strong></div>
+        <div class="summary-card"><span>Gesamt seit Reset</span><strong>-- kWh</strong></div>
+        <div class="summary-card"><span>Messpunkte</span><strong>--</strong></div>
+    </div>
 
-<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px;flex-wrap:wrap">
-    <h3 style="margin:0">Geräte</h3>
-    <span class="badge" id="priceBadge">Strompreis: -- €/kWh</span>
-</div>
+    <div class="section-title">
+        <h2>Statistik</h2>
+        <p>Aktuelle Verteilung aus den vorhandenen Zählerständen. Historische Zeitreihen werden hier noch nicht erfunden oder hochgerechnet.</p>
+    </div>
+    <div class="stats-grid" id="statistics"><div class="empty">Lade Statistik…</div></div>
 
-<div class="table header row">
-    <div>Gerät</div>
-    <div class="right">Aktuell</div>
-    <div class="right">Heute</div>
-    <div class="right">Gesamt</div>
-    <div class="right">€ Heute</div>
-    <div class="right">€ Gesamt</div>
-</div>
-
-<div id="energy-rows"></div>
-
-<div class="table total">
-    <div>Σ Gesamt</div>
-    <div class="right" id="sum-power">-- W</div>
-    <div class="right" id="sum-today">-- kWh</div>
-    <div class="right" id="sum-total">-- kWh</div>
-    <div class="right" id="sum-cost-today">-- €</div>
-    <div class="right" id="sum-cost-total">-- €</div>
-</div>
-
+    <div class="section-title">
+        <h2>Grow-Stationen</h2>
+        <p>Jede Station besitzt eigene Tages- und Gesamt-Offsets. Der Shelly-Poll bleibt zentral und läuft unabhängig von dieser Seite.</p>
+    </div>
+    <div class="station-list" id="stations"><div class="empty">Lade Energie-Daten…</div></div>
 </div>
 
 <script>
-const DEVICE_LABELS = {
-    heating: "🔥 Heizung",
-    light: "💡 Licht",
-    fan: "💨 Lüfter",
-    vent: "🌀 Ventilator",
-    irrigation: "🚿 Bewässerung",
-    humidifier: "💧 Luftbefeuchter",
-    dehumidifier: "🌵 Luftentfeuchter",
-    light2: "💡 Licht 2",
-    vent2: "🌀 Ventilator 2"
+const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const DEVICE_ICONS = {heating:'🔥',light:'💡',fan:'💨',vent:'🌀',irrigation:'🚿',humidifier:'💧',dehumidifier:'🌵',light2:'💡',vent2:'🌀'};
+const num = (value, digits=1) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '--';
+const ageText = ts => {
+    if(!ts) return 'noch kein Poll';
+    const sec = Math.max(0, Date.now()/1000 - Number(ts));
+    if(sec < 60) return `vor ${Math.round(sec)}s`;
+    return `vor ${Math.round(sec/60)} min`;
+};
+const modeBadge = mode => {
+    const value = String(mode || 'inactive').toLowerCase();
+    const cls = value === 'live' ? 'live' : (value === 'shadow' ? 'shadow' : (value === 'arming' ? 'arming' : 'neutral'));
+    return `<span class="badge ${cls}">${esc(value.toUpperCase())}</span>`;
 };
 
-let POWER_PRICE = 0.45;
-
-async function loadPrice(){
-    const cfg = await fetch("/api/config").then(r=>r.json());
-    POWER_PRICE = parseFloat(cfg.POWER_PRICE ?? 0.45);
-
-    document.getElementById("priceBadge").textContent =
-        `Strompreis: ${POWER_PRICE.toFixed(2)} €/kWh`;
+function renderSummary(data){
+    const t = data.totals || {};
+    document.getElementById('summary').innerHTML = `
+        <div class="summary-card"><span>Aktuelle Leistung</span><strong>${num(t.power,1)} W</strong><small>Summe aller erreichbaren Messpunkte</small></div>
+        <div class="summary-card"><span>Heute</span><strong>${num(t.today,3)} kWh</strong><small>Seit dem automatischen/manuellen Tagesreset</small></div>
+        <div class="summary-card"><span>Kosten heute</span><strong>${num(t.cost_today,2)} €</strong><small>Mit dem aktuellen Controller-Strompreis</small></div>
+        <div class="summary-card"><span>Gesamt seit Reset</span><strong>${num(t.total,3)} kWh</strong><small>${num(t.cost_total,2)} € seit Gesamt-Reset</small></div>
+        <div class="summary-card"><span>Messpunkte</span><strong>${Number(t.available_devices || 0)}/${Number(t.configured_devices || 0)}</strong><small>${(data.statistics || {}).station_count || 0} geladene Station(en)</small></div>`;
 }
 
-async function loadEnergy(){
-    const data = await fetch("/api/energy").then(r=>r.json());
+function consumerText(item, field, unit){
+    if(!item) return '<strong>Keine Daten</strong><small>Noch kein verfügbarer Messpunkt</small>';
+    return `<strong>${esc(item.tent_name)} · ${esc(item.label)}</strong><small>${num(item[field], field === 'power' ? 1 : 3)} ${unit}</small>`;
+}
 
-    const wrap = document.getElementById("energy-rows");
-    wrap.innerHTML = "";
+function renderStatistics(data){
+    const stats = data.statistics || {};
+    document.getElementById('statistics').innerHTML = `
+        <div class="stat-card"><span>Größter Verbraucher heute</span>${consumerText(stats.top_today,'today','kWh')}</div>
+        <div class="stat-card"><span>Höchste aktuelle Leistung</span>${consumerText(stats.top_power,'power','W')}</div>`;
+}
 
-    let sumPower = 0;
-    let sumTotal = 0;
-    let sumToday = 0;
-
-    let sumCostToday = 0;
-    let sumCostTotal = 0;
-
-    const keys = Object.keys(data);
-    keys.sort((a,b)=>{
-        const A = Object.keys(DEVICE_LABELS).indexOf(a);
-        const B = Object.keys(DEVICE_LABELS).indexOf(b);
-        return (A<0?999:A) - (B<0?999:B);
-    });
-
-    for(const key of keys){
-        const e = data[key];
-
-        const power = Number(e.power ?? 0);
-        const total = Number(e.total ?? 0);
-        const today = Number(e.today ?? 0);
-
-        const costToday = today * POWER_PRICE;
-        const costTotal = total * POWER_PRICE;
-
-        sumPower += power;
-        sumTotal += total;
-        sumToday += today;
-
-        sumCostToday += costToday;
-        sumCostTotal += costTotal;
-
-        const row = document.createElement("div");
-        row.className = "table row";
-        row.innerHTML = `
-            <div>${DEVICE_LABELS[key] ?? key}</div>
-            <div class="right">${power.toFixed(1)} W</div>
-            <div class="right">${today.toFixed(3)} kWh</div>
-            <div class="right">${total.toFixed(3)} kWh</div>
-            <div class="right">${costToday.toFixed(2)} €</div>
-            <div class="right">${costTotal.toFixed(2)} €</div>
-        `;
-        wrap.appendChild(row);
+function deviceRow(device, item, price){
+    const available = !!item.available;
+    const label = `${DEVICE_ICONS[device] || '⚡'} ${item.label || device}`;
+    const endpoint = `${item.host || '--'} / Relay ${item.relay ?? '--'}`;
+    if(!available){
+        return `<div class="device-row">
+            <div><span class="device-name">${esc(label)}</span><span class="device-meta">${esc(endpoint)}${item.error ? ` · ${esc(item.error)}` : ''}</span></div>
+            <div class="right power unavailable">nicht verfügbar</div>
+            <div class="right today">--</div><div class="right total-kwh">--</div>
+            <div class="right cost-today">--</div><div class="right cost-total">--</div>
+        </div>`;
     }
-
-    document.getElementById("sum-power").textContent = sumPower.toFixed(1)+" W";
-    document.getElementById("sum-today").textContent = sumToday.toFixed(3)+" kWh";
-    document.getElementById("sum-total").textContent = sumTotal.toFixed(3)+" kWh";
-
-    document.getElementById("sum-cost-today").textContent = sumCostToday.toFixed(2)+" €";
-    document.getElementById("sum-cost-total").textContent = sumCostTotal.toFixed(2)+" €";
+    const today = Number(item.today || 0), total = Number(item.total || 0);
+    return `<div class="device-row">
+        <div><span class="device-name">${esc(label)}</span><span class="device-meta">${esc(endpoint)}</span></div>
+        <div class="right power">${num(item.power,1)} W</div>
+        <div class="right today">${num(today,3)} kWh</div>
+        <div class="right total-kwh">${num(total,3)} kWh</div>
+        <div class="right cost-today">${num(today*price,2)} €</div>
+        <div class="right cost-total">${num(total*price,2)} €</div>
+    </div>`;
 }
 
-async function refresh(){
-    await loadPrice();
-    await loadEnergy();
+function renderStations(data){
+    const root = document.getElementById('stations');
+    const stations = data.stations || [];
+    const price = Number((data.settings || {}).power_price || 0);
+    if(!stations.length){root.innerHTML='<div class="empty">Keine geladene Grow-Station.</div>';return;}
+
+    root.innerHTML = stations.map(st => {
+        const totals = st.totals || {}, devices = st.devices || {};
+        const rows = Object.entries(devices).map(([device,item]) => deviceRow(device,item,price)).join('');
+        return `<article class="station-card">
+            <div class="station-head">
+                <div><h3>${esc(st.name)}</h3><span class="station-id">${esc(st.tent_id)}</span></div>
+                <div>${modeBadge(st.runtime_mode)} <span class="badge ${Number(totals.configured_devices||0) === 0 ? 'neutral' : (Number(totals.available_devices||0) === Number(totals.configured_devices||0) ? 'ok' : 'warn')}">${Number(totals.configured_devices||0) === 0 ? 'KEINE MESSPUNKTE' : `${Number(totals.available_devices||0)}/${Number(totals.configured_devices||0)} MESSPUNKTE`}</span></div>
+            </div>
+            <div class="station-totals">
+                <div class="metric"><span>Aktuell</span><strong>${num(totals.power,1)} W</strong></div>
+                <div class="metric"><span>Heute</span><strong>${num(totals.today,3)} kWh</strong></div>
+                <div class="metric"><span>Kosten heute</span><strong>${num(totals.cost_today,2)} €</strong></div>
+                <div class="metric"><span>Gesamt</span><strong>${num(totals.total,3)} kWh</strong></div>
+                <div class="metric"><span>Anteil heute</span><strong>${num(st.today_share_pct,1)} %</strong></div>
+            </div>
+            <div class="share"><div class="share-row"><span>Anteil am heutigen Gesamtverbrauch</span><span>${num(st.today_share_pct,1)} %</span></div><div class="share-track"><div class="share-bar" style="width:${Math.max(0,Math.min(100,Number(st.today_share_pct||0)))}%"></div></div></div>
+            ${rows ? `<div class="device-table"><div class="device-row header"><div>Gerät</div><div class="right">Aktuell</div><div class="right">Heute</div><div class="right">Gesamt</div><div class="right">€ Heute</div><div class="right">€ Gesamt</div></div>${rows}</div>` : '<div class="empty">In dieser Station ist noch kein Energie-Messpunkt über eine Hardware-Zuordnung konfiguriert.</div>'}
+        </article>`;
+    }).join('');
 }
 
-refresh();
-setInterval(refresh, 5000);
+async function refreshEnergy(){
+    try{
+        const response = await fetch('/api/energy/overview',{cache:'no-store'});
+        if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if(data.success === false) throw new Error(data.error || 'Energie-API Fehler');
+        document.getElementById('errorBox').innerHTML='';
+        document.getElementById('priceBadge').textContent = `${num(data.settings?.power_price,2)} €/kWh`;
+        document.getElementById('pollBadge').textContent = `Poll ${ageText(data.last_poll)}`;
+        renderSummary(data); renderStatistics(data); renderStations(data);
+    }catch(err){
+        document.getElementById('errorBox').innerHTML=`<div class="error-box">Energie konnte nicht geladen werden: ${esc(err.message)}</div>`;
+    }
+}
+
+refreshEnergy();
+setInterval(refreshEnergy,5000);
 </script>
-
-</body>
-</html>
+{% endblock %}
