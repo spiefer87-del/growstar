@@ -5,6 +5,7 @@ from flask import jsonify, request
 from core.runtime import get_default_runtime, get_runtime
 from services.energy import (
     build_energy_overview,
+    get_energy_history,
     get_energy_settings,
     get_runtime_energy_snapshot,
     reset_runtime_today,
@@ -64,6 +65,14 @@ def register(app):
     @app.route("/api/energy/overview")
     def api_energy_overview():
         return jsonify(build_energy_overview())
+
+    @app.route("/api/energy/history")
+    def api_energy_history():
+        range_key = request.args.get("range", "today")
+        try:
+            return jsonify(get_energy_history(range_key))
+        except ValueError as exc:
+            return jsonify(success=False, error=str(exc)), 400
 
     @app.route("/api/energy/settings", methods=["GET", "POST"])
     def api_energy_settings():
