@@ -168,13 +168,13 @@
 
     <div class="actions">
 
-        <button onclick="saveSensorAssignments()">
+        <button id="save-assignment-button" onclick="saveSensorAssignments()">
             Sensor-Zuweisung speichern
         </button>
 
         <button
             class="secondary"
-            onclick="loadAll()">
+            onclick="manualRefresh()">
             Aktualisieren
         </button>
 
@@ -209,6 +209,7 @@
 const TENT_ID = {{ tent_id|tojson }};
 const STATE_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/state`;
 const ASSIGNMENTS_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/sensors/assignments`;
+const OFFSET_DEBOUNCE_MS = 350;
 
 let sensorOptions = {
     temperature: [],
@@ -216,8 +217,27 @@ let sensorOptions = {
 };
 
 let sensorSources = [];
-
 let assignments = {};
+
+let stateLoadInFlight = false;
+let assignmentLoadInFlight = false;
+let assignmentSaveInFlight = false;
+let assignmentDirty = false;
+
+const offsetSaveState = {
+    TEMP_OFFSET: {
+        timer: null,
+        inFlight: false,
+        pending: null,
+        promise: null
+    },
+    HUM_OFFSET: {
+        timer: null,
+        inFlight: false,
+        pending: null,
+        promise: null
+    }
+};
 
 
 function fmt(value, digits=1){
@@ -426,47 +446,59 @@ function renderSources(){
 
 async function loadState(){
 
-    const stateResponse = await fetch(STATE_URL);
-    if (!stateResponse.ok) return;
+    if(stateLoadInFlight){
+        return;
+    }
 
-    const s = await stateResponse.json();
+    stateLoadInFlight = true;
 
-    document.getElementById("temp_raw").textContent = fmt(s.temp_raw);
-    document.getElementById("temp_corr").textContent = fmt(s.temp);
-    document.getElementById("hum_raw").textContent = fmt(s.hum_raw);
-    document.getElementById("hum_corr").textContent = fmt(s.hum);
+    try{
+
+        const stateResponse = await fetch(
+            STATE_URL,
+            {cache:"no-store"}
+        );
+
+        if (!stateResponse.ok) return;
+
+        const s = await stateResponse.json();
+
+        // Ausschließlich Live-Anzeigen – keine Formulareingaben.
+        document.getElementById("temp_raw").textContent = fmt(s.temp_raw);
+        document.getElementById("temp_corr").textContent = fmt(s.temp);
+        document.getElementById("hum_raw").textContent = fmt(s.hum_raw);
+        document.getElementById("hum_corr").textContent = fmt(s.hum);
+
+    }finally{
+
+        stateLoadInFlight = false;
+
+    }
 
 }
 
 
-async function loadAssignments(){
-
-    const response = await fetch(ASSIGNMENTS_URL);
-
-    const data =
-        await response.json();
-
-    if(!data.success){
-
-        return;
-
-    }
+function applyAssignmentControls(data){
 
     assignments =
         data.assignments || {};
 
-    const offsets = data.offsets || {};
-    document.getElementById("TEMP_OFFSET").value = offsets.TEMP_OFFSET ?? 0;
-    document.getElementById("HUM_OFFSET").value = offsets.HUM_OFFSET ?? 0;
+    const offsets =
+        data.offsets || {};
+
+    // Diese Werte werden nur beim initialen Laden, nach erfolgreichem
+    // Speichern oder bei bewusstem "Aktualisieren" übernommen.
+    document.getElementById("TEMP_OFFSET").value =
+        offsets.TEMP_OFFSET ?? 0;
+
+    document.getElementById("HUM_OFFSET").value =
+        offsets.HUM_OFFSET ?? 0;
 
     sensorOptions =
         data.options || {
             temperature: [],
             humidity: []
         };
-
-    sensorSources =
-        data.sources || [];
 
     renderSelect(
         "temperature",
@@ -480,45 +512,85 @@ async function loadAssignments(){
 
     renderSourceLabels();
 
-    renderSources();
+    assignmentDirty = false;
 
 }
 
 
-async function loadAll(){
+async function loadAssignments({syncControls = false} = {}){
 
-    await loadState();
-
-    await loadAssignments();
-
-}
-
-
-async function saveOffset(key, value){
-
-    const response = await fetch(
-        ASSIGNMENTS_URL,
-        {
-            method:"POST",
-            headers:{
-                "Content-Type":"application/json"
-            },
-            body:JSON.stringify({
-                offsets: { [key]: value }
-            })
-        }
-    );
-
-    if (!response.ok) {
-        alert("Offset konnte nicht gespeichert werden");
+    if(
+        assignmentLoadInFlight ||
+        assignmentSaveInFlight
+    ){
         return;
     }
 
-    const el = document.getElementById(
+    assignmentLoadInFlight = true;
+
+    try{
+
+        const response = await fetch(
+            ASSIGNMENTS_URL,
+            {cache:"no-store"}
+        );
+
+        if(!response.ok){
+            return;
+        }
+
+        const data =
+            await response.json();
+
+        if(!data.success){
+            return;
+        }
+
+        // Die Quellliste darf live aktualisieren, weil sie kein Eingabefeld ist.
+        sensorSources =
+            data.sources || [];
+
+        renderSources();
+
+        // Auto-Refresh überschreibt niemals Dropdowns oder Offsets.
+        if(syncControls){
+            applyAssignmentControls(data);
+        }
+
+    }finally{
+
+        assignmentLoadInFlight = false;
+
+    }
+
+}
+
+
+async function loadAll({syncControls = true} = {}){
+
+    await Promise.all([
+        loadState(),
+        loadAssignments({syncControls})
+    ]);
+
+}
+
+
+function offsetSavedElement(key){
+
+    return document.getElementById(
         key === "TEMP_OFFSET"
         ? "saved_temp"
         : "saved_hum"
     );
+
+}
+
+
+function showOffsetSaved(key){
+
+    const el =
+        offsetSavedElement(key);
 
     el.classList.add(
         "show"
@@ -533,7 +605,132 @@ async function saveOffset(key, value){
         1200
     );
 
-    loadState();
+}
+
+
+async function flushOffsetSave(key){
+
+    const state =
+        offsetSaveState[key];
+
+    if(!state){
+        return;
+    }
+
+    if(state.timer){
+        clearTimeout(state.timer);
+        state.timer = null;
+    }
+
+    if(state.inFlight){
+        return state.promise;
+    }
+
+    if(
+        state.pending === null ||
+        state.pending === undefined
+    ){
+        return;
+    }
+
+    const value =
+        state.pending;
+
+    state.pending = null;
+    state.inFlight = true;
+
+    state.promise = (async ()=>{
+
+        try{
+
+            const response = await fetch(
+                ASSIGNMENTS_URL,
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":"application/json"
+                    },
+                    body:JSON.stringify({
+                        offsets: { [key]: value }
+                    })
+                }
+            );
+
+            if(!response.ok){
+                alert("Offset konnte nicht gespeichert werden");
+                return;
+            }
+
+            showOffsetSaved(
+                key
+            );
+
+            // Nur Live-Korrekturwerte nachziehen. Das Eingabefeld selbst
+            // bleibt vollständig in Benutzerhand.
+            await loadState();
+
+        }finally{
+
+            state.inFlight = false;
+            state.promise = null;
+
+            // Falls während des Requests weiter getippt wurde, wird exakt
+            // der neueste Wert anschließend gespeichert.
+            if(
+                state.pending !== null &&
+                state.pending !== undefined
+            ){
+                await flushOffsetSave(
+                    key
+                );
+            }
+
+        }
+
+    })();
+
+    return state.promise;
+
+}
+
+
+function queueOffsetSave(key, value){
+
+    const state =
+        offsetSaveState[key];
+
+    if(!state){
+        return;
+    }
+
+    const numeric =
+        Number(value);
+
+    if(!Number.isFinite(numeric)){
+        return;
+    }
+
+    state.pending =
+        Math.round(
+            numeric * 10
+        ) / 10;
+
+    if(state.timer){
+        clearTimeout(
+            state.timer
+        );
+    }
+
+    state.timer =
+        setTimeout(
+            ()=>{
+                state.timer = null;
+                flushOffsetSave(
+                    key
+                );
+            },
+            OFFSET_DEBOUNCE_MS
+        );
 
 }
 
@@ -555,10 +752,12 @@ function changeOffset(key, delta){
             (value + delta) * 10
         ) / 10;
 
+    // Anzeige reagiert sofort auf den Benutzer.
     input.value =
         value;
 
-    saveOffset(
+    // Gespeichert wird gebündelt nach einer kurzen Bedienpause.
+    queueOffsetSave(
         key,
         value
     );
@@ -566,7 +765,33 @@ function changeOffset(key, delta){
 }
 
 
+async function flushAllOffsets(){
+
+    await Promise.all([
+        flushOffsetSave("TEMP_OFFSET"),
+        flushOffsetSave("HUM_OFFSET")
+    ]);
+
+}
+
+
+async function manualRefresh(){
+
+    // Bewusster Refresh speichert noch wartende Offset-Eingaben zuerst.
+    await flushAllOffsets();
+
+    await loadAll({
+        syncControls:true
+    });
+
+}
+
+
 async function saveSensorAssignments(){
+
+    if(assignmentSaveInFlight){
+        return;
+    }
 
     const tempOption =
         parseOptionValue(
@@ -602,24 +827,41 @@ async function saveSensorAssignments(){
         ?.replace(/\s\(.+\)$/, "") ||
         humOption.source_id;
 
-    const response = await fetch(
-        ASSIGNMENTS_URL,
-        {
-            method:"POST",
-            headers:{
-                "Content-Type":"application/json"
-            },
-            body:JSON.stringify({
-                temperature: tempOption,
-                humidity: humOption
-            })
+    const saveButton =
+        document.getElementById(
+            "save-assignment-button"
+        );
+
+    assignmentSaveInFlight = true;
+    saveButton.disabled = true;
+
+    try{
+
+        const response = await fetch(
+            ASSIGNMENTS_URL,
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    temperature: tempOption,
+                    humidity: humOption
+                })
+            }
+        );
+
+        const data =
+            await response.json();
+
+        if(!response.ok || !data.success){
+            alert(
+                data.message ||
+                data.error ||
+                "Sensor-Zuweisung konnte nicht gespeichert werden"
+            );
+            return;
         }
-    );
-
-    const data =
-        await response.json();
-
-    if(data.success){
 
         const el =
             document.getElementById(
@@ -639,44 +881,96 @@ async function saveSensorAssignments(){
             1200
         );
 
-        await loadAll();
+        // Erst nach erfolgreichem Speichern dürfen die Serverwerte wieder
+        // bewusst in die Auswahlfelder übernommen werden.
+        assignmentDirty = false;
+
+        await loadAll({
+            syncControls:true
+        });
+
+    }finally{
+
+        assignmentSaveInFlight = false;
+        saveButton.disabled = false;
 
     }
 
 }
 
 
-document.getElementById("TEMP_OFFSET").onchange =
-    ()=>{
-        saveOffset(
-            "TEMP_OFFSET",
-            Number(
-                document.getElementById("TEMP_OFFSET").value
-            )
+document.getElementById("temperature-source")
+    .addEventListener(
+        "change",
+        ()=>{
+            assignmentDirty = true;
+        }
+    );
+
+
+document.getElementById("humidity-source")
+    .addEventListener(
+        "change",
+        ()=>{
+            assignmentDirty = true;
+        }
+    );
+
+
+["TEMP_OFFSET", "HUM_OFFSET"].forEach(
+    key=>{
+
+        const input =
+            document.getElementById(
+                key
+            );
+
+        input.addEventListener(
+            "input",
+            ()=>{
+                queueOffsetSave(
+                    key,
+                    input.value
+                );
+            }
         );
-    };
 
+        input.addEventListener(
+            "change",
+            ()=>{
+                queueOffsetSave(
+                    key,
+                    input.value
+                );
 
-document.getElementById("HUM_OFFSET").onchange =
-    ()=>{
-        saveOffset(
-            "HUM_OFFSET",
-            Number(
-                document.getElementById("HUM_OFFSET").value
-            )
+                flushOffsetSave(
+                    key
+                );
+            }
         );
-    };
+
+    }
+);
 
 
-loadAll();
+// Initial: gespeicherte Konfiguration einmalig in die Bedienelemente übernehmen.
+loadAll({
+    syncControls:true
+});
 
+
+// Live-Messwerte dürfen weiter regelmäßig aktualisieren.
 setInterval(
     loadState,
     3000
 );
 
+
+// Sensorquellen dürfen aktualisieren, aber Dropdowns/Offsets bleiben unangetastet.
 setInterval(
-    loadAssignments,
+    ()=>loadAssignments({
+        syncControls:false
+    }),
     10000
 );
 

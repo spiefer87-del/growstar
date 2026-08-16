@@ -20,7 +20,7 @@ select,input{width:100%;padding:10px;border-radius:9px;border:1px solid var(--bo
 button{width:100%;border:none;border-radius:10px;padding:11px;background:var(--accent);color:#052e16;font-weight:700;cursor:pointer}
 button:disabled{opacity:.45;cursor:not-allowed}
 .status{padding:12px 14px;border-radius:12px;background:#111827;color:var(--muted);margin-bottom:14px}.status.shadow{background:rgba(124,58,237,.16);color:#ddd6fe}.status.live{background:rgba(34,197,94,.14);color:#bbf7d0}
-.state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}.assignment-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(120,53,15,.18);color:#fde68a;font-size:.84rem;line-height:1.5}.assignment-warning.visible{display:block}.safety-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(239,68,68,.42);background:rgba(127,29,29,.22);color:#fecaca;font-size:.84rem;line-height:1.5}.safety-warning.visible{display:block}.hardware-line{margin-top:7px;color:var(--muted);font-size:.78rem}
+.state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}.editing-hint{display:none;margin-top:10px;color:#fcd34d;text-align:center;font-size:.76rem}.editing-hint.visible{display:block}.assignment-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(120,53,15,.18);color:#fde68a;font-size:.84rem;line-height:1.5}.assignment-warning.visible{display:block}.safety-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(239,68,68,.42);background:rgba(127,29,29,.22);color:#fecaca;font-size:.84rem;line-height:1.5}.safety-warning.visible{display:block}.hardware-line{margin-top:7px;color:var(--muted);font-size:.78rem}
 @media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}}
 </style>
 {% endblock %}
@@ -97,6 +97,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         </div>
 
         <button id="save-button" onclick="saveDevice()">💾 Für {{ tent_name }} speichern</button>
+        <div id="editing-hint" class="editing-hint">Ungespeicherte Änderungen · Live-Status läuft weiter</div>
         <div id="saved" class="saved">✓ gespeichert</div>
     </div>
 </div>
@@ -113,8 +114,39 @@ button:disabled{opacity:.45;cursor:not-allowed}
     const assignmentWarning = document.getElementById("assignment-warning");
     const safetyWarning = document.getElementById("safety-warning");
     const hardwareState = document.getElementById("hardware-state");
+    const editingHint = document.getElementById("editing-hint");
+
+    const FORM_CONTROL_IDS = [
+        "mode",
+        "start",
+        "end",
+        "interval-on",
+        "interval-off",
+        "use-temp",
+        "use-hum",
+        "logic",
+        "direction"
+    ];
+
     let hardwareConfigured = false;
+    let formInitialized = false;
+    let formDirty = false;
+    let refreshInFlight = false;
+    let saveInProgress = false;
+    let refreshEpoch = 0;
+
     saveButton.disabled = !CAN_CONFIGURE;
+
+    function markFormDirty() {
+        if (!CAN_CONFIGURE) return;
+        formDirty = true;
+        editingHint.classList.add("visible");
+    }
+
+    function markFormClean() {
+        formDirty = false;
+        editingHint.classList.remove("visible");
+    }
 
     function setModeAvailability(configured) {
         hardwareConfigured = Boolean(configured);
@@ -169,6 +201,25 @@ button:disabled{opacity:.45;cursor:not-allowed}
         }
     }
 
+    function applyDeviceForm(data) {
+        const params = data.params || {};
+        const env = data.env_config || {};
+
+        mode.value = data.mode || "OFF";
+        document.getElementById("start").value = timeFromMinutes(params.start_min);
+        document.getElementById("end").value = timeFromMinutes(params.end_min);
+        document.getElementById("interval-on").value = params.interval_on ?? 300;
+        document.getElementById("interval-off").value = params.interval_off ?? 900;
+        document.getElementById("use-temp").checked = Boolean(env.use_temp);
+        document.getElementById("use-hum").checked = Boolean(env.use_hum);
+        document.getElementById("logic").value = env.logic || "OR";
+        document.getElementById("direction").value = env.direction || "HIGH";
+
+        formInitialized = true;
+        markFormClean();
+        updateSections();
+    }
+
     function renderRuntime(data) {
         const box = document.getElementById("runtime-status");
         const output = document.getElementById("output-state");
@@ -218,30 +269,37 @@ button:disabled{opacity:.45;cursor:not-allowed}
         }
     }
 
-    async function loadDevice() {
-        const response = await fetch(DEVICE_URL);
-        if (!response.ok) return;
-        const data = await response.json();
+    async function loadDevice({syncForm = false} = {}) {
+        if (refreshInFlight || saveInProgress) return;
 
-        mode.value = data.mode || "OFF";
-        const params = data.params || {};
-        const env = data.env_config || {};
+        const requestEpoch = refreshEpoch;
+        refreshInFlight = true;
 
-        document.getElementById("start").value = timeFromMinutes(params.start_min);
-        document.getElementById("end").value = timeFromMinutes(params.end_min);
-        document.getElementById("interval-on").value = params.interval_on ?? 300;
-        document.getElementById("interval-off").value = params.interval_off ?? 900;
-        document.getElementById("use-temp").checked = Boolean(env.use_temp);
-        document.getElementById("use-hum").checked = Boolean(env.use_hum);
-        document.getElementById("logic").value = env.logic || "OR";
-        document.getElementById("direction").value = env.direction || "HIGH";
+        try {
+            const response = await fetch(DEVICE_URL, {cache: "no-store"});
+            if (!response.ok) return;
 
-        renderRuntime(data);
-        updateSections();
+            const data = await response.json();
+
+            // Ein Refresh, der vor einem Speichervorgang gestartet wurde,
+            // darf danach keinen älteren Runtime-Zustand mehr rendern.
+            if (requestEpoch !== refreshEpoch) return;
+
+            renderRuntime(data);
+
+            // Auto-Refresh darf niemals Benutzereingaben überschreiben.
+            // Formularwerte werden nur beim Erstladen oder bewusst nach
+            // erfolgreichem Speichern synchronisiert.
+            if (syncForm && !formDirty) {
+                applyDeviceForm(data);
+            }
+        } finally {
+            refreshInFlight = false;
+        }
     }
 
     window.saveDevice = async function saveDevice() {
-        if (!CAN_CONFIGURE) return;
+        if (!CAN_CONFIGURE || saveInProgress) return;
 
         if (mode.value !== "OFF" && !hardwareConfigured) {
             alert(
@@ -267,33 +325,65 @@ button:disabled{opacity:.45;cursor:not-allowed}
             }
         };
 
-        const response = await fetch(DEVICE_URL, {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload)
-        });
+        saveInProgress = true;
+        refreshEpoch += 1;
+        saveButton.disabled = true;
 
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            if (error.error === "device_hardware_required") {
-                alert(error.message || "Aktiver Modus benötigt zuerst eine Hardware-Zuordnung.");
-            } else {
-                alert(error.message || error.error || "Speichern fehlgeschlagen");
+        try {
+            const response = await fetch(DEVICE_URL, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({}));
+                if (error.error === "device_hardware_required") {
+                    alert(error.message || "Aktiver Modus benötigt zuerst eine Hardware-Zuordnung.");
+                } else {
+                    alert(error.message || error.error || "Speichern fehlgeschlagen");
+                }
+                // Eingaben bewusst stehen lassen. Der Benutzer kann korrigieren
+                // und erneut speichern; der nächste Poll aktualisiert nur Status.
+                return;
             }
-            await loadDevice();
-            return;
-        }
 
-        const data = await response.json();
-        renderRuntime(data);
-        const saved = document.getElementById("saved");
-        saved.classList.add("visible");
-        setTimeout(() => saved.classList.remove("visible"), 1200);
+            const data = await response.json();
+            renderRuntime(data);
+            applyDeviceForm(data);
+
+            const saved = document.getElementById("saved");
+            saved.classList.add("visible");
+            setTimeout(() => saved.classList.remove("visible"), 1200);
+        } finally {
+            saveInProgress = false;
+            saveButton.disabled = !CAN_CONFIGURE;
+        }
     };
 
-    mode.addEventListener("change", updateSections);
-    loadDevice();
-    setInterval(loadDevice, 3000);
+    FORM_CONTROL_IDS.forEach(id => {
+        const element = document.getElementById(id);
+        if (!element) return;
+
+        const eventName =
+            element.tagName === "SELECT" || element.type === "checkbox"
+                ? "change"
+                : "input";
+
+        element.addEventListener(eventName, () => {
+            markFormDirty();
+            if (id === "mode") updateSections();
+        });
+    });
+
+    // Erstes Laden darf die gespeicherten Werte in das Formular übernehmen.
+    loadDevice({syncForm: true});
+
+    // Danach werden ausschließlich Live-/Hardware-/Safety-Daten aktualisiert.
+    setInterval(
+        () => loadDevice({syncForm: false}),
+        3000
+    );
 })();
 </script>
 {% endblock %}
