@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block title %}Patch-Information · Growstar v{{ current_release.version }}{% endblock %}
+
+{% block head %}
+<style>
+:root{
+    --release-bg:#0f172a;
+    --release-card:#111c31;
+    --release-card2:#162238;
+    --release-text:#e5e7eb;
+    --release-muted:#94a3b8;
+    --release-border:rgba(148,163,184,.15);
+    --release-accent:#22c55e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--release-bg);color:var(--release-text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.release-wrap{max-width:900px;margin:0 auto;padding:22px 16px 70px}
+.release-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
+.release-back{color:var(--release-muted);text-decoration:none;font-size:.86rem}
+.release-back:hover{color:var(--release-text)}
+.release-brand{margin-top:8px}
+.release-brand h1{margin:0;font-size:1.7rem}
+.release-sub{margin-top:5px;color:var(--release-muted);font-size:.84rem}
+.release-current{
+    padding:18px;
+    border:1px solid rgba(34,197,94,.24);
+    border-radius:18px;
+    background:linear-gradient(145deg,rgba(34,197,94,.08),var(--release-card));
+    box-shadow:0 16px 40px rgba(0,0,0,.18);
+    margin-bottom:18px;
+}
+.release-version-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.release-version{font-size:1.25rem;font-weight:800}
+.release-date{color:var(--release-muted);font-size:.78rem}
+.release-title{font-size:1rem;font-weight:750;margin:10px 0 4px}
+.release-summary{color:#cbd5e1;line-height:1.55;font-size:.86rem}
+.release-section{margin-top:16px}
+.release-section h3{margin:0 0 9px;font-size:.86rem}
+.release-list{display:grid;gap:8px}
+.release-item{
+    display:flex;
+    align-items:flex-start;
+    gap:9px;
+    padding:9px 10px;
+    border:1px solid var(--release-border);
+    border-radius:11px;
+    background:rgba(2,6,23,.25);
+    color:#dbe4ef;
+    font-size:.8rem;
+    line-height:1.45;
+}
+.release-bullet{flex:0 0 auto;color:#86efac;font-weight:800}
+.test-list{display:grid;gap:8px}
+.test-item{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:10px 11px;
+    border:1px solid var(--release-border);
+    border-radius:11px;
+    background:rgba(2,6,23,.25);
+    cursor:pointer;
+}
+.test-item input{margin-top:3px;accent-color:var(--release-accent)}
+.test-item span{font-size:.8rem;line-height:1.45;color:#dbe4ef}
+.test-item:has(input:checked) span{text-decoration:line-through;color:var(--release-muted)}
+.release-history-title{margin:26px 0 10px;font-size:1rem}
+.release-history{display:grid;gap:10px}
+.release-old{
+    border:1px solid var(--release-border);
+    border-radius:15px;
+    background:linear-gradient(145deg,var(--release-card),var(--release-card2));
+    overflow:hidden;
+}
+.release-old summary{
+    display:flex;
+    justify-content:space-between;
+    gap:12px;
+    padding:14px 15px;
+    cursor:pointer;
+    list-style:none;
+}
+.release-old summary::-webkit-details-marker{display:none}
+.release-old-title{font-weight:750;font-size:.88rem}
+.release-old-meta{color:var(--release-muted);font-size:.72rem;margin-top:3px}
+.release-old-arrow{color:var(--release-muted)}
+.release-old-content{padding:0 15px 15px}
+.release-api{
+    margin-top:18px;
+    padding:11px 13px;
+    border:1px solid var(--release-border);
+    border-radius:12px;
+    background:rgba(2,6,23,.28);
+    color:var(--release-muted);
+    font-size:.72rem;
+    line-height:1.5;
+}
+.release-api code{color:#cbd5e1}
+@media(max-width:640px){
+    .release-wrap{padding:15px 11px 62px}
+    .release-brand h1{font-size:1.45rem}
+    .release-current{padding:14px}
+}
+</style>
+{% endblock %}
+
+{% block page %}
+<div class="release-wrap">
+    <div class="release-top">
+        <div>
+            <a class="release-back" href="/">← Zurück</a>
+            <div class="release-brand">
+                <h1>🌱 Growstar</h1>
+                <div class="release-sub">Versions- und Patch-Information</div>
+            </div>
+        </div>
+    </div>
+
+    <section class="release-current">
+        <div class="release-version-row">
+            <div class="release-version">Version {{ current_release.version }}</div>
+            <div class="release-date">{{ current_release.date_label }}</div>
+        </div>
+
+        <div class="release-title">{{ current_release.title }}</div>
+        <div class="release-summary">{{ current_release.summary }}</div>
+
+        <div class="release-section">
+            <h3>Was wurde geändert?</h3>
+            <div class="release-list">
+                {% for item in current_release.changes %}
+                <div class="release-item">
+                    <span class="release-bullet">✓</span>
+                    <span>{{ item }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="release-section">
+            <h3>Was sollte nach dem Update getestet werden?</h3>
+            <div
+                id="release-test-list"
+                class="test-list"
+                data-release-version="{{ current_release.version }}"
+            >
+                {% for item in current_release.tests %}
+                <label class="test-item">
+                    <input type="checkbox" data-test-index="{{ loop.index0 }}">
+                    <span>{{ item }}</span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    {% if releases|length > 1 %}
+    <h2 class="release-history-title">Vorherige Änderungen</h2>
+    <div class="release-history">
+        {% for release in releases[1:] %}
+        <details class="release-old">
+            <summary>
+                <div>
+                    <div class="release-old-title">Version {{ release.version }} · {{ release.title }}</div>
+                    <div class="release-old-meta">{{ release.date_label }}</div>
+                </div>
+                <span class="release-old-arrow">⌄</span>
+            </summary>
+            <div class="release-old-content">
+                <div class="release-summary">{{ release.summary }}</div>
+
+                <div class="release-section">
+                    <h3>Änderungen</h3>
+                    <div class="release-list">
+                        {% for item in release.changes %}
+                        <div class="release-item">
+                            <span class="release-bullet">✓</span>
+                            <span>{{ item }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="release-section">
+                    <h3>Testhinweise</h3>
+                    <div class="release-list">
+                        {% for item in release.tests %}
+                        <div class="release-item">
+                            <span class="release-bullet">□</span>
+                            <span>{{ item }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </details>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="release-api">
+        Diagnose: <code>GET /api/system/version</code> liefert die aktuell laufende
+        Version read-only zurück.
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const list = document.getElementById("release-test-list");
+    if(!list) return;
+
+    const version = String(list.dataset.releaseVersion || "");
+    const storageKey = `growstar_release_tests_${version}`;
+
+    function loadState(){
+        try{
+            const raw = localStorage.getItem(storageKey);
+            const checked = new Set(JSON.parse(raw || "[]").map(Number));
+            list.querySelectorAll('input[data-test-index]').forEach(input => {
+                input.checked = checked.has(Number(input.dataset.testIndex));
+            });
+        }catch(_error){
+            // Die Checkliste bleibt auch ohne localStorage normal bedienbar.
+        }
+    }
+
+    function saveState(){
+        try{
+            const checked = [...list.querySelectorAll('input[data-test-index]:checked')]
+                .map(input => Number(input.dataset.testIndex));
+            localStorage.setItem(storageKey, JSON.stringify(checked));
+        }catch(_error){
+            // Rein lokale Komfortfunktion; kein Server-Schreibzugriff.
+        }
+    }
+
+    list.addEventListener("change", saveState);
+    loadState();
+})();
+</script>
+{% endblock %}
