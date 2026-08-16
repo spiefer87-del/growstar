@@ -38,6 +38,8 @@ def main():
     require('_design_page_context(tent_id)' in dashboard and 'design_tents' in dashboard,'Design-Route erhält Stationsliste ohne zusätzliche API-Abhängigkeit')
     require('@app.route("/design")' in dashboard and 'default_tent_id()' in dashboard,'Legacy /design bleibt für Default-Station erhalten')
     require('path.endswith("/design")' in policy and 'require("settings.view")' in policy,'Stationsbezogene Design-Seite benötigt settings.view')
+    require('"/energie/diagramme": require("grow.view")' in policy,'Bestehende Leseberechtigung der Energie-Diagrammseite bleibt erhalten')
+    require('if "/energy/reset_" in path:' in policy and 'return require("grow.configure")' in policy,'Stationsbezogene Energie-Reset-Rechte bleiben erhalten')
 
     require('/api/tents/${encodeURIComponent(TENT_ID)}/config' in design,'Design liest/schreibt stationsbezogene Config')
     require('/api/config' not in design,'Design verwendet kein globales /api/config mehr')
