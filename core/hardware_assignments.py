@@ -78,6 +78,30 @@ class HardwareConflictError(ValueError):
         self.owner = owner
 
 
+class HardwareAssignmentActiveModeError(ValueError):
+    def __init__(self, device, *, mode, current=None, requested=None):
+        self.device = str(device)
+        self.mode = str(mode or "OFF").upper()
+        self.current = deepcopy(current)
+        self.requested = deepcopy(requested)
+        super().__init__(
+            f"{self.device}: Hardware-Zuordnung kann im Modus {self.mode} "
+            "nicht geändert werden. Gerät zuerst auf OFF / Deaktiviert setzen."
+        )
+
+
+class HardwareAssignmentNotSafeOffError(ValueError):
+    def __init__(self, device, *, current=None, health=None):
+        self.device = str(device)
+        self.current = deepcopy(current)
+        self.health = deepcopy(health)
+        super().__init__(
+            f"{self.device}: Die bisherige Hardware-Zuordnung kann erst "
+            "geändert oder entfernt werden, wenn der alte Ausgang als "
+            "ONLINE · AUS bestätigt wurde."
+        )
+
+
 def _normalize_host(value):
     value = str(value or "").strip()
     if not value:
@@ -150,6 +174,15 @@ def _save_registered_config(tent_id, cfg, runtime=None):
     save_tent_config(tent_id, cfg)
 
 
+def _config_device_mode(cfg, device):
+    """Liest den Gerätemodus direkt aus der stationsbezogenen Config."""
+    modes = cfg.get("DEVICE_MODES", {})
+    value = modes.get(device, "OFF") if isinstance(modes, dict) else "OFF"
+    if isinstance(value, dict):
+        value = value.get("mode", "OFF")
+    return str(value or "OFF").upper()
+
+
 def hardware_snapshot(tent_id):
     tent_id = validate_tent_id(tent_id)
     tent = tent_manager.get(tent_id)
@@ -177,6 +210,11 @@ def hardware_snapshot(tent_id):
             "configured": bool(host) and relay is not None,
         }
 
+        assignments[device]["mode"] = _config_device_mode(
+            cfg,
+            device,
+        )
+
     control_enabled = bool(runtime.control_enabled) if runtime else bool(tent.get("control_enabled", False))
     return {
         "success": True,
@@ -189,6 +227,70 @@ def hardware_snapshot(tent_id):
         "editable": True,
         "assignments": assignments,
     }
+
+
+def device_assignment(tent_id, device):
+    """Liefert genau eine Zuordnung ohne Netzwerkzugriff."""
+    if device not in DEVICE_HARDWARE:
+        raise ValueError(f"Unbekanntes Gerät: {device}")
+    return deepcopy(hardware_snapshot(tent_id)["assignments"][device])
+
+
+def _endpoint_tuple(assignment):
+    if not assignment or not assignment.get("configured"):
+        return None
+    return (
+        str(assignment.get("ip") or "").strip().lower(),
+        int(assignment.get("relay")),
+    )
+
+
+def _assert_assignment_change_safe(tent_id, runtime, current_snapshot, normalized):
+    """Read-only Guard vor einer Endpoint-Änderung."""
+    from core.hardware.actuator_health import get_endpoint_health
+
+    for device, endpoint in normalized.items():
+        current = current_snapshot["assignments"][device]
+        current_endpoint = _endpoint_tuple(current)
+        requested_endpoint = (
+            None if endpoint is None
+            else (str(endpoint[0]).strip().lower(), int(endpoint[1]))
+        )
+
+        if current_endpoint == requested_endpoint:
+            continue
+
+        mode = str(current.get("mode") or "OFF").upper()
+        if mode != "OFF":
+            raise HardwareAssignmentActiveModeError(
+                device,
+                mode=mode,
+                current=current,
+                requested=(
+                    {"ip": requested_endpoint[0], "relay": requested_endpoint[1]}
+                    if requested_endpoint else None
+                ),
+            )
+
+        # Bei LIVE niemals die Adresse eines möglicherweise noch laufenden
+        # Relais verlieren. Der zentrale read-only Health-Poll muss den alten
+        # Endpoint frisch als ONLINE · AUS bestätigt haben.
+        if not runtime or not runtime.control_enabled or current_endpoint is None:
+            continue
+
+        health = get_endpoint_health(current_endpoint[0], current_endpoint[1])
+        confirmed_off = bool(
+            health
+            and health.get("state") == "ok"
+            and health.get("reachable") is True
+            and health.get("actual_state") is False
+        )
+        if not confirmed_off:
+            raise HardwareAssignmentNotSafeOffError(
+                device,
+                current=current,
+                health=health,
+            )
 
 
 def _normalize_patch(data):
@@ -283,6 +385,13 @@ def update_hardware_assignments(tent_id, data):
     cfg, runtime = _registered_config(tent_id, runtime_map)
 
     normalized = _normalize_patch(data)
+    current_snapshot = hardware_snapshot(tent_id)
+    _assert_assignment_change_safe(
+        tent_id,
+        runtime,
+        current_snapshot,
+        normalized,
+    )
     working = deepcopy(cfg)
 
     for device, endpoint in normalized.items():

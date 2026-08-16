@@ -1,27 +1,26 @@
 # core/devices.py
 
 from copy import deepcopy
-
 from core.runtime import resolve_runtime
 
-
-# =========================================
-# 🔌 GENERIC DEVICE CONTROL SYSTEM
-# =========================================
-
 DEVICE_NAMES = (
-    "heating",
-    "fan",
-    "light",
-    "vent",
-    "irrigation",
-    "humidifier",
-    "dehumidifier",
-    "light2",
-    "vent2",
+    "heating", "fan", "light", "vent", "irrigation",
+    "humidifier", "dehumidifier", "light2", "vent2",
 )
-
 DEVICE_MODES = {"OFF", "ON", "TIME", "INTERVAL", "ENV"}
+
+
+class DeviceHardwareRequiredError(ValueError):
+    """Aktiver Gerätemodus ohne vollständige Hardware-Zuordnung."""
+
+    def __init__(self, device, *, mode, assignment=None):
+        self.device = str(device)
+        self.mode = str(mode or "OFF").upper()
+        self.assignment = deepcopy(assignment or {})
+        super().__init__(
+            f"{self.device}: Für den Modus {self.mode} ist zuerst eine "
+            "Hardware-Zuordnung (IP/Hostname + Relay) erforderlich."
+        )
 
 
 def validate_device_name(device):
@@ -35,30 +34,22 @@ def get_device_mode(device, runtime=None):
     rt = resolve_runtime(runtime)
     modes = rt.config.setdefault("DEVICE_MODES", {})
     value = modes.get(device, "OFF")
-
-    # Kompatibilität mit dem DEFAULT_CONFIG-Schema, das ältere Einträge als
-    # {"mode": "ENV", "params": {...}} enthalten kann.
     if isinstance(value, dict):
         return str(value.get("mode", "OFF") or "OFF").upper()
-
     return str(value or "OFF").upper()
 
 
 def get_device_params(device, runtime=None):
     validate_device_name(device)
     rt = resolve_runtime(runtime)
-
     params = rt.config.setdefault("DEVICE_PARAMS", {})
     if device in params and isinstance(params[device], dict):
         return params[device]
-
-    # Legacy-/Default-Schema unterstützen.
     mode_entry = rt.config.setdefault("DEVICE_MODES", {}).get(device)
     if isinstance(mode_entry, dict):
         legacy_params = mode_entry.get("params")
         if isinstance(legacy_params, dict):
             return legacy_params
-
     return params.setdefault(device, {})
 
 
@@ -80,13 +71,29 @@ def _normalize_mode(mode):
     return mode
 
 
-def update_device_config(device, data, runtime=None):
-    """Aktualisiert genau ein Gerät in genau einer TentRuntime.
+def _assert_hardware_for_active_mode(device, mode, runtime):
+    mode = _normalize_mode(mode)
+    if mode == "OFF":
+        return
 
-    Unterstützt sowohl den neuen kompakten Payload (`mode`, `params`,
-    `env_config`) als auch die bisherige DEVICE_* Struktur. Der Merge ist
-    in-memory atomar und schaltet bewusst keine Hardware direkt; der jeweilige
-    Regelkreis übernimmt die Änderung im nächsten Zyklus.
+    # Lazy Import vermeidet einen Modulzyklus mit hardware_assignments.
+    from core.hardware_assignments import device_assignment
+
+    assignment = device_assignment(runtime.tent_id, device)
+    if not assignment.get("configured"):
+        raise DeviceHardwareRequiredError(
+            device,
+            mode=mode,
+            assignment=assignment,
+        )
+
+
+def update_device_config(device, data, runtime=None):
+    """Aktualisiert genau ein Gerät atomar in genau einer TentRuntime.
+
+    Phase 4L:
+    OFF bleibt immer möglich. ON/TIME/INTERVAL/ENV werden dagegen nur
+    gespeichert, wenn bereits IP/Hostname + Relay zugeordnet sind.
     """
 
     validate_device_name(device)
@@ -104,7 +111,6 @@ def update_device_config(device, data, runtime=None):
     params = data.get("params")
     env = data.get("env_config", data.get("env"))
 
-    # Kompatibilität mit den bisherigen JSON-Bodies.
     if isinstance(data.get("DEVICE_MODES"), dict):
         mode = data["DEVICE_MODES"].get(device, mode)
     if isinstance(data.get("DEVICE_PARAMS"), dict):
@@ -115,7 +121,9 @@ def update_device_config(device, data, runtime=None):
     changed = []
 
     if mode is not None:
-        working["DEVICE_MODES"][device] = _normalize_mode(mode)
+        normalized_mode = _normalize_mode(mode)
+        _assert_hardware_for_active_mode(device, normalized_mode, rt)
+        working["DEVICE_MODES"][device] = normalized_mode
         changed.append("mode")
 
     if params is not None:
