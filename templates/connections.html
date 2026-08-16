@@ -5,7 +5,7 @@
 {% block head %}
 <style>
 :root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--purple:#a78bfa;--amber:#f59e0b}
-*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.45;cursor:not-allowed}.mode-note{margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(148,163,184,.08);color:var(--muted);font-size:.75rem;line-height:1.4}.mode-note.locked{background:rgba(245,158,11,.12);color:#fde68a}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
+*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.45;cursor:not-allowed}.gateway-pick{margin:12px 0 4px;padding:11px;border:1px solid rgba(56,189,248,.16);border-radius:10px;background:rgba(14,116,144,.07)}.gateway-pick-title{margin-bottom:7px;color:#bae6fd;font-size:.75rem;font-weight:800}.gateway-pick-actions{display:grid;grid-template-columns:1fr auto;gap:8px}.gateway-pick select{width:100%;min-width:0;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.gateway-copy{border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:8px 10px;background:rgba(56,189,248,.12);color:#bae6fd;font-weight:800;cursor:pointer;white-space:nowrap}.gateway-copy:disabled,.gateway-pick select:disabled{opacity:.45;cursor:not-allowed}.gateway-hint{margin-top:7px;color:var(--muted);font-size:.7rem;line-height:1.4}.mode-note{margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(148,163,184,.08);color:var(--muted);font-size:.75rem;line-height:1.4}.mode-note.locked{background:rgba(245,158,11,.12);color:#fde68a}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
 </style>
 {% endblock %}
 
@@ -26,7 +26,8 @@
     <div class="legend">
         Nicht verwendete Aktoren können ohne IP/Hostname bleiben. Aktive Betriebsarten sind aber nur mit vollständiger Hardware-Zuordnung erlaubt.
         Eine bestehende Zuordnung kann nur im Modus <strong>Deaktiviert / OFF</strong> geändert werden; bei einer LIVE-Station muss der alte Ausgang zusätzlich als <strong>ONLINE · AUS</strong> bestätigt sein.
-        Bei gesetzter IP und leerem Relay wird Relay 0 verwendet. Doppelbelegungen derselben Kombination <strong>IP/Hostname + Relay</strong> bleiben gesperrt.
+        Bei gesetzter IP und leerem Relay wird Relay 0 verwendet. Doppelbelegungen derselben Kombination <strong>IP/Hostname + Relay</strong> bleiben gesperrt.<br>
+        Erkannte Shelly-Gateways können als Eingabehilfe gewählt werden; <strong>IP übernehmen</strong> kopiert ausschließlich die IP und speichert nichts automatisch.
     </div>
 </div>
 
@@ -39,6 +40,7 @@
     const saveButton = document.getElementById("save-button");
     const feedback = document.getElementById("feedback");
     let current = null;
+    let gateways = [];
 
     const q = new URLSearchParams(location.search);
     const preferred = q.get("tent");
@@ -58,6 +60,54 @@
         return html;
     }
 
+    function escapeHtml(value){
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+    function gatewayOptions(currentIp){
+        const normalizedCurrent = String(currentIp || "").trim().toLowerCase();
+
+        if(!gateways.length){
+            return '<option value="">Keine Gateways erkannt</option>';
+        }
+
+        const options = gateways.map(gateway => {
+            const ip = String(gateway.ip || "").trim();
+            const selected = normalizedCurrent && ip.toLowerCase() === normalizedCurrent;
+            const title = gateway.name || gateway.model || gateway.id || "Shelly Gateway";
+            const status = gateway.online ? "ONLINE" : "OFFLINE";
+            return `<option value="${escapeHtml(gateway.id || ip)}" ${selected ? 'selected' : ''}>${escapeHtml(title)} · ${escapeHtml(ip)} · ${status}</option>`;
+        }).join("");
+
+        return `<option value="" ${gateways.some(g => String(g.ip || "").trim().toLowerCase() === normalizedCurrent) ? '' : 'selected'}>– Gateway auswählen –</option>${options}`;
+    }
+
+    function gatewayBySelection(value){
+        return gateways.find(gateway =>
+            String(gateway.id || gateway.ip || "") === String(value || "")
+        ) || null;
+    }
+
+    async function loadGatewayCatalog(){
+        try{
+            const res = await fetch("/api/hardware", {cache:"no-store"});
+            const data = await res.json().catch(()=>({}));
+            if(!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+            gateways = (data.gateways || [])
+                .filter(gateway => String(gateway.ip || "").trim())
+                .sort((a,b) => String(a.ip || "").localeCompare(String(b.ip || ""), undefined, {numeric:true}));
+        }catch(err){
+            console.warn("Gateway-Liste konnte nicht geladen werden:", err);
+            gateways = [];
+        }
+    }
+
     function render(snapshot){
         current = snapshot;
         const editable = CAN_CONFIGURE;
@@ -73,7 +123,15 @@
             return `
             <article class="card" data-device="${a.device}">
                 <div class="card-head"><h2>${a.icon || '🔌'} ${a.label}</h2><span class="status ${a.configured ? 'ok':'none'}">${a.configured ? 'ZUGEORDNET':'OFFEN'}</span></div>
-                <div class="row"><label>IP / Host</label><input class="js-ip" value="${String(a.ip || '').replace(/"/g,'&quot;')}" placeholder="192.168.178.x" ${fieldsEditable ? '' : 'disabled'}></div>
+                <div class="row"><label>IP / Host</label><input class="js-ip" value="${escapeHtml(a.ip || '')}" placeholder="192.168.178.x" ${fieldsEditable ? '' : 'disabled'}></div>
+                <div class="gateway-pick">
+                    <div class="gateway-pick-title">Automatisch erkanntes Gateway</div>
+                    <div class="gateway-pick-actions">
+                        <select class="js-gateway" ${fieldsEditable && gateways.length ? '' : 'disabled'}>${gatewayOptions(a.ip)}</select>
+                        <button class="gateway-copy js-copy-gateway" type="button" ${fieldsEditable && gateways.length ? '' : 'disabled'}>IP übernehmen</button>
+                    </div>
+                    <div class="gateway-hint">Es wird nur die Gateway-IP in das vorhandene IP-Feld kopiert. Relay, Modus und Regelung bleiben unverändert.</div>
+                </div>
                 <div class="row"><label>Relay</label><select class="js-relay" ${fieldsEditable ? '' : 'disabled'}>${relayOptions(a.relay)}</select></div>
                 <div class="mode-note ${modeLocked ? 'locked' : ''}">
                     Modus: ${MODE_LABELS[mode] || mode}${modeLocked ? " · Zuordnung gesperrt. Gerät zuerst auf Deaktiviert / OFF setzen." : ""}
@@ -102,6 +160,27 @@
         select.value = wanted || tents[0]?.id || "";
         if(select.value) loadHardware(select.value);
     }
+
+    grid.addEventListener("click", event => {
+        const button = event.target.closest(".js-copy-gateway");
+        if(!button || button.disabled) return;
+
+        const card = button.closest(".card[data-device]");
+        if(!card) return;
+
+        const gatewaySelect = card.querySelector(".js-gateway");
+        const ipInput = card.querySelector(".js-ip");
+        const gateway = gatewayBySelection(gatewaySelect?.value);
+
+        if(!gateway || !ipInput || ipInput.disabled) return;
+
+        // Absichtlich NUR die IP kopieren. Relay, Modus und sämtliche
+        // Regel-/Safety-Strukturen bleiben unberührt. Gespeichert wird erst
+        // über den bereits bestehenden Zuordnungen-speichern-Button.
+        ipInput.value = String(gateway.ip || "").trim();
+        feedback.className = "feedback";
+        feedback.textContent = `${card.querySelector("h2")?.textContent || "Aktor"}: Gateway-IP übernommen. Noch nicht gespeichert.`;
+    });
 
     select.addEventListener("change",()=>loadHardware(select.value));
 
@@ -143,7 +222,12 @@
         feedback.className="feedback ok"; feedback.textContent="Zuordnungen gespeichert"; render(data);
     });
 
-    loadStations();
+    async function init(){
+        await loadGatewayCatalog();
+        await loadStations();
+    }
+
+    init();
 })();
 </script>
 {% endblock %}
