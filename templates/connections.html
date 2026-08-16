@@ -5,7 +5,7 @@
 {% block head %}
 <style>
 :root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--purple:#a78bfa;--amber:#f59e0b}
-*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.45;cursor:not-allowed}.gateway-pick{margin:12px 0 4px;padding:11px;border:1px solid rgba(56,189,248,.16);border-radius:10px;background:rgba(14,116,144,.07)}.gateway-pick-title{margin-bottom:7px;color:#bae6fd;font-size:.75rem;font-weight:800}.gateway-pick-actions{display:grid;grid-template-columns:1fr auto;gap:8px}.gateway-pick select{width:100%;min-width:0;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.gateway-copy{border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:8px 10px;background:rgba(56,189,248,.12);color:#bae6fd;font-weight:800;cursor:pointer;white-space:nowrap}.gateway-copy:disabled,.gateway-pick select:disabled{opacity:.45;cursor:not-allowed}.gateway-hint{margin-top:7px;color:var(--muted);font-size:.7rem;line-height:1.4}.mode-note{margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(148,163,184,.08);color:var(--muted);font-size:.75rem;line-height:1.4}.mode-note.locked{background:rgba(245,158,11,.12);color:#fde68a}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
+*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.45;cursor:not-allowed}.gateway-pick{margin:12px 0 4px;padding:11px;border:1px solid rgba(56,189,248,.16);border-radius:10px;background:rgba(14,116,144,.07)}.gateway-pick-title{margin-bottom:7px;color:#bae6fd;font-size:.75rem;font-weight:800}.gateway-pick-actions{display:grid;grid-template-columns:1fr auto;gap:8px}.gateway-pick select{width:100%;min-width:0;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.gateway-copy{border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:8px 10px;background:rgba(56,189,248,.12);color:#bae6fd;font-weight:800;cursor:pointer;white-space:nowrap}.gateway-copy:disabled,.gateway-pick select:disabled{opacity:.45;cursor:not-allowed}.gateway-hint{margin-top:7px;color:var(--muted);font-size:.7rem;line-height:1.4}.mode-note{margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(148,163,184,.08);color:var(--muted);font-size:.75rem;line-height:1.4}.mode-note.locked{background:rgba(245,158,11,.12);color:#fde68a}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.card.conflict{border-color:rgba(239,68,68,.72);box-shadow:0 0 0 2px rgba(239,68,68,.12),0 10px 30px rgba(0,0,0,.22)}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
 </style>
 {% endblock %}
 
@@ -93,6 +93,72 @@
         ) || null;
     }
 
+    function normalizeCurrentAssignment(assignment){
+        const ip = String(assignment?.ip || "").trim();
+        const relay =
+            assignment?.relay === null ||
+            assignment?.relay === undefined ||
+            assignment?.relay === ""
+                ? ""
+                : String(assignment.relay);
+
+        return {ip, relay: ip ? relay : ""};
+    }
+
+    function readCardAssignment(card){
+        const ipInput = card.querySelector(".js-ip");
+        const relaySelect = card.querySelector(".js-relay");
+        const ip = String(ipInput?.value || "").trim();
+        const relay = String(relaySelect?.value || "");
+
+        return {
+            ip,
+            relay: ip ? relay : ""
+        };
+    }
+
+    function assignmentChanged(currentAssignment, requested){
+        const currentValue = normalizeCurrentAssignment(currentAssignment);
+        return (
+            currentValue.ip !== requested.ip ||
+            currentValue.relay !== requested.relay
+        );
+    }
+
+    function assignmentLabel(tentId, device){
+        if(
+            current &&
+            String(current.tent_id || "") === String(tentId || "")
+        ){
+            const assignment = current.assignments?.[device];
+            if(assignment?.label){
+                return `${current.name || tentId} · ${assignment.label}`;
+            }
+        }
+
+        return `${tentId || "Station"} · ${device || "Aktor"}`;
+    }
+
+    function clearConflictHighlights(){
+        grid.querySelectorAll(".card.conflict")
+            .forEach(card => card.classList.remove("conflict"));
+    }
+
+    function highlightConflict(contender){
+        if(
+            !contender ||
+            String(contender.tent_id || "") !== String(select.value || "")
+        ){
+            return;
+        }
+
+        const card = [...grid.querySelectorAll(".card[data-device]")]
+            .find(item => String(item.dataset.device || "") === String(contender.device || ""));
+
+        card?.classList.add("conflict");
+        card?.scrollIntoView({behavior:"smooth", block:"center"});
+    }
+
     async function loadGatewayCatalog(){
         try{
             const res = await fetch("/api/hardware", {cache:"no-store"});
@@ -174,6 +240,8 @@
 
         if(!gateway || !ipInput || ipInput.disabled) return;
 
+        clearConflictHighlights();
+
         // Absichtlich NUR die IP kopieren. Relay, Modus und sämtliche
         // Regel-/Safety-Strukturen bleiben unberührt. Gespeichert wird erst
         // über den bereits bestehenden Zuordnungen-speichern-Button.
@@ -182,44 +250,115 @@
         feedback.textContent = `${card.querySelector("h2")?.textContent || "Aktor"}: Gateway-IP übernommen. Noch nicht gespeichert.`;
     });
 
+    grid.addEventListener("input", event => {
+        if(
+            event.target.matches(".js-ip") ||
+            event.target.matches(".js-relay")
+        ){
+            event.target.closest(".card")?.classList.remove("conflict");
+            if(feedback.classList.contains("err")){
+                feedback.className = "feedback";
+                feedback.textContent = "";
+            }
+        }
+    });
+
+    grid.addEventListener("change", event => {
+        if(event.target.matches(".js-relay")){
+            event.target.closest(".card")?.classList.remove("conflict");
+        }
+    });
+
     select.addEventListener("change",()=>loadHardware(select.value));
 
     saveButton?.addEventListener("click", async () => {
         if(!current || !CAN_CONFIGURE) return;
+
+        clearConflictHighlights();
+
+        // Nur tatsächlich geänderte Aktoren senden. Dadurch werden
+        // unberührte offene Alt-Zuordnungen nicht nebenbei normalisiert
+        // (z.B. leeres Relay -> Relay 0).
         const assignments={};
+
         grid.querySelectorAll(".card[data-device]").forEach(card => {
             const device = card.dataset.device;
             const currentAssignment = current.assignments?.[device] || {};
             const ipInput = card.querySelector(".js-ip");
             const relaySelect = card.querySelector(".js-relay");
 
-            if (ipInput.disabled || relaySelect.disabled) {
-                assignments[device] = {
-                    ip: currentAssignment.ip || "",
-                    relay: currentAssignment.relay ?? ""
-                };
+            if(
+                !ipInput ||
+                !relaySelect ||
+                ipInput.disabled ||
+                relaySelect.disabled
+            ){
                 return;
             }
 
-            const ip = ipInput.value.trim();
-            const relay = relaySelect.value;
-            assignments[device]={ip, relay: ip ? relay : ""};
+            const requested = readCardAssignment(card);
+
+            if(assignmentChanged(currentAssignment, requested)){
+                assignments[device] = requested;
+            }
         });
-        feedback.className="feedback"; feedback.textContent="Speichere …";
-        const res = await fetch(hwUrl(select.value),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({assignments})});
+
+        if(Object.keys(assignments).length === 0){
+            feedback.className="feedback";
+            feedback.textContent="Keine Änderungen zu speichern.";
+            return;
+        }
+
+        feedback.className="feedback";
+        feedback.textContent="Speichere …";
+
+        const res = await fetch(
+            hwUrl(select.value),
+            {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({assignments})
+            }
+        );
+
         const data = await res.json().catch(()=>({}));
+
         if(!res.ok){
             feedback.className="feedback err";
+
             if(data.error === "hardware_endpoint_conflict" && data.owner){
-                feedback.textContent=`Doppelbelegung: ${data.endpoint?.ip || ''} / Relay ${data.endpoint?.relay ?? ''} gehört bereits ${data.owner.tent_id} · ${data.owner.device}.`;
+                const ownerText = assignmentLabel(
+                    data.owner.tent_id,
+                    data.owner.device
+                );
+
+                const contenderText = data.contender
+                    ? assignmentLabel(
+                        data.contender.tent_id,
+                        data.contender.device
+                    )
+                    : "Die neue Zuordnung";
+
+                feedback.textContent =
+                    `Doppelbelegung: ${contenderText} möchte ` +
+                    `${data.endpoint?.ip || ""} / Relay ${data.endpoint?.relay ?? ""}; ` +
+                    `dieser Ausgang gehört bereits ${ownerText}.`;
+
+                highlightConflict(data.contender);
             } else if(data.error === "hardware_assignment_active_mode"){
                 feedback.textContent=data.message || "Gerät zuerst auf Deaktiviert / OFF setzen.";
             } else if(data.error === "hardware_assignment_not_safe_off"){
                 feedback.textContent=data.message || "Alter Ausgang ist noch nicht als ONLINE · AUS bestätigt.";
-            } else feedback.textContent=data.message || data.error || "Speichern fehlgeschlagen";
+            } else {
+                feedback.textContent=data.message || data.error || "Speichern fehlgeschlagen";
+            }
+
             return;
         }
-        feedback.className="feedback ok"; feedback.textContent="Zuordnungen gespeichert"; render(data);
+
+        feedback.className="feedback ok";
+        feedback.textContent="Zuordnungen gespeichert";
+        render(data);
     });
 
     async function init(){
