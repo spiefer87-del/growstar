@@ -4,14 +4,19 @@ from flask import jsonify, request
 
 from core.config_update import apply_config_patch, config_snapshot
 from core.devices import DEVICE_NAMES, get_device_mode
+from core.hardware.actuator_health import get_endpoint_health
 from core.hardware_assignments import (
+    HardwareAssignmentActiveModeError,
+    HardwareAssignmentNotSafeOffError,
     HardwareConflictError,
+    device_assignment,
     hardware_snapshot,
     update_hardware_assignments,
 )
 from core.profile import PROFILES, apply_profile, get_active_profile
 from core.live_preflight import evaluate_live_preflight
 from core.runtime import get_runtime, list_runtimes
+from core.safety import get_runtime_safety_snapshot
 from core.tent_config import ensure_tent_config
 from core.tents import manager as tent_manager, validate_tent_id
 from services.live_control import LiveTransitionError, request_live, request_shadow
@@ -99,12 +104,37 @@ def _state_snapshot(runtime):
         live = dict(st.live_state)
         shadow_outputs = dict(runtime.shadow_outputs)
 
+    safety = get_runtime_safety_snapshot(runtime)
+
     devices = {}
     for device in _DEVICE_NAMES:
+        assignment = device_assignment(runtime.tent_id, device)
+        health = None
+        if assignment.get("configured"):
+            health = get_endpoint_health(assignment["ip"], assignment["relay"])
+
+        runtime_on = bool(getattr(st, f"{device}_on", False))
+        physical_known = bool(
+            health
+            and health.get("state") == "ok"
+            and isinstance(health.get("actual_state"), bool)
+        )
+        safety_override = dict((safety.get("overrides") or {}).get(device) or {})
+
         devices[device] = {
-            "actual_on": getattr(st, f"{device}_on", False),
+            "actual_on": runtime_on,
+            "runtime_on": runtime_on,
             "mode": get_device_mode(device, runtime=runtime),
             "shadow_desired": shadow_outputs.get(device),
+            "assigned": bool(assignment.get("configured")),
+            "assignment": assignment,
+            "hardware_health": health,
+            "physical_known": physical_known,
+            "physical_on": health.get("actual_state") if physical_known else None,
+            "safety_blocked": device in (safety.get("blocked_devices") or []),
+            "safety_force_off": bool(safety_override.get("force_off")),
+            "safety_block_on": bool(safety_override.get("block_on")),
+            "safety_reason": safety_override.get("reason"),
         }
 
     return {
@@ -155,6 +185,15 @@ def _state_snapshot(runtime):
         "devices": devices,
         "shadow_outputs": shadow_outputs,
         "device_modes": cfg.get("DEVICE_MODES", {}),
+
+        "safety": {
+            "active": bool(safety.get("active")),
+            "stale": bool(safety.get("stale")),
+            "state": safety.get("state"),
+            "reason": safety.get("reason"),
+            "blocked_devices": list(safety.get("blocked_devices") or []),
+            "age": safety.get("age"),
+        },
 
         # Energie bleibt vorerst Runtime-lokal/leer für zusätzliche Stationen.
         "energy": dict(runtime.energy_state),
@@ -406,6 +445,25 @@ def register(app):
                 success=False,
                 error="live_hardware_edit_blocked",
                 message=str(exc),
+            ), 409
+        except HardwareAssignmentActiveModeError as exc:
+            return jsonify(
+                success=False,
+                error="hardware_assignment_active_mode",
+                message=str(exc),
+                device=exc.device,
+                mode=exc.mode,
+                current=exc.current,
+                requested=exc.requested,
+            ), 409
+        except HardwareAssignmentNotSafeOffError as exc:
+            return jsonify(
+                success=False,
+                error="hardware_assignment_not_safe_off",
+                message=str(exc),
+                device=exc.device,
+                current=exc.current,
+                health=exc.health,
             ), 409
         except HardwareConflictError as exc:
             return jsonify(
