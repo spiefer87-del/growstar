@@ -65,9 +65,17 @@ def main():
     require(
         "controllerPowerChart" not in overview
         and "stationPowerChart" not in overview
-        and "stationTodayBars" not in overview
-        and "devicePowerBars" not in overview,
-        "Kleine Diagramme sind aus der Energieübersicht entfernt",
+        and "lineChart(" not in overview,
+        "Verlaufdiagramme sind aus der Energieübersicht entfernt",
+    )
+    require(
+        "Tagesauswertung" in overview
+        and "Geräteauswertung" in overview
+        and "stationTodayBars" in overview
+        and "stationPeakBars" in overview
+        and "deviceNowBars" in overview
+        and "devicePeakBars" in overview,
+        "Tages- und Geräteauswertungen bleiben auf der Energieübersicht",
     )
     require(
         "/api/energy/history?range=" not in overview
@@ -79,9 +87,16 @@ def main():
         "Kennzahlen und Stationsdaten der Energieübersicht bleiben aktiv",
     )
     require(
-        "/api/energy/overview" in charts
-        and "/api/energy/history?range=" in charts,
-        "Große Diagrammseite nutzt weiterhin beide Phase-4M-Read-APIs",
+        "/api/energy/history?range=" in charts
+        and "/api/energy/overview" not in charts,
+        "Große Diagrammseite nutzt nur die Phase-4M-History-API",
+    )
+    require(
+        "Tagesauswertung" not in charts
+        and "Geräteauswertung" not in charts
+        and "stationTodayBars" not in charts
+        and "deviceNowBars" not in charts,
+        "Große Diagrammseite enthält wirklich nur Verlaufdiagramme",
     )
     require(
         'data-range="today"' in charts

@@ -62,9 +62,9 @@ def main():
         "Energieübersicht verlinkt die große Diagrammseite",
     )
     require(
-        "/api/energy/overview" in charts
-        and "/api/energy/history?range=" in charts,
-        "Diagrammseite verwendet ausschließlich bestehende Read-APIs",
+        "/api/energy/history?range=" in charts
+        and "/api/energy/overview" not in charts,
+        "Diagrammseite verwendet ausschließlich die read-only History-API",
     )
     require(
         "fetch(" in charts
@@ -74,15 +74,20 @@ def main():
     )
     require(
         "Gesamtleistung der Anlage" in charts
-        and "Leistungsverlauf je Grow-Station" in charts
-        and "Tagesmaximum nach Station" in charts
-        and "Geräte-Maximum heute" in charts,
-        "Große Seite zeigt Verlauf, Stationspeaks und Gerätepeaks",
+        and "Leistungsverlauf je Grow-Station" in charts,
+        "Große Seite zeigt ausschließlich die großen Leistungsverläufe",
     )
     require(
-        'id="stationFilter"' in charts
-        and "Alle Stationen" in charts,
-        "Geräte-Diagramme können nach Station gefiltert werden",
+        "Tagesauswertung" not in charts
+        and "Geräteauswertung" not in charts
+        and 'id="stationFilter"' not in charts,
+        "Statistik- und Geräteauswertungen liegen nicht auf der Diagrammseite",
+    )
+    require(
+        "Tagesauswertung" in overview
+        and "Geräteauswertung" in overview
+        and 'id="stationFilter"' in overview,
+        "Tages- und Geräteauswertungen liegen auf der Energieübersicht",
     )
     require(
         'data-range="today"' in charts

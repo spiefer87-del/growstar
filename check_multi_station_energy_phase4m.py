@@ -95,36 +95,40 @@ def static_checks():
         "Energieübersicht besitzt Tagesmaximum",
     )
 
-    # Phase 4M zeigte die Diagramme zunächst direkt auf /energie.
-    # Ab Phase 4M.1/4M.2 liegen sie absichtlich auf
-    # templates/energie_diagramme.html. Der Basis-Test muss beide
-    # Architekturen akzeptieren, da die Daten-/History-Funktionalität
-    # unverändert Phase 4M bleibt.
-    diagram_source = diagrams or energy
-
-    require(
-        "Gesamtleistung" in diagram_source
-        and (
-            "Verbrauch heute nach Station" in diagram_source
-            or "Tagesmaximum nach Station" in diagram_source
+    if diagrams:
+        require(
+            "Gesamtleistung der Anlage" in diagrams
+            and "Leistungsverlauf je Grow-Station" in diagrams
+            and "<svg" in diagrams,
+            "Separate Diagrammseite besitzt die beiden großen Leistungsverläufe",
         )
-        and (
-            "Aktuelle Geräteleistung" in diagram_source
-            or "Geräte-Maximum heute" in diagram_source
-        ),
-        "Energie-Historie besitzt eine Diagramm-Auswertung",
-    )
+        require(
+            "Tagesauswertung" not in diagrams
+            and "Geräteauswertung" not in diagrams
+            and "stationTodayBars" not in diagrams
+            and "deviceNowBars" not in diagrams,
+            "Separate Diagrammseite enthält keine Statistik-/Balkenauswertungen",
+        )
+        require(
+            "Tagesauswertung" in energy
+            and "Geräteauswertung" in energy
+            and "stationTodayBars" in energy
+            and "deviceNowBars" in energy,
+            "Tages- und Geräteauswertungen bleiben auf der Energieübersicht",
+        )
+        require(
+            'href="/energie/diagramme"' in energy,
+            "Energieübersicht verlinkt die separate Diagrammseite",
+        )
+        diagram_source = diagrams
+    else:
+        diagram_source = energy
+
     require(
         "Chart.js" not in diagram_source
         and "<svg" in diagram_source,
         "Diagramme benötigen keine externe Chart-Bibliothek",
     )
-
-    if diagrams:
-        require(
-            'href="/energie/diagramme"' in energy,
-            "Energieübersicht verlinkt die separate Diagrammseite",
-        )
     require(
         "Hardware bestätigt" not in grow,
         "Normale Gerätekacheln zeigen keinen Hardware-Poll-Text mehr",
