@@ -76,6 +76,12 @@ h3 {
     color: var(--muted);
     font-size: .86rem;
 }
+.design-text-link {
+    color: #c4b5fd;
+    text-decoration: none;
+    font-weight: 700;
+}
+.design-text-link:hover { text-decoration: underline; }
 
 .runtime-tools {
     display: flex;
@@ -269,7 +275,12 @@ h3 {
         <a class="back-link" href="{{ url_for('grow_control_dashboard') }}" title="Zur Grow-Control-Übersicht">←</a>
         <div>
             <h1>🏕️ {{ tent_name }}</h1>
-            <div class="heading-meta">Grow Control · {{ tent_id }}</div>
+            <div class="heading-meta">
+                Grow Control · {{ tent_id }}
+                {% if has_permission('settings.view') %}
+                    · <a class="design-text-link" href="{{ url_for('grow_control_tent_design', tent_id=tent_id) }}">🎨 Design</a>
+                {% endif %}
+            </div>
         </div>
     </div>
 

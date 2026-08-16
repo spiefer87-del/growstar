@@ -1,231 +1,306 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Dashboard Design</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
 
+{% block title %}Dashboard-Design – {{ tent_name }}{% endblock %}
+
+{% block head %}
 <style>
-:root {
-  --bg: #0f172a;
-  --card: #1e293b;
-  --accent: #22c55e;
-  --text: #e5e7eb;
-  --muted: #94a3b8;
+*,*::before,*::after{box-sizing:border-box}
+:root{
+    --design-bg:#0f172a;
+    --design-card:#1e293b;
+    --design-card2:#111c31;
+    --design-text:#e5e7eb;
+    --design-muted:#94a3b8;
+    --design-green:#22c55e;
+    --design-purple:#a78bfa;
+    --design-border:#334155;
+    --design-blue:#38bdf8;
 }
-body{
-    margin:0;
-    padding:20px;
-    background:#0f172a;
-    color:#e5e7eb;
-    font-family:system-ui;
-}
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-a.back {
-    color:var(--muted);
-    text-decoration:none;
-    font-size:0.9rem;
-}
-h1{margin-bottom:10px}
-h3{margin-top:20px}
-.grid {
-    display:grid;
-    gap:20px;
-    max-width:600px;
-    margin:auto;
-}
-.card {
-  background: var(--card);
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,.3);
-  text-align: center;
-  transition: transform .15s ease, box-shadow .15s ease;
-}
-.row{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    margin:8px 0;
-}
-select,input{
-    background:#020617;
-    color:#e5e7eb;
-    border:1px solid #334155;
-    border-radius:8px;
-    padding:6px 8px;
-}
-button{
-    margin-top:20px;
-    padding:10px 16px;
-    border:none;
-    border-radius:10px;
-    background:#22c55e;
-    color:#052e16;
-    font-weight:600;
-    cursor:pointer;
-}
-#msg{
-    margin-top:10px;
-    font-size:.9rem;
-}
+body{margin:0;background:var(--design-bg);color:var(--design-text);font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
+.design-wrap{max-width:980px;margin:0 auto;padding:20px clamp(12px,3vw,28px) 44px}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.heading{display:flex;align-items:flex-start;gap:12px;min-width:0}
+.back{width:46px;height:46px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(148,163,184,.18);border-radius:13px;background:var(--design-card);color:var(--design-text);text-decoration:none;font-size:1.25rem;flex:0 0 46px}
+h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
+.meta{margin-top:5px;color:var(--design-muted);font-size:.8rem}
+.station-select{min-width:180px;border:1px solid rgba(148,163,184,.22);background:var(--design-card);color:var(--design-text);border-radius:10px;padding:9px 34px 9px 11px;font:inherit;font-size:.8rem}
+.info{margin-bottom:16px;padding:13px 14px;border:1px solid rgba(167,139,250,.25);border-radius:13px;background:rgba(76,29,149,.14);color:#ddd6fe;font-size:.78rem;line-height:1.5}
+.section-title{margin:24px 0 10px}.section-title h2{margin:0;font-size:1rem}.section-title p{margin:4px 0 0;color:var(--design-muted);font-size:.75rem;line-height:1.45}
+.panel{background:linear-gradient(145deg,var(--design-card),var(--design-card2));border:1px solid rgba(148,163,184,.13);border-radius:18px;padding:12px;box-shadow:0 12px 26px rgba(0,0,0,.16)}
+.tile-list{display:grid;gap:8px}
+.tile-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 12px;border:1px solid rgba(148,163,184,.12);border-radius:13px;background:rgba(2,6,23,.24);transition:opacity .15s,border-color .15s}
+.tile-row.hidden-tile{opacity:.58}.tile-main{min-width:0}.tile-title{font-weight:760;font-size:.88rem}.tile-key{margin-top:2px;color:var(--design-muted);font-size:.65rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.toggle{position:relative;width:42px;height:24px;display:inline-block}.toggle input{position:absolute;opacity:0;pointer-events:none}.slider{position:absolute;inset:0;border-radius:999px;background:#334155;transition:.15s;cursor:pointer}.slider::after{content:"";position:absolute;width:18px;height:18px;left:3px;top:3px;border-radius:50%;background:#e5e7eb;transition:.15s}.toggle input:checked + .slider{background:var(--design-green)}.toggle input:checked + .slider::after{transform:translateX(18px)}
+.order-tools{display:flex;gap:5px}.move-btn{width:35px;height:35px;border:1px solid rgba(148,163,184,.17);border-radius:9px;background:#0b1220;color:var(--design-text);font-size:.85rem;cursor:pointer}.move-btn:disabled{opacity:.28;cursor:not-allowed}
+.actions{display:flex;gap:9px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.button{border:0;border-radius:11px;padding:10px 15px;font-weight:800;cursor:pointer}.button.secondary{background:#334155;color:var(--design-text)}.button.primary{background:var(--design-green);color:#052e16}.button:disabled{opacity:.45;cursor:not-allowed}
+.message{min-height:1.3em;margin-top:10px;text-align:right;font-size:.77rem;color:var(--design-muted)}.message.ok{color:#86efac}.message.error{color:#fca5a5}
+.permission-note{display:none;margin-top:12px;padding:11px 12px;border-radius:11px;border:1px solid rgba(245,158,11,.25);background:rgba(120,53,15,.14);color:#fde68a;font-size:.75rem;line-height:1.45}.permission-note.visible{display:block}
+@media(max-width:620px){.design-wrap{padding:12px 10px 34px}.top{align-items:stretch}.station-select{width:100%}.tile-row{grid-template-columns:auto minmax(0,1fr) auto;padding:10px 9px}.move-btn{width:32px;height:32px}.actions{align-items:stretch;flex-direction:column}.button{width:100%}.message{text-align:center}}
 </style>
-</head>
+{% endblock %}
 
-<body>
-<header>
-<h1>🎨 Dashboard Design</h1>
-<a href="/" class="back">← Dashboard</a>
-</header>
-<div class="grid">
+{% block page %}
+<div class="design-wrap">
+    <header class="top">
+        <div class="heading">
+            <a class="back" href="{{ url_for('grow_control_tent', tent_id=tent_id) }}" aria-label="Zur Station">←</a>
+            <div>
+                <h1>🎨 Dashboard-Design</h1>
+                <div class="meta">{{ tent_name }} · {{ tent_id }}</div>
+            </div>
+        </div>
 
-<div class="card">
+        <select id="stationSelect" class="station-select" aria-label="Grow-Station auswählen">
+            {% for tent in design_tents %}
+                <option value="{{ url_for('grow_control_tent_design', tent_id=tent.id) }}" {% if tent.id == tent_id %}selected{% endif %}>{{ tent.name or tent.id }}</option>
+            {% endfor %}
+        </select>
+    </header>
 
-<!-- ===================== -->
-<!-- 🌱 UMGEBUNG -->
-<!-- ===================== -->
-<h3>Umgebungs-Kacheln</h3>
+    <div class="info">
+        Sichtbarkeit und Reihenfolge werden ausschließlich für <strong>{{ tent_name }}</strong> gespeichert.
+        Eine Hardware-Zuordnung blendet eine Gerätekachel bewusst nicht automatisch ein oder aus – das Dashboard-Design bleibt eine eigene Einstellung.
+    </div>
 
-<div class="row"><label><input type="checkbox" id="env_profile"> Profil</label></div>
-<div class="row"><label><input type="checkbox" id="env_temp"> Temperatur</label></div>
-<div class="row"><label><input type="checkbox" id="env_hum"> Luftfeuchtigkeit</label></div>
-<div class="row"><label><input type="checkbox" id="env_vpd"> VPD</label></div>
-<div class="row"><label><input type="checkbox" id="env_ph"> pH-Wert</label></div>
-<div class="row"><label><input type="checkbox" id="env_ec"> EC-Wert</label></div>
-<div class="row"><label><input type="checkbox" id="env_water_temp"> Wassertemperatur</label></div>
-<div class="row"><label><input type="checkbox" id="env_light_level"> Helligkeit</label></div>
+    <section>
+        <div class="section-title">
+            <h2>🌱 Umgebungs-Kacheln</h2>
+            <p>Schalter bestimmt die Sichtbarkeit. Mit ▲/▼ legst du die Reihenfolge fest.</p>
+        </div>
+        <div class="panel"><div id="envList" class="tile-list"></div></div>
+    </section>
 
-<h3>Reihenfolge – Umgebung</h3>
+    <section>
+        <div class="section-title">
+            <h2>🔌 Geräte-Kacheln</h2>
+            <p>Alle neun Aktoren sind stationsbezogen verfügbar – einschließlich Bewässerung.</p>
+        </div>
+        <div class="panel"><div id="deviceList" class="tile-list"></div></div>
+    </section>
 
-<div class="row">Profil <select id="order_profile"></select></div>
-<div class="row">Temperatur <select id="order_temp"></select></div>
-<div class="row">Luftfeuchte <select id="order_hum"></select></div>
-<div class="row">VPD <select id="order_vpd"></select></div>
-<div class="row">pH <select id="order_ph"></select></div>
-<div class="row">EC <select id="order_ec"></select></div>
-<div class="row">Wasser <select id="order_water_temp"></select></div>
-<div class="row">Licht <select id="order_light_level"></select></div>
+    <div id="permissionNote" class="permission-note">
+        Du darfst diese Ansicht lesen, besitzt aber kein Recht zum Speichern der Dashboard-Konfiguration.
+    </div>
 
-<!-- ===================== -->
-<!-- 🔌 GERÄTE -->
-<!-- ===================== -->
-<h3>Geräte-Kacheln</h3>
-
-<div class="row"><label><input type="checkbox" id="dev_heating"> Heizung</label></div>
-<div class="row"><label><input type="checkbox" id="dev_fan"> Lüfter</label></div>
-<div class="row"><label><input type="checkbox" id="dev_light"> Licht</label></div>
-<div class="row"><label><input type="checkbox" id="dev_vent"> Ventilator</label></div>
-<div class="row"><label><input type="checkbox" id="dev_irrigation"> Bewässerung</label></div>
-<div class="row"><label><input type="checkbox" id="dev_humidifier"> Luftbefeuchter</label></div>
-<div class="row"><label><input type="checkbox" id="dev_dehumidifier"> Luftentfeuchter</label></div>
-<div class="row"><label><input type="checkbox" id="dev_light2"> Licht 2</label></div>
-<div class="row"><label><input type="checkbox" id="dev_vent2"> Ventilator 2</label></div>
-
-<h3>Reihenfolge – Geräte</h3>
-
-<div class="row">Heizung <select id="order_heating"></select></div>
-<div class="row">Lüfter <select id="order_fan"></select></div>
-<div class="row">Licht <select id="order_light"></select></div>
-<div class="row">Ventilator <select id="order_vent"></select></div>
-<div class="row">Bewässerung <select id="order_irrigation"></select></div>
-<div class="row">Befeuchter <select id="order_humidifier"></select></div>
-<div class="row">Entfeuchter <select id="order_dehumidifier"></select></div>
-<div class="row">Licht 2 <select id="order_light2"></select></div>
-<div class="row">Vent 2 <select id="order_vent2"></select></div>
-
-<button onclick="save()">💾 Speichern</button>
-<div id="msg"></div>
-
+    <div class="actions">
+        <button id="resetOrder" class="button secondary" type="button">↺ Standard-Reihenfolge</button>
+        <button id="saveButton" class="button primary" type="button">💾 Für {{ tent_name }} speichern</button>
+    </div>
+    <div id="message" class="message"></div>
 </div>
-</div>
+
 <script>
-const ENV_KEYS = [
-  "profile","temp","hum","vpd",
-  "ph","ec","water_temp","light_level"
-];
+(() => {
+    const TENT_ID = {{ tent_id|tojson }};
+    const TENT_NAME = {{ tent_name|tojson }};
+    const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
+    const CAN_SAVE = {{ 'true' if has_any_permission('grow.configure', 'settings.manage') else 'false' }};
 
-const DEV_KEYS = [
-  "heating","fan","light","vent",
-  "irrigation","humidifier","dehumidifier","light2","vent2"
-];
+    const ENV_META = [
+        {key:'profile', label:'Profil'},
+        {key:'temp', label:'Temperatur'},
+        {key:'hum', label:'Luftfeuchtigkeit'},
+        {key:'vpd', label:'VPD'},
+        {key:'ph', label:'pH-Wert'},
+        {key:'ec', label:'EC-Wert'},
+        {key:'water_temp', label:'Wassertemperatur'},
+        {key:'light_level', label:'Helligkeit'}
+    ];
 
-function fillSelect(sel, count) {
-    sel.innerHTML = "";
-    for (let i = 1; i <= count; i++) {
-        const o = document.createElement("option");
-        o.value = i;
-        o.textContent = i;
-        sel.appendChild(o);
+    const DEVICE_META = [
+        {key:'heating', label:'🔥 Heizung'},
+        {key:'fan', label:'💨 Lüfter'},
+        {key:'light', label:'💡 Beleuchtung'},
+        {key:'vent', label:'🌀 Ventilator'},
+        {key:'irrigation', label:'💧 Bewässerung'},
+        {key:'humidifier', label:'💦 Luftbefeuchter'},
+        {key:'dehumidifier', label:'🌬️ Entfeuchter'},
+        {key:'light2', label:'💡 Licht 2'},
+        {key:'vent2', label:'🌀 Ventilator 2'}
+    ];
+
+    let envItems = [];
+    let deviceItems = [];
+    let rawEnvVisible = {};
+    let rawEnvOrder = {};
+    let rawDeviceVisible = {};
+    let rawDeviceOrder = {};
+
+    const message = document.getElementById('message');
+    const saveButton = document.getElementById('saveButton');
+    const resetOrder = document.getElementById('resetOrder');
+    const permissionNote = document.getElementById('permissionNote');
+
+    function setMessage(text, type='') {
+        message.textContent = text || '';
+        message.className = `message${type ? ` ${type}` : ''}`;
     }
-}
 
+    function orderedItems(meta, visibility, order) {
+        return meta.map((item, index) => ({
+            ...item,
+            visible: visibility[item.key] !== false,
+            originalIndex: index,
+            order: Number.isFinite(Number(order[item.key])) ? Number(order[item.key]) : 1000 + index
+        })).sort((a,b) => a.order - b.order || a.originalIndex - b.originalIndex);
+    }
 
-async function load() {
-    const cfg = await fetch("/api/config").then(r => r.json());
+    function renderList(rootId, items, kind) {
+        const root = document.getElementById(rootId);
+        root.innerHTML = '';
 
-    const env = cfg.DASH_ENV || {};
-    const envOrder = cfg.DASH_ENV_ORDER || {};
-    const dev = cfg.DASH_DEVICE || {};
-    const devOrder = cfg.DASH_DEVICE_ORDER || {};
+        items.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = `tile-row${item.visible ? '' : ' hidden-tile'}`;
+            row.dataset.key = item.key;
 
-    ENV_KEYS.forEach(k => {
-        document.getElementById("env_" + k).checked = env[k] !== false;
-        const sel = document.getElementById("order_" + k);
-        fillSelect(sel, ENV_KEYS.length);
-        sel.value = envOrder[k] ?? ENV_KEYS.length;
+            const toggle = document.createElement('label');
+            toggle.className = 'toggle';
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = item.visible;
+            checkbox.disabled = !CAN_SAVE;
+            checkbox.setAttribute('aria-label', `${item.label} anzeigen`);
+            const slider = document.createElement('span');
+            slider.className = 'slider';
+            toggle.append(checkbox, slider);
+
+            checkbox.addEventListener('change', () => {
+                item.visible = checkbox.checked;
+                row.classList.toggle('hidden-tile', !item.visible);
+                setMessage('Ungespeicherte Änderung');
+            });
+
+            const main = document.createElement('div');
+            main.className = 'tile-main';
+            main.innerHTML = `<div class="tile-title">${item.label}</div><div class="tile-key">${item.key}</div>`;
+
+            const tools = document.createElement('div');
+            tools.className = 'order-tools';
+            const up = document.createElement('button');
+            up.type = 'button'; up.className = 'move-btn'; up.textContent = '▲'; up.title = 'Nach oben';
+            const down = document.createElement('button');
+            down.type = 'button'; down.className = 'move-btn'; down.textContent = '▼'; down.title = 'Nach unten';
+            up.disabled = !CAN_SAVE || index === 0;
+            down.disabled = !CAN_SAVE || index === items.length - 1;
+            up.addEventListener('click', () => moveItem(kind, index, -1));
+            down.addEventListener('click', () => moveItem(kind, index, 1));
+            tools.append(up, down);
+
+            row.append(toggle, main, tools);
+            root.appendChild(row);
+        });
+    }
+
+    function renderAll() {
+        renderList('envList', envItems, 'env');
+        renderList('deviceList', deviceItems, 'device');
+    }
+
+    function moveItem(kind, index, delta) {
+        const items = kind === 'env' ? envItems : deviceItems;
+        const next = index + delta;
+        if(next < 0 || next >= items.length) return;
+        [items[index], items[next]] = [items[next], items[index]];
+        renderAll();
+        setMessage('Ungespeicherte Reihenfolge');
+    }
+
+    function normalizeOrder(items, raw) {
+        const result = {...raw};
+        items.forEach((item, index) => { result[item.key] = index + 1; });
+        return result;
+    }
+
+    function normalizeVisibility(items, raw) {
+        const result = {...raw};
+        items.forEach(item => { result[item.key] = Boolean(item.visible); });
+        return result;
+    }
+
+    async function loadDesign() {
+        setMessage('Lade Konfiguration…');
+        try {
+            const response = await fetch(CONFIG_URL, {cache:'no-store'});
+            if(!response.ok) throw new Error(`Config HTTP ${response.status}`);
+            const payload = await response.json();
+            const cfg = payload.config || payload;
+
+            rawEnvVisible = {...(cfg.DASH_ENV || {})};
+            rawEnvOrder = {...(cfg.DASH_ENV_ORDER || {})};
+            rawDeviceVisible = {...(cfg.DASH_DEVICE || {})};
+            rawDeviceOrder = {...(cfg.DASH_DEVICE_ORDER || {})};
+
+            envItems = orderedItems(ENV_META, rawEnvVisible, rawEnvOrder);
+            deviceItems = orderedItems(DEVICE_META, rawDeviceVisible, rawDeviceOrder);
+            renderAll();
+            setMessage('');
+        } catch(error) {
+            console.error(error);
+            setMessage(`Konfiguration konnte nicht geladen werden: ${error.message}`, 'error');
+        }
+    }
+
+    async function saveDesign() {
+        if(!CAN_SAVE) return;
+
+        const body = {
+            DASH_ENV: normalizeVisibility(envItems, rawEnvVisible),
+            DASH_ENV_ORDER: normalizeOrder(envItems, rawEnvOrder),
+            DASH_DEVICE: normalizeVisibility(deviceItems, rawDeviceVisible),
+            DASH_DEVICE_ORDER: normalizeOrder(deviceItems, rawDeviceOrder)
+        };
+
+        saveButton.disabled = true;
+        setMessage(`Speichere für ${TENT_NAME}…`);
+
+        try {
+            const response = await fetch(CONFIG_URL, {
+                method:'POST',
+                headers:{'Content-Type':'application/json'},
+                body:JSON.stringify(body)
+            });
+            const payload = await response.json().catch(() => ({}));
+            if(!response.ok || payload.success === false){
+                throw new Error(payload.error || payload.message || `HTTP ${response.status}`);
+            }
+
+            rawEnvVisible = {...body.DASH_ENV};
+            rawEnvOrder = {...body.DASH_ENV_ORDER};
+            rawDeviceVisible = {...body.DASH_DEVICE};
+            rawDeviceOrder = {...body.DASH_DEVICE_ORDER};
+            setMessage(`✅ Dashboard-Design für ${TENT_NAME} gespeichert.`, 'ok');
+        } catch(error) {
+            console.error(error);
+            setMessage(`Speichern fehlgeschlagen: ${error.message}`, 'error');
+        } finally {
+            saveButton.disabled = !CAN_SAVE;
+        }
+    }
+
+    function resetOrders() {
+        if(!CAN_SAVE) return;
+        envItems = ENV_META.map((item,index) => ({...item, visible: envItems.find(x => x.key === item.key)?.visible ?? true, originalIndex:index, order:index+1}));
+        deviceItems = DEVICE_META.map((item,index) => ({...item, visible: deviceItems.find(x => x.key === item.key)?.visible ?? true, originalIndex:index, order:index+1}));
+        renderAll();
+        setMessage('Standard-Reihenfolge gewählt – noch nicht gespeichert.');
+    }
+
+    document.getElementById('stationSelect').addEventListener('change', event => {
+        const url = event.target.value;
+        if(url) window.location.href = url;
     });
 
-    DEV_KEYS.forEach(k => {
-        document.getElementById("dev_" + k).checked = dev[k] !== false;
-        const sel = document.getElementById("order_" + k);
-        fillSelect(sel, DEV_KEYS.length);
-        sel.value = devOrder[k] ?? DEV_KEYS.length;
-    });
-}
+    saveButton.addEventListener('click', saveDesign);
+    resetOrder.addEventListener('click', resetOrders);
 
+    if(!CAN_SAVE){
+        saveButton.disabled = true;
+        resetOrder.disabled = true;
+        permissionNote.classList.add('visible');
+    }
 
-
-async function save() {
-    if (!confirm("Dashboard-Einstellungen überschreiben?")) return;
-
-    const env = {};
-    const envOrder = {};
-    const dev = {};
-    const devOrder = {};
-
-    ENV_KEYS.forEach(k => {
-        env[k] = document.getElementById("env_" + k).checked;
-        envOrder[k] = Number(document.getElementById("order_" + k).value);
-    });
-
-    DEV_KEYS.forEach(k => {
-        dev[k] = document.getElementById("dev_" + k).checked;
-        devOrder[k] = Number(document.getElementById("order_" + k).value);
-    });
-
-    await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            DASH_ENV: env,
-            DASH_ENV_ORDER: envOrder,
-            DASH_DEVICE: dev,
-            DASH_DEVICE_ORDER: devOrder
-        })
-    });
-
-    msg.textContent = "✅ Gespeichert – Dashboard wird neu geladen";
-    setTimeout(() => location.href = "/", 800);
-}
-
-
-load();
+    loadDesign();
+})();
 </script>
-
-</body>
-</html>
+{% endblock %}
