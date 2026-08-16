@@ -55,6 +55,7 @@ READ_EXACT = {
     "/light-level": require("grow.view"),
     "/diagrams": require("grow.view"),
     "/energie": require("grow.view"),
+    "/energie/diagramme": require("grow.view"),
     "/licht": require("grow.view"),
     "/heizung": require("grow.view"),
     "/abluft": require("grow.view"),
@@ -333,6 +334,11 @@ def _tent_api_write_requirement(path):
     # runtime Grow control and explicit hardware control rights.
     if path.endswith("/live"):
         return require("grow.control", "hardware.control")
+
+    # Stationsbezogene Energie-Resets ändern nur Accounting-Offets und
+    # benötigen Grow-Konfigurationsrechte, niemals Hardware-Control.
+    if "/energy/reset_" in path:
+        return require("grow.configure")
 
     if "/sensors" in path or path.endswith("/hardware"):
         return require("hardware.configure")
