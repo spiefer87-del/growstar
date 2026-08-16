@@ -35,7 +35,8 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
 .actions{display:flex;gap:9px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.button{border:0;border-radius:11px;padding:10px 15px;font-weight:800;cursor:pointer}.button.secondary{background:#334155;color:var(--design-text)}.button.primary{background:var(--design-green);color:#052e16}.button:disabled{opacity:.45;cursor:not-allowed}
 .message{min-height:1.3em;margin-top:10px;text-align:right;font-size:.77rem;color:var(--design-muted)}.message.ok{color:#86efac}.message.error{color:#fca5a5}
 .permission-note{display:none;margin-top:12px;padding:11px 12px;border-radius:11px;border:1px solid rgba(245,158,11,.25);background:rgba(120,53,15,.14);color:#fde68a;font-size:.75rem;line-height:1.45}.permission-note.visible{display:block}
-@media(max-width:620px){.design-wrap{padding:12px 10px 34px}.top{align-items:stretch}.station-select{width:100%}.tile-row{grid-template-columns:auto minmax(0,1fr) auto;padding:10px 9px}.move-btn{width:32px;height:32px}.actions{align-items:stretch;flex-direction:column}.button{width:100%}.message{text-align:center}}
+.aux-name-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.aux-name{padding:11px 12px;border:1px solid rgba(148,163,184,.12);border-radius:13px;background:rgba(2,6,23,.24)}.aux-name label{display:block;margin-bottom:6px;color:var(--design-muted);font-size:.7rem}.aux-name input{width:100%;border:1px solid rgba(148,163,184,.2);border-radius:9px;background:#020617;color:var(--design-text);padding:9px 10px;font:inherit}.aux-name input:disabled{opacity:.55}.aux-hint{margin-top:8px;color:var(--design-muted);font-size:.68rem;line-height:1.45}
+@media(max-width:620px){.design-wrap{padding:12px 10px 34px}.top{align-items:stretch}.station-select{width:100%}.tile-row{grid-template-columns:auto minmax(0,1fr) auto;padding:10px 9px}.move-btn{width:32px;height:32px}.actions{align-items:stretch;flex-direction:column}.button{width:100%}.message{text-align:center}.aux-name-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -72,8 +73,28 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
 
     <section>
         <div class="section-title">
+            <h2>🧩 Freie Zusatzgeräte</h2>
+            <p>Die technischen Slots bleiben stabil. Du vergibst nur den sichtbaren Namen für diese Grow-Station.</p>
+        </div>
+        <div class="panel">
+            <div class="aux-name-grid">
+                <div class="aux-name">
+                    <label for="aux1Name">Zusatzgerät 1 · aux1</label>
+                    <input id="aux1Name" maxlength="48" value="Wasserpumpen">
+                    <div class="aux-hint">Standard: Wasserpumpen</div>
+                </div>
+                <div class="aux-name"><label for="aux2Name">Zusatzgerät 2 · aux2</label><input id="aux2Name" maxlength="48" value="Zusatzgerät 2"></div>
+                <div class="aux-name"><label for="aux3Name">Zusatzgerät 3 · aux3</label><input id="aux3Name" maxlength="48" value="Zusatzgerät 3"></div>
+                <div class="aux-name"><label for="aux4Name">Zusatzgerät 4 · aux4</label><input id="aux4Name" maxlength="48" value="Zusatzgerät 4"></div>
+            </div>
+            <div class="aux-hint">Der Name ändert nur die Anzeige. Technische ID, Hardware-Endpunkt, Regelung und Safety bleiben unverändert.</div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-title">
             <h2>🔌 Geräte-Kacheln</h2>
-            <p>Alle neun Aktoren sind stationsbezogen verfügbar – einschließlich Bewässerung.</p>
+            <p>Neun feste Aktoren plus vier frei benennbare Zusatzgeräte. Neue Zusatzgeräte sind zunächst ausgeblendet.</p>
         </div>
         <div class="panel"><div id="deviceList" class="tile-list"></div></div>
     </section>
@@ -107,16 +128,27 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
         {key:'light_level', label:'Helligkeit'}
     ];
 
+    const AUX_DEFAULT_LABELS = {
+        aux1:'Wasserpumpen',
+        aux2:'Zusatzgerät 2',
+        aux3:'Zusatzgerät 3',
+        aux4:'Zusatzgerät 4'
+    };
+
     const DEVICE_META = [
         {key:'heating', label:'🔥 Heizung'},
-        {key:'fan', label:'💨 Lüfter'},
+        {key:'fan', label:'💨 Abluft / Lüfter'},
         {key:'light', label:'💡 Beleuchtung'},
         {key:'vent', label:'🌀 Ventilator'},
         {key:'irrigation', label:'💧 Bewässerung'},
         {key:'humidifier', label:'💦 Luftbefeuchter'},
         {key:'dehumidifier', label:'🌬️ Entfeuchter'},
         {key:'light2', label:'💡 Licht 2'},
-        {key:'vent2', label:'🌀 Ventilator 2'}
+        {key:'vent2', label:'🌀 Ventilator 2'},
+        {key:'aux1', label:'💧 Wasserpumpen', auxiliary:true, icon:'💧', defaultVisible:false},
+        {key:'aux2', label:'🔌 Zusatzgerät 2', auxiliary:true, icon:'🔌', defaultVisible:false},
+        {key:'aux3', label:'🔌 Zusatzgerät 3', auxiliary:true, icon:'🔌', defaultVisible:false},
+        {key:'aux4', label:'🔌 Zusatzgerät 4', auxiliary:true, icon:'🔌', defaultVisible:false}
     ];
 
     let envItems = [];
@@ -137,12 +169,43 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
     }
 
     function orderedItems(meta, visibility, order) {
-        return meta.map((item, index) => ({
-            ...item,
-            visible: visibility[item.key] !== false,
-            originalIndex: index,
-            order: Number.isFinite(Number(order[item.key])) ? Number(order[item.key]) : 1000 + index
-        })).sort((a,b) => a.order - b.order || a.originalIndex - b.originalIndex);
+        return meta.map((item, index) => {
+            const hasVisibility = Object.prototype.hasOwnProperty.call(visibility, item.key);
+            return {
+                ...item,
+                visible: hasVisibility ? visibility[item.key] !== false : item.defaultVisible !== false,
+                originalIndex: index,
+                order: Number.isFinite(Number(order[item.key])) ? Number(order[item.key]) : 1000 + index
+            };
+        }).sort((a,b) => a.order - b.order || a.originalIndex - b.originalIndex);
+    }
+
+    function normalizedAuxName(key, value) {
+        const name = String(value || '').trim().replace(/\s+/g, ' ');
+        return name || AUX_DEFAULT_LABELS[key];
+    }
+
+    function readAuxLabels() {
+        return Object.fromEntries(
+            Object.keys(AUX_DEFAULT_LABELS).map(key => [
+                key,
+                normalizedAuxName(key, document.getElementById(`${key}Name`)?.value)
+            ])
+        );
+    }
+
+    function applyAuxLabels(labels) {
+        Object.keys(AUX_DEFAULT_LABELS).forEach(key => {
+            const name = normalizedAuxName(key, labels?.[key]);
+            const input = document.getElementById(`${key}Name`);
+            if(input) input.value = name;
+
+            const item = deviceItems.find(entry => entry.key === key);
+            if(item){
+                const meta = DEVICE_META.find(entry => entry.key === key);
+                item.label = `${meta?.icon || '🔌'} ${name}`;
+            }
+        });
     }
 
     function renderList(rootId, items, kind) {
@@ -233,6 +296,7 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
 
             envItems = orderedItems(ENV_META, rawEnvVisible, rawEnvOrder);
             deviceItems = orderedItems(DEVICE_META, rawDeviceVisible, rawDeviceOrder);
+            applyAuxLabels(cfg.DEVICE_LABELS || {});
             renderAll();
             setMessage('');
         } catch(error) {
@@ -248,7 +312,8 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
             DASH_ENV: normalizeVisibility(envItems, rawEnvVisible),
             DASH_ENV_ORDER: normalizeOrder(envItems, rawEnvOrder),
             DASH_DEVICE: normalizeVisibility(deviceItems, rawDeviceVisible),
-            DASH_DEVICE_ORDER: normalizeOrder(deviceItems, rawDeviceOrder)
+            DASH_DEVICE_ORDER: normalizeOrder(deviceItems, rawDeviceOrder),
+            DEVICE_LABELS: readAuxLabels()
         };
 
         saveButton.disabled = true;
@@ -281,10 +346,27 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.05rem)}
     function resetOrders() {
         if(!CAN_SAVE) return;
         envItems = ENV_META.map((item,index) => ({...item, visible: envItems.find(x => x.key === item.key)?.visible ?? true, originalIndex:index, order:index+1}));
-        deviceItems = DEVICE_META.map((item,index) => ({...item, visible: deviceItems.find(x => x.key === item.key)?.visible ?? true, originalIndex:index, order:index+1}));
+        deviceItems = DEVICE_META.map((item,index) => ({
+            ...item,
+            visible: deviceItems.find(x => x.key === item.key)?.visible ?? item.defaultVisible !== false,
+            originalIndex:index,
+            order:index+1
+        }));
+        applyAuxLabels(readAuxLabels());
         renderAll();
         setMessage('Standard-Reihenfolge gewählt – noch nicht gespeichert.');
     }
+
+    Object.keys(AUX_DEFAULT_LABELS).forEach(key => {
+        const input = document.getElementById(`${key}Name`);
+        if(!input) return;
+        input.disabled = !CAN_SAVE;
+        input.addEventListener('input', () => {
+            applyAuxLabels(readAuxLabels());
+            renderAll();
+            setMessage('Ungespeicherter Gerätename');
+        });
+    });
 
     document.getElementById('stationSelect').addEventListener('change', event => {
         const url = event.target.value;

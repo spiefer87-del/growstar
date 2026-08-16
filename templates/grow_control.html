@@ -378,6 +378,10 @@ h3 {
     <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='dehumidifier') }}" class="card-link"><div class="card device" id="dehumidifier-card"><h2>🌬️ Entfeuchter</h2><div class="value" id="dehumidifier-state">---</div><div class="sub">Modus: <span id="dehumidifier-mode">--</span></div><div class="device-detail" id="dehumidifier-detail"></div></div></a>
     <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='light2') }}" class="card-link"><div class="card device" id="light2-card"><h2>💡 Licht 2</h2><div class="value" id="light2-state">---</div><div class="sub">Modus: <span id="light2-mode">--</span></div><div class="device-detail" id="light2-detail"></div></div></a>
     <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='vent2') }}" class="card-link"><div class="card device" id="vent2-card"><h2>🌀 Ventilator 2</h2><div class="value" id="vent2-state">---</div><div class="sub">Modus: <span id="vent2-mode">--</span></div><div class="device-detail" id="vent2-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='aux1') }}" class="card-link"><div class="card device" id="aux1-card"><h2 id="aux1-title">💧 Wasserpumpen</h2><div class="value" id="aux1-state">---</div><div class="sub">Modus: <span id="aux1-mode">--</span></div><div class="device-detail" id="aux1-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='aux2') }}" class="card-link"><div class="card device" id="aux2-card"><h2 id="aux2-title">🔌 Zusatzgerät 2</h2><div class="value" id="aux2-state">---</div><div class="sub">Modus: <span id="aux2-mode">--</span></div><div class="device-detail" id="aux2-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='aux3') }}" class="card-link"><div class="card device" id="aux3-card"><h2 id="aux3-title">🔌 Zusatzgerät 3</h2><div class="value" id="aux3-state">---</div><div class="sub">Modus: <span id="aux3-mode">--</span></div><div class="device-detail" id="aux3-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='aux4') }}" class="card-link"><div class="card device" id="aux4-card"><h2 id="aux4-title">🔌 Zusatzgerät 4</h2><div class="value" id="aux4-state">---</div><div class="sub">Modus: <span id="aux4-mode">--</span></div><div class="device-detail" id="aux4-detail"></div></div></a>
 </div>
 
 <script>
@@ -397,8 +401,30 @@ h3 {
         ENV: "Umgebung"
     };
 
+    const AUX_DEVICES = ["aux1", "aux2", "aux3", "aux4"];
+    const AUX_DEFAULT_LABELS = {
+        aux1: "Wasserpumpen",
+        aux2: "Zusatzgerät 2",
+        aux3: "Zusatzgerät 3",
+        aux4: "Zusatzgerät 4"
+    };
+    const AUX_ICONS = {aux1:"💧", aux2:"🔌", aux3:"🔌", aux4:"🔌"};
+    let DEVICE_LABELS = {};
+
     let ENV_CARDS = {};
     let DEV_CARDS = {};
+
+    function deviceDisplayName(device) {
+        return DEVICE_LABELS[device] || AUX_DEFAULT_LABELS[device] || device;
+    }
+
+    function updateAuxTitles(labels) {
+        DEVICE_LABELS = {...(labels || {})};
+        AUX_DEVICES.forEach(device => {
+            const title = document.getElementById(`${device}-title`);
+            if(title) title.textContent = `${AUX_ICONS[device]} ${deviceDisplayName(device)}`;
+        });
+    }
 
     const safeText = (id, value) => {
         const el = document.getElementById(id);
@@ -479,7 +505,11 @@ h3 {
             humidifier: document.getElementById("humidifier-card")?.closest("a"),
             dehumidifier: document.getElementById("dehumidifier-card")?.closest("a"),
             light2: document.getElementById("light2-card")?.closest("a"),
-            vent2: document.getElementById("vent2-card")?.closest("a")
+            vent2: document.getElementById("vent2-card")?.closest("a"),
+            aux1: document.getElementById("aux1-card")?.closest("a"),
+            aux2: document.getElementById("aux2-card")?.closest("a"),
+            aux3: document.getElementById("aux3-card")?.closest("a"),
+            aux4: document.getElementById("aux4-card")?.closest("a")
         };
     }
 
@@ -504,10 +534,18 @@ h3 {
                 .sort((a, b) => (envOrder[a[0]] ?? 99) - (envOrder[b[0]] ?? 99))
                 .forEach(([_, el]) => envGrid.appendChild(el));
 
+            updateAuxTitles(cfg.DEVICE_LABELS || {});
+
             const devVisible = cfg.DASH_DEVICE || {};
             const devOrder = cfg.DASH_DEVICE_ORDER || {};
             Object.entries(DEV_CARDS)
-                .filter(([key, el]) => el && devVisible[key] !== false)
+                .filter(([key, el]) => {
+                    if(!el) return false;
+                    if(Object.prototype.hasOwnProperty.call(devVisible, key)){
+                        return devVisible[key] !== false;
+                    }
+                    return !AUX_DEVICES.includes(key);
+                })
                 .sort((a, b) => (devOrder[a[0]] ?? 99) - (devOrder[b[0]] ?? 99))
                 .forEach(([_, el]) => devGrid.appendChild(el));
         } catch (error) {
@@ -532,7 +570,9 @@ h3 {
                 banner?.classList.toggle("warning", Boolean(safety.stale && !safety.active));
 
                 if (banner) {
-                    const blocked = (safety.blocked_devices || []).join(", ");
+                    const blocked = (safety.blocked_devices || [])
+                        .map(device => deviceDisplayName(device))
+                        .join(", ");
                     const reason = safety.reason || "Safety-Supervisor meldet einen Fehler";
                     banner.textContent =
                         `${safety.active ? "🚨 SAFETY FAILSAFE AKTIV" : "⚠️ SAFETY SUPERVISOR STALE"} · ${reason}` +
@@ -653,7 +693,7 @@ h3 {
             }
 
             updateRuntimeMode(state);
-            ["heating", "fan", "light", "vent", "irrigation", "humidifier", "dehumidifier", "light2", "vent2"]
+            ["heating", "fan", "light", "vent", "irrigation", "humidifier", "dehumidifier", "light2", "vent2", "aux1", "aux2", "aux3", "aux4"]
                 .forEach(name => updateDevice(name, state));
         } catch (error) {
             console.error("Stations-State konnte nicht geladen werden:", error);

@@ -131,7 +131,44 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2.1rem)}.sub{color:var(--energy-muted);f
 
 <script>
 const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const DEVICE_ICONS = {heating:'🔥',light:'💡',fan:'💨',vent:'🌀',irrigation:'🚿',humidifier:'💧',dehumidifier:'🌵',light2:'💡',vent2:'🌀'};
+const DEVICE_ICONS = {heating:'🔥',light:'💡',fan:'💨',vent:'🌀',irrigation:'🚿',humidifier:'💧',dehumidifier:'🌵',light2:'💡',vent2:'🌀',aux1:'💧',aux2:'🔌',aux3:'🔌',aux4:'🔌'};
+const AUX_DEFAULT_LABELS = {aux1:'Wasserpumpen',aux2:'Zusatzgerät 2',aux3:'Zusatzgerät 3',aux4:'Zusatzgerät 4'};
+const DEVICE_LABEL_CACHE_MS = 30000;
+const stationDeviceLabels = new Map();
+
+function displayDeviceLabel(tentId, device, fallback){
+    const labels = stationDeviceLabels.get(String(tentId || ''))?.labels || {};
+    return labels[device] || fallback || AUX_DEFAULT_LABELS[device] || device;
+}
+
+async function refreshStationDeviceLabels(stations){
+    const now = Date.now();
+
+    await Promise.all((stations || []).map(async st => {
+        const tentId = String(st.tent_id || '');
+        if(!tentId) return;
+
+        const cached = stationDeviceLabels.get(tentId);
+        if(cached && now - cached.ts < DEVICE_LABEL_CACHE_MS) return;
+
+        try{
+            const response = await fetch(
+                `/api/tents/${encodeURIComponent(tentId)}/config`,
+                {cache:'no-store'}
+            );
+            if(!response.ok) return;
+
+            const payload = await response.json();
+            const cfg = payload.config || payload;
+            stationDeviceLabels.set(tentId, {
+                ts: now,
+                labels: {...(cfg.DEVICE_LABELS || {})}
+            });
+        }catch(_error){
+            // Der vorhandene Energie-Fallback-Name bleibt weiterhin verwendbar.
+        }
+    }));
+}
 const num = (value, digits=1) => Number.isFinite(Number(value)) ? Number(value).toFixed(digits) : '--';
 const ageText = ts => {
     if(!ts) return 'noch kein Poll';
@@ -166,13 +203,17 @@ function renderSummary(data){
 
 function consumerText(item, field, unit){
     if(!item) return '<strong>Keine Daten</strong><small>Noch kein verfügbarer Messpunkt</small>';
-    return `<strong>${esc(item.tent_name)} · ${esc(item.label)}</strong><small>${num(item[field], field === 'power' ? 1 : 3)} ${unit}</small>`;
+    const label = displayDeviceLabel(item.tent_id, item.device, item.label);
+    return `<strong>${esc(item.tent_name)} · ${esc(label)}</strong><small>${num(item[field], field === 'power' ? 1 : 3)} ${unit}</small>`;
 }
 
 function peakText(item, labelPrefix=''){
     if(!item) return '<strong>Noch keine Daten</strong><small>Startet ab dem ersten Phase-4M-Poll</small>';
+    const deviceLabel = item.device
+        ? displayDeviceLabel(item.tent_id, item.device, item.label)
+        : item.label;
     const label = item.tent_name
-        ? `${item.tent_name}${item.label ? ` · ${item.label}` : ''}`
+        ? `${item.tent_name}${deviceLabel ? ` · ${deviceLabel}` : ''}`
         : (labelPrefix || 'Gesamtanlage');
     return `<strong>${esc(label)} · ${num(item.power,1)} W</strong><small>${dateTimeText(item.ts)}</small>`;
 }
@@ -205,9 +246,9 @@ function deviceTodaySharePct(item, stationToday){
     return Math.max(0, Math.min(100, deviceToday / stationTotal * 100));
 }
 
-function deviceRow(device, item, price, stationToday, stationName){
+function deviceRow(device, item, price, stationToday, stationName, tentId){
     const available = !!item.available;
-    const label = `${DEVICE_ICONS[device] || '⚡'} ${item.label || device}`;
+    const label = `${DEVICE_ICONS[device] || '⚡'} ${displayDeviceLabel(tentId, device, item.label)}`;
     const endpoint = `${item.host || '--'} / Relay ${item.relay ?? '--'}`;
     if(!available){
         return `<div class="device-row">
@@ -258,7 +299,7 @@ function renderStations(data){
     root.innerHTML = stations.map(st => {
         const totals = st.totals || {}, devices = st.devices || {};
         const rows = Object.entries(devices)
-            .map(([device,item]) => deviceRow(device, item, price, totals.today, st.name))
+            .map(([device,item]) => deviceRow(device, item, price, totals.today, st.name, st.tent_id))
             .join('');
         return `<article class="station-card">
             <div class="station-head">
@@ -353,7 +394,7 @@ function renderEvaluations(data){
         .filter(st => !filter || st.tent_id === filter)
         .forEach(st => {
             Object.entries(st.devices || {}).forEach(([device,item]) => {
-                const label = `${st.name} · ${item.label || device}`;
+                const label = `${st.name} · ${displayDeviceLabel(st.tent_id, device, item.label)}`;
 
                 if(item.available){
                     nowItems.push({name: label, value: Number(item.power || 0)});
@@ -397,6 +438,7 @@ async function refreshEnergy(){
         document.getElementById('errorBox').innerHTML='';
         document.getElementById('priceBadge').textContent = `${num(data.settings?.power_price,2)} €/kWh`;
         document.getElementById('pollBadge').textContent = `Poll ${ageText(data.last_poll)}`;
+        await refreshStationDeviceLabels(data.stations || []);
         renderSummary(data);
         renderStatistics(data);
         fillStationFilter(data);

@@ -179,6 +179,12 @@
         border: 1px solid rgba(167,139,250,.30);
     }
 
+    .tent-mode-badge.arming {
+        background: rgba(245,158,11,.16);
+        color: #fcd34d;
+        border: 1px solid rgba(245,158,11,.30);
+    }
+
     .tent-mode-badge.ready,
     .tent-mode-badge.offline {
         background: rgba(148,163,184,.12);
@@ -497,6 +503,13 @@
         }
         if (tent.control_enabled) {
             return { text: "LIVE", cls: "live", detail: "Hardware-Regelung aktiv" };
+        }
+        if (tent.arming || tent.live_requested) {
+            return {
+                text: "ARMING",
+                cls: "arming",
+                detail: "LIVE angefordert · Hardware-Gate wartet auf Preflight"
+            };
         }
         if (tent.shadow_enabled) {
             return { text: "SHADOW", cls: "shadow", detail: "Hardware gesperrt" };
