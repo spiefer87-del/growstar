@@ -215,6 +215,14 @@ body{margin:0;background:var(--release-bg);color:var(--release-text);font-family
     const version = String(list.dataset.releaseVersion || "");
     const storageKey = `growstar_release_tests_${version}`;
 
+    try{
+        if(version){
+            localStorage.setItem("growstar_last_seen_version", version);
+        }
+    }catch(_error){
+        // Der NEU-Status ist nur eine lokale Komfortfunktion.
+    }
+
     function loadState(){
         try{
             const raw = localStorage.getItem(storageKey);

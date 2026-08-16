@@ -47,9 +47,56 @@
         font-size: clamp(1.8rem, 4vw, 2.5rem);
     }
 
-    .brand p {
-        margin: 7px 0 0;
+    .brand-meta {
+        margin-top: 7px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
         color: var(--muted);
+    }
+
+    .dashboard-release-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 2px 6px;
+        border: 1px solid rgba(148,163,184,.15);
+        border-radius: 999px;
+        color: rgba(148,163,184,.82);
+        text-decoration: none;
+        font-size: .66rem;
+        font-weight: 700;
+        line-height: 1.25;
+        opacity: .76;
+        transition: opacity .18s ease, border-color .18s ease, color .18s ease;
+    }
+
+    .dashboard-release-link:hover,
+    .dashboard-release-link:focus-visible {
+        opacity: 1;
+        color: var(--text);
+        border-color: rgba(34,197,94,.40);
+        outline: none;
+    }
+
+    .dashboard-release-new {
+        display: none;
+        padding: 1px 4px;
+        border-radius: 999px;
+        background: rgba(34,197,94,.16);
+        color: #86efac;
+        font-size: .54rem;
+        letter-spacing: .04em;
+    }
+
+    .dashboard-release-link.has-new {
+        opacity: 1;
+        border-color: rgba(34,197,94,.30);
+    }
+
+    .dashboard-release-link.has-new .dashboard-release-new {
+        display: inline-block;
     }
 
     .user-panel {
@@ -212,7 +259,21 @@
 <header class="topbar">
     <div class="brand">
         <h1>🌱 Growstar</h1>
-        <p>Management Dashboard</p>
+        <div class="brand-meta">
+            <span>Management Dashboard</span>
+            {% if growstar_release %}
+            <a
+                id="dashboard-release-link"
+                class="dashboard-release-link"
+                href="{{ url_for('patch_notes_page') }}"
+                data-growstar-version="{{ growstar_release.version }}"
+                title="Versions- und Patch-Information öffnen"
+            >
+                <span>v{{ growstar_release.version }}</span>
+                <span class="dashboard-release-new">NEU</span>
+            </a>
+            {% endif %}
+        </div>
     </div>
 
     {% if current_user %}
@@ -291,4 +352,25 @@
     Für deinen Benutzer sind derzeit keine Module freigeschaltet.
 </div>
 {% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const link = document.getElementById("dashboard-release-link");
+    if(!link) return;
+
+    const version = String(link.dataset.growstarVersion || "");
+    if(!version) return;
+
+    try{
+        const seenVersion = localStorage.getItem("growstar_last_seen_version");
+        if(seenVersion !== version){
+            link.classList.add("has-new");
+        }
+    }catch(_error){
+        // localStorage ist nur Komfort. Der Versionslink bleibt trotzdem nutzbar.
+    }
+})();
+</script>
 {% endblock %}

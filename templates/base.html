@@ -6,103 +6,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Growstar{% endblock %}</title>
     <script data-growstar-feedback src="{{ url_for('static', filename='js/growstar-feedback.js') }}"></script>
-    <style data-growstar-release-style>
-        .growstar-release-chip{
-            position:fixed;
-            right:max(9px,env(safe-area-inset-right));
-            bottom:max(9px,env(safe-area-inset-bottom));
-            z-index:40;
-            display:inline-flex;
-            align-items:center;
-            gap:6px;
-            max-width:calc(100vw - 18px);
-            padding:5px 8px;
-            border:1px solid rgba(148,163,184,.18);
-            border-radius:999px;
-            background:rgba(15,23,42,.72);
-            color:rgba(226,232,240,.72);
-            box-shadow:0 4px 18px rgba(0,0,0,.14);
-            backdrop-filter:blur(8px);
-            -webkit-backdrop-filter:blur(8px);
-            font:600 10px/1.1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-            text-decoration:none;
-            opacity:.56;
-            transition:opacity .18s ease,border-color .18s ease,transform .18s ease;
-        }
-        .growstar-release-chip:hover,
-        .growstar-release-chip:focus-visible{
-            opacity:1;
-            border-color:rgba(34,197,94,.42);
-            transform:translateY(-1px);
-            outline:none;
-        }
-        .growstar-release-new{
-            display:none;
-            padding:2px 5px;
-            border-radius:999px;
-            background:rgba(34,197,94,.18);
-            color:#86efac;
-            font-size:8px;
-            letter-spacing:.04em;
-        }
-        .growstar-release-chip.has-new{
-            opacity:.88;
-            border-color:rgba(34,197,94,.30);
-        }
-        .growstar-release-chip.has-new .growstar-release-new{
-            display:inline-block;
-        }
-        @media(max-width:640px){
-            .growstar-release-chip{
-                right:max(7px,env(safe-area-inset-right));
-                bottom:max(7px,env(safe-area-inset-bottom));
-                padding:4px 7px;
-                font-size:9px;
-            }
-        }
-    </style>
     {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
     {% block page %}{% endblock %}
-
-    {% if growstar_release %}
-    <a
-        id="growstar-release-chip"
-        class="growstar-release-chip"
-        href="{{ url_for('patch_notes_page') }}"
-        data-growstar-version="{{ growstar_release.version }}"
-        aria-label="Growstar Versions- und Patch-Information öffnen"
-    >
-        <span>Growstar v{{ growstar_release.version }}</span>
-        <span class="growstar-release-new">NEU</span>
-    </a>
-    <script>
-    (() => {
-        const chip = document.getElementById("growstar-release-chip");
-        if(!chip) return;
-
-        const version = String(chip.dataset.growstarVersion || "");
-        const seenKey = "growstar_last_seen_version";
-        const notesPath = chip.getAttribute("href");
-
-        try{
-            const seenVersion = localStorage.getItem(seenKey);
-            if(version && seenVersion !== version){
-                chip.classList.add("has-new");
-            }
-
-            if(notesPath && window.location.pathname === notesPath && version){
-                localStorage.setItem(seenKey, version);
-                chip.classList.remove("has-new");
-            }
-        }catch(_error){
-            // localStorage ist nur Komfort. Die Versionsanzeige funktioniert
-            // auch dann weiter, wenn ein Browser lokalen Speicher blockiert.
-        }
-    })();
-    </script>
-    {% endif %}
 
     {% block scripts %}{% endblock %}
 </body>
