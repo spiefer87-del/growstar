@@ -37,10 +37,20 @@ def main():
     dashboard = read("templates/dashboard.html")
     notes = read("templates/patch_notes.html")
 
+    history = release.release_history()
+    q1_release = next(
+        (
+            item
+            for item in history
+            if item.get("version") == "3.6.3"
+            and item.get("phase") == "4Q.1"
+        ),
+        None,
+    )
+
     require(
-        release.GROWSTAR_VERSION == "3.6.3"
-        and release.GROWSTAR_INTERNAL_PHASE == "4Q.1",
-        "Phase 4Q.1 erhöht Growstar auf Version 3.6.3",
+        q1_release is not None,
+        "Phase 4Q.1 bleibt als Version 3.6.3 in der Release-Historie erhalten",
     )
     require(
         "growstar-release-chip" not in base
