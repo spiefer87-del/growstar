@@ -33,6 +33,12 @@ def _tent_page_context(tent_id):
     }
 
 
+def _design_page_context(tent_id):
+    context = _tent_page_context(tent_id)
+    context["design_tents"] = tent_manager.list_tents()
+    return context
+
+
 def _default_tent_url(endpoint, **values):
     return url_for(
         endpoint,
@@ -115,6 +121,13 @@ def register(app):
         return render_template(
             "settings.html",
             **_tent_page_context(tent_id),
+        )
+
+    @app.route("/grow-control/tents/<tent_id>/design")
+    def grow_control_tent_design(tent_id):
+        return render_template(
+            "design.html",
+            **_design_page_context(tent_id),
         )
 
     @app.route("/grow-control/tents/<tent_id>/sensors")
@@ -213,7 +226,10 @@ def register(app):
 
     @app.route("/design")
     def design_page():
-        return render_template("design.html")
+        return render_template(
+            "design.html",
+            **_design_page_context(tent_manager.default_tent_id()),
+        )
 
     @app.route("/energie")
     def energie_page():
