@@ -15,6 +15,34 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.6.4",
+        "date": "2026-08-16",
+        "phase": "4R",
+        "title": "Bedienungssicherer Auto-Refresh",
+        "summary": (
+            "Automatische Live-Aktualisierungen überschreiben keine laufenden "
+            "Benutzereingaben mehr. Sensor-Offsets lassen sich auf dem Handy "
+            "ruhiger und zuverlässiger einstellen."
+        ),
+        "changes": (
+            "Gerätesteuerung trennt Live-Status strikt von noch nicht gespeicherten Formularwerten.",
+            "Modus, Zeit, Intervall und ENV-Auswahl werden durch den 3-Sekunden-Refresh nicht mehr zurückgesetzt.",
+            "Sensor-Zuweisungen und Offsets werden durch den 10-Sekunden-Refresh nicht mehr überschrieben.",
+            "Sensor-Livewerte und verfügbare Sensorquellen aktualisieren sich weiterhin automatisch.",
+            "Offset-Tasten speichern mit kurzem Debounce statt mit einem POST pro Tastendruck.",
+            "Offset-Speicherzugriffe werden pro Feld serialisiert, damit schnelle Eingaben nicht gegeneinander laufen.",
+            "Refresh- und Speicherzugriffe erhalten einfache In-Flight-Guards gegen überlappende Requests.",
+        ),
+        "tests": (
+            "Ventilator-Modus ändern und mindestens 5 Sekunden warten: Auswahl darf nicht zurückspringen.",
+            "Zeit-, Intervall- oder ENV-Felder ändern und auf einen Auto-Refresh warten: Eingaben müssen erhalten bleiben.",
+            "Temperatur- oder Feuchte-Sensor im Dropdown auswählen und länger als 10 Sekunden warten: Auswahl darf nicht zurückspringen.",
+            "Sensor-Offset mehrfach schnell mit + oder − verstellen: sichtbarer Wert muss direkt folgen und anschließend stabil gespeichert werden.",
+            "RAW-/Korrekturwerte und Hardware-/LIVE-Status müssen sich trotz aktiver Eingabe weiterhin automatisch aktualisieren.",
+            "/api/system/version meldet Version 3.6.4 und Build-Kennung 4R.",
+        ),
+    },
+    {
         "version": "3.6.3",
         "date": "2026-08-16",
         "phase": "4Q.1",
