@@ -2,6 +2,91 @@ from flask import jsonify, request
 
 from services.hardware import hardware
 from core.mqtt_sensor_devices import list_mqtt_sensor_devices
+from core.hardware_assignments import hardware_snapshot
+from core.tents import manager as tent_manager
+
+
+
+def _assigned_actuator_views(gateway_rows, *, tents=None, snapshot_loader=None):
+    """Verknüpft bestehende Stations-Zuordnungen read-only mit Gateway-Metadaten.
+
+    Diese Darstellung ist ausschließlich für die Hardware-Oberfläche gedacht.
+    Sie verändert weder Runtime-Konfiguration noch Aktor-/Safety-Logik und
+    führt keine Netzwerkrequests aus. Gateway-Daten stammen nur aus dem bereits
+    vorhandenen HardwareManager-Snapshot.
+    """
+
+    snapshot_loader = snapshot_loader or hardware_snapshot
+    tents = tent_manager.list_tents() if tents is None else list(tents)
+
+    gateway_by_ip = {}
+    for gateway in gateway_rows or []:
+        if not isinstance(gateway, dict):
+            continue
+        ip = str(gateway.get("ip") or "").strip().lower()
+        if ip:
+            gateway_by_ip[ip] = gateway
+
+    result = []
+
+    for tent in tents:
+        if not isinstance(tent, dict):
+            continue
+
+        tent_id = str(tent.get("id") or "").strip()
+        if not tent_id:
+            continue
+
+        try:
+            snapshot = snapshot_loader(tent_id)
+        except Exception:
+            # Eine fehlerhafte/inzwischen entfernte Station darf die zentrale
+            # Hardware-Uebersicht nicht komplett unbrauchbar machen.
+            continue
+
+        tent_name = str(snapshot.get("name") or tent.get("name") or tent_id)
+
+        for assignment in (snapshot.get("assignments") or {}).values():
+            if not isinstance(assignment, dict) or not assignment.get("configured"):
+                continue
+
+            ip = str(assignment.get("ip") or "").strip()
+            if not ip:
+                continue
+
+            gateway = gateway_by_ip.get(ip.lower())
+            gateway_view = None
+
+            if gateway is not None:
+                gateway_view = {
+                    "id": gateway.get("id"),
+                    "name": gateway.get("name"),
+                    "model": gateway.get("model"),
+                    "manufacturer": gateway.get("manufacturer"),
+                    "ip": gateway.get("ip"),
+                    "mac": gateway.get("mac"),
+                    "online": bool(gateway.get("online")),
+                    "firmware": gateway.get("firmware"),
+                    "rssi": gateway.get("rssi"),
+                    "uptime": gateway.get("uptime"),
+                }
+
+            result.append({
+                "id": f"{tent_id}:{assignment.get('device') or ''}",
+                "tent_id": tent_id,
+                "tent_name": tent_name,
+                "device": assignment.get("device"),
+                "label": assignment.get("label") or assignment.get("device"),
+                "icon": assignment.get("icon") or "🔌",
+                "mode": assignment.get("mode") or "OFF",
+                "ip": ip,
+                "relay": assignment.get("relay"),
+                "configured": True,
+                "gateway_detected": gateway_view is not None,
+                "gateway": gateway_view,
+            })
+
+    return result
 
 
 def register(app):
@@ -21,22 +106,31 @@ def register(app):
     @app.get("/api/hardware")
     def hardware_status():
 
+        gateways = [
+            gateway.to_dict()
+            for gateway in hardware.gateways()
+        ]
+
         return jsonify({
 
-            "gateways": [
-                gateway.to_dict()
-                for gateway in hardware.gateways()
-            ],
+            "gateways": gateways,
 
             "devices": [
                 device.to_dict()
                 for device in hardware.devices()
             ],
 
+            # Legacy HardwareManager-Aktoren bleiben unverändert erhalten.
+            # Growstar-Aktorzuordnungen werden zusätzlich read-only aus den
+            # bereits bestehenden stationsbezogenen Assignments dargestellt.
             "actuators": [
                 actuator.to_dict()
                 for actuator in hardware.actuators()
             ],
+
+            "assigned_actuators": _assigned_actuator_views(
+                gateways
+            ),
 
             # Controller-weite MQTT-Sensorcontroller (Pico etc.).
             # Sie gehören bewusst zu keinem Zelt; die Zuordnung erfolgt erst
