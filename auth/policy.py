@@ -55,6 +55,7 @@ READ_EXACT = {
     "/light-level": require("grow.view"),
     "/diagrams": require("grow.view"),
     "/energie": require("grow.view"),
+    "/energie/diagramme": require("grow.view"),
     "/licht": require("grow.view"),
     "/heizung": require("grow.view"),
     "/abluft": require("grow.view"),
