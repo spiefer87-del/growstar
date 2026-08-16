@@ -112,10 +112,18 @@ _HOST_RE = re.compile(
 
 
 class HardwareConflictError(ValueError):
-    def __init__(self, message, *, endpoint=None, owner=None):
+    def __init__(
+        self,
+        message,
+        *,
+        endpoint=None,
+        owner=None,
+        contender=None,
+    ):
         super().__init__(message)
         self.endpoint = endpoint
         self.owner = owner
+        self.contender = contender
 
 
 class HardwareAssignmentActiveModeError(ValueError):
@@ -401,6 +409,7 @@ def _endpoint_owners(*, exclude_tent_id=None, candidate_cfg=None):
                     f"Hardware-Endpunkt {host} / Relay {relay} ist mehrfach belegt",
                     endpoint={"ip": host, "relay": relay},
                     owner=owner,
+                    contender=current,
                 )
             owners[endpoint] = current
 

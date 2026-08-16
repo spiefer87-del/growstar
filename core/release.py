@@ -15,6 +15,33 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.6.5",
+        "date": "2026-08-16",
+        "phase": "4R.1",
+        "title": "Hardware-Zuordnung ohne falsche Doppelbelegung",
+        "summary": (
+            "Die Verbindungsseite speichert nur noch tatsächlich geänderte "
+            "Aktor-Zuordnungen. Unveränderte Geräte können dadurch keine "
+            "scheinbaren Doppelbelegungen mehr auslösen."
+        ),
+        "changes": (
+            "Verbindungen sendet beim Speichern nur noch geänderte Aktor-Zuordnungen an das Backend.",
+            "Unveränderte IP-/Relay-Felder werden nicht mehr nebenbei normalisiert oder neu gespeichert.",
+            "Eine unveränderte Zuordnung desselben Aktors bleibt ausdrücklich zulässig.",
+            "Doppelbelegungsfehler nennen jetzt sowohl den bestehenden Besitzer als auch den kollidierenden Aktor.",
+            "Der betroffene Aktor wird bei einem Konflikt auf der Verbindungsseite hervorgehoben.",
+            "Der Schutz gegen echte Doppelbelegung von IP/Hostname + Relay bleibt vollständig aktiv.",
+        ),
+        "tests": (
+            "Eine unveränderte bereits gespeicherte IP/Relay-Zuordnung erneut speichern: kein Konflikt.",
+            "Ventilator eine neue IP mit leerem Relay zuweisen: Relay 0 wird nur für diesen geänderten Aktor übernommen.",
+            "Ein anderer unveränderter Aktor mit unvollständiger IP-Zuordnung darf nicht automatisch Relay 0 erhalten.",
+            "Zweiten Aktor absichtlich auf dieselbe IP + dasselbe Relay legen: echte Doppelbelegung muss weiter blockiert werden.",
+            "Fehlermeldung muss bestehenden Besitzer und kollidierenden Aktor nennen.",
+            "/api/system/version meldet Version 3.6.5 und Build-Kennung 4R.1.",
+        ),
+    },
+    {
         "version": "3.6.4",
         "date": "2026-08-16",
         "phase": "4R",
