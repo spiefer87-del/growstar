@@ -1,5 +1,7 @@
 from flask import abort, redirect, render_template, url_for
 
+from core.devices import get_device_default_label, get_device_icon, get_device_label
+from core.runtime import get_runtime
 from core.tents import manager as tent_manager, validate_tent_id
 
 
@@ -13,6 +15,10 @@ _DEVICE_META = {
     "dehumidifier": {"label": "Entfeuchter", "icon": "🌬️"},
     "light2": {"label": "Licht 2", "icon": "💡"},
     "vent2": {"label": "Ventilator 2", "icon": "🌀"},
+    "aux1": {"label": "Wasserpumpen", "icon": "💧"},
+    "aux2": {"label": "Zusatzgerät 2", "icon": "🔌"},
+    "aux3": {"label": "Zusatzgerät 3", "icon": "🔌"},
+    "aux4": {"label": "Zusatzgerät 4", "icon": "🔌"},
 }
 
 
@@ -144,11 +150,17 @@ def register(app):
         if meta is None:
             abort(404)
 
+        try:
+            runtime = get_runtime(context["tent_id"])
+            device_label = get_device_label(device, runtime=runtime)
+        except KeyError:
+            device_label = get_device_default_label(device)
+
         return render_template(
             "device_control.html",
             device_key=device,
-            device_label=meta["label"],
-            device_icon=meta["icon"],
+            device_label=device_label,
+            device_icon=get_device_icon(device),
             **context,
         )
 
