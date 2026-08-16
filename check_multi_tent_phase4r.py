@@ -39,10 +39,20 @@ def main():
     device = read("templates/device_control.html")
     sensors = read("templates/sensoren.html")
 
+    history = release.release_history()
+    phase4r_release = next(
+        (
+            item
+            for item in history
+            if item.get("version") == "3.6.4"
+            and item.get("phase") == "4R"
+        ),
+        None,
+    )
+
     require(
-        release.GROWSTAR_VERSION == "3.6.4"
-        and release.GROWSTAR_INTERNAL_PHASE == "4R",
-        "Growstar wurde auf Version 3.6.4 / Phase 4R erhöht",
+        phase4r_release is not None,
+        "Phase 4R bleibt als Version 3.6.4 in der Release-Historie erhalten",
     )
 
     # Gerätesteuerung
