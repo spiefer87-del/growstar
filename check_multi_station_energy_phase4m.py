@@ -43,6 +43,12 @@ def static_checks():
     thread = read("threads/shelly.py")
     energy = read("templates/energie.html")
     grow = read("templates/grow_control.html")
+    diagrams_path = ROOT / "templates" / "energie_diagramme.html"
+    diagrams = (
+        diagrams_path.read_text(encoding="utf-8")
+        if diagrams_path.exists()
+        else ""
+    )
     self_src = read("check_multi_station_energy_phase4m.py")
 
     for name, src in (
@@ -57,6 +63,8 @@ def static_checks():
     if Environment is not None:
         Environment().parse(energy)
         Environment().parse(grow)
+        if diagrams:
+            Environment().parse(diagrams)
         print("✅ Jinja-Syntax Phase 4M")
 
     require(
@@ -83,17 +91,40 @@ def static_checks():
         "Read-only History-API vorhanden",
     )
     require(
-        "Tagesmaximum" in energy
-        and "Gesamtleistung im Verlauf" in energy
-        and "Verbrauch heute nach Station" in energy
-        and "Aktuelle Leistung nach Gerät" in energy,
-        "Energie-Seite besitzt Tagesmaximum und mehrere Diagramme",
+        "Tagesmaximum" in energy,
+        "Energieübersicht besitzt Tagesmaximum",
+    )
+
+    # Phase 4M zeigte die Diagramme zunächst direkt auf /energie.
+    # Ab Phase 4M.1/4M.2 liegen sie absichtlich auf
+    # templates/energie_diagramme.html. Der Basis-Test muss beide
+    # Architekturen akzeptieren, da die Daten-/History-Funktionalität
+    # unverändert Phase 4M bleibt.
+    diagram_source = diagrams or energy
+
+    require(
+        "Gesamtleistung" in diagram_source
+        and (
+            "Verbrauch heute nach Station" in diagram_source
+            or "Tagesmaximum nach Station" in diagram_source
+        )
+        and (
+            "Aktuelle Geräteleistung" in diagram_source
+            or "Geräte-Maximum heute" in diagram_source
+        ),
+        "Energie-Historie besitzt eine Diagramm-Auswertung",
     )
     require(
-        "Chart.js" not in energy
-        and "<svg" in energy,
+        "Chart.js" not in diagram_source
+        and "<svg" in diagram_source,
         "Diagramme benötigen keine externe Chart-Bibliothek",
     )
+
+    if diagrams:
+        require(
+            'href="/energie/diagramme"' in energy,
+            "Energieübersicht verlinkt die separate Diagrammseite",
+        )
     require(
         "Hardware bestätigt" not in grow,
         "Normale Gerätekacheln zeigen keinen Hardware-Poll-Text mehr",
