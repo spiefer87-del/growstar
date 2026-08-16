@@ -5,7 +5,7 @@
 {% block head %}
 <style>
 :root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--purple:#a78bfa;--amber:#f59e0b}
-*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.55}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
+*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.45;cursor:not-allowed}.mode-note{margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(148,163,184,.08);color:var(--muted);font-size:.75rem;line-height:1.4}.mode-note.locked{background:rgba(245,158,11,.12);color:#fde68a}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
 </style>
 {% endblock %}
 
@@ -24,8 +24,9 @@
         <span id="feedback" class="feedback"></span>
     </div>
     <div class="legend">
-        Nicht verwendete Aktoren können einfach ohne IP/Hostname bleiben. Bei einer gesetzten IP und leerem Relay wird automatisch <strong>Relay 0</strong> verwendet – passend für Shelly-Steckdosen.
-        Gesperrt wird nur eine echte Doppelbelegung derselben Kombination <strong>IP/Hostname + Relay</strong>.
+        Nicht verwendete Aktoren können ohne IP/Hostname bleiben. Aktive Betriebsarten sind aber nur mit vollständiger Hardware-Zuordnung erlaubt.
+        Eine bestehende Zuordnung kann nur im Modus <strong>Deaktiviert / OFF</strong> geändert werden; bei einer LIVE-Station muss der alte Ausgang zusätzlich als <strong>ONLINE · AUS</strong> bestätigt sein.
+        Bei gesetzter IP und leerem Relay wird Relay 0 verwendet. Doppelbelegungen derselben Kombination <strong>IP/Hostname + Relay</strong> bleiben gesperrt.
     </div>
 </div>
 
@@ -42,6 +43,13 @@
     const q = new URLSearchParams(location.search);
     const preferred = q.get("tent");
     const hwUrl = id => `/api/tents/${encodeURIComponent(id)}/hardware`;
+    const MODE_LABELS = {
+        OFF: "Deaktiviert",
+        ON: "Dauerbetrieb",
+        TIME: "Zeitgesteuert",
+        INTERVAL: "Intervall",
+        ENV: "Umgebung"
+    };
 
     function relayOptions(selected){
         const hasSelection = selected !== null && selected !== undefined && selected !== "";
@@ -58,12 +66,20 @@
         else if(snapshot.shadow_enabled) banner.textContent = `${snapshot.name}: SHADOW. Zuordnungen werden gespeichert, reale Aktorik bleibt weiterhin gesperrt.`;
         else banner.textContent = `${snapshot.name}: Hardware-Control ist gesperrt. Die Station kann vorbereitet werden, ohne Relais zu schalten.`;
 
-        grid.innerHTML = Object.values(snapshot.assignments || {}).map(a => `
+        grid.innerHTML = Object.values(snapshot.assignments || {}).map(a => {
+            const mode = String(a.mode || "OFF").toUpperCase();
+            const modeLocked = mode !== "OFF";
+            const fieldsEditable = editable && !modeLocked;
+            return `
             <article class="card" data-device="${a.device}">
                 <div class="card-head"><h2>${a.icon || '🔌'} ${a.label}</h2><span class="status ${a.configured ? 'ok':'none'}">${a.configured ? 'ZUGEORDNET':'OFFEN'}</span></div>
-                <div class="row"><label>IP / Host</label><input class="js-ip" value="${String(a.ip || '').replace(/"/g,'&quot;')}" placeholder="192.168.178.x" ${editable ? '' : 'disabled'}></div>
-                <div class="row"><label>Relay</label><select class="js-relay" ${editable ? '' : 'disabled'}>${relayOptions(a.relay)}</select></div>
-            </article>`).join("");
+                <div class="row"><label>IP / Host</label><input class="js-ip" value="${String(a.ip || '').replace(/"/g,'&quot;')}" placeholder="192.168.178.x" ${fieldsEditable ? '' : 'disabled'}></div>
+                <div class="row"><label>Relay</label><select class="js-relay" ${fieldsEditable ? '' : 'disabled'}>${relayOptions(a.relay)}</select></div>
+                <div class="mode-note ${modeLocked ? 'locked' : ''}">
+                    Modus: ${MODE_LABELS[mode] || mode}${modeLocked ? " · Zuordnung gesperrt. Gerät zuerst auf Deaktiviert / OFF setzen." : ""}
+                </div>
+            </article>`;
+        }).join("");
 
         if(saveButton) saveButton.disabled = !editable;
     }
@@ -93,11 +109,22 @@
         if(!current || !CAN_CONFIGURE) return;
         const assignments={};
         grid.querySelectorAll(".card[data-device]").forEach(card => {
-            const ip = card.querySelector(".js-ip").value.trim();
-            const relay = card.querySelector(".js-relay").value;
-            // Leere IP = Aktor wird nicht verwendet. Ein eventuell noch
-            // sichtbarer Relay-Wert darf daraus keine Teilzuordnung machen.
-            assignments[card.dataset.device]={ip, relay: ip ? relay : ""};
+            const device = card.dataset.device;
+            const currentAssignment = current.assignments?.[device] || {};
+            const ipInput = card.querySelector(".js-ip");
+            const relaySelect = card.querySelector(".js-relay");
+
+            if (ipInput.disabled || relaySelect.disabled) {
+                assignments[device] = {
+                    ip: currentAssignment.ip || "",
+                    relay: currentAssignment.relay ?? ""
+                };
+                return;
+            }
+
+            const ip = ipInput.value.trim();
+            const relay = relaySelect.value;
+            assignments[device]={ip, relay: ip ? relay : ""};
         });
         feedback.className="feedback"; feedback.textContent="Speichere …";
         const res = await fetch(hwUrl(select.value),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({assignments})});
@@ -106,6 +133,10 @@
             feedback.className="feedback err";
             if(data.error === "hardware_endpoint_conflict" && data.owner){
                 feedback.textContent=`Doppelbelegung: ${data.endpoint?.ip || ''} / Relay ${data.endpoint?.relay ?? ''} gehört bereits ${data.owner.tent_id} · ${data.owner.device}.`;
+            } else if(data.error === "hardware_assignment_active_mode"){
+                feedback.textContent=data.message || "Gerät zuerst auf Deaktiviert / OFF setzen.";
+            } else if(data.error === "hardware_assignment_not_safe_off"){
+                feedback.textContent=data.message || "Alter Ausgang ist noch nicht als ONLINE · AUS bestätigt.";
             } else feedback.textContent=data.message || data.error || "Speichern fehlgeschlagen";
             return;
         }

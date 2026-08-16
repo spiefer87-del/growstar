@@ -17,6 +17,8 @@
     --disabled: #7c2d12;
     --purple: #a78bfa;
     --purple-dark: #312e81;
+    --red: #ef4444;
+    --amber: #f59e0b;
 }
 
 html { font-size: 16px; }
@@ -132,6 +134,27 @@ h3 {
     line-height: 1.45;
 }
 .safety-banner.visible { display: block; }
+.safety-banner.failsafe {
+    border-color: rgba(239,68,68,.55);
+    background: rgba(127,29,29,.30);
+    color: #fecaca;
+    font-weight: 700;
+}
+.safety-banner.warning {
+    border-color: rgba(245,158,11,.45);
+    background: rgba(120,53,15,.24);
+    color: #fde68a;
+}
+.device.unassigned { background: linear-gradient(135deg, #451a03, #92400e); }
+.device.safety { background: linear-gradient(135deg, #450a0a, #991b1b); }
+.device.unknown { background: linear-gradient(135deg, #111827, #475569); }
+.device-detail {
+    margin-top: 5px;
+    min-height: 1.1em;
+    color: rgba(255,255,255,.72);
+    font-size: .68rem;
+    line-height: 1.25;
+}
 
 .grid {
     display: grid;
@@ -335,15 +358,15 @@ h3 {
 
 <h3>Geräte</h3>
 <div class="grid" id="device-grid">
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='light') }}" class="card-link"><div class="card device" id="light-card"><h2>💡 Beleuchtung</h2><div class="value" id="light-state">---</div><div class="sub">Modus: <span id="light-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='heating') }}" class="card-link"><div class="card device" id="heating-card"><h2>🔥 Heizung</h2><div class="value" id="heating-state">---</div><div class="sub">Modus: <span id="heating-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='fan') }}" class="card-link"><div class="card device" id="fan-card"><h2>💨 Lüfter</h2><div class="value" id="fan-state">---</div><div class="sub">Modus: <span id="fan-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='vent') }}" class="card-link"><div class="card device" id="vent-card"><h2>🌀 Ventilator</h2><div class="value" id="vent-state">---</div><div class="sub">Modus: <span id="vent-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='irrigation') }}" class="card-link"><div class="card device" id="irrigation-card"><h2>💧 Bewässerung</h2><div class="value" id="irrigation-state">---</div><div class="sub">Modus: <span id="irrigation-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='humidifier') }}" class="card-link"><div class="card device" id="humidifier-card"><h2>💦 Luftbefeuchter</h2><div class="value" id="humidifier-state">---</div><div class="sub">Modus: <span id="humidifier-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='dehumidifier') }}" class="card-link"><div class="card device" id="dehumidifier-card"><h2>🌬️ Entfeuchter</h2><div class="value" id="dehumidifier-state">---</div><div class="sub">Modus: <span id="dehumidifier-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='light2') }}" class="card-link"><div class="card device" id="light2-card"><h2>💡 Licht 2</h2><div class="value" id="light2-state">---</div><div class="sub">Modus: <span id="light2-mode">--</span></div></div></a>
-    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='vent2') }}" class="card-link"><div class="card device" id="vent2-card"><h2>🌀 Ventilator 2</h2><div class="value" id="vent2-state">---</div><div class="sub">Modus: <span id="vent2-mode">--</span></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='light') }}" class="card-link"><div class="card device" id="light-card"><h2>💡 Beleuchtung</h2><div class="value" id="light-state">---</div><div class="sub">Modus: <span id="light-mode">--</span></div><div class="device-detail" id="light-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='heating') }}" class="card-link"><div class="card device" id="heating-card"><h2>🔥 Heizung</h2><div class="value" id="heating-state">---</div><div class="sub">Modus: <span id="heating-mode">--</span></div><div class="device-detail" id="heating-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='fan') }}" class="card-link"><div class="card device" id="fan-card"><h2>💨 Lüfter</h2><div class="value" id="fan-state">---</div><div class="sub">Modus: <span id="fan-mode">--</span></div><div class="device-detail" id="fan-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='vent') }}" class="card-link"><div class="card device" id="vent-card"><h2>🌀 Ventilator</h2><div class="value" id="vent-state">---</div><div class="sub">Modus: <span id="vent-mode">--</span></div><div class="device-detail" id="vent-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='irrigation') }}" class="card-link"><div class="card device" id="irrigation-card"><h2>💧 Bewässerung</h2><div class="value" id="irrigation-state">---</div><div class="sub">Modus: <span id="irrigation-mode">--</span></div><div class="device-detail" id="irrigation-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='humidifier') }}" class="card-link"><div class="card device" id="humidifier-card"><h2>💦 Luftbefeuchter</h2><div class="value" id="humidifier-state">---</div><div class="sub">Modus: <span id="humidifier-mode">--</span></div><div class="device-detail" id="humidifier-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='dehumidifier') }}" class="card-link"><div class="card device" id="dehumidifier-card"><h2>🌬️ Entfeuchter</h2><div class="value" id="dehumidifier-state">---</div><div class="sub">Modus: <span id="dehumidifier-mode">--</span></div><div class="device-detail" id="dehumidifier-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='light2') }}" class="card-link"><div class="card device" id="light2-card"><h2>💡 Licht 2</h2><div class="value" id="light2-state">---</div><div class="sub">Modus: <span id="light2-mode">--</span></div><div class="device-detail" id="light2-detail"></div></div></a>
+    <a href="{{ url_for('grow_control_tent_device', tent_id=tent_id, device='vent2') }}" class="card-link"><div class="card device" id="vent2-card"><h2>🌀 Ventilator 2</h2><div class="value" id="vent2-state">---</div><div class="sub">Modus: <span id="vent2-mode">--</span></div><div class="device-detail" id="vent2-detail"></div></div></a>
 </div>
 
 <script>
@@ -486,28 +509,40 @@ h3 {
         const banner = document.getElementById("safety-banner");
         if (!badge) return;
 
+        const safety = state.safety || {};
+
         if (state.control_enabled) {
             badge.textContent = "LIVE";
             badge.className = "runtime-badge live";
-            banner?.classList.remove("visible");
-        } else if (state.arming || state.live_requested) {
-            badge.textContent = "ARMING";
-            badge.className = "runtime-badge arming";
-            if (banner) {
-                banner.textContent = "🟠 ARMING: LIVE ist angefordert, aber die Hardware-Aktorik bleibt bis zu einem frischen erfolgreichen Preflight gesperrt.";
-                banner.classList.add("visible");
+
+            if (safety.active || safety.stale) {
+                banner?.classList.add("visible");
+                banner?.classList.toggle("failsafe", Boolean(safety.active));
+                banner?.classList.toggle("warning", Boolean(safety.stale && !safety.active));
+
+                if (banner) {
+                    const blocked = (safety.blocked_devices || []).join(", ");
+                    const reason = safety.reason || "Safety-Supervisor meldet einen Fehler";
+                    banner.textContent =
+                        `${safety.active ? "🚨 SAFETY FAILSAFE AKTIV" : "⚠️ SAFETY SUPERVISOR STALE"} · ${reason}` +
+                        (blocked ? ` · Gesperrt: ${blocked}` : "");
+                }
+            } else {
+                banner?.classList.remove("visible", "failsafe", "warning");
             }
         } else if (state.shadow_enabled) {
-            badge.textContent = "SHADOW";
+            badge.textContent = state.runtime_mode === "arming" ? "ARMING" : "SHADOW";
             badge.className = "runtime-badge shadow";
+            banner?.classList.remove("failsafe", "warning");
+            banner?.classList.add("visible");
             if (banner) {
-                banner.textContent = "🟣 Shadow-Modus: Growstar berechnet Sollzustände für diese Station, aber die Hardware-Aktorik bleibt gesperrt.";
-                banner.classList.add("visible");
+                banner.textContent =
+                    "🟣 Shadow/ARMING: Growstar berechnet Sollzustände, reale Hardware-Aktorik bleibt bis zur Freigabe gesperrt.";
             }
         } else {
             badge.textContent = "BEREIT";
             badge.className = "runtime-badge";
-            banner?.classList.remove("visible");
+            banner?.classList.remove("visible", "failsafe", "warning");
         }
     }
 
@@ -515,40 +550,74 @@ h3 {
         const card = document.getElementById(`${name}-card`);
         const label = document.getElementById(`${name}-state`);
         const modeEl = document.getElementById(`${name}-mode`);
+        const detail = document.getElementById(`${name}-detail`);
         if (!card || !label) return;
 
         const device = state.devices?.[name] || {};
         const mode = device.mode ?? state.device_modes?.[name] ?? "OFF";
-        const isArming = Boolean(!state.control_enabled && (state.arming || state.live_requested));
-        const isShadow = Boolean(!state.control_enabled && (state.shadow_enabled || isArming));
+        const isShadow = Boolean(state.shadow_enabled && !state.control_enabled);
 
         if (modeEl) modeEl.textContent = MODE_LABELS[mode] || mode;
+        if (detail) detail.textContent = "";
 
         if (mode === "OFF") {
             label.textContent = "DEAKTIVIERT";
             card.className = "card device disabled";
+            if (detail) {
+                detail.textContent = device.assigned ? "Hardware zugeordnet" : "Keine Hardware zugeordnet";
+            }
+            return;
+        }
+
+        if (!device.assigned) {
+            label.textContent = "NICHT ZUGEORDNET";
+            card.className = "card device unassigned";
+            if (detail) detail.textContent = "Aktive Betriebsart gesperrt · zuerst Verbindungen";
             return;
         }
 
         if (isShadow) {
             const desired = device.shadow_desired;
-            const prefix = isArming ? "ARMING" : "SHADOW";
             if (desired === null || desired === undefined) {
-                label.textContent = `${prefix} --`;
+                label.textContent = "SHADOW --";
                 card.className = "card device shadow-off";
             } else if (desired) {
-                label.textContent = `${prefix} EIN`;
+                label.textContent = "SHADOW EIN";
                 card.className = "card device shadow-on";
             } else {
-                label.textContent = `${prefix} AUS`;
+                label.textContent = "SHADOW AUS";
                 card.className = "card device shadow-off";
+            }
+            if (detail) detail.textContent = "Keine reale Aktorik";
+            return;
+        }
+
+        if (device.safety_blocked || device.safety_force_off) {
+            label.textContent = "SAFE AUS";
+            card.className = "card device safety";
+            if (detail) detail.textContent = device.safety_reason || "Safety blockiert EIN";
+            return;
+        }
+
+        if (device.physical_known) {
+            const on = Boolean(device.physical_on);
+            label.textContent = on ? "EIN" : "AUS";
+            card.className = on ? "card device on" : "card device off";
+            if (detail) {
+                const age = device.hardware_health?.check_age;
+                detail.textContent = `Hardware bestätigt${age == null ? "" : ` · ${Math.round(age)}s`}`;
             }
             return;
         }
 
-        const on = Boolean(device.actual_on);
-        label.textContent = on ? "EIN" : "AUS";
-        card.className = on ? "card device on" : "card device off";
+        label.textContent = "STATUS UNBEKANNT";
+        card.className = "card device unknown";
+        if (detail) {
+            const h = device.hardware_health || {};
+            detail.textContent =
+                h.last_error ||
+                (h.state ? `Hardware ${String(h.state).toUpperCase()}` : "Noch kein Hardware-Poll");
+        }
     }
 
     async function loadState() {
