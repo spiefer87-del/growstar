@@ -563,8 +563,8 @@ h3 {
         if (mode === "OFF") {
             label.textContent = "DEAKTIVIERT";
             card.className = "card device disabled";
-            if (detail) {
-                detail.textContent = device.assigned ? "Hardware zugeordnet" : "Keine Hardware zugeordnet";
+            if (detail && !device.assigned) {
+                detail.textContent = "Keine Hardware zugeordnet";
             }
             return;
         }
@@ -603,10 +603,10 @@ h3 {
             const on = Boolean(device.physical_on);
             label.textContent = on ? "EIN" : "AUS";
             card.className = on ? "card device on" : "card device off";
-            if (detail) {
-                const age = device.hardware_health?.check_age;
-                detail.textContent = `Hardware bestätigt${age == null ? "" : ` · ${Math.round(age)}s`}`;
-            }
+            // Verifizierungsalter gehört in den Watchdog, nicht auf die
+            // normale Grow-Kachel. Die Kachelfarbe folgt trotzdem weiterhin
+            // dem zentral bestätigten physischen Relay-Zustand.
+            if (detail) detail.textContent = "";
             return;
         }
 
