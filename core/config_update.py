@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 
+from core.devices import AUX_DEVICE_NAMES, normalize_device_label
 from core.profile import get_active_profile
 from core.ramp import resync_active_ramp, stop_ramp, update_ramp_duration
 from core.runtime import resolve_runtime
@@ -116,6 +117,27 @@ def apply_config_patch(data, runtime=None):
 
         if key in _NESTED_DEVICE_KEYS:
             _merge_nested_config(working, key, value)
+            changed_keys.add(key)
+            continue
+
+        if key == "DEVICE_LABELS":
+            if not isinstance(value, dict):
+                raise TypeError("DEVICE_LABELS muss ein JSON-Objekt sein")
+
+            unknown = sorted(set(value) - set(AUX_DEVICE_NAMES))
+            if unknown:
+                raise ValueError(
+                    "Unbekannte Gerätenamen-Slots: " + ", ".join(unknown)
+                )
+
+            target = working.setdefault("DEVICE_LABELS", {})
+            if not isinstance(target, dict):
+                target = {}
+                working["DEVICE_LABELS"] = target
+
+            for device, label in value.items():
+                target[device] = normalize_device_label(device, label)
+
             changed_keys.add(key)
             continue
 

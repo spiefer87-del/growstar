@@ -15,6 +15,7 @@ from core.hardware.actuator_health import get_endpoint_health
 from core.hardware_assignments import (
     DEVICE_HARDWARE,
     HardwareConflictError,
+    device_display_label,
     validate_hardware_assignments,
 )
 from core.runtime import resolve_runtime
@@ -199,13 +200,14 @@ def _hardware_check(runtime, active_devices, now):
 
     for device, mode in active_devices:
         meta = DEVICE_HARDWARE[device]
+        label = device_display_label(cfg, device)
         host = str(cfg.get(meta["ip_key"]) or "").strip()
         relay = cfg.get(meta["relay_key"])
 
         if not host or relay in (None, ""):
             items.append({
                 "device": device,
-                "label": meta["label"],
+                "label": label,
                 "mode": mode,
                 "configured": False,
                 "ok": False,
@@ -213,7 +215,7 @@ def _hardware_check(runtime, active_devices, now):
                 "ip": host or None,
                 "relay": None,
             })
-            blockers.append(f"{meta['label']}: keine Hardware-Zuordnung")
+            blockers.append(f"{label}: keine Hardware-Zuordnung")
             continue
 
         try:
@@ -221,7 +223,7 @@ def _hardware_check(runtime, active_devices, now):
         except (TypeError, ValueError):
             items.append({
                 "device": device,
-                "label": meta["label"],
+                "label": label,
                 "mode": mode,
                 "configured": False,
                 "ok": False,
@@ -229,7 +231,7 @@ def _hardware_check(runtime, active_devices, now):
                 "ip": host,
                 "relay": relay,
             })
-            blockers.append(f"{meta['label']}: ungültiges Relay")
+            blockers.append(f"{label}: ungültiges Relay")
             continue
 
         health = get_endpoint_health(host, relay, now=now)
@@ -242,7 +244,7 @@ def _hardware_check(runtime, active_devices, now):
 
         item = {
             "device": device,
-            "label": meta["label"],
+            "label": label,
             "mode": mode,
             "configured": True,
             "ok": ok,
@@ -258,7 +260,7 @@ def _hardware_check(runtime, active_devices, now):
         if not ok:
             reason = item["last_error"] or item["state"] or "nicht geprüft"
             blockers.append(
-                f"{meta['label']}: {host} / Relay {relay} nicht bereit ({reason})"
+                f"{label}: {host} / Relay {relay} nicht bereit ({reason})"
             )
 
     return {

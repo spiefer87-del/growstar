@@ -30,6 +30,12 @@ _LIVE_STATE_TEMPLATE = {
     "fan": False,
     "light": False,
 
+    # Phase 4P – sichere Startwerte der vier freien Universal-Aktoren.
+    "aux1": False,
+    "aux2": False,
+    "aux3": False,
+    "aux4": False,
+
     "ramp_active": False,
     "ramp_target": None,
 
@@ -72,6 +78,10 @@ def create_runtime_state():
         dehumidifier_on=False,
         light2_on=False,
         vent2_on=False,
+        aux1_on=False,
+        aux2_on=False,
+        aux3_on=False,
+        aux4_on=False,
 
         # Rohwerte
         last_temp_raw=None,
@@ -122,6 +132,10 @@ humidifier_on = _default.humidifier_on
 dehumidifier_on = _default.dehumidifier_on
 light2_on = _default.light2_on
 vent2_on = _default.vent2_on
+aux1_on = _default.aux1_on
+aux2_on = _default.aux2_on
+aux3_on = _default.aux3_on
+aux4_on = _default.aux4_on
 
 last_temp_raw = _default.last_temp_raw
 last_hum_raw = _default.last_hum_raw

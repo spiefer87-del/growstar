@@ -66,7 +66,21 @@ DEFAULT_CONFIG = {
         "fan":      {"mode": "ENV",  "params": {}},
         "vent":     {"mode": "TIME", "params": {}},
         "heating":  {"mode": "ENV",  "params": {}},
-        "light":    {"mode": "ENV",  "params": {}}
+        "light":    {"mode": "ENV",  "params": {}},
+
+        # Vier sichere Universal-Slots. Ohne Hardware-Zuordnung bleiben aktive
+        # Modi zusätzlich durch den bestehenden Phase-4L-Guard blockiert.
+        "aux1": "OFF",
+        "aux2": "OFF",
+        "aux3": "OFF",
+        "aux4": "OFF"
+    },
+
+    "DEVICE_LABELS": {
+        "aux1": "Wasserpumpen",
+        "aux2": "Zusatzgerät 2",
+        "aux3": "Zusatzgerät 3",
+        "aux4": "Zusatzgerät 4"
     },
 
     "DEVICE_ENV_CONFIG": {

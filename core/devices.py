@@ -3,11 +3,28 @@
 from copy import deepcopy
 from core.runtime import resolve_runtime
 
-DEVICE_NAMES = (
-    "heating", "fan", "light", "vent", "irrigation",
-    "humidifier", "dehumidifier", "light2", "vent2",
-)
+
+AUX_DEVICE_NAMES = ("aux1", "aux2", "aux3", "aux4")
+
+DEVICE_META = {
+    "heating": {"label": "Heizung", "icon": "🔥", "auxiliary": False},
+    "fan": {"label": "Abluft / Lüfter", "icon": "💨", "auxiliary": False},
+    "light": {"label": "Beleuchtung", "icon": "💡", "auxiliary": False},
+    "vent": {"label": "Ventilator", "icon": "🌀", "auxiliary": False},
+    "irrigation": {"label": "Bewässerung", "icon": "💧", "auxiliary": False},
+    "humidifier": {"label": "Luftbefeuchter", "icon": "💦", "auxiliary": False},
+    "dehumidifier": {"label": "Entfeuchter", "icon": "🌬️", "auxiliary": False},
+    "light2": {"label": "Licht 2", "icon": "💡", "auxiliary": False},
+    "vent2": {"label": "Ventilator 2", "icon": "🌀", "auxiliary": False},
+    "aux1": {"label": "Wasserpumpen", "icon": "💧", "auxiliary": True},
+    "aux2": {"label": "Zusatzgerät 2", "icon": "🔌", "auxiliary": True},
+    "aux3": {"label": "Zusatzgerät 3", "icon": "🔌", "auxiliary": True},
+    "aux4": {"label": "Zusatzgerät 4", "icon": "🔌", "auxiliary": True},
+}
+
+DEVICE_NAMES = tuple(DEVICE_META)
 DEVICE_MODES = {"OFF", "ON", "TIME", "INTERVAL", "ENV"}
+DEVICE_LABEL_MAX_LENGTH = 48
 
 
 class DeviceHardwareRequiredError(ValueError):
@@ -27,6 +44,67 @@ def validate_device_name(device):
     if device not in DEVICE_NAMES:
         raise ValueError(f"Unbekanntes Gerät: {device}")
     return device
+
+
+def get_device_default_label(device):
+    validate_device_name(device)
+    return DEVICE_META[device]["label"]
+
+
+def get_device_icon(device):
+    validate_device_name(device)
+    return DEVICE_META[device]["icon"]
+
+
+def is_aux_device(device):
+    validate_device_name(device)
+    return bool(DEVICE_META[device].get("auxiliary"))
+
+
+def normalize_device_label(device, value):
+    """Normalisiert einen frei vergebenen Anzeigenamen.
+
+    Technische Geräte-IDs bleiben unverändert. Ein leerer Name fällt auf den
+    sicheren Standardnamen des Slots zurück.
+    """
+    validate_device_name(device)
+
+    if value is None:
+        return get_device_default_label(device)
+
+    label = " ".join(str(value).split()).strip()
+    if not label:
+        return get_device_default_label(device)
+
+    if len(label) > DEVICE_LABEL_MAX_LENGTH:
+        raise ValueError(
+            f"{device}: Gerätename darf höchstens "
+            f"{DEVICE_LABEL_MAX_LENGTH} Zeichen lang sein"
+        )
+
+    return label
+
+
+def get_device_label(device, runtime=None, *, config=None):
+    """Liefert den stationsbezogenen Anzeigenamen eines Aktors."""
+    validate_device_name(device)
+
+    # Nur die vier Universal-Slots sind absichtlich frei benennbar.
+    if not is_aux_device(device):
+        return get_device_default_label(device)
+
+    if config is None:
+        config = resolve_runtime(runtime).config
+
+    labels = config.get("DEVICE_LABELS") if isinstance(config, dict) else None
+    if not isinstance(labels, dict):
+        labels = {}
+
+    try:
+        return normalize_device_label(device, labels.get(device))
+    except (TypeError, ValueError):
+        # UI/Diagnose bleibt selbst bei manuell beschädigter Config benutzbar.
+        return get_device_default_label(device)
 
 
 def get_device_mode(device, runtime=None):

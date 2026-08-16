@@ -63,7 +63,47 @@ DEVICE_HARDWARE = {
         "ip_key": "IP_VENT2",
         "relay_key": "RELAY_VENT2",
     },
+    "aux1": {
+        "label": "Wasserpumpen",
+        "icon": "💧",
+        "ip_key": "IP_AUX1",
+        "relay_key": "RELAY_AUX1",
+    },
+    "aux2": {
+        "label": "Zusatzgerät 2",
+        "icon": "🔌",
+        "ip_key": "IP_AUX2",
+        "relay_key": "RELAY_AUX2",
+    },
+    "aux3": {
+        "label": "Zusatzgerät 3",
+        "icon": "🔌",
+        "ip_key": "IP_AUX3",
+        "relay_key": "RELAY_AUX3",
+    },
+    "aux4": {
+        "label": "Zusatzgerät 4",
+        "icon": "🔌",
+        "ip_key": "IP_AUX4",
+        "relay_key": "RELAY_AUX4",
+    },
 }
+
+
+def device_display_label(cfg, device):
+    """Liefert den sichtbaren Namen ohne Seiteneffekt oder Hardwarezugriff."""
+    meta = DEVICE_HARDWARE.get(device) or {}
+    default = meta.get("label") or str(device)
+
+    # Nur die vier Universal-Slots sind frei benennbar.
+    if device not in ("aux1", "aux2", "aux3", "aux4"):
+        return default
+
+    labels = cfg.get("DEVICE_LABELS") if isinstance(cfg, dict) else None
+    value = labels.get(device) if isinstance(labels, dict) else None
+    value = " ".join(str(value or "").split()).strip()
+    return value or default
+
 
 _HOST_RE = re.compile(
     r"^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)*"
@@ -203,7 +243,7 @@ def hardware_snapshot(tent_id):
 
         assignments[device] = {
             "device": device,
-            "label": meta["label"],
+            "label": device_display_label(cfg, device),
             "icon": meta["icon"],
             "ip": host,
             "relay": relay,

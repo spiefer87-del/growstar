@@ -17,7 +17,7 @@ import core.context as ctx
 from core.constants import SENSOR_TIMEOUT
 from core.devices import DEVICE_MODES
 from core.hardware.actuator_health import actuator_poll_status, get_endpoint_health
-from core.hardware_assignments import DEVICE_HARDWARE
+from core.hardware_assignments import DEVICE_HARDWARE, device_display_label
 from core.runtime import list_runtimes
 from core.tents import DEFAULT_TENT_ID
 
@@ -220,7 +220,7 @@ def _hardware_health(rt, *, now):
 
         endpoints.append({
             "device": device,
-            "label": meta["label"],
+            "label": device_display_label(cfg, device),
             "ip": host,
             "relay": relay,
             "state": endpoint_state,

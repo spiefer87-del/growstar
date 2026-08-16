@@ -303,6 +303,51 @@ def set_vent2(enabled, reason="", runtime=None):
     )
 
 
+_AUX_DEVICE_NAMES = ("aux1", "aux2", "aux3", "aux4")
+_AUX_DEFAULT_LABELS = {
+    "aux1": "Wasserpumpen",
+    "aux2": "Zusatzgerät 2",
+    "aux3": "Zusatzgerät 3",
+    "aux4": "Zusatzgerät 4",
+}
+_AUX_ICONS = {
+    "aux1": "💧",
+    "aux2": "🔌",
+    "aux3": "🔌",
+    "aux4": "🔌",
+}
+
+
+def _aux_display_label(runtime, device):
+    labels = runtime.config.get("DEVICE_LABELS") or {}
+    label = labels.get(device) if isinstance(labels, dict) else None
+    label = " ".join(str(label or "").split()).strip()
+    return label or _AUX_DEFAULT_LABELS[device]
+
+
+def set_auxiliary(device, enabled, reason="", runtime=None):
+    """Schaltet einen freien Universal-Aktor über denselben Shelly-/Safety-Pfad."""
+    if device not in _AUX_DEVICE_NAMES:
+        raise ValueError(f"Unbekannter Universal-Aktor: {device}")
+
+    rt = resolve_runtime(runtime)
+    suffix = device.upper()
+    label = _aux_display_label(rt, device)
+    icon = _AUX_ICONS[device]
+
+    _set_shelly_device(
+        enabled=enabled,
+        state_attr=f"{device}_on",
+        live_key=device,
+        ip_key=f"IP_{suffix}",
+        relay_key=f"RELAY_{suffix}",
+        on_text=f"{icon} {label} EIN ",
+        off_text=f"🛑 {label} AUS ",
+        reason=reason,
+        runtime=rt,
+    )
+
+
 # =========================================
 # 🔌 DEVICE SETTER MAPPING
 # =========================================
@@ -324,3 +369,12 @@ def set_device(device, enabled, runtime=None, reason=""):
     setter = DEVICE_SETTERS.get(device)
     if setter:
         setter(enabled, reason=reason, runtime=runtime)
+        return
+
+    if device in _AUX_DEVICE_NAMES:
+        set_auxiliary(
+            device,
+            enabled,
+            reason=reason,
+            runtime=runtime,
+        )
