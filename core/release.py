@@ -15,6 +15,29 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.6.3",
+        "date": "2026-08-16",
+        "phase": "4Q.1",
+        "title": "Versionsanzeige ins Management Dashboard verschoben",
+        "summary": (
+            "Die Growstar-Version bleibt weiterhin direkt erreichbar, wird aber "
+            "nicht mehr dauerhaft über jeder Seite eingeblendet."
+        ),
+        "changes": (
+            "Globale schwebende Versionsanzeige aus base.html entfernt.",
+            "Version dezent direkt bei 'Management Dashboard' platziert.",
+            "NEU-Hinweis bleibt erhalten, bis die Patch-Information geöffnet wurde.",
+            "Patch-Historie, Test-Checkliste und Versions-API bleiben unverändert erhalten.",
+        ),
+        "tests": (
+            "Auf dem Management Dashboard steht dezent v3.6.3 neben der Überschrift.",
+            "Auf Grow Control, Energie und anderen Unterseiten erscheint keine dauerhafte Versionsanzeige mehr.",
+            "NEU erscheint auf dem Management Dashboard bei einer ungelesenen Version.",
+            "Nach Öffnen der Patch-Information verschwindet NEU beim nächsten Dashboard-Aufruf.",
+            "/api/system/version meldet Version 3.6.3 und Build-Kennung 4Q.1.",
+        ),
+    },
+    {
         "version": "3.6.2",
         "date": "2026-08-16",
         "phase": "4Q",
