@@ -45,6 +45,11 @@ READ_EXACT = {
     "/grow-control/watchdog": require("hardware.view"),
     "/pflanzenmanagement": require("plants.view"),
 
+    # Release-/Patch-Informationen sind read-only und für alle normalen
+    # angemeldeten Growstar-Rollen sichtbar.
+    "/system/patch-notes": require("dashboard.view"),
+    "/api/system/version": require("dashboard.view"),
+
     # Grow / Live-Daten
     "/temperature": require("grow.view"),
     "/humidity": require("grow.view"),
