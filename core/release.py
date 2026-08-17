@@ -15,6 +15,39 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.0",
+        "date": "2026-08-17",
+        "phase": "4S",
+        "title": "Network Management – sichere Diagnosebasis",
+        "summary": (
+            "Growstar erhält ein eigenes Netzwerkmodul. Die erste Stufe zeigt "
+            "NetworkManager-Status, aktive Interfaces, IP/Gateway/DNS und sichtbare "
+            "WLAN-Netze an, ohne Netzwerkverbindungen zu verändern."
+        ),
+        "changes": (
+            "Neue Systemseite /system/network für Netzwerkstatus und WLAN-Diagnose.",
+            "Read-only NetworkManager-Integration über nmcli mit festen Argumentlisten und Timeout.",
+            "Aktive LAN-/WLAN-Interfaces zeigen Verbindung, IPv4-Adressen, Gateway und DNS.",
+            "WLAN-Scan zeigt SSID, Signalstärke, Sicherheit und aktuell verbundenes Netz.",
+            "Doppelte SSIDs werden auf den stärksten sichtbaren Access Point zusammengefasst.",
+            "Fehlender NetworkManager/nmcli wird als Diagnosezustand behandelt und erzeugt keinen Serverfehler.",
+            "Netzwerkseite und APIs sind zusätzlich mit settings.view geschützt.",
+            "System-Dashboard trennt Netzwerkverwaltung von Shelly-/Hardware-Verbindungen.",
+            "Phase 4S bleibt vollständig read-only; Verbinden, Hotspot und Recovery verändern noch nichts.",
+        ),
+        "tests": (
+            "Unter System erscheint die neue Karte 'Netzwerk' und öffnet /system/network.",
+            "Auf dem Raspberry werden NetworkManager, Hostname und aktive Interfaces angezeigt.",
+            "IP-Adresse, Gateway und DNS eines verbundenen Interfaces werden plausibel dargestellt.",
+            "WLAN-Scan zeigt sichtbare SSIDs, Signalstärke und Sicherheitsart.",
+            "Das aktuell verbundene WLAN wird im Scan markiert.",
+            "Auf einem System ohne nmcli erscheint eine verständliche Diagnose statt eines HTTP-500-Fehlers.",
+            "Die Seite bietet keine Buttons zum Verbinden, Trennen oder Starten eines Hotspots.",
+            "python3 check_phase4s_network.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.0 und Build-Kennung 4S.",
+        ),
+    },
+    {
         "version": "3.6.6",
         "date": "2026-08-16",
         "phase": "4R.2",
