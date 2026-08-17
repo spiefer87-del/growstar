@@ -27,7 +27,10 @@ def register(app):
     @app.route("/api/config/network/wifi")
     @permission_required("settings.view")
     def api_network_wifi():
-        return jsonify(wifi_scan())
+        force = str(request.args.get("refresh") or "").strip().lower() in {
+            "1", "true", "yes", "on"
+        }
+        return jsonify(wifi_scan(force=force))
 
     @app.route("/api/config/network/capabilities")
     @permission_required("settings.view")
