@@ -15,6 +15,43 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.2",
+        "date": "2026-08-17",
+        "phase": "4S.2",
+        "title": "WLAN-Wechsel direkt in Growstar mit sicherem Rückfall",
+        "summary": (
+            "Sichtbare WLAN-Netze können jetzt direkt über die Growstar-Oberfläche "
+            "ausgewählt werden. Vor einem Wechsel merkt sich Growstar die aktive "
+            "Verbindung und versucht bei einer fehlgeschlagenen Aktivierung "
+            "automatisch zurückzuwechseln."
+        ),
+        "changes": (
+            "Netzwerkseite kann sichtbare offene sowie WPA/WPA2/WPA3-Personal-WLANs direkt verbinden.",
+            "Vor schreibenden Aktionen prüft Growstar die NetworkManager-Polkit-Berechtigungen seines laufenden Dienstkontos.",
+            "WLAN-Schreibaktionen sind zusätzlich durch die bestehende settings.manage-Policy und CSRF-Schutz abgesichert.",
+            "Das WLAN-Passwort wird nicht in Growstar-Konfigurationsdateien gespeichert und nicht als nmcli-Prozessargument übergeben.",
+            "Geschützte WLAN-Secrets werden über die interaktive nmcli-Secret-Abfrage per stdin an NetworkManager übergeben.",
+            "Vor dem Wechsel wird die aktive WLAN-Verbindung als Rückfallziel gespeichert.",
+            "Das Ziel-WLAN gilt erst nach bestätigter Aktivierung und erhaltener IPv4-Adresse als erfolgreich.",
+            "Bei Aktivierungs- oder Verifikationsfehler versucht Growstar automatisch die vorherige WLAN-Verbindung wiederherzustellen.",
+            "WEP und Enterprise-WLAN 802.1X bleiben in dieser Ausbaustufe bewusst gesperrt.",
+            "Gunicorn bindet Port 8001 nicht mehr an die feste IP 192.168.178.66, sondern netzwerkneutral an 0.0.0.0.",
+            "Damit ist Growstar nicht mehr von der bisherigen Router-IP abhängig und für die kommende Setup-Hotspot-Erstinbetriebnahme vorbereitet.",
+            "Der automatische Erstinbetriebnahme-Hotspot wird erst in der nächsten Stufe aktiviert, nachdem die NetworkManager-Schreibrechte auf dem Ziel-Raspberry bestätigt wurden.",
+        ),
+        "tests": (
+            "Netzwerkseite zeigt unter 'Netzwerkverwaltung', ob NetworkManager-Schreibzugriff bereit ist.",
+            "Bei fehlender NetworkManager-Freigabe bleiben alle WLAN-Verbinden-Schaltflächen deaktiviert.",
+            "Bei vorhandener Freigabe zeigt ein nicht verbundenes WPA/WPA2/WPA3-Personal-WLAN eine Verbinden-Schaltfläche.",
+            "WLAN-Passwort wird nur im Dialog eingegeben und nach dem Verbindungsversuch aus dem Formular gelöscht.",
+            "Ein simuliertes geschütztes WLAN übergibt das Secret ausschließlich per stdin und niemals als Prozessargument.",
+            "Bei simulierter fehlender IPv4-Verifikation wird die vorherige Verbindung als Rollback-Ziel aktiviert.",
+            "python3 check_phase4s2_wifi_connect.py läuft vollständig grün.",
+            "Nach dem Neustart lauscht Gunicorn weiterhin lokal auf 127.0.0.1:8000 und zusätzlich netzwerkneutral auf 0.0.0.0:8001.",
+            "/api/system/version meldet Version 3.7.2 und Build-Kennung 4S.2.",
+        ),
+    },
+    {
         "version": "3.7.1",
         "date": "2026-08-17",
         "phase": "4S.1",
