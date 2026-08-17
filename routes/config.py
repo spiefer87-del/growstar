@@ -1,10 +1,27 @@
-from flask import jsonify, request
+from flask import jsonify, render_template, request
 
+from auth.decorators import permission_required
 from core.config_update import apply_config_patch, config_snapshot
 from core.runtime import get_default_runtime
+from services.network import network_status, wifi_scan
 
 
 def register(app):
+
+    @app.route("/system/network")
+    @permission_required("settings.view")
+    def system_network_page():
+        return render_template("network.html")
+
+    @app.route("/api/config/network/status")
+    @permission_required("settings.view")
+    def api_network_status():
+        return jsonify(network_status())
+
+    @app.route("/api/config/network/wifi")
+    @permission_required("settings.view")
+    def api_network_wifi():
+        return jsonify(wifi_scan())
 
     @app.route("/api/config", methods=["GET", "POST"])
     def api_config():
