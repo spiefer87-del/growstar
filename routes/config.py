@@ -8,6 +8,7 @@ from services.network import (
     connect_wifi,
     network_permissions,
     network_status,
+    update_current_wifi_password,
     wifi_scan,
 )
 
@@ -46,6 +47,31 @@ def register(app):
 
         try:
             result = connect_wifi(
+                data.get("ssid"),
+                data.get("password"),
+            )
+        except ValueError as exc:
+            return jsonify(
+                success=False,
+                error=str(exc),
+            ), 400
+        except NetworkChangeError as exc:
+            return jsonify(exc.as_dict()), 409
+        except RuntimeError as exc:
+            return jsonify(
+                success=False,
+                error=str(exc),
+            ), 503
+
+        return jsonify(result)
+
+    @app.route("/system/network/password", methods=["POST"])
+    @permission_required("settings.manage")
+    def system_network_password():
+        data = request.get_json(silent=True) or {}
+
+        try:
+            result = update_current_wifi_password(
                 data.get("ssid"),
                 data.get("password"),
             )
