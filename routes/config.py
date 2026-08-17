@@ -6,6 +6,7 @@ from core.runtime import get_default_runtime
 from services.network import (
     NetworkChangeError,
     connect_wifi,
+    get_current_wifi_password,
     network_permissions,
     network_status,
     update_current_wifi_password,
@@ -89,6 +90,30 @@ def register(app):
             ), 503
 
         return jsonify(result)
+
+    @app.route("/system/network/password/show", methods=["POST"])
+    @permission_required("settings.manage")
+    def system_network_password_show():
+        data = request.get_json(silent=True) or {}
+
+        try:
+            result = get_current_wifi_password(data.get("ssid"))
+        except ValueError as exc:
+            response = jsonify(success=False, error=str(exc))
+            response.status_code = 400
+        except NetworkChangeError as exc:
+            response = jsonify(exc.as_dict())
+            response.status_code = 409
+        except RuntimeError as exc:
+            response = jsonify(success=False, error=str(exc))
+            response.status_code = 503
+        else:
+            response = jsonify(result)
+
+        response.headers["Cache-Control"] = "no-store, private, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     @app.route("/api/config", methods=["GET", "POST"])
     def api_config():
