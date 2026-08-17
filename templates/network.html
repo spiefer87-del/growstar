@@ -77,15 +77,15 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     <div>
       <a href="/grow-control" class="back">← Grow Control</a>
       <h1>🌐 Netzwerk</h1>
-      <div class="sub">Phase 4S.3.2 · privilegierter WLAN-Scan</div>
+      <div class="sub">Phase 4S.3.3 · WLAN-Passwort sicher ändern</div>
     </div>
     <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
   </div>
 
   <div class="notice">
-    „Aktualisieren“ fordert den frischen WLAN-Scan jetzt ebenfalls über den begrenzten System-Helper an.
-    Growstar wartet anschließend auf den Scan und liest die fertige WLAN-Liste wieder ohne Root-Rechte aus.
-    WLAN-Wechsel und automatischer Rückfall bleiben unverändert abgesichert.
+    Growstar kann jetzt auch das Passwort der aktuell verbundenen WPA/WPA2/WPA3-Personal-Verbindung ändern.
+    Das bisherige Secret bleibt ausschließlich im Netzwerk-Helper als Rollback-Sicherung. Nach der Änderung
+    wird die Verbindung neu aktiviert und auf SSID sowie IPv4 geprüft.
   </div>
 
   <div class="actions">
@@ -134,9 +134,20 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     <p id="wifi-dialog-sub">--</p>
 
     <div id="password-field" class="field">
-      <label for="wifi-password">WLAN-Passwort</label>
+      <label id="wifi-password-label" for="wifi-password">WLAN-Passwort</label>
       <input
         id="wifi-password"
+        type="password"
+        autocomplete="new-password"
+        autocapitalize="none"
+        spellcheck="false"
+      >
+    </div>
+
+    <div id="password-confirm-field" class="field" hidden>
+      <label for="wifi-password-confirm">Neues Passwort wiederholen</label>
+      <input
+        id="wifi-password-confirm"
         type="password"
         autocomplete="new-password"
         autocapitalize="none"
@@ -172,6 +183,7 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
 
   let writeReady = false;
   let selectedNetwork = null;
+  let selectedAction = "connect";
   let lastNetworks = [];
 
   const esc = value => String(value ?? "--")
@@ -285,10 +297,34 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
 
     el("wifi-list").innerHTML = networks.map((item, index) => {
       const supported = networkSupported(item);
-      const disabled = item.connected || !writeReady || !supported.ok;
-      const buttonLabel = item.connected
-        ? "Verbunden"
-        : (!writeReady ? "Nur lesen" : supported.label);
+      const canConnect = !item.connected && writeReady && supported.ok;
+      const canChangePassword =
+        item.connected &&
+        writeReady &&
+        supported.ok &&
+        passwordRequired(item);
+
+      let actions = "";
+
+      if(item.connected){
+        actions += `<button type="button" disabled>Verbunden</button>`;
+        if(canChangePassword){
+          actions += `
+            <button type="button" class="primary" data-password-index="${index}">
+              Passwort ändern
+            </button>
+          `;
+        }
+      }else{
+        actions += `
+          <button
+            type="button"
+            class="${canConnect ? "primary" : ""}"
+            data-connect-index="${index}"
+            ${canConnect ? "" : "disabled"}
+          >${esc(writeReady ? supported.label : "Nur lesen")}</button>
+        `;
+      }
 
       return `
         <div class="wifi">
@@ -300,29 +336,40 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
           </div>
           <div class="wifi-side">
             <div class="signal">${item.signal == null ? "--" : esc(item.signal + " %")}</div>
-            <button
-              type="button"
-              class="${!disabled ? "primary" : ""}"
-              data-connect-index="${index}"
-              ${disabled ? "disabled" : ""}
-            >${esc(buttonLabel)}</button>
+            ${actions}
           </div>
         </div>
       `;
     }).join("");
   }
 
-  function openDialog(item){
+  function openDialog(item, action = "connect"){
     selectedNetwork = item;
-    const needsPassword = passwordRequired(item);
+    selectedAction = action;
 
-    el("wifi-dialog-title").textContent = `Mit „${item.ssid}“ verbinden`;
-    el("wifi-dialog-sub").textContent =
-      `${item.security || "Offen"} · Signal ${item.signal == null ? "--" : item.signal + " %"}`;
+    const changingPassword = action === "password";
+    const needsPassword = changingPassword || passwordRequired(item);
+
+    el("wifi-dialog-title").textContent = changingPassword
+      ? `Passwort für „${item.ssid}“ ändern`
+      : `Mit „${item.ssid}“ verbinden`;
+
+    el("wifi-dialog-sub").textContent = changingPassword
+      ? "Das aktive Profil wird neu gespeichert, anschließend neu verbunden und automatisch geprüft."
+      : `${item.security || "Offen"} · Signal ${item.signal == null ? "--" : item.signal + " %"}`;
+
+    el("wifi-password-label").textContent = changingPassword
+      ? "Neues WLAN-Passwort"
+      : "WLAN-Passwort";
 
     el("password-field").hidden = !needsPassword;
+    el("password-confirm-field").hidden = !changingPassword;
     el("wifi-password").value = "";
+    el("wifi-password-confirm").value = "";
     el("connect-status").textContent = "";
+    el("confirm-connect-btn").textContent = changingPassword
+      ? "Passwort ändern"
+      : "Verbinden";
 
     el("wifi-dialog-backdrop").classList.add("open");
     el("wifi-dialog-backdrop").setAttribute("aria-hidden", "false");
@@ -334,7 +381,9 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
 
   function closeDialog(){
     selectedNetwork = null;
+    selectedAction = "connect";
     el("wifi-password").value = "";
+    el("wifi-password-confirm").value = "";
     el("wifi-dialog-backdrop").classList.remove("open");
     el("wifi-dialog-backdrop").setAttribute("aria-hidden", "true");
   }
@@ -343,8 +392,12 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     if(!selectedNetwork || !writeReady) return;
 
     const item = selectedNetwork;
-    const needsPassword = passwordRequired(item);
+    const changingPassword = selectedAction === "password";
+    const needsPassword = changingPassword || passwordRequired(item);
     const password = needsPassword ? el("wifi-password").value : "";
+    const passwordConfirm = changingPassword
+      ? el("wifi-password-confirm").value
+      : "";
 
     if(needsPassword && !password){
       el("connect-status").innerHTML =
@@ -352,10 +405,24 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
       return;
     }
 
+    if(changingPassword && password !== passwordConfirm){
+      el("connect-status").innerHTML =
+        `<span class="error">Die beiden neuen Passwörter stimmen nicht überein.</span>`;
+      return;
+    }
+
     const confirmed = window.confirm(
-      `Growstar jetzt mit „${item.ssid}“ verbinden?\n\n` +
-      "Die aktuelle Browser-Verbindung kann dabei kurz abbrechen. " +
-      "Wenn das Zielnetz nicht funktioniert, versucht Growstar automatisch zurückzuwechseln."
+      changingPassword
+        ? (
+            `Passwort für „${item.ssid}“ jetzt ändern?\n\n` +
+            "Growstar aktiviert das Profil danach neu. Wenn das neue Passwort nicht funktioniert, " +
+            "wird automatisch das bisherige Passwort wiederhergestellt."
+          )
+        : (
+            `Growstar jetzt mit „${item.ssid}“ verbinden?\n\n` +
+            "Die aktuelle Browser-Verbindung kann dabei kurz abbrechen. " +
+            "Wenn das Zielnetz nicht funktioniert, versucht Growstar automatisch zurückzuwechseln."
+          )
     );
 
     if(!confirmed) return;
@@ -363,17 +430,29 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     const confirmBtn = el("confirm-connect-btn");
     confirmBtn.disabled = true;
     el("cancel-connect-btn").disabled = true;
-    el("connect-status").textContent = "Verbindung wird vorbereitet …";
+    el("connect-status").textContent = changingPassword
+      ? "Passwort wird sicher aktualisiert …"
+      : "Verbindung wird vorbereitet …";
 
-    el("switch-message").textContent =
-      `Growstar verbindet sich mit „${item.ssid}“. Wenn dein Browser die Verbindung verliert, ` +
-      "verbinde dein Handy ebenfalls mit diesem WLAN und öffne Growstar danach erneut.";
+    el("switch-message").textContent = changingPassword
+      ? (
+          `Growstar aktualisiert das Passwort für „${item.ssid}“ und aktiviert das Profil neu. ` +
+          "Die Browser-Verbindung kann kurz unterbrochen werden."
+        )
+      : (
+          `Growstar verbindet sich mit „${item.ssid}“. Wenn dein Browser die Verbindung verliert, ` +
+          "verbinde dein Handy ebenfalls mit diesem WLAN und öffne Growstar danach erneut."
+        );
 
     el("switch-overlay").classList.add("open");
     el("switch-overlay").setAttribute("aria-hidden", "false");
 
     try{
-      const response = await fetch("/system/network/connect", {
+      const endpoint = changingPassword
+        ? "/system/network/password"
+        : "/system/network/connect";
+
+      const response = await fetch(endpoint, {
         method:"POST",
         headers:{
           "Accept":"application/json",
@@ -389,29 +468,35 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
       const data = await response.json().catch(() => ({}));
 
       if(!response.ok || !data.success){
-        throw new Error(
-          data.error ||
-          (
-            data.rollback_attempted && data.rollback_success
-              ? "Das Zielnetz konnte nicht aktiviert werden. Die vorherige Verbindung wurde wiederhergestellt."
-              : `HTTP ${response.status}`
-          )
-        );
+        let message = data.error || `HTTP ${response.status}`;
+
+        if(data.rollback_attempted && data.rollback_success){
+          message += " Das bisherige WLAN wurde erfolgreich wiederhergestellt.";
+        }else if(data.rollback_attempted && data.rollback_error){
+          message += ` Rollback-Fehler: ${data.rollback_error}`;
+        }
+
+        throw new Error(message);
       }
 
-      el("switch-message").textContent =
-        data.already_connected
-          ? `Growstar ist bereits mit „${item.ssid}“ verbunden.`
-          : `„${item.ssid}“ wurde aktiviert. Growstar hat eine IPv4-Adresse erhalten.`;
+      el("switch-message").textContent = changingPassword
+        ? `Das Passwort für „${item.ssid}“ wurde gespeichert und die WLAN-Verbindung erfolgreich bestätigt.`
+        : (
+            data.already_connected
+              ? `Growstar ist bereits mit „${item.ssid}“ verbunden.`
+              : `„${item.ssid}“ wurde aktiviert. Growstar hat eine IPv4-Adresse erhalten.`
+          );
 
       window.setTimeout(() => window.location.reload(), 2500);
 
     }catch(error){
-      // Ein fetch-Fehler kann auch bedeuten, dass der Netzwerkwechsel bereits
-      // erfolgreich war und nur die alte Browser-Verbindung abgerissen ist.
       el("switch-message").textContent =
         `${error.message || "Die Browser-Verbindung wurde unterbrochen."} ` +
-        `Falls Growstar bereits gewechselt hat, verbinde dein Handy mit „${item.ssid}“ und öffne Growstar erneut.`;
+        (
+          changingPassword
+            ? "Wenn Growstar weiterhin erreichbar ist, wurde die vorherige Verbindung beibehalten oder wiederhergestellt."
+            : `Falls Growstar bereits gewechselt hat, verbinde dein Handy mit „${item.ssid}“ und öffne Growstar erneut.`
+        );
 
       window.setTimeout(() => {
         el("switch-overlay").classList.remove("open");
@@ -421,6 +506,7 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
       }, 4500);
     }finally{
       el("wifi-password").value = "";
+      el("wifi-password-confirm").value = "";
     }
   }
 
@@ -453,13 +539,21 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
   }
 
   el("wifi-list").addEventListener("click", event => {
-    const button = event.target.closest("button[data-connect-index]");
-    if(!button || button.disabled) return;
+    const passwordButton = event.target.closest("button[data-password-index]");
+    if(passwordButton && !passwordButton.disabled){
+      const index = Number(passwordButton.dataset.passwordIndex);
+      const item = lastNetworks[index];
+      if(item) openDialog(item, "password");
+      return;
+    }
 
-    const index = Number(button.dataset.connectIndex);
+    const connectButton = event.target.closest("button[data-connect-index]");
+    if(!connectButton || connectButton.disabled) return;
+
+    const index = Number(connectButton.dataset.connectIndex);
     const item = lastNetworks[index];
 
-    if(item) openDialog(item);
+    if(item) openDialog(item, "connect");
   });
 
   el("cancel-connect-btn").addEventListener("click", closeDialog);
