@@ -10,6 +10,7 @@ Prozessargument.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import socket
@@ -22,6 +23,8 @@ NMCLI_TIMEOUT_SECONDS = 8
 WIFI_SCAN_TIMEOUT_SECONDS = 15
 WIFI_CONNECT_TIMEOUT_SECONDS = 35
 WIFI_VERIFY_TIMEOUT_SECONDS = 12
+NETWORK_HELPER_PATH = "/usr/local/libexec/growstar-network-helper"
+FORCED_SCAN_SETTLE_SECONDS = 5.0
 
 _network_change_lock = threading.Lock()
 
@@ -143,12 +146,60 @@ def network_manager_available():
     return shutil.which("nmcli") is not None
 
 
-def network_permissions():
-    """Liefert die NetworkManager-Rechte des laufenden Growstar-Prozesses.
+def _run_network_helper(payload, timeout=50):
+    """Ruft den root-eigenen, eng begrenzten Netzwerk-Helper auf."""
 
-    Für neue WLAN-Verbindungen bevorzugt Growstar benutzerspezifische
-    NetworkManager-Profile. Dafür ist settings.modify.own ausreichend;
-    settings.modify.system ist bewusst keine zwingende Voraussetzung mehr.
+    sudo = shutil.which("sudo")
+
+    if not sudo:
+        raise RuntimeError("sudo ist für den Netzwerk-Helper nicht verfügbar")
+
+    if not os.path.isfile(NETWORK_HELPER_PATH):
+        raise RuntimeError(
+            "Growstar-Netzwerk-Helper ist noch nicht installiert"
+        )
+
+    try:
+        completed = subprocess.run(
+            [sudo, "-n", NETWORK_HELPER_PATH],
+            input=json.dumps(payload, ensure_ascii=False),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+            env={**os.environ, "LC_ALL": "C"},
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            "Growstar-Netzwerk-Helper hat das Zeitlimit überschritten"
+        ) from exc
+
+    data = None
+
+    try:
+        data = json.loads((completed.stdout or "").strip() or "{}")
+    except json.JSONDecodeError:
+        data = None
+
+    if completed.returncode != 0:
+        message = (
+            (data or {}).get("error")
+            or (completed.stderr or "").strip()
+            or "Growstar-Netzwerk-Helper wurde abgelehnt"
+        )
+        raise RuntimeError(message)
+
+    if not isinstance(data, dict):
+        raise RuntimeError("Ungültige Antwort des Growstar-Netzwerk-Helpers")
+
+    return data
+
+
+def network_permissions():
+    """Prüft den tatsächlich verwendeten privilegierten Netzwerkpfad.
+
+    Read-only NetworkManager-Abfragen laufen weiterhin direkt als Growstar.
+    Schreibende Änderungen laufen ausschließlich über den root-eigenen Helper.
     """
 
     result = {
@@ -157,7 +208,7 @@ def network_permissions():
         "write_ready": False,
         "hotspot_ready": False,
         "profile_scope": None,
-        "permissions": {},
+        "backend": "privileged-helper",
         "checks": {},
         "error": None,
     }
@@ -168,99 +219,31 @@ def network_permissions():
         return result
 
     try:
-        output = _run_nmcli(
-            "--fields",
-            "PERMISSION,VALUE",
-            "general",
-            "permissions",
-        )
+        probe = _run_network_helper({"action": "probe"}, timeout=12)
     except RuntimeError as exc:
-        result["success"] = False
+        result["checks"] = {
+            "helper_installed": os.path.isfile(NETWORK_HELPER_PATH),
+            "helper_authorized": False,
+        }
         result["error"] = str(exc)
         return result
 
-    permissions = {}
-
-    for raw_line in output.splitlines():
-        if not raw_line.strip():
-            continue
-
-        parts = _split_escaped(raw_line)
-        parts += [""] * (2 - len(parts))
-        permission, value = parts[:2]
-
-        permission = permission.strip()
-        value = value.strip().lower()
-
-        if permission:
-            permissions[permission] = value
-
-    result["permissions"] = permissions
-
-    network_control = permissions.get(
-        "org.freedesktop.NetworkManager.network-control"
-    )
-    modify_own = permissions.get(
-        "org.freedesktop.NetworkManager.settings.modify.own"
-    )
-    modify_system = permissions.get(
-        "org.freedesktop.NetworkManager.settings.modify.system"
-    )
-    hotspot_permission = permissions.get(
-        "org.freedesktop.NetworkManager.wifi.share.protected"
-    )
-
+    result["write_ready"] = bool(probe.get("write_ready"))
+    result["hotspot_ready"] = bool(probe.get("hotspot_ready"))
+    result["profile_scope"] = probe.get("profile_scope") or "system"
     result["checks"] = {
-        "network_control": network_control,
-        "modify_own": modify_own,
-        "modify_system": modify_system,
-        "hotspot_protected": hotspot_permission,
+        "helper_installed": True,
+        "helper_authorized": bool(probe.get("success")),
+        "service_guard": bool(probe.get("success")),
     }
 
-    if modify_own == "yes":
-        result["profile_scope"] = "private"
-    elif modify_system == "yes":
-        # Kompatibilitäts-Fallback für Systeme, auf denen nur systemweite
-        # Profile freigegeben sind. Neue Growstar-Installationen sollen
-        # normalerweise den engeren private-Pfad verwenden.
-        result["profile_scope"] = "system"
-
-    result["write_ready"] = (
-        network_control == "yes"
-        and result["profile_scope"] is not None
-    )
-    result["hotspot_ready"] = (
-        result["write_ready"]
-        and hotspot_permission == "yes"
-    )
-
     if not result["write_ready"]:
-        missing = []
-        if network_control != "yes":
-            missing.append(f"network-control={network_control or 'unbekannt'}")
-        if modify_own != "yes" and modify_system != "yes":
-            missing.append(
-                "modify-own/system="
-                f"{modify_own or 'unbekannt'}/{modify_system or 'unbekannt'}"
-            )
-
-        if any(
-            value == "auth"
-            for value in (network_control, modify_own, modify_system)
-        ):
-            result["error"] = (
-                "NetworkManager verlangt für den Growstar-Dienst noch eine "
-                "Polkit-Freigabe (" + ", ".join(missing) + ")."
-            )
-        else:
-            result["error"] = (
-                "NetworkManager-Schreibzugriff ist noch nicht freigegeben"
-                + (" (" + ", ".join(missing) + ")" if missing else "")
-                + "."
-            )
+        result["error"] = (
+            probe.get("error")
+            or "Privilegierter Growstar-Netzwerk-Helper ist nicht bereit"
+        )
 
     return result
-
 
 def _device_ip_details(device):
     result = {
@@ -362,47 +345,11 @@ def network_status():
     return result
 
 
-def wifi_scan(force=False):
-    """Scannt sichtbare WLANs und fasst doppelte SSIDs zusammen.
-
-    ``force=True`` erzwingt mit ``--rescan yes`` einen frischen Scan.
-    """
-
-    rescan_mode = "yes" if force else "auto"
-
-    result = {
-        "success": True,
-        "manager_available": network_manager_available(),
-        "rescan": rescan_mode,
-        "networks": [],
-        "error": None,
-    }
-
-    if not result["manager_available"]:
-        result["success"] = False
-        result["error"] = "NetworkManager/nmcli ist nicht verfügbar"
-        return result
-
-    try:
-        output = _run_nmcli(
-            "--fields",
-            "IN-USE,SSID,SIGNAL,SECURITY",
-            "device",
-            "wifi",
-            "list",
-            "--rescan",
-            rescan_mode,
-            timeout=WIFI_SCAN_TIMEOUT_SECONDS,
-        )
-    except RuntimeError as exc:
-        result["success"] = False
-        result["error"] = str(exc)
-        return result
-
+def _parse_wifi_list(output):
     by_ssid = {}
     hidden_count = 0
 
-    for raw_line in output.splitlines():
+    for raw_line in str(output or "").splitlines():
         if not raw_line.strip():
             continue
 
@@ -439,7 +386,7 @@ def wifi_scan(force=False):
         elif item["connected"]:
             previous["connected"] = True
 
-    result["networks"] = sorted(
+    return sorted(
         by_ssid.values(),
         key=lambda item: (
             not item["connected"],
@@ -448,8 +395,80 @@ def wifi_scan(force=False):
         ),
     )
 
-    return result
 
+def _read_wifi_list(device=None, rescan="auto"):
+    args = [
+        "--fields",
+        "IN-USE,SSID,SIGNAL,SECURITY",
+        "device",
+        "wifi",
+        "list",
+        "--rescan",
+        rescan,
+    ]
+
+    if device:
+        args.extend(["ifname", device])
+
+    return _parse_wifi_list(
+        _run_nmcli(
+            *args,
+            timeout=WIFI_SCAN_TIMEOUT_SECONDS,
+        )
+    )
+
+
+def wifi_scan(force=False):
+    """Scannt sichtbare WLANs.
+
+    Bei ``force=True`` wird der Scan zuerst ausdrücklich angefordert. Danach
+    wartet Growstar auf den Treiber/NetworkManager und liest erst anschließend
+    die fertige AP-Liste mit ``--rescan no``. Dadurch wird kein frühes
+    Zwischenergebnis mehr an die Oberfläche ausgeliefert.
+    """
+
+    result = {
+        "success": True,
+        "manager_available": network_manager_available(),
+        "rescan": "forced-settled" if force else "auto",
+        "networks": [],
+        "error": None,
+    }
+
+    if not result["manager_available"]:
+        result["success"] = False
+        result["error"] = "NetworkManager/nmcli ist nicht verfügbar"
+        return result
+
+    try:
+        if force:
+            device = _wifi_device()
+
+            # "wifi rescan" fordert nur den Scan an und zeigt selbst noch
+            # keine Access Points. NetworkManager/Treiber erhalten danach
+            # bewusst Zeit, bevor die Liste gelesen wird.
+            _run_nmcli(
+                "device",
+                "wifi",
+                "rescan",
+                "ifname",
+                device,
+                timeout=WIFI_SCAN_TIMEOUT_SECONDS,
+            )
+
+            time.sleep(FORCED_SCAN_SETTLE_SECONDS)
+            result["networks"] = _read_wifi_list(
+                device=device,
+                rescan="no",
+            )
+        else:
+            result["networks"] = _read_wifi_list(rescan="auto")
+
+    except RuntimeError as exc:
+        result["success"] = False
+        result["error"] = str(exc)
+
+    return result
 
 def _wifi_device():
     output = _run_nmcli(
@@ -555,40 +574,6 @@ def _wait_for_target_wifi(ssid, device, timeout=WIFI_VERIFY_TIMEOUT_SECONDS):
     return last_snapshot
 
 
-def _rollback_wifi(previous, device):
-    if not previous or not previous.get("connection"):
-        return {
-            "attempted": False,
-            "success": False,
-            "error": None,
-        }
-
-    try:
-        _run_nmcli(
-            "--wait",
-            "25",
-            "connection",
-            "up",
-            "id",
-            previous["connection"],
-            "ifname",
-            device,
-            timeout=30,
-        )
-    except RuntimeError as exc:
-        return {
-            "attempted": True,
-            "success": False,
-            "error": str(exc),
-        }
-
-    return {
-        "attempted": True,
-        "success": True,
-        "error": None,
-    }
-
-
 def _validate_ssid(value):
     ssid = str(value or "").strip()
 
@@ -641,8 +626,8 @@ def _password_required(network):
 def connect_wifi(ssid, password=None):
     """Wechselt kontrolliert auf ein sichtbares WLAN.
 
-    Bei fehlgeschlagener Aktivierung oder fehlender IPv4-Adresse wird versucht,
-    die zuvor aktive WLAN-Verbindung wiederherzustellen.
+    Die Web-Anwendung bleibt unprivilegiert. Die eigentliche NetworkManager-
+    Mutation und der Rollback laufen ausschließlich im root-eigenen Helper.
     """
 
     ssid = _validate_ssid(ssid)
@@ -651,7 +636,7 @@ def connect_wifi(ssid, password=None):
     if not permissions.get("write_ready"):
         raise NetworkChangeError(
             permissions.get("error")
-            or "NetworkManager-Schreibzugriff ist nicht freigegeben"
+            or "Growstar-Netzwerk-Helper ist nicht freigegeben"
         )
 
     target = _target_network(ssid)
@@ -670,86 +655,25 @@ def connect_wifi(ssid, password=None):
         secret = ""
 
     with _network_change_lock:
-        device = _wifi_device()
-        previous = _active_wifi_snapshot(device=device)
-
-        if previous and previous.get("ssid") == ssid:
-            return {
-                "success": True,
-                "already_connected": True,
-                "ssid": ssid,
-                "device": device,
-                "addresses": previous.get("addresses") or [],
-                "gateway": previous.get("gateway"),
-                "rollback_attempted": False,
-                "rollback_success": False,
-            }
-
-        connect_args = [
-            "--wait",
-            str(WIFI_CONNECT_TIMEOUT_SECONDS),
-        ]
-
-        input_text = None
-
-        if requires_password:
-            # --ask liest das Secret von stdin. Das Passwort landet dadurch
-            # nicht in ps/top oder in der Prozessargumentliste.
-            connect_args.append("--ask")
-            input_text = secret + "\n"
-
-        connect_args.extend([
-            "device",
-            "wifi",
-            "connect",
-            ssid,
-            "ifname",
-            device,
-            "private",
-            "yes" if permissions.get("profile_scope") == "private" else "no",
-        ])
-
         try:
-            _run_nmcli(
-                *connect_args,
-                timeout=WIFI_CONNECT_TIMEOUT_SECONDS + 5,
-                input_text=input_text,
+            result = _run_network_helper(
+                {
+                    "action": "connect",
+                    "ssid": ssid,
+                    "password": secret,
+                },
+                timeout=WIFI_CONNECT_TIMEOUT_SECONDS + WIFI_VERIFY_TIMEOUT_SECONDS + 20,
             )
-        except RuntimeError as exc:
-            rollback = _rollback_wifi(previous, device)
-            raise NetworkChangeError(
-                f"WLAN-Verbindung zu '{ssid}' konnte nicht aktiviert werden: {exc}",
-                rollback_attempted=rollback["attempted"],
-                rollback_success=rollback["success"],
-                rollback_error=rollback["error"],
-            ) from exc
+        finally:
+            # Lokale Referenz so früh wie möglich leeren.
+            secret = ""
 
-        verified = _wait_for_target_wifi(ssid, device)
+    if not result.get("success"):
+        raise NetworkChangeError(
+            result.get("error") or "WLAN-Wechsel fehlgeschlagen",
+            rollback_attempted=result.get("rollback_attempted", False),
+            rollback_success=result.get("rollback_success", False),
+            rollback_error=result.get("rollback_error"),
+        )
 
-        if not (
-            verified
-            and verified.get("ssid") == ssid
-            and verified.get("addresses")
-        ):
-            rollback = _rollback_wifi(previous, device)
-            raise NetworkChangeError(
-                (
-                    f"'{ssid}' wurde nicht mit einer gültigen IPv4-Adresse "
-                    "bestätigt. Die vorherige Verbindung wird wiederhergestellt."
-                ),
-                rollback_attempted=rollback["attempted"],
-                rollback_success=rollback["success"],
-                rollback_error=rollback["error"],
-            )
-
-        return {
-            "success": True,
-            "already_connected": False,
-            "ssid": ssid,
-            "device": device,
-            "connection": verified.get("connection"),
-            "addresses": verified.get("addresses") or [],
-            "gateway": verified.get("gateway"),
-            "rollback_attempted": False,
-            "rollback_success": False,
-        }
+    return result
