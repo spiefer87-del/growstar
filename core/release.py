@@ -15,6 +15,45 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.4",
+        "date": "2026-08-17",
+        "phase": "4S.3.1",
+        "title": "Stabiler WLAN-Scan und zuverlässiger Netzwerk-Helper",
+        "summary": (
+            "Der erzwungene WLAN-Scan wartet jetzt auf das fertige "
+            "NetworkManager-Ergebnis. Schreibende Netzwerkaktionen werden nicht "
+            "mehr von der Polkit-Zuordnung des Gunicorn-Prozesses abhängig gemacht, "
+            "sondern über einen eng begrenzten root-eigenen Helper ausgeführt."
+        ),
+        "changes": (
+            "Ein manueller WLAN-Refresh fordert zuerst explizit einen NetworkManager-Scan an und liest die Access-Point-Liste erst nach einer Wartephase.",
+            "Der Refresh verwendet für die abschließende Liste --rescan no, damit kein zweiter paralleler Scan ein frühes Zwischenergebnis erzeugt.",
+            "Die bestehende WLAN-Liste bleibt im Browser sichtbar, während der neue Scan läuft; der Button zeigt 'Scan läuft …'.",
+            "Die fragile Phase-4S.3-Polkit-Freigabe für den Gunicorn-Prozess wird durch einen root-eigenen Netzwerk-Helper ersetzt.",
+            "Flask und Gunicorn bleiben weiterhin vollständig unprivilegiert.",
+            "sudoers erlaubt dem Growstar-Dienstbenutzer ausschließlich den fest installierten Netzwerk-Helper ohne Passwortabfrage.",
+            "Der Helper prüft zusätzlich seinen systemd-Cgroup-Kontext und verweigert Aufrufe außerhalb von growstar.service.",
+            "Der Helper akzeptiert nur fest implementierte JSON-Aktionen und führt nmcli weiterhin ohne Shell-Ausführung aus.",
+            "WLAN-Passwörter werden per stdin weitergereicht und erscheinen weder im Helper- noch im nmcli-Prozessargument.",
+            "WLAN-Verbindung und Rollback werden vollständig im privilegierten Helper ausgeführt.",
+            "Neue WLAN-Profile werden bewusst systemweit angelegt, damit NetworkManager sie auf einem headless Growstar bereits beim Boot automatisch verbinden kann.",
+            "Der Installer entfernt die alte /etc/polkit-1/rules.d/49-growstar-network.rules automatisch.",
+            "Der automatische Erstinbetriebnahme-Hotspot bleibt weiterhin deaktiviert, bis ein kontrollierter WLAN-Wechsel erfolgreich getestet wurde.",
+        ),
+        "tests": (
+            "Netzwerkseite öffnen: ein frischer Scan darf nach Abschluss nicht nur das aktuell verbundene WLAN anzeigen, wenn weitere Netze sichtbar sind.",
+            "Auf 'Aktualisieren' drücken: während des Scans bleibt die bisherige Liste sichtbar und der Button zeigt 'Scan läuft …'.",
+            "Capabilities-API meldet nach Helper-Installation write_ready=true und backend=privileged-helper.",
+            "Netzwerkseite zeigt danach 'WLAN-Verwaltung bereit' und unterstützte fremde WLANs erhalten den Button 'Verbinden'.",
+            "Der Helper wird root:root unter /usr/local/libexec installiert und die sudoers-Datei mit visudo geprüft.",
+            "Ein direkter Helper-Aufruf außerhalb von growstar.service wird durch den Cgroup-Guard abgelehnt.",
+            "Ein simuliertes WLAN-Passwort erscheint in keinem Prozessargument.",
+            "Ein simulierter Verifikationsfehler aktiviert weiterhin das vorherige WLAN als Rollback-Ziel.",
+            "python3 check_phase4s31_network_helper.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.4 und Build-Kennung 4S.3.1.",
+        ),
+    },
+    {
         "version": "3.7.3",
         "date": "2026-08-17",
         "phase": "4S.3",
