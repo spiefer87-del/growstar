@@ -730,3 +730,40 @@ def update_current_wifi_password(ssid, password):
 
     return result
 
+def get_current_wifi_password(ssid):
+    """Liefert das gespeicherte PSK des aktuell verbundenen Personal-WLANs."""
+
+    ssid = _validate_ssid(ssid)
+    permissions = network_permissions()
+
+    if not permissions.get("write_ready"):
+        raise NetworkChangeError(
+            permissions.get("error")
+            or "Growstar-Netzwerk-Helper ist nicht freigegeben"
+        )
+
+    result = _run_network_helper(
+        {
+            "action": "get_password",
+            "ssid": ssid,
+        },
+        timeout=15,
+    )
+
+    if not result.get("success"):
+        raise NetworkChangeError(
+            result.get("error") or "WLAN-Passwort konnte nicht gelesen werden"
+        )
+
+    password = result.get("password")
+    if not isinstance(password, str) or not password:
+        raise NetworkChangeError(
+            "NetworkManager liefert kein gespeichertes WLAN-Passwort"
+        )
+
+    return {
+        "success": True,
+        "ssid": ssid,
+        "password": password,
+    }
+
