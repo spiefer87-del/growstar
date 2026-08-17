@@ -1,8 +1,11 @@
 """Growstar Network Management.
 
-Phase 4S begann read-only. Phase 4S.2 ergänzt einen bewusst begrenzten,
-transaktionalen WLAN-Wechsel über NetworkManager. Growstar editiert keine
-/etc-Netzwerkdateien und übergibt WLAN-Passwörter nicht als Prozessargument.
+Phase 4S begann read-only. Phase 4S.2 ergänzte den transaktionalen
+WLAN-Wechsel. Phase 4S.3 erzwingt auf Wunsch einen frischen WLAN-Scan und
+verwendet für neu angelegte WLAN-Verbindungen bevorzugt private, dem
+Growstar-Dienstbenutzer gehörende NetworkManager-Profile. Growstar editiert
+keine /etc-Netzwerkdateien und übergibt WLAN-Passwörter nicht als
+Prozessargument.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ import time
 
 
 NMCLI_TIMEOUT_SECONDS = 8
+WIFI_SCAN_TIMEOUT_SECONDS = 15
 WIFI_CONNECT_TIMEOUT_SECONDS = 35
 WIFI_VERIFY_TIMEOUT_SECONDS = 12
 
@@ -140,14 +144,21 @@ def network_manager_available():
 
 
 def network_permissions():
-    """Liefert die NetworkManager-Rechte des laufenden Growstar-Prozesses."""
+    """Liefert die NetworkManager-Rechte des laufenden Growstar-Prozesses.
+
+    Für neue WLAN-Verbindungen bevorzugt Growstar benutzerspezifische
+    NetworkManager-Profile. Dafür ist settings.modify.own ausreichend;
+    settings.modify.system ist bewusst keine zwingende Voraussetzung mehr.
+    """
 
     result = {
         "success": True,
         "manager_available": network_manager_available(),
         "write_ready": False,
         "hotspot_ready": False,
+        "profile_scope": None,
         "permissions": {},
+        "checks": {},
         "error": None,
     }
 
@@ -189,6 +200,9 @@ def network_permissions():
     network_control = permissions.get(
         "org.freedesktop.NetworkManager.network-control"
     )
+    modify_own = permissions.get(
+        "org.freedesktop.NetworkManager.settings.modify.own"
+    )
     modify_system = permissions.get(
         "org.freedesktop.NetworkManager.settings.modify.system"
     )
@@ -196,9 +210,24 @@ def network_permissions():
         "org.freedesktop.NetworkManager.wifi.share.protected"
     )
 
+    result["checks"] = {
+        "network_control": network_control,
+        "modify_own": modify_own,
+        "modify_system": modify_system,
+        "hotspot_protected": hotspot_permission,
+    }
+
+    if modify_own == "yes":
+        result["profile_scope"] = "private"
+    elif modify_system == "yes":
+        # Kompatibilitäts-Fallback für Systeme, auf denen nur systemweite
+        # Profile freigegeben sind. Neue Growstar-Installationen sollen
+        # normalerweise den engeren private-Pfad verwenden.
+        result["profile_scope"] = "system"
+
     result["write_ready"] = (
         network_control == "yes"
-        and modify_system == "yes"
+        and result["profile_scope"] is not None
     )
     result["hotspot_ready"] = (
         result["write_ready"]
@@ -206,20 +235,28 @@ def network_permissions():
     )
 
     if not result["write_ready"]:
-        if network_control == "auth" or modify_system == "auth":
-            result["error"] = (
-                "NetworkManager verlangt für Änderungen noch eine "
-                "interaktive Systemfreigabe."
+        missing = []
+        if network_control != "yes":
+            missing.append(f"network-control={network_control or 'unbekannt'}")
+        if modify_own != "yes" and modify_system != "yes":
+            missing.append(
+                "modify-own/system="
+                f"{modify_own or 'unbekannt'}/{modify_system or 'unbekannt'}"
             )
-        elif network_control == "no" or modify_system == "no":
+
+        if any(
+            value == "auth"
+            for value in (network_control, modify_own, modify_system)
+        ):
             result["error"] = (
-                "Der Growstar-Dienst besitzt noch keine "
-                "NetworkManager-Schreibberechtigung."
+                "NetworkManager verlangt für den Growstar-Dienst noch eine "
+                "Polkit-Freigabe (" + ", ".join(missing) + ")."
             )
         else:
             result["error"] = (
-                "NetworkManager-Schreibberechtigung konnte nicht "
-                "eindeutig bestätigt werden."
+                "NetworkManager-Schreibzugriff ist noch nicht freigegeben"
+                + (" (" + ", ".join(missing) + ")" if missing else "")
+                + "."
             )
 
     return result
@@ -325,12 +362,18 @@ def network_status():
     return result
 
 
-def wifi_scan():
-    """Scannt sichtbare WLANs und fasst doppelte SSIDs zusammen."""
+def wifi_scan(force=False):
+    """Scannt sichtbare WLANs und fasst doppelte SSIDs zusammen.
+
+    ``force=True`` erzwingt mit ``--rescan yes`` einen frischen Scan.
+    """
+
+    rescan_mode = "yes" if force else "auto"
 
     result = {
         "success": True,
         "manager_available": network_manager_available(),
+        "rescan": rescan_mode,
         "networks": [],
         "error": None,
     }
@@ -348,7 +391,8 @@ def wifi_scan():
             "wifi",
             "list",
             "--rescan",
-            "auto",
+            rescan_mode,
+            timeout=WIFI_SCAN_TIMEOUT_SECONDS,
         )
     except RuntimeError as exc:
         result["success"] = False
@@ -561,7 +605,7 @@ def _validate_ssid(value):
 
 
 def _target_network(ssid):
-    scan = wifi_scan()
+    scan = wifi_scan(force=True)
 
     if not scan.get("success"):
         raise RuntimeError(
@@ -661,6 +705,8 @@ def connect_wifi(ssid, password=None):
             ssid,
             "ifname",
             device,
+            "private",
+            "yes" if permissions.get("profile_scope") == "private" else "no",
         ])
 
         try:
