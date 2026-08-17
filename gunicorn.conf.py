@@ -3,11 +3,12 @@
 # Hardware-, MQTT-, Shelly- und Regelungsinstanz starten würde.
 
 # Lokal bleibt Gunicorn über 127.0.0.1:8000 für Caddy erreichbar.
-# Zusätzlich lauscht Growstar nur auf der LAN-IP 192.168.178.66:8001,
-# damit der zentrale Nginx-Reverse-Proxy auf 192.168.178.83 zugreifen kann.
+# Port 8001 lauscht netzwerkneutral auf allen Interfaces. Dadurch startet
+# Growstar auch dann, wenn sich die LAN-/WLAN-IP nach einem Netzwerkwechsel
+# oder bei einer späteren Erstinbetriebnahme geändert hat.
 bind = [
     "127.0.0.1:8000",
-    "192.168.178.66:8001",
+    "0.0.0.0:8001",
 ]
 
 workers = 1
