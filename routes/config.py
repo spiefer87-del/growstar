@@ -3,7 +3,13 @@ from flask import jsonify, render_template, request
 from auth.decorators import permission_required
 from core.config_update import apply_config_patch, config_snapshot
 from core.runtime import get_default_runtime
-from services.network import network_status, wifi_scan
+from services.network import (
+    NetworkChangeError,
+    connect_wifi,
+    network_permissions,
+    network_status,
+    wifi_scan,
+)
 
 
 def register(app):
@@ -22,6 +28,38 @@ def register(app):
     @permission_required("settings.view")
     def api_network_wifi():
         return jsonify(wifi_scan())
+
+    @app.route("/api/config/network/capabilities")
+    @permission_required("settings.view")
+    def api_network_capabilities():
+        return jsonify(network_permissions())
+
+    # Absichtlich unter /system: Die bestehende zentrale Auth-Policy verlangt
+    # für schreibende /system-Unterpfade bereits settings.manage.
+    @app.route("/system/network/connect", methods=["POST"])
+    @permission_required("settings.manage")
+    def system_network_connect():
+        data = request.get_json(silent=True) or {}
+
+        try:
+            result = connect_wifi(
+                data.get("ssid"),
+                data.get("password"),
+            )
+        except ValueError as exc:
+            return jsonify(
+                success=False,
+                error=str(exc),
+            ), 400
+        except NetworkChangeError as exc:
+            return jsonify(exc.as_dict()), 409
+        except RuntimeError as exc:
+            return jsonify(
+                success=False,
+                error=str(exc),
+            ), 503
+
+        return jsonify(result)
 
     @app.route("/api/config", methods=["GET", "POST"])
     def api_config():
