@@ -15,6 +15,32 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.1",
+        "date": "2026-08-17",
+        "phase": "4S.1",
+        "title": "Netzwerk direkt im Grow Control erreichbar",
+        "summary": (
+            "Die in Phase 4S eingeführte Netzwerkdiagnose ist jetzt direkt im "
+            "Grow-Control-Dashboard unter System & Infrastruktur erreichbar."
+        ),
+        "changes": (
+            "Neue Netzwerk-Kachel im Grow-Control-Dashboard unter System & Infrastruktur.",
+            "Die Kachel öffnet die bestehende Netzwerkseite über den registrierten Endpoint system_network_page.",
+            "Die Netzwerk-Kachel ist nur mit der Berechtigung settings.view sichtbar.",
+            "Das Layout und die mobile Darstellung verwenden die bestehende Modul-Kachelstruktur.",
+            "Die Netzwerkdiagnose aus Phase 4S bleibt vollständig read-only und unverändert.",
+            "Es werden weiterhin keine WLAN-Verbindungen, Hotspots oder NetworkManager-Profile verändert.",
+        ),
+        "tests": (
+            "Grow Control öffnen: Unter System & Infrastruktur erscheint die Kachel 'Netzwerk'.",
+            "Netzwerk-Kachel öffnen: /system/network muss ohne Umweg geladen werden.",
+            "Die Kachel wird nur innerhalb des settings.view-Berechtigungsblocks gerendert.",
+            "Status, Interfaces und WLAN-Scan auf der Netzwerkseite funktionieren weiterhin wie in Phase 4S.",
+            "python3 check_phase4s1_network_dashboard.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.1 und Build-Kennung 4S.1.",
+        ),
+    },
+    {
         "version": "3.7.0",
         "date": "2026-08-17",
         "phase": "4S",
