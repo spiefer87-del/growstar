@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Netzwerk · Growstar{% endblock %}
+
+{% block head %}
+<style>
+:root{
+  --bg:#0f172a;--card:#1e293b;--card2:#111827;--text:#e5e7eb;
+  --muted:#94a3b8;--accent:#22c55e;--warn:#f59e0b;--bad:#ef4444;
+  --border:rgba(148,163,184,.18)
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:18px 14px 70px}
+.top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:18px}
+.back{color:var(--muted);text-decoration:none;font-size:.86rem}
+h1{margin:6px 0 3px;font-size:1.55rem}
+.sub{color:var(--muted);font-size:.82rem}
+.badge{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#162238;border:1px solid var(--border);font-size:.76rem}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.ok{background:var(--accent)} .dot.bad{background:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.card{background:linear-gradient(145deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 14px 35px rgba(0,0,0,.2)}
+.card h2{margin:0 0 12px;font-size:1rem}
+.kv{display:grid;grid-template-columns:115px 1fr;gap:7px 10px;font-size:.82rem}
+.k{color:var(--muted)} .v{word-break:break-word}
+.interface{padding:11px 0;border-top:1px solid var(--border)}
+.interface:first-child{border-top:0;padding-top:0}
+.interface-title{display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:.84rem}
+.interface-meta{margin-top:6px;color:var(--muted);font-size:.75rem;line-height:1.5}
+.wifi-list{display:grid;gap:8px}
+.wifi{display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 11px;border:1px solid var(--border);border-radius:12px;background:rgba(2,6,23,.24)}
+.wifi-name{font-size:.84rem;font-weight:650}
+.wifi-meta{font-size:.72rem;color:var(--muted);margin-top:3px}
+.signal{font-size:.78rem;color:#cbd5e1;white-space:nowrap}
+.connected{color:#86efac}
+button{border:1px solid var(--border);background:#162238;color:var(--text);border-radius:10px;padding:9px 12px;cursor:pointer;font:inherit;font-size:.78rem}
+button:hover{border-color:rgba(34,197,94,.45)}
+.notice{margin-bottom:14px;padding:11px 13px;border:1px solid rgba(245,158,11,.3);border-radius:12px;background:rgba(245,158,11,.08);color:#fde68a;font-size:.78rem;line-height:1.5}
+.error{color:#fca5a5;font-size:.78rem;line-height:1.5}
+.empty{color:var(--muted);font-size:.78rem}
+.actions{display:flex;justify-content:flex-end;margin:0 0 12px}
+@media(max-width:560px){.wrap{padding:14px 10px 60px}.top{display:block}.badge{margin-top:10px}.kv{grid-template-columns:95px 1fr}}
+</style>
+{% endblock %}
+
+{% block page %}
+<div class="wrap">
+  <div class="top">
+    <div>
+      <a href="/system" class="back">← System</a>
+      <h1>🌐 Netzwerk</h1>
+      <div class="sub">Phase 4S · sichere read-only Netzwerkdiagnose</div>
+    </div>
+    <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
+  </div>
+
+  <div class="notice">
+    Diese Version verändert noch keine WLAN-Einstellungen. Verbinden, Hotspot und automatisches Recovery
+    folgen erst nach erfolgreichem Test dieser Diagnosebasis.
+  </div>
+
+  <div class="actions">
+    <button id="refresh-btn" type="button">↻ Aktualisieren</button>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Systemstatus</h2>
+      <div class="kv">
+        <div class="k">Hostname</div><div id="hostname" class="v">--</div>
+        <div class="k">Manager</div><div id="manager" class="v">--</div>
+        <div class="k">Erreichbarkeit</div><div id="online" class="v">--</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Interfaces</h2>
+      <div id="interfaces"><div class="empty">Lade …</div></div>
+    </section>
+
+    <section class="card" style="grid-column:1/-1">
+      <h2>Sichtbare WLAN-Netze</h2>
+      <div id="wifi-list" class="wifi-list"><div class="empty">Lade …</div></div>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const el = id => document.getElementById(id);
+  const esc = value => String(value ?? "--")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+
+  async function readJson(url){
+    const response = await fetch(url, {headers:{"Accept":"application/json"}});
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  }
+
+  function renderStatus(data){
+    el("hostname").textContent = data.hostname || "--";
+    el("manager").textContent = data.manager || (data.manager_available ? "NetworkManager" : "nicht verfügbar");
+    el("online").textContent = data.online ? "Netzwerk verbunden" : "keine aktive LAN/WLAN-Verbindung";
+
+    const dot = el("status-dot");
+    dot.className = `dot ${data.online ? "ok" : "bad"}`;
+    el("status-label").textContent = data.online ? "Verbunden" : "Nicht verbunden";
+
+    if(data.error){
+      el("interfaces").innerHTML = `<div class="error">${esc(data.error)}</div>`;
+      return;
+    }
+
+    const interfaces = Array.isArray(data.interfaces) ? data.interfaces : [];
+    if(!interfaces.length){
+      el("interfaces").innerHTML = `<div class="empty">Keine Interfaces gemeldet.</div>`;
+      return;
+    }
+
+    el("interfaces").innerHTML = interfaces.map(item => {
+      const addresses = (item.addresses || []).join(", ") || "--";
+      const dns = (item.dns || []).join(", ") || "--";
+      return `<div class="interface">
+        <div class="interface-title">
+          <span>${esc(item.device)} · ${esc(item.type)}</span>
+          <span class="${item.connected ? "connected" : ""}">${esc(item.state)}</span>
+        </div>
+        <div class="interface-meta">
+          Verbindung: ${esc(item.connection || "--")}<br>
+          IP: ${esc(addresses)}<br>
+          Gateway: ${esc(item.gateway || "--")}<br>
+          DNS: ${esc(dns)}
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  function renderWifi(data){
+    if(data.error){
+      el("wifi-list").innerHTML = `<div class="error">${esc(data.error)}</div>`;
+      return;
+    }
+    const networks = Array.isArray(data.networks) ? data.networks : [];
+    if(!networks.length){
+      el("wifi-list").innerHTML = `<div class="empty">Keine WLAN-Netze gefunden.</div>`;
+      return;
+    }
+    el("wifi-list").innerHTML = networks.map(item => `
+      <div class="wifi">
+        <div>
+          <div class="wifi-name ${item.connected ? "connected" : ""}">
+            ${item.connected ? "● " : ""}${esc(item.ssid)}
+          </div>
+          <div class="wifi-meta">${esc(item.security || "--")}</div>
+        </div>
+        <div class="signal">${item.signal == null ? "--" : esc(item.signal + " %")}</div>
+      </div>
+    `).join("");
+  }
+
+  async function refresh(){
+    const btn = el("refresh-btn");
+    btn.disabled = true;
+    try{
+      const [status, wifi] = await Promise.all([
+        readJson("/api/config/network/status"),
+        readJson("/api/config/network/wifi")
+      ]);
+      renderStatus(status);
+      renderWifi(wifi);
+    }catch(error){
+      el("status-dot").className = "dot bad";
+      el("status-label").textContent = "Fehler";
+      el("interfaces").innerHTML = `<div class="error">${esc(error.message)}</div>`;
+      el("wifi-list").innerHTML = `<div class="error">${esc(error.message)}</div>`;
+    }finally{
+      btn.disabled = false;
+    }
+  }
+
+  el("refresh-btn").addEventListener("click", refresh);
+  refresh();
+})();
+</script>
+{% endblock %}
