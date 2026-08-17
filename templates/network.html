@@ -77,15 +77,15 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     <div>
       <a href="/grow-control" class="back">← Grow Control</a>
       <h1>🌐 Netzwerk</h1>
-      <div class="sub">Phase 4S.3.1 · stabiler WLAN-Scan & Netzwerk-Helper</div>
+      <div class="sub">Phase 4S.3.2 · privilegierter WLAN-Scan</div>
     </div>
     <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
   </div>
 
   <div class="notice">
-    „Aktualisieren“ fordert einen frischen WLAN-Scan an und wartet auf dessen Abschluss, bevor die Liste
-    ersetzt wird. Schreibende WLAN-Aktionen laufen über einen eng begrenzten System-Helper. Beim Wechsel
-    kann die Browser-Verbindung kurz abbrechen; bei Fehlern bleibt der automatische Rückfall aktiv.
+    „Aktualisieren“ fordert den frischen WLAN-Scan jetzt ebenfalls über den begrenzten System-Helper an.
+    Growstar wartet anschließend auf den Scan und liest die fertige WLAN-Liste wieder ohne Root-Rechte aus.
+    WLAN-Wechsel und automatischer Rückfall bleiben unverändert abgesichert.
   </div>
 
   <div class="actions">
