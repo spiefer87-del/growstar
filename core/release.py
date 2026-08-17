@@ -15,6 +15,40 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.5",
+        "date": "2026-08-17",
+        "phase": "4S.3.2",
+        "title": "WLAN-Scan nutzt den privilegierten Netzwerk-Helper",
+        "summary": (
+            "Der echte WLAN-Neuscan wird jetzt über denselben eng begrenzten "
+            "Netzwerk-Helper angefordert wie andere privilegierte "
+            "NetworkManager-Aktionen. Die fertige Access-Point-Liste wird danach "
+            "weiterhin unprivilegiert vom Growstar-Webprozess gelesen."
+        ),
+        "changes": (
+            "Fehler 'org.freedesktop.NetworkManager.wifi.scan request failed: not authorized' im Webprozess behoben.",
+            "Der Force-Scan ruft NetworkManager nicht mehr direkt aus Gunicorn auf.",
+            "Der root-eigene Growstar-Netzwerk-Helper erhält die neue fest definierte Aktion 'scan'.",
+            "Die Helper-Aktion fordert ausschließlich einen frischen Scan auf dem erkannten WLAN-Interface an und verändert keine Verbindung.",
+            "Nach erfolgreicher Scan-Anforderung wartet Growstar weiterhin fünf Sekunden auf NetworkManager und den WLAN-Treiber.",
+            "Die fertige Access-Point-Liste wird anschließend mit --rescan no ohne zusätzliche privilegierte Aktion gelesen.",
+            "Der normale Cache-/Listenabruf bleibt unprivilegiert.",
+            "WLAN-Verbindung, Passwortbehandlung, Rollback, Gunicorn-Binding und Authentifizierung bleiben unverändert.",
+            "Der bereits installierte Helper muss nach git pull einmalig mit dem bestehenden Installer aktualisiert werden.",
+        ),
+        "tests": (
+            "Direkter API-Aufruf /api/config/network/wifi?refresh=1 darf keinen 'not authorized'-Fehler mehr liefern.",
+            "Ein erzwungener Scan wird im Service ausschließlich über die Helper-Aktion 'scan' angefordert.",
+            "Der unprivilegierte Service führt bei force=True keinen direkten 'nmcli device wifi rescan'-Aufruf mehr aus.",
+            "Nach der Helper-Antwort wartet Growstar die definierte Settle-Zeit ab.",
+            "Die abschließende WLAN-Liste wird mit --rescan no gelesen.",
+            "Der Helper unterstützt ausschließlich die neue explizite Aktion 'scan' zusätzlich zu probe und connect.",
+            "Die Helper-Scan-Aktion verändert keine aktive Verbindung und legt kein NetworkManager-Profil an.",
+            "python3 check_phase4s32_privileged_scan.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.5 und Build-Kennung 4S.3.2.",
+        ),
+    },
+    {
         "version": "3.7.4",
         "date": "2026-08-17",
         "phase": "4S.3.1",
