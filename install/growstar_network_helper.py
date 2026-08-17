@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -383,6 +384,223 @@ def _connect(payload):
     }
 
 
+
+def _run_nmcli_editor(connection_name, password):
+    """Speichert ein PSK über den interaktiven nmcli-Editor per stdin."""
+
+    executable = shutil.which("nmcli")
+    if not executable:
+        raise HelperError("NetworkManager/nmcli ist nicht verfügbar")
+
+    env = os.environ.copy()
+    env["LC_ALL"] = "C"
+    env["NO_COLOR"] = "1"
+
+    quoted_password = shlex.quote(password)
+    editor_input = (
+        f"set wifi-sec.psk {quoted_password}\n"
+        "verify\n"
+        "save\n"
+        "quit\n"
+    )
+
+    try:
+        completed = subprocess.run(
+            [executable, "connection", "edit", "id", connection_name],
+            input=editor_input,
+            capture_output=True,
+            text=True,
+            timeout=NMCLI_TIMEOUT_SECONDS + 10,
+            check=False,
+            env=env,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise HelperError(
+            "NetworkManager-Passwortänderung hat das Zeitlimit überschritten"
+        ) from exc
+    finally:
+        editor_input = ""
+        quoted_password = ""
+
+    if completed.returncode != 0:
+        # stdout wird bewusst nicht weitergegeben, weil interaktive
+        # Editorausgabe Eingaben enthalten kann.
+        raise HelperError(
+            "NetworkManager konnte das WLAN-Passwort nicht speichern"
+        )
+
+
+def _connection_key_mgmt(connection_name):
+    return _run_nmcli(
+        "--get-values",
+        "802-11-wireless-security.key-mgmt",
+        "connection",
+        "show",
+        "id",
+        connection_name,
+    ).strip().lower()
+
+
+def _connection_psk(connection_name):
+    """Liest das bisherige PSK nur innerhalb des root-Helpers."""
+
+    return _run_nmcli(
+        "--show-secrets",
+        "--get-values",
+        "802-11-wireless-security.psk",
+        "connection",
+        "show",
+        "id",
+        connection_name,
+    ).strip()
+
+
+def _personal_wifi_security(key_mgmt):
+    value = str(key_mgmt or "").lower()
+    return "wpa-psk" in value or "sae" in value
+
+
+def _update_password(payload):
+    """Ändert das PSK der aktuell verbundenen WLAN-Verbindung mit Rollback."""
+
+    requested_ssid = str(payload.get("ssid") or "").strip()
+    new_password = (
+        ""
+        if payload.get("password") is None
+        else str(payload.get("password"))
+    )
+
+    if not requested_ssid:
+        raise HelperError("WLAN-Name fehlt")
+    if any(char in requested_ssid for char in ("\x00", "\n", "\r")):
+        raise HelperError("Ungültiger WLAN-Name")
+    if not new_password:
+        raise HelperError("Bitte ein neues WLAN-Passwort eingeben")
+    if any(char in new_password for char in ("\x00", "\n", "\r")):
+        raise HelperError(
+            "Das WLAN-Passwort enthält ungültige Steuerzeichen"
+        )
+    if len(new_password) > 128:
+        raise HelperError("Das WLAN-Passwort ist zu lang")
+
+    device = _wifi_device()
+    previous = _device_snapshot(device)
+
+    if not previous or previous.get("ssid") != requested_ssid:
+        raise HelperError(
+            "Das Passwort kann nur für das aktuell verbundene WLAN geändert werden"
+        )
+
+    connection_name = previous.get("connection")
+    if not connection_name:
+        raise HelperError(
+            "Die aktive NetworkManager-Verbindung konnte nicht ermittelt werden"
+        )
+
+    key_mgmt = _connection_key_mgmt(connection_name)
+    if not _personal_wifi_security(key_mgmt):
+        raise HelperError(
+            "Passwortänderung wird nur für WPA/WPA2/WPA3-Personal unterstützt"
+        )
+
+    old_password = _connection_psk(connection_name)
+    if not old_password:
+        raise HelperError(
+            "Das bisherige WLAN-Passwort konnte nicht für einen sicheren "
+            "Rollback gelesen werden"
+        )
+
+    try:
+        _run_nmcli_editor(connection_name, new_password)
+
+        try:
+            _run_nmcli(
+                "--wait",
+                "25",
+                "connection",
+                "up",
+                "id",
+                connection_name,
+                "ifname",
+                device,
+                timeout=30,
+            )
+        except HelperError as exc:
+            raise HelperError(
+                "Das WLAN-Profil konnte mit dem neuen Passwort nicht "
+                f"aktiviert werden: {exc}"
+            ) from exc
+
+        verified = _wait_for_target(requested_ssid, device)
+
+        if not (
+            verified
+            and verified.get("ssid") == requested_ssid
+            and verified.get("addresses")
+        ):
+            raise HelperError(
+                "Das WLAN wurde mit dem neuen Passwort nicht mit einer "
+                "gültigen IPv4-Adresse bestätigt"
+            )
+
+        return {
+            "success": True,
+            "ssid": requested_ssid,
+            "device": device,
+            "connection": connection_name,
+            "addresses": verified.get("addresses") or [],
+            "gateway": verified.get("gateway"),
+            "password_updated": True,
+            "rollback_attempted": False,
+            "rollback_success": False,
+        }
+
+    except HelperError as change_error:
+        rollback_success = False
+        rollback_error = None
+
+        try:
+            _run_nmcli_editor(connection_name, old_password)
+            _run_nmcli(
+                "--wait",
+                "25",
+                "connection",
+                "up",
+                "id",
+                connection_name,
+                "ifname",
+                device,
+                timeout=30,
+            )
+
+            restored = _wait_for_target(requested_ssid, device)
+            rollback_success = bool(
+                restored
+                and restored.get("ssid") == requested_ssid
+                and restored.get("addresses")
+            )
+
+            if not rollback_success:
+                rollback_error = (
+                    "Die vorherige WLAN-Verbindung konnte nach dem "
+                    "Rollback nicht bestätigt werden"
+                )
+
+        except HelperError as exc:
+            rollback_error = str(exc)
+
+        return {
+            "success": False,
+            "error": str(change_error),
+            "rollback_attempted": True,
+            "rollback_success": rollback_success,
+            "rollback_error": rollback_error,
+        }
+
+    finally:
+        old_password = ""
+        new_password = ""
+
 def main():
     try:
         _guard()
@@ -409,6 +627,9 @@ def main():
 
         if action == "connect":
             _json_out(_connect(payload))
+
+        if action == "update_password":
+            _json_out(_update_password(payload))
 
         raise HelperError("Nicht unterstützte Netzwerk-Aktion")
 
