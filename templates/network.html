@@ -7,7 +7,7 @@
 :root{
   --bg:#0f172a;--card:#1e293b;--card2:#111827;--text:#e5e7eb;
   --muted:#94a3b8;--accent:#22c55e;--warn:#f59e0b;--bad:#ef4444;
-  --border:rgba(148,163,184,.18)
+  --blue:#38bdf8;--border:rgba(148,163,184,.18)
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -18,7 +18,7 @@ h1{margin:6px 0 3px;font-size:1.55rem}
 .sub{color:var(--muted);font-size:.82rem}
 .badge{display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border-radius:999px;background:#162238;border:1px solid var(--border);font-size:.76rem}
 .dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
-.dot.ok{background:var(--accent)} .dot.bad{background:var(--bad)}
+.dot.ok{background:var(--accent)} .dot.bad{background:var(--bad)} .dot.warn{background:var(--warn)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
 .card{background:linear-gradient(145deg,var(--card),var(--card2));border:1px solid var(--border);border-radius:16px;padding:16px;box-shadow:0 14px 35px rgba(0,0,0,.2)}
 .card h2{margin:0 0 12px;font-size:1rem}
@@ -29,18 +29,45 @@ h1{margin:6px 0 3px;font-size:1.55rem}
 .interface-title{display:flex;justify-content:space-between;gap:10px;font-weight:700;font-size:.84rem}
 .interface-meta{margin-top:6px;color:var(--muted);font-size:.75rem;line-height:1.5}
 .wifi-list{display:grid;gap:8px}
-.wifi{display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 11px;border:1px solid var(--border);border-radius:12px;background:rgba(2,6,23,.24)}
-.wifi-name{font-size:.84rem;font-weight:650}
+.wifi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px;border:1px solid var(--border);border-radius:12px;background:rgba(2,6,23,.24)}
+.wifi-name{font-size:.84rem;font-weight:650;word-break:break-word}
 .wifi-meta{font-size:.72rem;color:var(--muted);margin-top:3px}
+.wifi-side{display:flex;align-items:center;gap:10px}
 .signal{font-size:.78rem;color:#cbd5e1;white-space:nowrap}
 .connected{color:#86efac}
 button{border:1px solid var(--border);background:#162238;color:var(--text);border-radius:10px;padding:9px 12px;cursor:pointer;font:inherit;font-size:.78rem}
-button:hover{border-color:rgba(34,197,94,.45)}
-.notice{margin-bottom:14px;padding:11px 13px;border:1px solid rgba(245,158,11,.3);border-radius:12px;background:rgba(245,158,11,.08);color:#fde68a;font-size:.78rem;line-height:1.5}
+button:hover:not(:disabled){border-color:rgba(34,197,94,.45)}
+button:disabled{cursor:not-allowed;opacity:.48}
+button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);color:#bbf7d0}
+.notice{margin-bottom:14px;padding:11px 13px;border:1px solid rgba(56,189,248,.28);border-radius:12px;background:rgba(56,189,248,.07);color:#bae6fd;font-size:.78rem;line-height:1.5}
+.warning{margin-top:10px;padding:10px 11px;border:1px solid rgba(245,158,11,.3);border-radius:11px;background:rgba(245,158,11,.08);color:#fde68a;font-size:.76rem;line-height:1.45}
+.success{color:#86efac}
 .error{color:#fca5a5;font-size:.78rem;line-height:1.5}
 .empty{color:var(--muted);font-size:.78rem}
 .actions{display:flex;justify-content:flex-end;margin:0 0 12px}
-@media(max-width:560px){.wrap{padding:14px 10px 60px}.top{display:block}.badge{margin-top:10px}.kv{grid-template-columns:95px 1fr}}
+.capability{display:flex;align-items:flex-start;gap:10px}
+.capability strong{display:block;font-size:.86rem}
+.capability small{display:block;margin-top:4px;color:var(--muted);line-height:1.45}
+.dialog-backdrop{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(2,6,23,.72);backdrop-filter:blur(5px)}
+.dialog-backdrop.open{display:flex}
+.dialog{width:min(440px,100%);border:1px solid var(--border);border-radius:18px;background:#111c31;padding:18px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+.dialog h2{margin:0 0 6px;font-size:1.05rem}
+.dialog p{margin:0;color:var(--muted);font-size:.78rem;line-height:1.5}
+.field{margin-top:14px}
+.field label{display:block;margin-bottom:6px;color:#cbd5e1;font-size:.76rem}
+.field input{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:#0f172a;color:var(--text);font:inherit}
+.dialog-actions{display:flex;justify-content:flex-end;gap:9px;margin-top:17px}
+.connect-status{min-height:18px;margin-top:12px;font-size:.76rem;line-height:1.45}
+.switch-overlay{position:fixed;inset:0;z-index:1100;display:none;align-items:center;justify-content:center;padding:24px;background:rgba(2,6,23,.92);text-align:center}
+.switch-overlay.open{display:flex}
+.switch-box{max-width:440px}
+.switch-box .big{font-size:2.2rem}
+.switch-box h2{margin:10px 0 7px}
+.switch-box p{margin:0;color:var(--muted);line-height:1.55;font-size:.86rem}
+@media(max-width:560px){
+  .wrap{padding:14px 10px 60px}.top{display:block}.badge{margin-top:10px}.kv{grid-template-columns:95px 1fr}
+  .wifi{grid-template-columns:1fr}.wifi-side{justify-content:space-between}
+}
 </style>
 {% endblock %}
 
@@ -48,16 +75,17 @@ button:hover{border-color:rgba(34,197,94,.45)}
 <div class="wrap">
   <div class="top">
     <div>
-      <a href="/system" class="back">← System</a>
+      <a href="/grow-control" class="back">← Grow Control</a>
       <h1>🌐 Netzwerk</h1>
-      <div class="sub">Phase 4S · sichere read-only Netzwerkdiagnose</div>
+      <div class="sub">Phase 4S.2 · WLAN verwalten mit sicherem Rückfall</div>
     </div>
     <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
   </div>
 
   <div class="notice">
-    Diese Version verändert noch keine WLAN-Einstellungen. Verbinden, Hotspot und automatisches Recovery
-    folgen erst nach erfolgreichem Test dieser Diagnosebasis.
+    WLAN-Netze können jetzt direkt in Growstar ausgewählt werden. Beim Wechsel kann die Browser-Verbindung
+    kurz abbrechen. Wird das Zielnetz nicht mit einer IPv4-Adresse bestätigt, versucht Growstar automatisch,
+    die vorherige WLAN-Verbindung wieder zu aktivieren.
   </div>
 
   <div class="actions">
@@ -75,6 +103,20 @@ button:hover{border-color:rgba(34,197,94,.45)}
     </section>
 
     <section class="card">
+      <h2>Netzwerkverwaltung</h2>
+      <div class="capability">
+        <span id="manage-dot" class="dot"></span>
+        <div>
+          <strong id="manage-label">Prüfe Berechtigung …</strong>
+          <small id="manage-detail">
+            Growstar prüft, ob sein Dienstkonto NetworkManager ohne Terminal-Dialog verändern darf.
+          </small>
+        </div>
+      </div>
+      <div id="manage-warning" class="warning" hidden></div>
+    </section>
+
+    <section class="card" style="grid-column:1/-1">
       <h2>Interfaces</h2>
       <div id="interfaces"><div class="empty">Lade …</div></div>
     </section>
@@ -85,21 +127,78 @@ button:hover{border-color:rgba(34,197,94,.45)}
     </section>
   </div>
 </div>
+
+<div id="wifi-dialog-backdrop" class="dialog-backdrop" aria-hidden="true">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="wifi-dialog-title">
+    <h2 id="wifi-dialog-title">Mit WLAN verbinden</h2>
+    <p id="wifi-dialog-sub">--</p>
+
+    <div id="password-field" class="field">
+      <label for="wifi-password">WLAN-Passwort</label>
+      <input
+        id="wifi-password"
+        type="password"
+        autocomplete="new-password"
+        autocapitalize="none"
+        spellcheck="false"
+      >
+    </div>
+
+    <div id="connect-status" class="connect-status"></div>
+
+    <div class="dialog-actions">
+      <button id="cancel-connect-btn" type="button">Abbrechen</button>
+      <button id="confirm-connect-btn" type="button" class="primary">Verbinden</button>
+    </div>
+  </div>
+</div>
+
+<div id="switch-overlay" class="switch-overlay" aria-hidden="true">
+  <div class="switch-box">
+    <div class="big">📡</div>
+    <h2>Netzwerk wird gewechselt</h2>
+    <p id="switch-message">
+      Growstar aktiviert das neue WLAN und prüft die Verbindung.
+    </p>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 (() => {
   const el = id => document.getElementById(id);
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+
+  let writeReady = false;
+  let selectedNetwork = null;
+  let lastNetworks = [];
+
   const esc = value => String(value ?? "--")
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
     .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 
   async function readJson(url){
-    const response = await fetch(url, {headers:{"Accept":"application/json"}});
+    const response = await fetch(url, {
+      headers:{"Accept":"application/json"},
+      cache:"no-store"
+    });
     const data = await response.json().catch(() => ({}));
     if(!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
     return data;
+  }
+
+  function networkSupported(item){
+    if(item.hidden) return {ok:false, label:"Versteckt"};
+    const security = String(item.security || "--").toUpperCase();
+    if(security.includes("802.1X")) return {ok:false, label:"Enterprise"};
+    if(security.includes("WEP")) return {ok:false, label:"WEP gesperrt"};
+    return {ok:true, label:"Verbinden"};
+  }
+
+  function passwordRequired(item){
+    const security = String(item.security || "--").trim().toUpperCase();
+    return !["", "--", "NONE", "OPEN"].includes(security);
   }
 
   function renderStatus(data){
@@ -140,39 +239,202 @@ button:hover{border-color:rgba(34,197,94,.45)}
     }).join("");
   }
 
+  function renderCapabilities(data){
+    writeReady = Boolean(data.write_ready);
+    const dot = el("manage-dot");
+    const warning = el("manage-warning");
+
+    if(writeReady){
+      dot.className = "dot ok";
+      el("manage-label").textContent = "WLAN-Verwaltung bereit";
+      el("manage-detail").textContent =
+        data.hotspot_ready
+          ? "WLAN-Wechsel und geschützter Setup-Hotspot sind vom NetworkManager grundsätzlich freigegeben."
+          : "WLAN-Wechsel ist freigegeben. Die Hotspot-Berechtigung wird separat bewertet.";
+      warning.hidden = true;
+      warning.textContent = "";
+    }else{
+      dot.className = "dot warn";
+      el("manage-label").textContent = "Momentan nur Diagnose";
+      el("manage-detail").textContent =
+        "Growstar verändert kein WLAN, solange NetworkManager die Systemänderung nicht ausdrücklich erlaubt.";
+      warning.hidden = false;
+      warning.textContent = data.error || "NetworkManager-Schreibberechtigung fehlt.";
+    }
+
+    renderWifi({networks:lastNetworks});
+  }
+
   function renderWifi(data){
     if(data.error){
       el("wifi-list").innerHTML = `<div class="error">${esc(data.error)}</div>`;
       return;
     }
+
     const networks = Array.isArray(data.networks) ? data.networks : [];
+    lastNetworks = networks;
+
     if(!networks.length){
       el("wifi-list").innerHTML = `<div class="empty">Keine WLAN-Netze gefunden.</div>`;
       return;
     }
-    el("wifi-list").innerHTML = networks.map(item => `
-      <div class="wifi">
-        <div>
-          <div class="wifi-name ${item.connected ? "connected" : ""}">
-            ${item.connected ? "● " : ""}${esc(item.ssid)}
+
+    el("wifi-list").innerHTML = networks.map((item, index) => {
+      const supported = networkSupported(item);
+      const disabled = item.connected || !writeReady || !supported.ok;
+      const buttonLabel = item.connected
+        ? "Verbunden"
+        : (!writeReady ? "Nur lesen" : supported.label);
+
+      return `
+        <div class="wifi">
+          <div>
+            <div class="wifi-name ${item.connected ? "connected" : ""}">
+              ${item.connected ? "● " : ""}${esc(item.ssid)}
+            </div>
+            <div class="wifi-meta">${esc(item.security || "--")}</div>
           </div>
-          <div class="wifi-meta">${esc(item.security || "--")}</div>
+          <div class="wifi-side">
+            <div class="signal">${item.signal == null ? "--" : esc(item.signal + " %")}</div>
+            <button
+              type="button"
+              class="${!disabled ? "primary" : ""}"
+              data-connect-index="${index}"
+              ${disabled ? "disabled" : ""}
+            >${esc(buttonLabel)}</button>
+          </div>
         </div>
-        <div class="signal">${item.signal == null ? "--" : esc(item.signal + " %")}</div>
-      </div>
-    `).join("");
+      `;
+    }).join("");
+  }
+
+  function openDialog(item){
+    selectedNetwork = item;
+    const needsPassword = passwordRequired(item);
+
+    el("wifi-dialog-title").textContent = `Mit „${item.ssid}“ verbinden`;
+    el("wifi-dialog-sub").textContent =
+      `${item.security || "Offen"} · Signal ${item.signal == null ? "--" : item.signal + " %"}`;
+
+    el("password-field").hidden = !needsPassword;
+    el("wifi-password").value = "";
+    el("connect-status").textContent = "";
+
+    el("wifi-dialog-backdrop").classList.add("open");
+    el("wifi-dialog-backdrop").setAttribute("aria-hidden", "false");
+
+    if(needsPassword){
+      window.setTimeout(() => el("wifi-password").focus(), 50);
+    }
+  }
+
+  function closeDialog(){
+    selectedNetwork = null;
+    el("wifi-password").value = "";
+    el("wifi-dialog-backdrop").classList.remove("open");
+    el("wifi-dialog-backdrop").setAttribute("aria-hidden", "true");
+  }
+
+  async function connectSelected(){
+    if(!selectedNetwork || !writeReady) return;
+
+    const item = selectedNetwork;
+    const needsPassword = passwordRequired(item);
+    const password = needsPassword ? el("wifi-password").value : "";
+
+    if(needsPassword && !password){
+      el("connect-status").innerHTML =
+        `<span class="error">Bitte das WLAN-Passwort eingeben.</span>`;
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Growstar jetzt mit „${item.ssid}“ verbinden?\n\n` +
+      "Die aktuelle Browser-Verbindung kann dabei kurz abbrechen. " +
+      "Wenn das Zielnetz nicht funktioniert, versucht Growstar automatisch zurückzuwechseln."
+    );
+
+    if(!confirmed) return;
+
+    const confirmBtn = el("confirm-connect-btn");
+    confirmBtn.disabled = true;
+    el("cancel-connect-btn").disabled = true;
+    el("connect-status").textContent = "Verbindung wird vorbereitet …";
+
+    el("switch-message").textContent =
+      `Growstar verbindet sich mit „${item.ssid}“. Wenn dein Browser die Verbindung verliert, ` +
+      "verbinde dein Handy ebenfalls mit diesem WLAN und öffne Growstar danach erneut.";
+
+    el("switch-overlay").classList.add("open");
+    el("switch-overlay").setAttribute("aria-hidden", "false");
+
+    try{
+      const response = await fetch("/system/network/connect", {
+        method:"POST",
+        headers:{
+          "Accept":"application/json",
+          "Content-Type":"application/json",
+          "X-CSRF-Token":csrfToken,
+        },
+        body:JSON.stringify({
+          ssid:item.ssid,
+          password:password,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if(!response.ok || !data.success){
+        throw new Error(
+          data.error ||
+          (
+            data.rollback_attempted && data.rollback_success
+              ? "Das Zielnetz konnte nicht aktiviert werden. Die vorherige Verbindung wurde wiederhergestellt."
+              : `HTTP ${response.status}`
+          )
+        );
+      }
+
+      el("switch-message").textContent =
+        data.already_connected
+          ? `Growstar ist bereits mit „${item.ssid}“ verbunden.`
+          : `„${item.ssid}“ wurde aktiviert. Growstar hat eine IPv4-Adresse erhalten.`;
+
+      window.setTimeout(() => window.location.reload(), 2500);
+
+    }catch(error){
+      // Ein fetch-Fehler kann auch bedeuten, dass der Netzwerkwechsel bereits
+      // erfolgreich war und nur die alte Browser-Verbindung abgerissen ist.
+      el("switch-message").textContent =
+        `${error.message || "Die Browser-Verbindung wurde unterbrochen."} ` +
+        `Falls Growstar bereits gewechselt hat, verbinde dein Handy mit „${item.ssid}“ und öffne Growstar erneut.`;
+
+      window.setTimeout(() => {
+        el("switch-overlay").classList.remove("open");
+        el("switch-overlay").setAttribute("aria-hidden", "true");
+        confirmBtn.disabled = false;
+        el("cancel-connect-btn").disabled = false;
+      }, 4500);
+    }finally{
+      el("wifi-password").value = "";
+    }
   }
 
   async function refresh(){
     const btn = el("refresh-btn");
     btn.disabled = true;
+
     try{
-      const [status, wifi] = await Promise.all([
+      const [status, wifi, capabilities] = await Promise.all([
         readJson("/api/config/network/status"),
-        readJson("/api/config/network/wifi")
+        readJson("/api/config/network/wifi"),
+        readJson("/api/config/network/capabilities"),
       ]);
+
       renderStatus(status);
       renderWifi(wifi);
+      renderCapabilities(capabilities);
+
     }catch(error){
       el("status-dot").className = "dot bad";
       el("status-label").textContent = "Fehler";
@@ -183,7 +445,24 @@ button:hover{border-color:rgba(34,197,94,.45)}
     }
   }
 
+  el("wifi-list").addEventListener("click", event => {
+    const button = event.target.closest("button[data-connect-index]");
+    if(!button || button.disabled) return;
+
+    const index = Number(button.dataset.connectIndex);
+    const item = lastNetworks[index];
+
+    if(item) openDialog(item);
+  });
+
+  el("cancel-connect-btn").addEventListener("click", closeDialog);
+  el("confirm-connect-btn").addEventListener("click", connectSelected);
   el("refresh-btn").addEventListener("click", refresh);
+
+  el("wifi-dialog-backdrop").addEventListener("click", event => {
+    if(event.target === el("wifi-dialog-backdrop")) closeDialog();
+  });
+
   refresh();
 })();
 </script>
