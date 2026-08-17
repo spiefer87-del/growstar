@@ -681,3 +681,52 @@ def connect_wifi(ssid, password=None):
         )
 
     return result
+
+def update_current_wifi_password(ssid, password):
+    """Ändert transaktional das Passwort des aktuell verbundenen WLANs."""
+
+    ssid = _validate_ssid(ssid)
+    secret = "" if password is None else str(password)
+
+    if not secret:
+        raise ValueError("Bitte das neue WLAN-Passwort eingeben")
+    if any(char in secret for char in ("\x00", "\n", "\r")):
+        raise ValueError(
+            "Das WLAN-Passwort enthält ungültige Steuerzeichen"
+        )
+    if len(secret) > 128:
+        raise ValueError("Das WLAN-Passwort ist zu lang")
+
+    permissions = network_permissions()
+
+    if not permissions.get("write_ready"):
+        raise NetworkChangeError(
+            permissions.get("error")
+            or "Growstar-Netzwerk-Helper ist nicht freigegeben"
+        )
+
+    with _network_change_lock:
+        try:
+            result = _run_network_helper(
+                {
+                    "action": "update_password",
+                    "ssid": ssid,
+                    "password": secret,
+                },
+                timeout=WIFI_CONNECT_TIMEOUT_SECONDS
+                + WIFI_VERIFY_TIMEOUT_SECONDS
+                + 35,
+            )
+        finally:
+            secret = ""
+
+    if not result.get("success"):
+        raise NetworkChangeError(
+            result.get("error") or "WLAN-Passwortänderung fehlgeschlagen",
+            rollback_attempted=result.get("rollback_attempted", False),
+            rollback_success=result.get("rollback_success", False),
+            rollback_error=result.get("rollback_error"),
+        )
+
+    return result
+
