@@ -1,0 +1,20 @@
+// Growstar NetworkManager-Berechtigungen – Phase 4S.3
+// Wird durch install_network_permissions.sh nach /etc/polkit-1/rules.d installiert.
+// Bewusst KEIN pauschales NetworkManager-Recht für den interaktiven Benutzer.
+
+polkit.addRule(function(action, subject) {
+    var allowed = [
+        "org.freedesktop.NetworkManager.network-control",
+        "org.freedesktop.NetworkManager.settings.modify.own",
+        "org.freedesktop.NetworkManager.wifi.share.protected"
+    ];
+
+    if (allowed.indexOf(action.id) < 0) {
+        return;
+    }
+
+    if (subject.system_unit == "growstar.service" &&
+        subject.user == "__GROWSTAR_SERVICE_USER__") {
+        return polkit.Result.YES;
+    }
+});
