@@ -266,6 +266,27 @@ def _probe():
     }
 
 
+
+def _scan():
+    """Fordert einen frischen WLAN-Scan mit Helper-Rechten an."""
+
+    device = _wifi_device()
+
+    _run_nmcli(
+        "device",
+        "wifi",
+        "rescan",
+        "ifname",
+        device,
+        timeout=NMCLI_TIMEOUT_SECONDS,
+    )
+
+    return {
+        "success": True,
+        "device": device,
+        "scan_requested": True,
+    }
+
 def _connect(payload):
     ssid = str(payload.get("ssid") or "").strip()
     password = "" if payload.get("password") is None else str(payload.get("password"))
@@ -382,6 +403,9 @@ def main():
 
         if action == "probe":
             _json_out(_probe())
+
+        if action == "scan":
+            _json_out(_scan())
 
         if action == "connect":
             _json_out(_connect(payload))
