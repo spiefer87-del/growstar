@@ -15,6 +15,44 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.6",
+        "date": "2026-08-17",
+        "phase": "4S.3.3",
+        "title": "Passwort der bestehenden WLAN-Verbindung sicher ändern",
+        "summary": (
+            "Das Passwort der aktuell verbundenen WPA/WPA2/WPA3-Personal-"
+            "Verbindung kann jetzt direkt in Growstar geändert werden. "
+            "Growstar hält das bisherige Secret ausschließlich im privilegierten "
+            "Netzwerk-Helper als Rollback-Sicherung und bestätigt die neue "
+            "Verbindung erst nach erfolgreicher IPv4-Aktivierung."
+        ),
+        "changes": (
+            "Das aktuell verbundene geschützte WLAN erhält auf der Netzwerkseite die Aktion 'Passwort ändern'.",
+            "Das neue Passwort muss zur Vermeidung von Tippfehlern zweimal eingegeben werden.",
+            "Die Passwortänderung ist wie andere Netzwerkmutationen durch settings.manage und CSRF geschützt.",
+            "Das bisherige PSK wird ausschließlich im root-eigenen Netzwerk-Helper mit --show-secrets gelesen und niemals an Flask oder den Browser zurückgegeben.",
+            "Das neue PSK wird über den interaktiven nmcli-Verbindungseditor per stdin gespeichert und erscheint nicht in der Prozessargumentliste.",
+            "Nach dem Speichern wird das bestehende NetworkManager-Profil explizit neu aktiviert.",
+            "Die Passwortänderung gilt erst als erfolgreich, wenn dieselbe SSID wieder aktiv ist und eine IPv4-Adresse vorliegt.",
+            "Bei Aktivierungs- oder Verifikationsfehler schreibt der Helper automatisch das vorherige PSK zurück und aktiviert die bisherige Verbindung erneut.",
+            "WEP und Enterprise-WLAN bleiben für diese Funktion bewusst ausgeschlossen; unterstützt werden WPA/WPA2/WPA3-Personal-Profile.",
+            "WLAN-Scan, Gunicorn-Binding und Setup-Hotspot-Status bleiben unverändert.",
+            "Der Netzwerk-Helper muss nach git pull erneut mit dem bestehenden Installer nach /usr/local/libexec kopiert werden.",
+        ),
+        "tests": (
+            "Beim aktuell verbundenen WPA/WPA2/WPA3-Personal-WLAN erscheint 'Passwort ändern'.",
+            "Offene, WEP- und Enterprise-Netze erhalten keine Passwortänderungsaktion.",
+            "Zwei abweichende neue Passwörter werden bereits im Browser blockiert.",
+            "Der Webservice delegiert die Passwortänderung ausschließlich an die Helper-Aktion update_password.",
+            "Weder altes noch neues WLAN-Passwort erscheint in nmcli-Prozessargumenten.",
+            "Der Helper liest das alte PSK nur intern als Rollback-Sicherung.",
+            "Nach erfolgreicher Änderung wird das bestehende Profil neu aktiviert und auf SSID + IPv4 geprüft.",
+            "Ein simulierter Fehler stellt das alte PSK wieder her und aktiviert die vorherige Verbindung erneut.",
+            "python3 check_phase4s33_wifi_password.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.6 und Build-Kennung 4S.3.3.",
+        ),
+    },
+    {
         "version": "3.7.5",
         "date": "2026-08-17",
         "phase": "4S.3.2",
