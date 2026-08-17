@@ -77,15 +77,15 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     <div>
       <a href="/grow-control" class="back">← Grow Control</a>
       <h1>🌐 Netzwerk</h1>
-      <div class="sub">Phase 4S.2 · WLAN verwalten mit sicherem Rückfall</div>
+      <div class="sub">Phase 4S.3 · frischer WLAN-Scan & sichere Dienstfreigabe</div>
     </div>
     <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
   </div>
 
   <div class="notice">
-    WLAN-Netze können jetzt direkt in Growstar ausgewählt werden. Beim Wechsel kann die Browser-Verbindung
-    kurz abbrechen. Wird das Zielnetz nicht mit einer IPv4-Adresse bestätigt, versucht Growstar automatisch,
-    die vorherige WLAN-Verbindung wieder zu aktivieren.
+    „Aktualisieren“ erzwingt jetzt einen frischen WLAN-Scan. WLAN-Wechsel verwenden bevorzugt private
+    NetworkManager-Profile des Growstar-Dienstes. Beim Wechsel kann die Browser-Verbindung kurz abbrechen;
+    bei fehlender IPv4-Bestätigung versucht Growstar weiterhin automatisch zurückzuwechseln.
   </div>
 
   <div class="actions">
@@ -244,20 +244,28 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     const dot = el("manage-dot");
     const warning = el("manage-warning");
 
+    const checks = data.checks || {};
+    const scope = data.profile_scope === "private"
+      ? "privates Growstar-Profil"
+      : (data.profile_scope === "system" ? "Systemprofil" : "kein Profilzugriff");
+
     if(writeReady){
       dot.className = "dot ok";
       el("manage-label").textContent = "WLAN-Verwaltung bereit";
       el("manage-detail").textContent =
-        data.hotspot_ready
-          ? "WLAN-Wechsel und geschützter Setup-Hotspot sind vom NetworkManager grundsätzlich freigegeben."
-          : "WLAN-Wechsel ist freigegeben. Die Hotspot-Berechtigung wird separat bewertet.";
+        `NetworkManager erlaubt den WLAN-Wechsel (${scope}). ` +
+        (data.hotspot_ready
+          ? "Die geschützte Hotspot-Berechtigung ist ebenfalls vorhanden."
+          : "Die Hotspot-Berechtigung ist noch nicht freigegeben.");
       warning.hidden = true;
       warning.textContent = "";
     }else{
       dot.className = "dot warn";
       el("manage-label").textContent = "Momentan nur Diagnose";
       el("manage-detail").textContent =
-        "Growstar verändert kein WLAN, solange NetworkManager die Systemänderung nicht ausdrücklich erlaubt.";
+        `network-control: ${checks.network_control || "--"} · ` +
+        `modify-own: ${checks.modify_own || "--"} · ` +
+        `modify-system: ${checks.modify_system || "--"}`;
       warning.hidden = false;
       warning.textContent = data.error || "NetworkManager-Schreibberechtigung fehlt.";
     }
@@ -420,14 +428,14 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     }
   }
 
-  async function refresh(){
+  async function refresh(forceWifiScan = false){
     const btn = el("refresh-btn");
     btn.disabled = true;
 
     try{
       const [status, wifi, capabilities] = await Promise.all([
         readJson("/api/config/network/status"),
-        readJson("/api/config/network/wifi"),
+        readJson(forceWifiScan ? "/api/config/network/wifi?refresh=1" : "/api/config/network/wifi"),
         readJson("/api/config/network/capabilities"),
       ]);
 
@@ -457,13 +465,13 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
 
   el("cancel-connect-btn").addEventListener("click", closeDialog);
   el("confirm-connect-btn").addEventListener("click", connectSelected);
-  el("refresh-btn").addEventListener("click", refresh);
+  el("refresh-btn").addEventListener("click", () => refresh(true));
 
   el("wifi-dialog-backdrop").addEventListener("click", event => {
     if(event.target === el("wifi-dialog-backdrop")) closeDialog();
   });
 
-  refresh();
+  refresh(true);
 })();
 </script>
 {% endblock %}
