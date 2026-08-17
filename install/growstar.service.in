@@ -1,0 +1,22 @@
+[Unit]
+Description=Growstar Gunicorn Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__GROWSTAR_USER__
+Group=__GROWSTAR_GROUP__
+WorkingDirectory=__GROWSTAR_DIR__
+
+Environment="PYTHONUNBUFFERED=1"
+Environment="GROWSTAR_BEHIND_PROXY=1"
+
+ExecStart=__GUNICORN_BIN__ --config __GROWSTAR_DIR__/gunicorn.conf.py app:flask_app
+
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

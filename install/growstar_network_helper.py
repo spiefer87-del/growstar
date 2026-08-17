@@ -601,6 +601,53 @@ def _update_password(payload):
         old_password = ""
         new_password = ""
 
+
+def _get_password(payload):
+    """Liefert das PSK der aktuell verbundenen Personal-WLAN-Verbindung.
+
+    Diese Aktion wird nur auf ausdrückliche UI-Anforderung verwendet.
+    Das Secret wird nicht geloggt und nicht in Prozessargumenten übergeben.
+    """
+
+    requested_ssid = str(payload.get("ssid") or "").strip()
+
+    if not requested_ssid:
+        raise HelperError("WLAN-Name fehlt")
+    if any(char in requested_ssid for char in ("\\x00", "\\n", "\\r")):
+        raise HelperError("Ungültiger WLAN-Name")
+
+    device = _wifi_device()
+    current = _device_snapshot(device)
+
+    if not current or current.get("ssid") != requested_ssid:
+        raise HelperError(
+            "Das Passwort kann nur für das aktuell verbundene WLAN angezeigt werden"
+        )
+
+    connection_name = current.get("connection")
+    if not connection_name:
+        raise HelperError(
+            "Die aktive NetworkManager-Verbindung konnte nicht ermittelt werden"
+        )
+
+    key_mgmt = _connection_key_mgmt(connection_name)
+    if not _personal_wifi_security(key_mgmt):
+        raise HelperError(
+            "Passwortanzeige wird nur für WPA/WPA2/WPA3-Personal unterstützt"
+        )
+
+    password = _connection_psk(connection_name)
+    if not password:
+        raise HelperError(
+            "NetworkManager liefert für diese Verbindung kein gespeichertes Passwort"
+        )
+
+    return {
+        "success": True,
+        "ssid": requested_ssid,
+        "password": password,
+    }
+
 def main():
     try:
         _guard()
@@ -630,6 +677,9 @@ def main():
 
         if action == "update_password":
             _json_out(_update_password(payload))
+
+        if action == "get_password":
+            _json_out(_get_password(payload))
 
         raise HelperError("Nicht unterstützte Netzwerk-Aktion")
 
