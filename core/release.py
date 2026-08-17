@@ -15,6 +15,41 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.3",
+        "date": "2026-08-17",
+        "phase": "4S.3",
+        "title": "Frischer WLAN-Scan und gezielte NetworkManager-Freigabe",
+        "summary": (
+            "Growstar erzwingt beim Öffnen und Aktualisieren der Netzwerkseite "
+            "einen frischen WLAN-Scan. Die NetworkManager-Freigabe wird zugleich "
+            "auf den Growstar-Systemdienst und benutzereigene WLAN-Profile begrenzt."
+        ),
+        "changes": (
+            "Die Netzwerkseite erzwingt beim ersten Laden und über 'Aktualisieren' einen frischen WLAN-Scan mit --rescan yes.",
+            "Normale interne Scans dürfen weiterhin den NetworkManager-Cache mit --rescan auto verwenden.",
+            "WLAN-Ziellisten werden vor einem Verbindungsversuch nochmals mit einem frischen Scan geprüft.",
+            "NetworkManager-Schreibbereitschaft akzeptiert jetzt settings.modify.own als bevorzugte, engere Alternative zu settings.modify.system.",
+            "Neu angelegte WLAN-Verbindungen werden bei vorhandener modify-own-Berechtigung mit nmcli private yes dem Growstar-Dienstbenutzer zugeordnet.",
+            "Die Netzwerkseite zeigt die einzelnen NetworkManager-Berechtigungszustände verständlicher an.",
+            "Neue Polkit-Regel erlaubt nur growstar.service die Aktionen network-control, settings.modify.own und wifi.share.protected.",
+            "Die Polkit-Regel wird zusätzlich an den tatsächlich in growstar.service konfigurierten Dienstbenutzer gebunden und enthält keinen fest codierten pi5-Benutzer.",
+            "Ein idempotentes Installationsskript richtet die Regel einmalig unter /etc/polkit-1/rules.d ein; Flask und Gunicorn laufen weiterhin ohne Root-Rechte.",
+            "Ein Entfernungsskript ermöglicht das saubere Zurücknehmen der NetworkManager-Freigabe.",
+            "Der automatische Setup-Hotspot bleibt weiterhin deaktiviert und folgt erst nach bestätigtem grünem Schreibzugriff.",
+        ),
+        "tests": (
+            "Netzwerkseite neu öffnen: sichtbare WLANs werden ohne vorherigen Terminal-Scan frisch ermittelt.",
+            "Auf 'Aktualisieren' drücken: Backend verwendet --rescan yes statt --rescan auto.",
+            "NetworkManager-Berechtigungsanzeige zeigt network-control, modify-own und modify-system getrennt an.",
+            "Nach Installation der Polkit-Regel und Growstar-Neustart zeigt die Netzwerkseite 'WLAN-Verwaltung bereit'.",
+            "Nicht verbundenes unterstütztes WLAN zeigt anschließend 'Verbinden' statt 'Nur lesen'.",
+            "Neue WLAN-Verbindung wird bevorzugt als privates Benutzerprofil angelegt; settings.modify.system ist dafür nicht erforderlich.",
+            "Polkit-Regel enthält keine pauschale Freigabe für den interaktiven Raspberry-Benutzer und keine modify-system-Berechtigung.",
+            "python3 check_phase4s3_network_permissions.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.3 und Build-Kennung 4S.3.",
+        ),
+    },
+    {
         "version": "3.7.2",
         "date": "2026-08-17",
         "phase": "4S.2",
