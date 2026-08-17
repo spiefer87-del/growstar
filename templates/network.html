@@ -32,6 +32,8 @@ h1{margin:6px 0 3px;font-size:1.55rem}
 .wifi{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px;border:1px solid var(--border);border-radius:12px;background:rgba(2,6,23,.24)}
 .wifi-name{font-size:.84rem;font-weight:650;word-break:break-word}
 .wifi-meta{font-size:.72rem;color:var(--muted);margin-top:3px}
+.wifi-secret{margin-top:7px;font-size:.74rem;color:#cbd5e1;word-break:break-all}
+.wifi-secret strong{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
 .wifi-side{display:flex;align-items:center;gap:10px}
 .signal{font-size:.78rem;color:#cbd5e1;white-space:nowrap}
 .connected{color:#86efac}
@@ -77,15 +79,15 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     <div>
       <a href="/grow-control" class="back">← Grow Control</a>
       <h1>🌐 Netzwerk</h1>
-      <div class="sub">Phase 4S.3.3 · WLAN-Passwort sicher ändern</div>
+      <div class="sub">Phase 4S.3.4 · WLAN-Secret & Systemdienst</div>
     </div>
     <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
   </div>
 
   <div class="notice">
-    Growstar kann jetzt auch das Passwort der aktuell verbundenen WPA/WPA2/WPA3-Personal-Verbindung ändern.
-    Das bisherige Secret bleibt ausschließlich im Netzwerk-Helper als Rollback-Sicherung. Nach der Änderung
-    wird die Verbindung neu aktiviert und auf SSID sowie IPv4 geprüft.
+    Das aktuell gespeicherte WLAN-Passwort bleibt standardmäßig maskiert und kann nur bewusst kurz eingeblendet werden.
+    Passwortänderung, Scan und Rollback bleiben unverändert abgesichert. Zusätzlich kann der Growstar-Gunicorn-
+    Systemdienst jetzt reproduzierbar aus dem Repository installiert werden.
   </div>
 
   <div class="actions">
@@ -310,6 +312,9 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
         actions += `<button type="button" disabled>Verbunden</button>`;
         if(canChangePassword){
           actions += `
+            <button type="button" data-reveal-index="${index}">
+              👁 Passwort anzeigen
+            </button>
             <button type="button" class="primary" data-password-index="${index}">
               Passwort ändern
             </button>
@@ -333,6 +338,11 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
               ${item.connected ? "● " : ""}${esc(item.ssid)}
             </div>
             <div class="wifi-meta">${esc(item.security || "--")}</div>
+            ${
+              item.connected && canChangePassword
+                ? `<div class="wifi-secret">Passwort: <strong data-secret-index="${index}">••••••••••••</strong></div>`
+                : ""
+            }
           </div>
           <div class="wifi-side">
             <div class="signal">${item.signal == null ? "--" : esc(item.signal + " %")}</div>
@@ -510,6 +520,65 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     }
   }
 
+  async function revealPassword(index){
+    const item = lastNetworks[index];
+    const target = document.querySelector(`[data-secret-index="${index}"]`);
+    const button = document.querySelector(`[data-reveal-index="${index}"]`);
+
+    if(!item || !target || !button || !writeReady) return;
+
+    const confirmed = window.confirm(
+      `Gespeichertes WLAN-Passwort für „${item.ssid}“ kurz anzeigen?`
+    );
+    if(!confirmed) return;
+
+    const oldLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "Lade …";
+
+    try{
+      const response = await fetch("/system/network/password/show", {
+        method:"POST",
+        headers:{
+          "Accept":"application/json",
+          "Content-Type":"application/json",
+          "X-CSRF-Token":csrfToken,
+        },
+        cache:"no-store",
+        body:JSON.stringify({ssid:item.ssid}),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if(!response.ok || !data.success || !data.password){
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      target.textContent = data.password;
+      button.textContent = "🙈 Verbergen";
+
+      const hide = () => {
+        target.textContent = "••••••••••••";
+        button.textContent = oldLabel;
+        button.disabled = false;
+        button.onclick = null;
+      };
+
+      const timer = window.setTimeout(hide, 15000);
+      button.disabled = false;
+      button.onclick = () => {
+        window.clearTimeout(timer);
+        hide();
+      };
+
+    }catch(error){
+      target.textContent = "••••••••••••";
+      button.textContent = oldLabel;
+      button.disabled = false;
+      button.onclick = null;
+      window.alert(error.message || "WLAN-Passwort konnte nicht geladen werden.");
+    }
+  }
+
   async function refresh(forceWifiScan = false){
     const btn = el("refresh-btn");
     const oldLabel = btn.textContent;
@@ -539,6 +608,12 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
   }
 
   el("wifi-list").addEventListener("click", event => {
+    const revealButton = event.target.closest("button[data-reveal-index]");
+    if(revealButton && !revealButton.disabled){
+      revealPassword(Number(revealButton.dataset.revealIndex));
+      return;
+    }
+
     const passwordButton = event.target.closest("button[data-password-index]");
     if(passwordButton && !passwordButton.disabled){
       const index = Number(passwordButton.dataset.passwordIndex);
