@@ -15,6 +15,49 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.7",
+        "date": "2026-08-17",
+        "phase": "4S.3.4",
+        "title": "WLAN-Passwort anzeigen und Growstar-Systemdienst reproduzierbar installieren",
+        "summary": (
+            "Das gespeicherte Passwort der aktuell verbundenen Personal-WLAN-"
+            "Verbindung kann jetzt auf ausdrückliche Administrator-Aktion kurz "
+            "angezeigt werden. Zusätzlich erhält Growstar einen reproduzierbaren "
+            "systemd-Installer für den bestehenden Gunicorn-Betrieb."
+        ),
+        "changes": (
+            "Die verbundene WPA/WPA2/WPA3-Personal-Verbindung zeigt das Passwort standardmäßig nur maskiert.",
+            "Ein expliziter Button 'Passwort anzeigen' lädt das Secret nur mit settings.manage und bestehendem CSRF-Schutz.",
+            "Die Secret-Antwort trägt Cache-Control no-store, Pragma no-cache und Expires 0.",
+            "Das eingeblendete WLAN-Passwort wird nach 15 Sekunden automatisch wieder maskiert und kann vorher manuell verborgen werden.",
+            "Der root-eigene Netzwerk-Helper erhält die eng definierte Aktion get_password.",
+            "Der Helper gibt nur das Passwort der tatsächlich aktuell verbundenen Personal-WLAN-Verbindung frei.",
+            "WEP, Enterprise-WLAN und nicht aktive SSIDs können über diese Aktion kein Secret auslesen.",
+            "Das WLAN-Passwort wird weiterhin nicht in Growstar-Dateien gespeichert und erscheint nicht in Prozessargumenten.",
+            "Neue growstar.service-Vorlage bildet den bestehenden Gunicorn-Systemdienst reproduzierbar ab.",
+            "Der Service-Installer ermittelt Growstar-Verzeichnis, Dienstbenutzer, Gruppe und Gunicorn-Binary dynamisch statt pi5 oder /home/pi5 fest zu codieren.",
+            "Growstar wird weiterhin ausdrücklich nicht als root gestartet.",
+            "Der Installer aktiviert growstar.service für den Systemstart, startet ihn standardmäßig aber nicht ungefragt neu.",
+            "Mit --start kann der Installer bei einer Factory-/Neuinstallation den Dienst direkt starten.",
+            "Vorhandene systemd-Drop-ins wie GROWSTAR_HTTPS_ONLY bleiben unangetastet.",
+            "Die bestehende gunicorn.conf.py bleibt unverändert: 127.0.0.1:8000 für Caddy und 0.0.0.0:8001 für lokale/Setup-Erreichbarkeit.",
+            "Caddy/DuckDNS bleiben bewusst außerhalb dieses Installers und werden in einem separaten Infrastruktur-Schritt behandelt.",
+        ),
+        "tests": (
+            "Beim verbundenen Personal-WLAN erscheint 'Passwort anzeigen' neben 'Passwort ändern'.",
+            "Ohne bewusste Aktion bleibt das Passwort ausschließlich maskiert.",
+            "Die Passwortanzeige verwendet POST, settings.manage, CSRF und no-store-Header.",
+            "Nach 15 Sekunden wird ein eingeblendetes Passwort wieder maskiert.",
+            "Der Helper verweigert get_password für eine andere als die aktuell verbundene SSID.",
+            "Der Helper verweigert die Passwortanzeige für nicht unterstützte Sicherheitsarten.",
+            "growstar.service.in enthält network-online-Abhängigkeit, Restart=always und app:flask_app.",
+            "Der Service-Installer enthält keinen fest codierten Benutzer pi5 und keinen fest codierten Pfad /home/pi5/growstar.",
+            "Der Service-Installer lehnt root als Growstar-Dienstbenutzer ab und erhält bestehende Drop-ins.",
+            "python3 check_phase4s34_password_service.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.7 und Build-Kennung 4S.3.4.",
+        ),
+    },
+    {
         "version": "3.7.6",
         "date": "2026-08-17",
         "phase": "4S.3.3",
