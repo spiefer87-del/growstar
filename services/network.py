@@ -442,21 +442,25 @@ def wifi_scan(force=False):
 
     try:
         if force:
-            device = _wifi_device()
-
-            # "wifi rescan" fordert nur den Scan an und zeigt selbst noch
-            # keine Access Points. NetworkManager/Treiber erhalten danach
-            # bewusst Zeit, bevor die Liste gelesen wird.
-            _run_nmcli(
-                "device",
-                "wifi",
-                "rescan",
-                "ifname",
-                device,
+            # Das aktive Anfordern eines WLAN-Scans ist auf dem Raspberry
+            # eine privilegierte NetworkManager-Aktion. Der unprivilegierte
+            # Gunicorn-Prozess darf weiterhin nur die fertige AP-Liste lesen.
+            scan_request = _run_network_helper(
+                {"action": "scan"},
                 timeout=WIFI_SCAN_TIMEOUT_SECONDS,
             )
 
+            device = scan_request.get("device")
+            if not scan_request.get("success") or not device:
+                raise RuntimeError(
+                    scan_request.get("error")
+                    or "WLAN-Scan konnte nicht angefordert werden"
+                )
+
             time.sleep(FORCED_SCAN_SETTLE_SECONDS)
+
+            # Kein zweiter Scan: Nur den vom Helper aktualisierten
+            # NetworkManager-Cache auslesen.
             result["networks"] = _read_wifi_list(
                 device=device,
                 rescan="no",
