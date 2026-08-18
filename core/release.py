@@ -15,6 +15,49 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.9",
+        "date": "2026-08-18",
+        "phase": "4T",
+        "title": "Neustart-Verhalten pro Aktor konfigurierbar",
+        "summary": (
+            "Growstar schaltet bei einem geordneten Neustart nicht mehr pauschal "
+            "alle Aktoren aus. Pro Station und Aktor kann gewählt werden, ob der "
+            "physische Zustand unverändert bleiben oder das Relay sicher AUS "
+            "geschaltet werden soll."
+        ),
+        "changes": (
+            "Neue stationsbezogene RESTART_POLICY mit den ausschließlich erlaubten Aktionen KEEP und OFF.",
+            "Beleuchtung und Licht 2 verwenden als sicheren Migrationsstandard KEEP; alle übrigen Aktoren starten mit OFF.",
+            "KEEP sendet beim geordneten Growstar-/systemd-Shutdown ausdrücklich keinen Shelly-Schreibbefehl.",
+            "OFF sendet unabhängig vom In-Memory-State einen realen AUS-Befehl und verifiziert den Relayzustand.",
+            "shutdown_backend verwendet nicht mehr den historischen pauschalen set_device(..., False)-Not-Aus für alle Geräte.",
+            "Während der Shutdown-Policy wird die Runtime auf disarming gesetzt, damit Regelkreis und Safety nicht gegen die Policy arbeiten.",
+            "Beim Backend-Start werden vor allen Regel-/Failsafe-Threads die tatsächlichen Relayzustände synchronisiert.",
+            "Die Start-Synchronisierung verwendet jetzt DEVICE_HARDWARE generisch und umfasst damit auch AUX1 bis AUX4.",
+            "Neue Setup-Unterseite /grow-control/setup/restart-policy zeigt das Verhalten pro Station und Aktor.",
+            "Änderungen an der Neustart-Policy werden sofort gespeichert und gelten bereits für den nächsten geordneten Neustart; ein weiterer Neustart zum Speichern ist nicht nötig.",
+            "Neue stationsbezogene API /api/tents/<tent_id>/restart-policy verwendet die bestehende Grow-Konfigurationsberechtigung.",
+            "Ein erzwungenes automatisches EIN beim Neustart wird aus Sicherheitsgründen bewusst nicht angeboten.",
+            "Die Policy gilt für geordnete Prozess-/systemd-Neustarts und Shutdowns; ein abrupter Stromausfall kann softwareseitig keinen letzten Schaltbefehl ausführen.",
+            "Ein einmaliges Phase-4T-Aktivierungsskript verhindert beim Wechsel von 3.7.8, dass der alte pauschale Alles-AUS-aexit-Handler noch einmal das Licht unterbricht.",
+            "Das Aktivierungsskript friert den alten Growstar-Prozess zuerst per SIGSTOP ein, wendet die neue physische Policy an und beendet erst danach den alten Worker ohne dessen historischen Shutdown-Handler.",
+            "Gunicorn-Bindings, Caddy, Netzwerkmanagement und die bestehende Safety-Supervisor-Logik bleiben unverändert.",
+        ),
+        "tests": (
+            "Default-Policy meldet light/light2=KEEP und heating=OFF.",
+            "Ungültige Geräte-IDs und andere Aktionen als KEEP/OFF werden atomar abgelehnt.",
+            "KEEP erzeugt im simulierten Shutdown keinen Shelly-Schreibzugriff.",
+            "OFF erzeugt einen realen AUS-Befehl auch dann, wenn der Runtime-State bereits fälschlich False meldet.",
+            "OFF wird nach dem Schreiben direkt am Relay verifiziert und aktualisiert erst danach den Runtime-State.",
+            "Start-Synchronisierung basiert auf DEVICE_HARDWARE und umfasst AUX-Aktoren.",
+            "app.shutdown_backend enthält keinen pauschalen set_device(device, False)-Loop mehr.",
+            "Setup-API und Setup-Unterseite für Neustart-Verhalten sind registriert.",
+            "Das einmalige Aktivierungsskript enthält SIGSTOP vor Policy-Vorbereitung und SIGKILL erst danach.",
+            "python3 check_phase4t_restart_policy.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.9 und Build-Kennung 4T.",
+        ),
+    },
+    {
         "version": "3.7.8",
         "date": "2026-08-17",
         "phase": "4S.3.5",
