@@ -15,6 +15,51 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.8.0",
+        "date": "2026-08-18",
+        "phase": "4U",
+        "title": "Bereinigte Repository- und Sicherheitsbaseline",
+        "summary": (
+            "Die lange 3.7-Patchserie wird mit einer bereinigten 3.8-Basis "
+            "abgeschlossen. Historische Einmal- und Phasenartefakte werden aus "
+            "dem aktiven Repository entfernt, Pico-Zugangsdaten werden nicht "
+            "mehr versioniert und ein konsolidierter Repository-Baseline-Test "
+            "ersetzt die große Sammlung einzelner Root-Checker."
+        ),
+        "changes": (
+            "Start der neuen Growstar-3.8-Serie; die bestehende Regelungs-, Hardware-, Netzwerk- und Restart-Policy-Logik bleibt unverändert.",
+            "53 historische check_*.py-Phasen- und Patchtests werden aus dem Repository-Root entfernt; ihr vollständiger Stand bleibt über die Git-Historie bis Commit 0e44d73639c0060eb7f520ccb7ef692081ce5ec6 nachvollziehbar.",
+            "Neue konsolidierte Tests liegen ab 3.8 unter tests/regression statt als fortlaufende Patchdateien im Repository-Root.",
+            "app_backup.py, das leere tools/test.py und das leere templates/admin/new.py werden als nicht verwendete Entwicklungsreste entfernt.",
+            "Der veraltete Root-main.py-Pico-Prototyp wird entfernt; Growstar selbst startet weiterhin ausschließlich über Gunicorn mit app:flask_app.",
+            "Die nicht mehr gerouteten Legacy-Templates heizung.html, abluft.html, licht.html und ventilator.html werden entfernt; Geräteansichten verwenden weiterhin das generische device_control.html.",
+            "Die nicht mehr referenzierten Legacy-Templates tagebuch.html und pflanzendaten.html werden entfernt.",
+            "Das nicht verwendete presets.py und die nicht referenzierte Root-style.css werden entfernt.",
+            "Pico-WLAN-Zugangsdaten werden nicht mehr in pico_sensor_01/config.py oder pico_sensor_02/config.py versioniert.",
+            "Für beide Pico-Sensorcontroller gibt es stattdessen config.example.py ohne reale Zugangsdaten; die lokale config.py wird per .gitignore ausgeschlossen.",
+            ".gitignore nimmt zusätzlich lokale Growstar-Laufzeitdaten wie instance/, backups/, tent_configs/ und tests.json auf.",
+            "profiles.json, core/profile.py und routes/profile.py bleiben ausdrücklich erhalten, weil sie im aktuellen Laufzeitpfad weiterhin aktiv verwendet werden.",
+            "Die Phase-4T-Migrationswerkzeuge sowie Growstar-Service-, NetworkManager- und Netzwerk-Helper-Installer bleiben erhalten, damit bestehende Installations- und Upgradepfade nicht durch das Aufräumen beschädigt werden.",
+            "Neue SECURITY.md dokumentiert verbindlich, dass WLAN-Passwörter, API-Tokens, Session-Secrets und andere produktive Zugangsdaten nicht in Git gespeichert werden dürfen.",
+            "Ein zuvor versioniertes WLAN-Credential wird aus dem aktuellen Repository-Stand entfernt; da Git-Historie bereits veröffentlichte Secrets nicht zurücknimmt, muss das betroffene WLAN-Passwort kontrolliert rotiert werden.",
+        ),
+        "tests": (
+            "core/release.py meldet Version 3.8.0 und Build-Kennung 4U.",
+            "Im Repository-Root ist nach dem Cleanup kein check_*.py mehr versioniert.",
+            "Alle gezielt entfernten Backup-, Prototyp-, Leer- und Legacy-Template-Dateien sind nicht mehr getrackt.",
+            "pico_sensor_01/config.py und pico_sensor_02/config.py sind nicht mehr getrackt, ihre config.example.py-Dateien dagegen schon.",
+            ".gitignore schützt Pico-Secrets sowie instance/, backups/, tent_configs/ und tests.json.",
+            "Alle literalen render_template()-Ziele der aktiven Python-Routen werden gegen vorhandene Templates geprüft.",
+            "Alle getrackten Python-Dateien werden syntaktisch per ast.parse geprüft, ohne Hardwarezugriffe auszuführen.",
+            "app.py verwendet weiterhin apply_shutdown_restart_policy und registriert die aktive Profile- und Restart-Policy-Routenfamilie.",
+            "core/profile.py, profiles.json und routes/profile.py bleiben Bestandteil der Baseline.",
+            "install/activate_phase4t_without_old_shutdown.sh und tools/prepare_phase4t_restart.py bleiben für historische Upgradepfade erhalten.",
+            "install/growstar.service.in startet weiterhin Gunicorn mit app:flask_app und Restart=always.",
+            "services/network.py und install/growstar_network_helper.py bleiben ohne shell=True-Aufrufe.",
+            "python3 tests/regression/check_repository_baseline.py läuft nach dem vollständigen GitHub-Cleanup grün.",
+        ),
+    },
+    {
         "version": "3.7.10",
         "date": "2026-08-18",
         "phase": "4T.1",
