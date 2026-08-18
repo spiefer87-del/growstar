@@ -731,7 +731,7 @@ def update_current_wifi_password(ssid, password):
     return result
 
 def get_current_wifi_password(ssid):
-    """Liefert das gespeicherte PSK des aktuell verbundenen Personal-WLANs."""
+    """Prüft, ob die aktive Verbindung eine rücklesbare Passphrase besitzt."""
 
     ssid = _validate_ssid(ssid)
     permissions = network_permissions()
@@ -752,18 +752,27 @@ def get_current_wifi_password(ssid):
 
     if not result.get("success"):
         raise NetworkChangeError(
-            result.get("error") or "WLAN-Passwort konnte nicht gelesen werden"
+            result.get("error") or "WLAN-Zugangsdaten konnten nicht geprüft werden"
         )
 
-    password = result.get("password")
-    if not isinstance(password, str) or not password:
-        raise NetworkChangeError(
-            "NetworkManager liefert kein gespeichertes WLAN-Passwort"
-        )
+    credential_type = str(result.get("credential_type") or "unknown")
+    revealable = bool(result.get("revealable"))
 
-    return {
+    response = {
         "success": True,
         "ssid": ssid,
-        "password": password,
+        "credential_type": credential_type,
+        "revealable": revealable,
+        "credential_length": result.get("credential_length"),
     }
+
+    if revealable:
+        password = result.get("password")
+        if not isinstance(password, str) or not password:
+            raise NetworkChangeError(
+                "NetworkManager meldet eine Passphrase, liefert sie aber nicht"
+            )
+        response["password"] = password
+
+    return response
 
