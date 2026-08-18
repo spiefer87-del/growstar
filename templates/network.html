@@ -79,15 +79,15 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     <div>
       <a href="/grow-control" class="back">← Grow Control</a>
       <h1>🌐 Netzwerk</h1>
-      <div class="sub">Phase 4S.3.4 · WLAN-Secret & Systemdienst</div>
+      <div class="sub">Phase 4S.3.5 · WLAN-Credential korrekt erkennen</div>
     </div>
     <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
   </div>
 
   <div class="notice">
-    Das aktuell gespeicherte WLAN-Passwort bleibt standardmäßig maskiert und kann nur bewusst kurz eingeblendet werden.
-    Passwortänderung, Scan und Rollback bleiben unverändert abgesichert. Zusätzlich kann der Growstar-Gunicorn-
-    Systemdienst jetzt reproduzierbar aus dem Repository installiert werden.
+    Growstar unterscheidet jetzt zwischen einer tatsächlich gespeicherten WLAN-Passphrase und einem bereits
+    abgeleiteten 64-stelligen WPA-Schlüssel. Nur eine echte Passphrase kann eingeblendet werden; ein abgeleiteter
+    PSK wird nicht als vermeintliches Originalpasswort dargestellt oder an den Browser übertragen.
   </div>
 
   <div class="actions">
@@ -340,7 +340,7 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
             <div class="wifi-meta">${esc(item.security || "--")}</div>
             ${
               item.connected && canChangePassword
-                ? `<div class="wifi-secret">Passwort: <strong data-secret-index="${index}">••••••••••••</strong></div>`
+                ? `<div class="wifi-secret"><span data-secret-label-index="${index}">Passwort:</span> <strong data-secret-index="${index}">••••••••••••</strong></div>`
                 : ""
             }
           </div>
@@ -523,18 +523,19 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
   async function revealPassword(index){
     const item = lastNetworks[index];
     const target = document.querySelector(`[data-secret-index="${index}"]`);
+    const label = document.querySelector(`[data-secret-label-index="${index}"]`);
     const button = document.querySelector(`[data-reveal-index="${index}"]`);
 
-    if(!item || !target || !button || !writeReady) return;
+    if(!item || !target || !label || !button || !writeReady) return;
 
     const confirmed = window.confirm(
-      `Gespeichertes WLAN-Passwort für „${item.ssid}“ kurz anzeigen?`
+      `Gespeicherte WLAN-Zugangsdaten für „${item.ssid}“ prüfen?`
     );
     if(!confirmed) return;
 
     const oldLabel = button.textContent;
     button.disabled = true;
-    button.textContent = "Lade …";
+    button.textContent = "Prüfe …";
 
     try{
       const response = await fetch("/system/network/password/show", {
@@ -549,14 +550,31 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
       });
 
       const data = await response.json().catch(() => ({}));
-      if(!response.ok || !data.success || !data.password){
+      if(!response.ok || !data.success){
         throw new Error(data.error || `HTTP ${response.status}`);
       }
 
+      if(data.credential_type === "derived_psk" || data.revealable === false){
+        label.textContent = "WLAN-Schlüssel:";
+        target.textContent = "abgeleiteter PSK – Originalpasswort nicht auslesbar";
+        button.textContent = "Nicht auslesbar";
+        button.disabled = true;
+        button.onclick = null;
+        return;
+      }
+
+      if(!data.password){
+        throw new Error(
+          "NetworkManager meldet keine rücklesbare WLAN-Passphrase."
+        );
+      }
+
+      label.textContent = "Passwort:";
       target.textContent = data.password;
       button.textContent = "🙈 Verbergen";
 
       const hide = () => {
+        label.textContent = "Passwort:";
         target.textContent = "••••••••••••";
         button.textContent = oldLabel;
         button.disabled = false;
@@ -571,11 +589,14 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
       };
 
     }catch(error){
+      label.textContent = "Passwort:";
       target.textContent = "••••••••••••";
       button.textContent = oldLabel;
       button.disabled = false;
       button.onclick = null;
-      window.alert(error.message || "WLAN-Passwort konnte nicht geladen werden.");
+      window.alert(
+        error.message || "WLAN-Zugangsdaten konnten nicht geprüft werden."
+      );
     }
   }
 
