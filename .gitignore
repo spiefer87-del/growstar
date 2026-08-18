@@ -2,6 +2,24 @@ __pycache__/
 *.pyc
 *.db
 *.sqlite
+*.sqlite3
 logs/
 venv/
+.venv/
 .env
+.pytest_cache/
+.coverage
+
+# Growstar Laufzeitdaten – lokal, niemals Repository-Inhalt
+instance/
+backups/
+tent_configs/
+tests.json
+
+# Pico-Gerätecredentials – config.example.py bleibt versioniert
+pico_sensor_*/config.py
+
+# Editor-/OS-Reste
+*.swp
+*.bak
+.DS_Store
