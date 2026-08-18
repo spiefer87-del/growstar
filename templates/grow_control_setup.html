@@ -23,6 +23,11 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
 .toggle-row{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px}.toggle{display:flex;align-items:center;gap:7px;color:var(--text);font-size:.86rem}.toggle input{width:18px;height:18px}
 .actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.btn{border:0;border-radius:9px;padding:9px 12px;font-weight:750;cursor:pointer}.btn.primary{background:var(--green);color:#052e16}.btn.live-btn{background:#16a34a;color:white}.btn.shadow-btn{background:#7c3aed;color:white}.btn:disabled{opacity:.42;cursor:not-allowed}.feedback{min-height:20px;margin-top:10px;color:var(--muted);font-size:.8rem}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
 .preflight{margin-top:16px;padding:13px;border-radius:13px;background:rgba(15,23,42,.58);border:1px solid rgba(148,163,184,.13)}.preflight-title{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:.82rem;font-weight:800}.preflight-list{display:grid;gap:6px;margin-top:10px;font-size:.78rem}.pf-row{display:flex;justify-content:space-between;gap:12px;color:var(--muted)}.pf-row strong{color:var(--text);text-align:right}.pf-ok{color:#86efac!important}.pf-err{color:#fca5a5!important}.pf-muted{color:var(--muted)!important}.blockers{margin:10px 0 0;padding-left:18px;color:#fca5a5;font-size:.76rem;line-height:1.45}
+.setup-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin:0 0 20px}
+.setup-tool{display:block;padding:17px 18px;border:1px solid rgba(245,158,11,.24);border-radius:16px;background:linear-gradient(145deg,rgba(30,41,59,.95),rgba(15,23,42,.96));color:var(--text);text-decoration:none;box-shadow:0 8px 24px rgba(0,0,0,.18);transition:border-color .18s ease,transform .18s ease}
+.setup-tool:hover{border-color:rgba(245,158,11,.55);transform:translateY(-1px)}
+.setup-tool-head{display:flex;align-items:center;gap:10px;font-size:1rem;font-weight:800}
+.setup-tool-icon{font-size:1.35rem}.setup-tool p{margin:8px 0 0;color:var(--muted);font-size:.82rem;line-height:1.5}.setup-tool-action{margin-top:11px;color:#fcd34d;font-size:.78rem;font-weight:800}
 .add-card{margin-top:24px;background:rgba(30,41,59,.75);border:1px dashed rgba(148,163,184,.28);border-radius:18px;padding:18px}.add-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.add-grid .field label{margin-top:0}.section-title{margin:0 0 13px;font-size:1.05rem}
 @media(max-width:650px){body{padding:14px}.add-grid{grid-template-columns:1fr}.btn{width:100%}}
 </style>
@@ -41,6 +46,20 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         Nach einem Neustart startet eine gespeicherte LIVE-Station erneut sicher in <strong>ARMING</strong> und öffnet ihr
         Hardware-Gate erst nach einem neuen erfolgreichen Preflight.
     </div>
+
+    <section class="setup-tools" aria-label="Weitere Setup-Einstellungen">
+        <a class="setup-tool" href="{{ url_for('grow_control_restart_policy') }}">
+            <div class="setup-tool-head">
+                <span class="setup-tool-icon">🔁</span>
+                <span>Neustart-Verhalten</span>
+            </div>
+            <p>
+                Pro Station und Aktor festlegen, ob der physische Zustand bei einem
+                geordneten Growstar-Neustart beibehalten oder sicher AUS geschaltet wird.
+            </p>
+            <div class="setup-tool-action">Einstellen →</div>
+        </a>
+    </section>
 
     <div id="station-grid" class="grid"><div class="card">Stationen werden geladen …</div></div>
 
