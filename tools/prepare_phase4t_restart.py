@@ -1,6 +1,18 @@
 #!/usr/bin/env python3
 """Bereitet den einmaligen Wechsel von der alten Shutdown-Logik auf Phase 4T vor."""
 
+from pathlib import Path
+import sys
+
+
+# Direkter Aufruf über tools/ setzt sonst nur tools/ auf sys.path.
+# Das Projekt-Root muss vor allen core-/services-Imports verfügbar sein.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+project_root_text = str(PROJECT_ROOT)
+if project_root_text not in sys.path:
+    sys.path.insert(0, project_root_text)
+
+
 from core.runtime import init_runtimes, list_runtimes
 from core.tents import init_tents
 from services.restart_policy import apply_shutdown_restart_policy
