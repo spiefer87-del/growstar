@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -602,18 +603,30 @@ def _update_password(payload):
         new_password = ""
 
 
-def _get_password(payload):
-    """Liefert das PSK der aktuell verbundenen Personal-WLAN-Verbindung.
+def _credential_type(value):
+    """Klassifiziert den von NetworkManager gespeicherten WPA-Schlüssel."""
 
-    Diese Aktion wird nur auf ausdrückliche UI-Anforderung verwendet.
-    Das Secret wird nicht geloggt und nicht in Prozessargumenten übergeben.
+    value = str(value or "")
+
+    if re.fullmatch(r"[0-9A-Fa-f]{64}", value):
+        return "derived_psk"
+
+    return "passphrase"
+
+
+def _get_password(payload):
+    """Prüft das gespeicherte Secret der aktiven Personal-WLAN-Verbindung.
+
+    Ein 64-stelliger WPA-PSK ist bereits der aus der Passphrase abgeleitete
+    Schlüssel. Er wird bewusst NICHT als angebliches "Passwort" an Flask bzw.
+    den Browser zurückgegeben.
     """
 
     requested_ssid = str(payload.get("ssid") or "").strip()
 
     if not requested_ssid:
         raise HelperError("WLAN-Name fehlt")
-    if any(char in requested_ssid for char in ("\\x00", "\\n", "\\r")):
+    if any(char in requested_ssid for char in ("\x00", "\n", "\r")):
         raise HelperError("Ungültiger WLAN-Name")
 
     device = _wifi_device()
@@ -621,7 +634,7 @@ def _get_password(payload):
 
     if not current or current.get("ssid") != requested_ssid:
         raise HelperError(
-            "Das Passwort kann nur für das aktuell verbundene WLAN angezeigt werden"
+            "Das Passwort kann nur für das aktuell verbundene WLAN geprüft werden"
         )
 
     connection_name = current.get("connection")
@@ -636,16 +649,33 @@ def _get_password(payload):
             "Passwortanzeige wird nur für WPA/WPA2/WPA3-Personal unterstützt"
         )
 
-    password = _connection_psk(connection_name)
-    if not password:
+    stored_secret = _connection_psk(connection_name)
+    if not stored_secret:
         raise HelperError(
-            "NetworkManager liefert für diese Verbindung kein gespeichertes Passwort"
+            "NetworkManager liefert für diese Verbindung kein gespeichertes Secret"
         )
+
+    credential_type = _credential_type(stored_secret)
+
+    if credential_type == "derived_psk":
+        # Der abgeleitete Schlüssel ist ein gültiges WLAN-Credential, aber
+        # nicht die ursprüngliche Passphrase. Deshalb weder irreführend
+        # anzeigen noch unnötig an den Browser übertragen.
+        return {
+            "success": True,
+            "ssid": requested_ssid,
+            "credential_type": "derived_psk",
+            "revealable": False,
+            "credential_length": len(stored_secret),
+        }
 
     return {
         "success": True,
         "ssid": requested_ssid,
-        "password": password,
+        "credential_type": "passphrase",
+        "revealable": True,
+        "credential_length": len(stored_secret),
+        "password": stored_secret,
     }
 
 def main():
