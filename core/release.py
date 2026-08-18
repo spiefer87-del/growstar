@@ -15,6 +15,42 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.10",
+        "date": "2026-08-18",
+        "phase": "4T.1",
+        "title": "Phase-4T-Aktivierung und Setup-Einstieg korrigiert",
+        "summary": (
+            "Der einmalige Phase-4T-Migrationsweg kann das Vorbereitungsskript "
+            "jetzt zuverlässig direkt aus dem tools-Verzeichnis starten. "
+            "Zusätzlich ist das Neustart-Verhalten als sichtbare Unterkachel "
+            "im Grow-Control-Setup erreichbar."
+        ),
+        "changes": (
+            "tools/prepare_phase4t_restart.py ergänzt das Growstar-Projekt-Root vor allen core- und services-Imports selbst in sys.path.",
+            "Der direkte Aufruf des Vorbereitungsskripts benötigt dadurch keinen manuellen PYTHONPATH-Workaround mehr.",
+            "install/activate_phase4t_without_old_shutdown.sh übergibt zusätzlich explizit das erkannte PROJECT_DIR als PYTHONPATH.",
+            "Die bestehende Fehlerbehandlung des Aktivierungsskripts bleibt erhalten: Bei einem Fehler wird der zuvor eingefrorene alte Growstar-Prozess mit SIGCONT fortgesetzt.",
+            "Die Reihenfolge Freeze -> physische Restart-Policy -> alter Worker ohne historischen atexit-Shutdown beenden bleibt unverändert.",
+            "Im Grow-Control-Setup erscheint eine neue Unterkachel 'Neustart-Verhalten'.",
+            "Die Kachel führt auf die bereits vorhandene Seite /grow-control/setup/restart-policy.",
+            "Die Beschreibung erklärt direkt, dass pro Station und Aktor zwischen Zustand beibehalten und sicher AUS gewählt wird.",
+            "Die eigentliche Phase-4T-Restart-Policy, ihre sicheren Defaults und die Relay-Verifikation werden nicht verändert.",
+            "Gunicorn, systemd-Service, Netzwerkmanagement und Caddy werden durch 4T.1 nicht verändert.",
+        ),
+        "tests": (
+            "Projekt-Root-Bootstrap steht vor allen core-Imports im Vorbereitungsskript.",
+            "Vorbereitungsskript verwendet Path(__file__).resolve().parents[1] als Projekt-Root.",
+            "Aktivierungsskript setzt beim Aufruf zusätzlich PYTHONPATH auf das aus systemd erkannte PROJECT_DIR.",
+            "SIGCONT-Fallback bei Fehlern bleibt im Aktivierungsskript vorhanden.",
+            "SIGSTOP erfolgt weiterhin vor Policy-Vorbereitung und SIGKILL erst danach.",
+            "Grow-Control-Setup enthält die sichtbare Kachel 'Neustart-Verhalten'.",
+            "Die Setup-Kachel verlinkt über url_for('grow_control_restart_policy') auf die bestehende Restart-Policy-Seite.",
+            "Die bestehende Restart-Policy-Seite und API bleiben unverändert registriert.",
+            "python3 check_phase4t1_activation_setup.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.10 und Build-Kennung 4T.1.",
+        ),
+    },
+    {
         "version": "3.7.9",
         "date": "2026-08-18",
         "phase": "4T",
