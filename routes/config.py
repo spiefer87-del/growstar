@@ -91,6 +91,8 @@ def register(app):
 
         return jsonify(result)
 
+    # Prüft erst, ob NetworkManager eine Passphrase oder nur einen
+    # abgeleiteten 64-Hex-PSK gespeichert hat.
     @app.route("/system/network/password/show", methods=["POST"])
     @permission_required("settings.manage")
     def system_network_password_show():
