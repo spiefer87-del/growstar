@@ -21,8 +21,7 @@ from core.runtime import (
     list_runtimes,
     resolve_runtime,
 )
-from core.actuators import set_device
-from core.devices import DEVICE_NAMES
+from core.hardware_assignments import DEVICE_HARDWARE, device_display_label
 from core.release import GROWSTAR_VERSION
 
 from services.watchdog import log_event, watchdog_loop
@@ -35,6 +34,7 @@ from threads.hardware import hardware_loop
 from threads.blu import start_blu_thread
 from services.hardware_recovery import start_hardware_recovery_thread
 from services.live_control import live_arming_loop
+from services.restart_policy import apply_shutdown_restart_policy
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.plant_management import register as register_plant_management_routes
@@ -53,6 +53,7 @@ from routes.tents import register as register_tent_routes
 from routes.auth import register as register_auth_routes
 from routes.admin import register as register_admin_routes
 from routes.release import register as register_release_routes
+from routes.restart_policy import register as register_restart_policy_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -131,6 +132,7 @@ def create_flask_app():
     register_hardware_routes(app)
     register_sensor_routes(app)
     register_tent_routes(app)
+    register_restart_policy_routes(app)
 
     # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
     install_auth(app)
@@ -170,37 +172,34 @@ def _start_daemon_thread(name, target):
 
 
 def _sync_all_relays(runtime=None):
+    """Seedet vor dem Thread-Start jeden zugeordneten Aktor aus der Hardware.
+
+    Das ist für RESTART_POLICY=KEEP entscheidend: Growstar übernimmt den
+    physischen Zustand, bevor Failsafe oder Regelkreis irgendeinen Soll/Ist-
+    Vergleich durchführen. Phase 4T bezieht dabei erstmals auch AUX1..AUX4 ein.
+    """
+
     rt = resolve_runtime(runtime)
     cfg = rt.config
 
-    relay_definitions = (
-        ("🔥 Heizung", "IP_HEATING", "RELAY_HEATING", "heating_on", "heating"),
-        ("💨 Lüfter", "IP_FAN", "RELAY_FAN", "fan_on", "fan"),
-        ("💡 Licht", "IP_LIGHT", "RELAY_LIGHT", "light_on", "light"),
-        ("🌀 Ventilator", "IP_VENT", "RELAY_VENT", "vent_on", "vent"),
-        ("🚿 Bewässerung", "IP_IRRIGATION", "RELAY_IRRIGATION", "irrigation_on", "irrigation"),
-        ("💧 Luftbefeuchter", "IP_HUMIDIFIER", "RELAY_HUMIDIFIER", "humidifier_on", "humidifier"),
-        ("🌵 Luftentfeuchter", "IP_DEHUMIDIFIER", "RELAY_DEHUMIDIFIER", "dehumidifier_on", "dehumidifier"),
-        ("💡 Licht 2", "IP_LIGHT2", "RELAY_LIGHT2", "light2_on", "light2"),
-        ("🌀 Ventilator 2", "IP_VENT2", "RELAY_VENT2", "vent2_on", "vent2"),
-    )
+    for device, meta in DEVICE_HARDWARE.items():
+        ip = cfg.get(meta["ip_key"])
+        relay = cfg.get(meta["relay_key"])
 
-    for label, ip_key, relay_key, state_attr, device_key in relay_definitions:
-        ip = cfg.get(ip_key)
-        relay = cfg.get(relay_key)
-
-        # Zusätzliche Zelte dürfen in späteren Phasen zunächst unvollständig
-        # konfiguriert sein. Für tent_1 ändert sich bei vollständiger Config
-        # nichts; fehlende Hardware wird nur sauber übersprungen.
         if not ip or relay is None:
             continue
+
+        label = (
+            f"{meta.get('icon') or ''} "
+            f"{device_display_label(cfg, device)}"
+        ).strip()
 
         sync_relay(
             label,
             ip,
             relay,
-            state_attr,
-            device_key,
+            f"{device}_on",
+            device,
             runtime=rt,
         )
 
@@ -315,7 +314,7 @@ def start_backend():
 
 
 def shutdown_backend():
-    """Führt beim geordneten Prozessende den bisherigen Not-Aus aus."""
+    """Wendet beim geordneten Prozessende die stationsbezogene Restart-Policy an."""
 
     global _backend_started
 
@@ -326,21 +325,44 @@ def shutdown_backend():
         _backend_started = False
         print("🛑 Grow-Backend wird beendet")
 
-        # Every actually armed LIVE runtime gets the same controlled shutdown.
-        # Shadow/ARMING runtimes cannot write hardware through core.actuators.
-        # All known devices are driven OFF so later-added local stations do not
-        # depend on the historical heating/fan/vent-only shutdown list.
         for runtime in list_runtimes():
             if not runtime.control_enabled:
                 continue
 
-            for device in DEVICE_NAMES:
-                try:
-                    set_device(device, False, runtime=runtime)
-                except Exception as exc:
+            # Controller-/Safety-Threads dürfen während des Shutdowns nicht
+            # gegen die explizite Restart-Policy arbeiten.
+            runtime.disarming = True
+
+            try:
+                result = apply_shutdown_restart_policy(
+                    runtime,
+                    verify=True,
+                )
+            except Exception as exc:
+                print(
+                    f"⚠️ [{runtime.tent_id}] Restart-Policy fehlgeschlagen:",
+                    exc,
+                )
+                continue
+
+            for item in result.get("devices", {}).values():
+                if not item.get("configured"):
+                    continue
+
+                if item.get("action") == "KEEP":
                     print(
-                        f"⚠️ [{runtime.tent_id}] Shutdown {device} fehlgeschlagen:",
-                        exc,
+                        f"↔️ [{runtime.tent_id}] "
+                        f"{item.get('label')}: Zustand beibehalten"
+                    )
+                elif item.get("error"):
+                    print(
+                        f"⚠️ [{runtime.tent_id}] "
+                        f"{item.get('label')}: {item.get('error')}"
+                    )
+                else:
+                    print(
+                        f"🛑 [{runtime.tent_id}] "
+                        f"{item.get('label')}: sicher AUS"
                     )
 
 
