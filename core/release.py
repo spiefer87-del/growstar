@@ -15,6 +15,43 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.7.8",
+        "date": "2026-08-17",
+        "phase": "4S.3.5",
+        "title": "Abgeleiteten WLAN-PSK nicht mehr als Originalpasswort anzeigen",
+        "summary": (
+            "Growstar unterscheidet jetzt zuverlässig zwischen einer gespeicherten "
+            "WLAN-Passphrase und einem bereits abgeleiteten 64-stelligen WPA-PSK. "
+            "Ein abgeleiteter Schlüssel wird nicht mehr irreführend als Passwort "
+            "angezeigt und nicht an den Browser übertragen."
+        ),
+        "changes": (
+            "Der Netzwerk-Helper klassifiziert gespeicherte WPA-Credentials als Passphrase oder 64-stelligen Hex-PSK.",
+            "Ein 64-stelliger Hex-PSK wird als derived_psk erkannt.",
+            "Bei derived_psk gibt der Helper ausschließlich Metadaten zurück und niemals den vollständigen WLAN-Schlüssel.",
+            "Die Growstar-API überträgt den abgeleiteten PSK deshalb nicht an den Browser.",
+            "Die Netzwerkseite zeigt bei derived_psk klar 'Originalpasswort nicht auslesbar' statt eines falschen Passworts.",
+            "Nur wenn NetworkManager tatsächlich eine Passphrase speichert, kann 'Passwort anzeigen' weiterhin den Klartext kurz einblenden.",
+            "Die automatische 15-Sekunden-Maskierung für rücklesbare Passphrasen bleibt erhalten.",
+            "Passwort ändern, WLAN-Wechsel, Scan, Rollback und der privilegierte Netzwerk-Helper bleiben ansonsten unverändert.",
+            "Die SSID-Prüfung der get_password-Aktion behandelt Steuerzeichen wieder korrekt statt nach literalen Escape-Strings zu suchen.",
+            "Growstar liest Netplan nicht zusätzlich nach Klartext-Secrets aus; auf dem getesteten Raspberry enthält Netplan ebenfalls nur denselben abgeleiteten 64-Hex-PSK.",
+            "Gunicorn-, systemd- und Caddy-Konfigurationen werden durch diesen Patch nicht verändert.",
+            "Der Netzwerk-Helper muss nach git pull erneut mit dem bestehenden Installer nach /usr/local/libexec kopiert werden.",
+        ),
+        "tests": (
+            "Ein simuliertes 64-stelliges Hex-Credential wird als derived_psk erkannt.",
+            "Bei derived_psk enthält die Helper-Antwort kein password-Feld.",
+            "Der Webservice gibt derived_psk-Metadaten weiter, ohne ein Secret zu verlangen.",
+            "Die Netzwerkseite zeigt für derived_psk 'Originalpasswort nicht auslesbar'.",
+            "Eine normale simulierte Passphrase bleibt revealable und kann weiterhin angezeigt werden.",
+            "Eine Passphrase wird nach 15 Sekunden weiterhin automatisch maskiert.",
+            "Nicht aktive SSIDs und nicht unterstützte WLAN-Sicherheitsarten bleiben für die Credential-Abfrage gesperrt.",
+            "python3 check_phase4s35_wifi_credential_type.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.8 und Build-Kennung 4S.3.5.",
+        ),
+    },
+    {
         "version": "3.7.7",
         "date": "2026-08-17",
         "phase": "4S.3.4",
