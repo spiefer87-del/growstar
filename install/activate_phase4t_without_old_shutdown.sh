@@ -41,7 +41,7 @@ trap resume_old_service ERR
 echo "===== 2/4 NEUE RESTART-POLICY PHYSISCH VORBEREITEN ====="
 (
     cd "${PROJECT_DIR}"
-    sudo -u "${SERVICE_USER}" python3 "${PREPARE}"
+    sudo -u "${SERVICE_USER}" env         PYTHONPATH="${PROJECT_DIR}${PYTHONPATH:+:${PYTHONPATH}}"         python3 "${PREPARE}"
 )
 
 echo "===== 3/4 ALTEN WORKER OHNE ALTEN AEXIT-SHUTDOWN BEENDEN ====="
