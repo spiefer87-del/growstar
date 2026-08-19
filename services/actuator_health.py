@@ -7,7 +7,7 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 
-from core.actuators import get_shelly_relay_state
+from core.actuators import probe_shelly_relay_state
 from core.hardware.actuator_health import (
     mark_poll_finished,
     mark_poll_started,
@@ -19,6 +19,13 @@ from core.runtime import list_runtimes
 
 ACTUATOR_PROBE_TIMEOUT_SEC = 1.5
 ACTUATOR_PROBE_WORKERS = 4
+
+# Phase 4V.4:
+# Ein einmaliger Kommunikationsaussetzer wird nicht sofort als Hardware-
+# Failsafe in den zentralen Health-Cache geschrieben. Erst wenn auch der
+# zweite read-only Statusversuch fehlschlägt, bleibt der Endpunkt "offline".
+ACTUATOR_PROBE_RETRIES = 1
+ACTUATOR_PROBE_RETRY_DELAY_SEC = 0.25
 
 
 def collect_assigned_endpoints(runtimes=None):
@@ -57,24 +64,77 @@ def collect_assigned_endpoints(runtimes=None):
     return list(endpoints.values())
 
 
-def _default_probe(host, relay, timeout):
+def _default_probe(
+    host,
+    relay,
+    timeout,
+    *,
+    retries=ACTUATOR_PROBE_RETRIES,
+    retry_delay=ACTUATOR_PROBE_RETRY_DELAY_SEC,
+):
     started = time.monotonic()
-    state = get_shelly_relay_state(host, relay, timeout=timeout)
-    latency_ms = (time.monotonic() - started) * 1000.0
+    retries = max(0, int(retries))
+    attempts = []
+    last_result = None
 
-    if isinstance(state, bool):
-        return {
-            "reachable": True,
-            "actual_state": state,
-            "error": None,
-            "latency_ms": latency_ms,
-        }
+    for attempt_index in range(retries + 1):
+        result = probe_shelly_relay_state(
+            host,
+            relay,
+            timeout=timeout,
+        )
+        result = dict(result or {})
+        last_result = result
+
+        if (
+            result.get("reachable")
+            and isinstance(result.get("actual_state"), bool)
+        ):
+            if attempt_index > 0:
+                print(
+                    "♻️ Aktor-Health Retry erfolgreich: "
+                    f"{host} Relay {relay} nach {attempt_index + 1} Versuchen"
+                )
+
+            return {
+                "reachable": True,
+                "actual_state": result["actual_state"],
+                "error": None,
+                "latency_ms": (time.monotonic() - started) * 1000.0,
+                "attempts": attempt_index + 1,
+                "protocol": result.get("protocol"),
+            }
+
+        attempts.append(
+            str(result.get("error") or "Keine verwertbare Shelly-Antwort")
+        )
+
+        if attempt_index < retries:
+            time.sleep(max(0.0, float(retry_delay)))
+
+    if len(attempts) <= 1:
+        error = attempts[-1] if attempts else "Keine verwertbare Shelly-Antwort"
+    elif len(set(attempts)) == 1:
+        error = (
+            f"{len(attempts)} Versuche fehlgeschlagen · "
+            f"{attempts[-1]}"
+        )
+    else:
+        error = (
+            f"{len(attempts)} Versuche fehlgeschlagen · "
+            + " · ".join(
+                f"{index + 1}) {value}"
+                for index, value in enumerate(attempts)
+            )
+        )
 
     return {
         "reachable": False,
         "actual_state": None,
-        "error": "Keine Antwort / ungültiger Relay-Status",
-        "latency_ms": latency_ms,
+        "error": error,
+        "latency_ms": (time.monotonic() - started) * 1000.0,
+        "attempts": len(attempts),
+        "protocol": None if last_result is None else last_result.get("protocol"),
     }
 
 

@@ -2,6 +2,8 @@
 
 import requests
 
+import core.context as ctx
+
 from core.runtime import resolve_runtime
 from core.actuators import switch_shelly, get_shelly_relay_state
 from core.hardware_assignments import DEVICE_HARDWARE
@@ -32,8 +34,11 @@ def run_failsafe(runtime=None):
 
 def shelly_set(ip, relay, on):
     try:
-        url = f"http://{ip}/relay/{relay}?turn={'on' if on else 'off'}"
-        requests.get(url, timeout=3)
+        # Legacy-Gen1-Helfer bleibt ebenfalls im zentralen Shelly-
+        # Transport-Lock. Der reguläre Aktorpfad nutzt switch_shelly().
+        with ctx.shelly_lock:
+            url = f"http://{ip}/relay/{relay}?turn={'on' if on else 'off'}"
+            requests.get(url, timeout=3)
         return True
     except Exception as exc:
         print(f"❌ Shelly SET Fehler {ip} R{relay}: {exc}")
