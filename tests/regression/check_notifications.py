@@ -34,12 +34,22 @@ def load_module(name, rel):
 def install_alert_stubs():
     runtime = types.ModuleType("core.runtime")
 
+    class FakeState:
+        live_state = {
+            "temp_target": 20.0,
+            "hum_target": 60.0,
+        }
+
     class FakeRuntime:
         config = {
             "MIN_TEMP": 12.0,
             "MAX_TEMP": 30.0,
-            "MAX_HUM": 75.0,
+            "MIN_HUM": 30.0,
+            "MAX_HUM": 80.0,
+            "TEMP_ALERT_TOL": 5.0,
+            "HUM_ALERT_TOL": 10.0,
         }
+        state = FakeState()
 
     runtime.get_runtime = lambda tent_id: FakeRuntime()
     sys.modules["core.runtime"] = runtime
@@ -64,6 +74,9 @@ def main():
     for rel in (
         "app.py",
         "core/release.py",
+        "core/config.py",
+        "core/environment_limits.py",
+        "core/config_update.py",
         "services/telegram.py",
         "services/notification_settings.py",
         "services/notifications.py",
@@ -88,6 +101,61 @@ def main():
         feature_release is not None,
         "Feature-Release 3.9.0 / Phase 4V bleibt in den Patch Notes dokumentiert",
     )
+
+    thresholds_release = next(
+        (
+            item
+            for item in release.RELEASES
+            if item.get("version") == "3.9.2"
+            and item.get("phase") == "4V.2"
+        ),
+        None,
+    )
+    require(
+        thresholds_release is not None,
+        "Feature-Release 3.9.2 / Phase 4V.2 ist in den Patch Notes dokumentiert",
+    )
+
+    env_limits = load_module(
+        "growstar_environment_limits",
+        "core/environment_limits.py",
+    )
+    valid_limits = env_limits.validate_environment_limits({
+        "MIN_TEMP": 12.0,
+        "MAX_TEMP": 30.0,
+        "MIN_HUM": 30.0,
+        "MAX_HUM": 80.0,
+        "TEMP_ALERT_TOL": 5.0,
+        "HUM_ALERT_TOL": 10.0,
+        "DAY_TEMP_TOL": 2.0,
+        "NIGHT_TEMP_TOL": 2.0,
+        "DAY_HUM_TOL": 5.0,
+        "NIGHT_HUM_TOL": 5.0,
+    })
+    require(
+        valid_limits["temp_alert_tol"] == 5.0
+        and valid_limits["hum_alert_tol"] == 10.0,
+        "Getrennte Temperatur-/Feuchte-Alarmtoleranzen werden validiert",
+    )
+
+    try:
+        env_limits.validate_environment_limits({
+            "MIN_TEMP": 30.0,
+            "MAX_TEMP": 20.0,
+            "MIN_HUM": 30.0,
+            "MAX_HUM": 80.0,
+            "TEMP_ALERT_TOL": 5.0,
+            "HUM_ALERT_TOL": 10.0,
+            "DAY_TEMP_TOL": 2.0,
+            "NIGHT_TEMP_TOL": 2.0,
+            "DAY_HUM_TOL": 5.0,
+            "NIGHT_HUM_TOL": 5.0,
+        })
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("Ungültige MIN_TEMP/MAX_TEMP-Kombination wurde akzeptiert")
+    print("✅ Ungültige absolute Temperaturgrenzen werden blockiert")
 
     telegram = load_module("growstar_390_telegram", "services/telegram.py")
     require(
@@ -184,6 +252,48 @@ def main():
         "Stale Temperatursensor erzeugt stabilen Alarm-Key",
     )
 
+    within_alert_band = dict(base_station)
+    within_alert_band["temperature"] = dict(base_station["temperature"])
+    within_alert_band["temperature"]["value"] = 24.9
+    candidates = alerts.extract_alarm_candidates({
+        "stations": [within_alert_band],
+        "controller": {"threads": {}, "mqtt": {"stale": False}},
+    })
+    require(
+        "station:tent_1:sensor:temperature:limit" not in candidates,
+        "20 °C Soll mit ±5 °C Alarmtoleranz alarmiert bei 24.9 °C noch nicht",
+    )
+
+    relative_high = dict(base_station)
+    relative_high["temperature"] = dict(base_station["temperature"])
+    relative_high["temperature"]["value"] = 25.0
+    candidates = alerts.extract_alarm_candidates({
+        "stations": [relative_high],
+        "controller": {"threads": {}, "mqtt": {"stale": False}},
+    })
+    relative_item = candidates.get("station:tent_1:sensor:temperature:limit")
+    require(
+        relative_item is not None
+        and relative_item["severity"] == "error"
+        and "Alarmtoleranz ±5.0 °C" in relative_item["detail"],
+        "20 °C Soll mit ±5 °C Alarmtoleranz alarmiert ab 25.0 °C",
+    )
+
+    hum_relative_high = dict(base_station)
+    hum_relative_high["humidity"] = dict(base_station["humidity"])
+    hum_relative_high["humidity"]["value"] = 70.0
+    candidates = alerts.extract_alarm_candidates({
+        "stations": [hum_relative_high],
+        "controller": {"threads": {}, "mqtt": {"stale": False}},
+    })
+    hum_item = candidates.get("station:tent_1:sensor:humidity:limit")
+    require(
+        hum_item is not None
+        and hum_item["severity"] == "error"
+        and "Alarmtoleranz ±10.0 %" in hum_item["detail"],
+        "60 % Soll mit ±10 % Alarmtoleranz alarmiert ab 70 %",
+    )
+
     high = dict(base_station)
     high["temperature"] = dict(base_station["temperature"])
     high["temperature"]["value"] = 31.5
@@ -272,6 +382,48 @@ def main():
         and "Chat finden" in template
         and "Testnachricht senden" in template,
         "Benachrichtigungsseite enthält den vollständigen Telegram-Setupfluss",
+    )
+
+    climate_template = read("templates/settings.html")
+    require(
+        "TEMP_ALERT_TOL" in climate_template
+        and "HUM_ALERT_TOL" in climate_template
+        and "MIN_HUM" in climate_template
+        and "MAX_HUM" in climate_template,
+        "Stations-Setup enthält Alarmtoleranzen sowie MIN/MAX-Grenzen",
+    )
+    require(
+        "Regel-Toleranz" in climate_template
+        and "Alarm-Toleranz" in climate_template
+        and "Absolute Schutzgrenze" in climate_template,
+        "Setup erklärt die drei Ebenen Sollwert, Regelung und Alarm",
+    )
+
+    setup_template = read("templates/grow_control_setup.html")
+    require(
+        "Klima & Grenzwerte" in setup_template
+        and "/grow-control/tents/${encodeURIComponent(t.id)}/settings" in setup_template,
+        "Grow-Control-Setup verlinkt jede Station direkt zu Klima & Grenzwerte",
+    )
+
+    notification_template = read("templates/notifications.html")
+    require(
+        "Sensorabweichung & Grenzwerte" in notification_template,
+        "Notification-Regel beschreibt relative Abweichung und absolute Grenzen",
+    )
+
+    config_source = read("core/config.py")
+    require(
+        '"TEMP_ALERT_TOL": 5.0' in config_source
+        and '"HUM_ALERT_TOL": 10.0' in config_source
+        and '"MIN_HUM": 0.0' in config_source,
+        "Sichere rückwärtskompatible Alarm-Defaults sind definiert",
+    )
+
+    config_update_source = read("core/config_update.py")
+    require(
+        "validate_environment_limits(working)" in config_update_source,
+        "Config-Updates validieren Klima-/Alarmgrenzen atomar vor dem Commit",
     )
 
     print(f"✅ Growstar Alarm & Notifications vollständig · aktuell {release.GROWSTAR_VERSION} / Phase {release.GROWSTAR_INTERNAL_PHASE}")
