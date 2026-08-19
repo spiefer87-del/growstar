@@ -15,6 +15,50 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.4",
+        "date": "2026-08-19",
+        "phase": "4V.4",
+        "title": "Shelly-RPC koordiniert und Aktor-Health gegen Einzelaussetzer gehärtet",
+        "summary": (
+            "Shelly-Inventar, BLE-RPC, Aktor-Schaltungen, Relay-Statusprüfungen "
+            "und der bereits bestehende Energy/Failsafe-Zyklus teilen jetzt "
+            "denselben reentranten Transport-Lock. Ein einzelner kurzzeitiger "
+            "Relay-Read-Fehler löst außerdem nicht mehr sofort einen "
+            "Safety-relevanten Offline-Eintrag aus."
+        ),
+        "changes": (
+            "Der bestehende controllerweite shelly_lock wird von Lock auf RLock umgestellt, damit bereits geschützte Background-Zyklen sicher in geschützte Shelly-Helfer eintreten können.",
+            "ShellyAPI.call serialisiert Inventar-, BLE- und weitere RPC-Aufrufe mit demselben Shelly-Transport-Lock.",
+            "switch_shelly serialisiert Gen2-Schaltungen und den Gen1-Fallback mit demselben Transport-Lock.",
+            "Die read-only Relay-Statusermittlung läuft ebenfalls unter dem Transport-Lock und kann damit nicht mehr gleichzeitig mit BLE-/Inventar-RPC oder regulären Relay-Schaltungen feuern.",
+            "Der bestehende Energy- und Relay-Failsafe-Background war bereits durch ctx.shelly_lock geschützt und ist durch die gemeinsame Lock-Nutzung nun mit Hardware-, BLE- und Aktor-RPC koordiniert.",
+            "Der Legacy-Helfer services.shelly.shelly_set verwendet ebenfalls den zentralen Transport-Lock.",
+            "Neue probe_shelly_relay_state-Diagnostik unterscheidet unter anderem Timeout, Verbindungsfehler, HTTP-Status, ungültiges JSON, fehlendes output/ison und ungültige Relay-Bereiche.",
+            "get_shelly_relay_state bleibt als rückwärtskompatibler bool/None-Wrapper erhalten.",
+            "Der zentrale Aktor-Health-Poll wiederholt einen fehlgeschlagenen read-only Relay-Status nach 250 ms genau einmal.",
+            "Erst wenn auch der zweite Versuch fehlschlägt, wird der Endpunkt als nicht erreichbar in den Safety-relevanten Health-Cache geschrieben.",
+            "Ein beim zweiten Versuch wieder erreichbarer Shelly erzeugt keinen Offline-Health-Eintrag und damit keinen daraus resultierenden Safety-Failsafe.",
+            "Bei einem echten zweifachen Ausfall bleibt die bestehende Safety-Reaktion unverändert aktiv.",
+            "Der Health-Fehlertext enthält nach endgültigem Fehlschlag den konkreten Diagnosegrund statt nur 'Keine Antwort / ungültiger Relay-Status'.",
+            "Der Aktor-Health-Poll bleibt vollständig read-only; der Retry sendet niemals Switch.Set oder Gen1-turn-Befehle.",
+            "Regelung, Restart-Policy, Alarmgrenzen, Telegram-Deduplizierung und Benutzeroberfläche werden durch Phase 4V.4 nicht verändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist GitHub main Commit 1c38ff6367477e47421a3f0ab9cc66485fde4f54 mit Growstar 3.9.3 / Phase 4V.3.",
+            "Der aktuelle core/release.py-Blob wurde vor der Patch-Erzeugung gegen SHA adaf2260f016c501cda335455ab5df0da651dac1 verifiziert.",
+            "Der zentrale Shelly-Lock ist reentrant und kann im selben Thread verschachtelt betreten werden.",
+            "Parallel gestartete kritische Abschnitte werden durch den gemeinsamen Shelly-Lock serialisiert.",
+            "ShellyAPI.call, switch_shelly, Relay-Statusprobe und Legacy-shelly_set verwenden den gemeinsamen Transport-Lock.",
+            "Ein simuliert fehlgeschlagener erster Aktor-Health-Read mit anschließend erfolgreichem zweiten Read bleibt erreichbar und erzeugt keinen Offline-Eintrag.",
+            "Ein simuliert zweifach fehlgeschlagener Read bleibt offline und transportiert den konkreten Diagnosegrund.",
+            "Die diagnostische Relay-Probe liefert bei einem gültigen Gen2-output einen booleschen Istzustand.",
+            "Ein simulierter Timeout wird als Timeout-Diagnose statt als generischer ungültiger Relay-Status gemeldet.",
+            "Der Aktor-Health-Code enthält weiterhin keinen Switch.Set- oder turn=-Schreibpfad.",
+            "Bestehende Notification- und Repository-Baseline-Regressionen bleiben zusätzlich ausführbar.",
+            "core/release.py meldet Version 3.9.4 und Build-Kennung 4V.4.",
+        ),
+    },
+    {
         "version": "3.9.3",
         "date": "2026-08-19",
         "phase": "4V.3",

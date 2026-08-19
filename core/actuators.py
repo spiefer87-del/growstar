@@ -2,87 +2,175 @@
 
 import requests
 
+import core.context as ctx
+
 from core.runtime import resolve_runtime
+
+
+def _request_error(stage, exc, timeout):
+    """Klassifiziert Shelly-Transportfehler für Health/Safety-Diagnosen."""
+
+    if isinstance(exc, requests.Timeout):
+        return f"{stage}: Timeout nach {float(timeout):.1f}s"
+
+    if isinstance(exc, requests.ConnectionError):
+        return f"{stage}: Verbindungsfehler: {exc}"
+
+    if isinstance(exc, requests.RequestException):
+        return f"{stage}: Netzwerkfehler: {exc}"
+
+    return f"{stage}: unerwarteter Fehler: {exc}"
 
 
 def switch_shelly(ip, relay, enabled, timeout=3):
     relay = int(relay)
 
-    # =========================
-    # Gen2 / Pro API
-    # =========================
-    try:
-        url = f"http://{ip}/rpc/Switch.Set"
-        payload = {
-            "id": relay,
-            "on": bool(enabled),
-        }
+    # Phase 4V.4:
+    # Eine komplette Relay-Schaltoperation (Gen2 + möglicher Gen1-Fallback)
+    # bleibt gegenüber allen anderen regulären Shelly-HTTP-Zugriffen atomar.
+    with ctx.shelly_lock:
 
-        response = requests.post(url, json=payload, timeout=timeout)
-        if response.status_code == 200:
-            return True
+        # =========================
+        # Gen2 / Pro API
+        # =========================
+        try:
+            url = f"http://{ip}/rpc/Switch.Set"
+            payload = {
+                "id": relay,
+                "on": bool(enabled),
+            }
 
-    except Exception:
-        pass
+            response = requests.post(url, json=payload, timeout=timeout)
+            if response.status_code == 200:
+                return True
 
-    # =========================
-    # Gen1 Fallback
-    # =========================
-    try:
-        url = f"http://{ip}/relay/{relay}?turn={'on' if enabled else 'off'}"
-        response = requests.get(url, timeout=timeout)
+        except Exception:
+            pass
 
-        if response.status_code == 200:
-            return True
+        # =========================
+        # Gen1 Fallback
+        # =========================
+        try:
+            url = f"http://{ip}/relay/{relay}?turn={'on' if enabled else 'off'}"
+            response = requests.get(url, timeout=timeout)
 
-    except Exception as exc:
-        print(f"❌ Shelly Fehler {ip} Relay {relay}:", exc)
+            if response.status_code == 200:
+                return True
+
+        except Exception as exc:
+            print(f"❌ Shelly Fehler {ip} Relay {relay}:", exc)
 
     return False
 
 
-def get_shelly_relay_state(ip, relay, timeout=3):
+def probe_shelly_relay_state(ip, relay, timeout=3):
+    """Liest einen Relay-Status read-only und liefert einen Diagnose-Datensatz.
+
+    Rückgabe:
+        {
+            "reachable": bool,
+            "actual_state": bool | None,
+            "error": str | None,
+            "protocol": "gen2" | "gen1" | None,
+        }
+
+    Die bestehende öffentliche Funktion get_shelly_relay_state() bleibt als
+    bool/None-Wrapper erhalten, damit ältere Aufrufer unverändert funktionieren.
+    """
+
     relay = int(relay)
+    errors = []
 
-    # ---------- Gen2 / Strip / Pro ----------
-    try:
-        url = f"http://{ip}/rpc/Switch.GetStatus?id={relay}"
-        response = requests.get(url, timeout=timeout)
+    # Eine komplette Statusermittlung bleibt gegenüber anderen regulären
+    # Shelly-HTTP-Requests atomar. Das verhindert insbesondere Kollisionen
+    # zwischen BLE/Inventar-RPC und dem Safety-relevanten Aktor-Health.
+    with ctx.shelly_lock:
 
-        if response.status_code != 200:
-            return None
+        # ---------- Gen2 / Strip / Pro ----------
+        try:
+            url = f"http://{ip}/rpc/Switch.GetStatus?id={relay}"
+            response = requests.get(url, timeout=timeout)
 
-        data = response.json()
-        if not isinstance(data, dict):
-            return None
-        if "output" not in data:
-            return None
-        if not isinstance(data["output"], bool):
-            return None
+            if response.status_code != 200:
+                errors.append(f"Gen2: HTTP {response.status_code}")
+            else:
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    errors.append(f"Gen2: ungültiges JSON: {exc}")
+                else:
+                    if not isinstance(data, dict):
+                        errors.append("Gen2: JSON-Antwort ist kein Objekt")
+                    elif "output" not in data:
+                        errors.append("Gen2: Feld 'output' fehlt")
+                    elif not isinstance(data["output"], bool):
+                        errors.append("Gen2: Feld 'output' ist kein bool")
+                    else:
+                        return {
+                            "reachable": True,
+                            "actual_state": data["output"],
+                            "error": None,
+                            "protocol": "gen2",
+                        }
 
-        return data["output"]
+        except Exception as exc:
+            errors.append(_request_error("Gen2", exc, timeout))
 
-    except Exception:
-        pass
+        # ---------- Gen1 Fallback ----------
+        try:
+            url = f"http://{ip}/status"
+            response = requests.get(url, timeout=timeout)
 
-    # ---------- Gen1 Fallback ----------
-    try:
-        url = f"http://{ip}/status"
-        response = requests.get(url, timeout=timeout)
+            if response.status_code != 200:
+                errors.append(f"Gen1: HTTP {response.status_code}")
+            else:
+                try:
+                    data = response.json()
+                except ValueError as exc:
+                    errors.append(f"Gen1: ungültiges JSON: {exc}")
+                else:
+                    relays = data.get("relays") if isinstance(data, dict) else None
 
-        if response.status_code != 200:
-            return None
+                    if not isinstance(relays, list):
+                        errors.append("Gen1: Feld 'relays' fehlt/ist ungültig")
+                    elif relay < 0 or relay >= len(relays):
+                        errors.append(
+                            f"Gen1: Relay {relay} außerhalb des gültigen Bereichs"
+                        )
+                    else:
+                        raw_state = relays[relay].get("ison")
+                        if not isinstance(raw_state, bool):
+                            errors.append("Gen1: Feld 'ison' ist kein bool")
+                        else:
+                            return {
+                                "reachable": True,
+                                "actual_state": raw_state,
+                                "error": None,
+                                "protocol": "gen1",
+                            }
 
-        data = response.json()
-        if "relays" not in data:
-            return None
-        if relay >= len(data["relays"]):
-            return None
+        except Exception as exc:
+            errors.append(_request_error("Gen1", exc, timeout))
 
-        return bool(data["relays"][relay].get("ison", False))
+    return {
+        "reachable": False,
+        "actual_state": None,
+        "error": " | ".join(errors) or "Keine verwertbare Shelly-Antwort",
+        "protocol": None,
+    }
 
-    except Exception:
-        return None
+
+def get_shelly_relay_state(ip, relay, timeout=3):
+    result = probe_shelly_relay_state(
+        ip,
+        relay,
+        timeout=timeout,
+    )
+
+    if result.get("reachable") and isinstance(result.get("actual_state"), bool):
+        return result["actual_state"]
+
+    return None
 
 
 # =========================================
