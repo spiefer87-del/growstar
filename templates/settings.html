@@ -2,371 +2,290 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Profileinstellungen – {{ tent_name }}</title>
+<title>Klima & Profileinstellungen – {{ tent_name }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-:root {
-    --bg:#0f172a;
-    --card:#1e293b;
-    --text:#e5e7eb;
-    --muted:#94a3b8;
+:root{
+    --bg:#0f172a;--card:#1e293b;--card2:#111827;--text:#e5e7eb;
+    --muted:#94a3b8;--green:#22c55e;--blue:#38bdf8;--amber:#f59e0b;
+    --red:#f87171;--border:rgba(148,163,184,.18)
 }
-
-body {
-    margin:0;
-    padding:20px;
-    background:var(--bg);
-    color:var(--text);
-    font-family:system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-a.back {
-    color:var(--muted);
-    text-decoration:none;
-    font-size:0.9rem;
-}
-
-h1 {
-    text-align:center;
-    margin-bottom:20px;
-}
-
-/* GRID */
-.grid {
-    display:grid;
-    gap:20px;
-    max-width:600px;
-    margin:auto;
-}
-
-/* KACHEL */
-.card {
-    background:var(--card);
-    border-radius:16px;
-    padding:20px;
-    box-shadow:0 10px 30px rgba(0,0,0,.35);
-}
-
-.card h2 {
-    margin-top:0;
-    margin-bottom:14px;
-    text-align:center;
-    font-size:1rem;
-    color:var(--muted);
-    text-transform:uppercase;
-    letter-spacing:.05em;
-}
-
-button {
-    padding: 8px 16px;
-    border-radius: 999px;
-    border: none;
-    background: #334155;
-    color: #e5e7eb;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-button:hover {
-    background: #475569;
-}
-
-/* INLINE ROW */
-.row-inline {
-    display:flex;
-    gap:12px;
-    justify-content:center;
-    align-items:center;
-    margin-bottom:10px;
-}
-
-.field {
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-}
-
-.field label {
-    font-size:0.75rem;
-    color:var(--muted);
-    margin-bottom:4px;
-}
-
-/* INPUTS */
-.compact-input {
-    width:80px;
-    height:34px;
-    padding:4px;
-    font-size:0.9rem;
-    text-align:center;
-    border-radius:8px;
-    border:none;
-    box-sizing:border-box;
-}
-
-.compact-input:out-of-range {
-    outline: 2px solid #ef4444;
-}
-
-input[type="time"].compact-input {
-    appearance:none;
-    -webkit-appearance:none;
-}
-
-.num-control {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-/* Buttons standardmäßig aus */
-.num-control button {
-    display: none;
-}
-
-.profile-btn {
-    padding: 8px 18px;
-    border-radius: 999px;
-    border: none;
-    background: #334155;
-    color: #e5e7eb;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background .2s ease, transform .15s ease;
-}
-
-.profile-btn:hover {
-    background: #475569;
-}
-
-.profile-btn.active {
-    background: #22c55e;
-    color: #022c22;
-    transform: scale(1.05);
-    box-shadow: 0 0 0 2px rgba(34,197,94,.4);
-}
-
-/* Mobile */
-@media (max-width:1600px) {
-    .compact-input {
-        width:70px;
-        height:32px;
-        font-size:0.85rem;
-    }
-    .compact-input:out-of-range {
-        outline: 2px solid #ef4444;
-    }
-
-    .num-control button {
-        display: inline-flex;
-        width: 28px;
-        height: 28px;
-        border-radius: 50%;
-        border: none;
-        background: #334155;
-        color: #e5e7eb;
-        font-size: 1.1rem;
-        font-weight: 700;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-    }
-
-    .num-control button:active {
-        background: #475569;
-    }
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
+.wrap{max-width:760px;margin:auto}
+.nav{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+.nav a{color:var(--muted);text-decoration:none;font-size:.86rem}
+h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
+.subtitle{text-align:center;color:var(--muted);font-size:.8rem;margin-bottom:20px}
+.grid{display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+.card h2{margin:0 0 12px;text-align:center;font-size:1rem;color:#cbd5e1;text-transform:uppercase;letter-spacing:.04em}
+.row-inline{display:flex;gap:12px;justify-content:center;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.field{display:flex;flex-direction:column;align-items:center;min-width:118px}
+.field label{font-size:.74rem;color:var(--muted);margin-bottom:5px;text-align:center}
+.compact-input{width:96px;height:36px;padding:4px 7px;font-size:.92rem;text-align:center;border-radius:9px;border:1px solid var(--border);background:#0f172a;color:var(--text)}
+.compact-input:out-of-range{outline:2px solid var(--red)}
+.num-control{display:flex;align-items:center;gap:5px}
+.num-control button{display:inline-flex;width:28px;height:28px;border-radius:50%;border:0;background:#334155;color:var(--text);font-size:1rem;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
+button{padding:8px 15px;border-radius:999px;border:0;background:#334155;color:var(--text);font-weight:650;cursor:pointer}
+button:hover{background:#475569}
+.profile-btn.active{background:var(--green);color:#052e16;box-shadow:0 0 0 2px rgba(34,197,94,.32)}
+.hint{color:var(--muted);font-size:.76rem;line-height:1.5;text-align:center}
+.info{margin:10px 0 14px;padding:11px 12px;border-radius:11px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);color:#bae6fd;font-size:.76rem;line-height:1.5}
+.warning{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.26);color:#fde68a}
+.levels{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 15px}
+.level{padding:10px;border-radius:11px;background:var(--card2);border:1px solid var(--border)}
+.level strong{display:block;font-size:.77rem;margin-bottom:4px}
+.level span{color:var(--muted);font-size:.7rem;line-height:1.4}
+.preview{margin-top:9px;padding:11px;border-radius:11px;background:#0f172a;border:1px solid var(--border);font-size:.76rem;line-height:1.55}
+.preview strong{color:#fcd34d}
+.feedback{min-height:20px;margin:10px 0 0;text-align:center;font-size:.76rem;color:var(--muted)}
+.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
+.divider{height:1px;background:var(--border);margin:14px 0}
+@media(max-width:620px){
+    body{padding:13px}
+    .levels{grid-template-columns:1fr}
+    .field{min-width:105px}
+    .compact-input{width:86px}
 }
 </style>
 </head>
 
 <body>
-
-<a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}" class="back">← {{ tent_name }}</a>
-<h1>⚙️ {{ tent_name }} · Profileinstellungen</h1>
-
-<div class="grid">
-
-<!-- ================= PRESETS ================= -->
-
-<div class="card">
-    <h2>🌱 Profile</h2>
-
-    <div class="row-inline">
-        <button class="profile-btn" data-profile="veg"
-                onclick="setProfile('veg')">Veg</button>
-
-        <button class="profile-btn" data-profile="bloom"
-                onclick="setProfile('bloom')">Bloom</button>
-
-        <button class="profile-btn" data-profile="dry"
-                onclick="setProfile('dry')">Dry</button>
+<div class="wrap">
+    <div class="nav">
+        <a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← {{ tent_name }}</a>
+        <a href="{{ url_for('grow_control_setup') }}">⚙️ Setup</a>
     </div>
 
-    <div class="hint" style="text-align:center;">
-        Aktives Profil wird hervorgehoben
-    </div>
+    <h1>⚙️ {{ tent_name }} · Klima & Profile</h1>
+    <div class="subtitle">Sollwerte, Regel-Toleranzen, Alarm-Toleranzen und absolute Grenzen</div>
 
-<div class="hint" style="text-align:center;">
-    Presets laden Startwerte. Änderungen werden nur in dieser Station gespeichert.
-    </div>
-</div>
-
-<!-- ================= ZEITEN ================= -->
-<div class="card">
-<h2>⏰ Zeiten</h2>
-
-<div class="row-inline">
-    <div class="field">
-        <label>Tag Start</label>
-        <input type="time" id="DAY_START_TIME" class="compact-input">
-    </div>
-    <div class="field">
-        <label>Nacht Start</label>
-        <input type="time" id="NIGHT_START_TIME" class="compact-input">
-    </div>
-</div>
-</div>
-
-<!-- ================= TEMPERATUR ================= -->
-<div class="card">
-<h2>🌡️ Temperatur</h2>
-
-<div class="row-inline">
-    <div class="field">
-        <label>Tag °C</label>
-        <div class="num-control">
-            <button type="button" onclick="step('DAY_TEMP', -0.1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="DAY_TEMP"
-                class="compact-input">
-            <button type="button" onclick="step('DAY_TEMP', 0.1)">+</button>
+    <div class="levels">
+        <div class="level">
+            <strong>1 · Sollwert</strong>
+            <span>Gewünschte Temperatur bzw. Luftfeuchte für Tag/Nacht.</span>
+        </div>
+        <div class="level">
+            <strong>2 · Regel-Toleranz</strong>
+            <span>Steuert die normale Aktorregelung. Beispiel: 20 °C ±2 °C.</span>
+        </div>
+        <div class="level">
+            <strong>3 · Alarm-Toleranz</strong>
+            <span>Benachrichtigung erst bei deutlich größerer Abweichung, z. B. ±5 °C.</span>
         </div>
     </div>
 
-    <div class="field">
-        <label>± Tol</label>
-        <div class="num-control">
-            <button type="button" onclick="step('DAY_TEMP_TOL', -0.1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="DAY_TEMP_TOL"
-                class="compact-input">
-            <button type="button" onclick="step('DAY_TEMP_TOL', 0.1)">+</button>
+    <div id="save-feedback" class="feedback"></div>
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>🌱 Profile</h2>
+            <div class="row-inline">
+                <button class="profile-btn" data-profile="veg" onclick="setProfile('veg')">Veg</button>
+                <button class="profile-btn" data-profile="bloom" onclick="setProfile('bloom')">Bloom</button>
+                <button class="profile-btn" data-profile="dry" onclick="setProfile('dry')">Dry</button>
+            </div>
+            <div class="hint">
+                Presets laden Startwerte. Eigene Grenz- und Alarmtoleranzen bleiben stationsbezogene Einstellungen.
+            </div>
         </div>
-    </div>
-</div>
 
-<div class="row-inline">
-    <div class="field">
-        <label>Nacht °C</label>
-        <div class="num-control">
-            <button type="button" onclick="step('NIGHT_TEMP', -0.1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="NIGHT_TEMP"
-                class="compact-input">
-            <button type="button" onclick="step('NIGHT_TEMP', 0.1)">+</button>  
+        <div class="card">
+            <h2>⏰ Zeiten</h2>
+            <div class="row-inline">
+                <div class="field">
+                    <label>Tag Start</label>
+                    <input type="time" id="DAY_START_TIME" class="compact-input">
+                </div>
+                <div class="field">
+                    <label>Nacht Start</label>
+                    <input type="time" id="NIGHT_START_TIME" class="compact-input">
+                </div>
+            </div>
         </div>
-    </div>
-    <div class="field">
-        <label>± Tol</label>
-        <div class="num-control">
-            <button type="button" onclick="step('NIGHT_TEMP_TOL', -0.1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="NIGHT_TEMP_TOL"
-                class="compact-input">
-            <button type="button" onclick="step('NIGHT_TEMP_TOL', 0.1)">+</button>
+
+        <div class="card">
+            <h2>🌡️ Temperatur</h2>
+
+            <div class="info">
+                <strong>Regel-Toleranz</strong> steuert weiterhin die Heizung/Lüftung.
+                <strong>Alarm ±</strong> beeinflusst nur Alarm & Benachrichtigungen.
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Tag Soll °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_TEMP',-0.1)">−</button>
+                        <input type="number" step="0.1" id="DAY_TEMP" class="compact-input">
+                        <button type="button" onclick="step('DAY_TEMP',0.1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Tag Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_TEMP_TOL',-0.1)">−</button>
+                        <input type="number" step="0.1" id="DAY_TEMP_TOL" class="compact-input">
+                        <button type="button" onclick="step('DAY_TEMP_TOL',0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Nacht Soll °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_TEMP',-0.1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_TEMP" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_TEMP',0.1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Nacht Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_TEMP_TOL',-0.1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_TEMP_TOL" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_TEMP_TOL',0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Alarm ± °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('TEMP_ALERT_TOL',-0.5)">−</button>
+                        <input type="number" step="0.5" id="TEMP_ALERT_TOL" class="compact-input">
+                        <button type="button" onclick="step('TEMP_ALERT_TOL',0.5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MIN_TEMP °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MIN_TEMP',-0.5)">−</button>
+                        <input type="number" step="0.5" id="MIN_TEMP" class="compact-input">
+                        <button type="button" onclick="step('MIN_TEMP',0.5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MAX_TEMP °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MAX_TEMP',-0.5)">−</button>
+                        <input type="number" step="0.5" id="MAX_TEMP" class="compact-input">
+                        <button type="button" onclick="step('MAX_TEMP',0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info warning">
+                MIN_TEMP/MAX_TEMP sind bestehende Temperatur-Schutzgrenzen und
+                beeinflussen auch den Heiz-/Lüfter-Schutz. Die Alarm-Toleranz
+                schaltet dagegen keine Hardware.
+            </div>
+            <div id="temp-preview" class="preview"></div>
         </div>
-    </div>
-</div>
-</div>
 
-<!-- ================= Luftfeuchtigkeit ================= -->
-<div class="card">
-<h2>💧 Luftfeuchtigkeit</h2>
+        <div class="card">
+            <h2>💧 Luftfeuchtigkeit</h2>
 
-<div class="row-inline">
-    <div class="field">
-        <label>Tag %</label>
-        <div class="num-control">
-            <button type="button" onclick="step('DAY_HUM', -1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="DAY_HUM"
-                class="compact-input">
-            <button type="button" onclick="step('DAY_HUM', 1)">+</button>
+            <div class="row-inline">
+                <div class="field">
+                    <label>Tag Soll %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_HUM',-1)">−</button>
+                        <input type="number" step="0.1" id="DAY_HUM" class="compact-input">
+                        <button type="button" onclick="step('DAY_HUM',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Tag Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_HUM_TOL',-1)">−</button>
+                        <input type="number" step="0.1" id="DAY_HUM_TOL" class="compact-input">
+                        <button type="button" onclick="step('DAY_HUM_TOL',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Nacht Soll %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_HUM',-1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_HUM" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_HUM',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Nacht Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_HUM_TOL',-1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_HUM_TOL" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_HUM_TOL',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Alarm ± %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('HUM_ALERT_TOL',-1)">−</button>
+                        <input type="number" step="1" id="HUM_ALERT_TOL" class="compact-input">
+                        <button type="button" onclick="step('HUM_ALERT_TOL',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MIN_HUM %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MIN_HUM',-1)">−</button>
+                        <input type="number" step="1" id="MIN_HUM" class="compact-input">
+                        <button type="button" onclick="step('MIN_HUM',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MAX_HUM %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MAX_HUM',-1)">−</button>
+                        <input type="number" step="1" id="MAX_HUM" class="compact-input">
+                        <button type="button" onclick="step('MAX_HUM',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info">
+                MIN_HUM/MAX_HUM sind absolute Alarmgrenzen. Die normale
+                Feuchteregelung arbeitet weiterhin mit Sollwert ± Regel-Toleranz.
+            </div>
+            <div id="hum-preview" class="preview"></div>
         </div>
-    </div>
 
-    <div class="field">
-        <label>± Tol</label>
-        <div class="num-control">
-            <button type="button" onclick="step('DAY_HUM_TOL', -1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="DAY_HUM_TOL"
-                class="compact-input">
-            <button type="button" onclick="step('DAY_HUM_TOL', 1)">+</button>
+        <div class="card">
+            <h2>⏱️ Rampe</h2>
+            <div class="row-inline">
+                <div class="field">
+                    <label>Aktiv</label>
+                    <input type="checkbox" id="RAMP_ENABLED">
+                </div>
+                <div class="field">
+                    <label>Dauer (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('RAMP_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="10" id="RAMP_DURATION_MIN" class="compact-input">
+                        <button type="button" onclick="step('RAMP_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+            </div>
         </div>
+
     </div>
-</div>
-
-<div class="row-inline">
-    <div class="field">
-        <label>Nacht %</label>
-        <div class="num-control">
-            <button type="button" onclick="step('NIGHT_HUM', -1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="NIGHT_HUM"
-                class="compact-input">
-            <button type="button" onclick="step('NIGHT_HUM', 1)">+</button>  
-        </div>
-    </div>
-    <div class="field">
-        <label>± Tol</label>
-        <div class="num-control">
-            <button type="button" onclick="step('NIGHT_HUM_TOL', -1)">−</button>
-            <input type="number"
-                step="0.1"
-                id="NIGHT_HUM_TOL"
-                class="compact-input">
-            <button type="button" onclick="step('NIGHT_HUM_TOL', 1)">+</button>
-        </div>
-    </div>
-</div>
-</div>
-
-<!-- ================= RAMPE ================= -->
-<div class="card">
-<h2>⏱️ Rampe</h2>
-
-<div class="row-inline">
-    <div class="field">
-        <label>Aktiv</label>
-        <input type="checkbox" id="RAMP_ENABLED">
-    </div>
-    <div class="field">
-        <label>Dauer (min)</label>
-        <div class="num-control">
-            <button type="button" onclick="step('RAMP_DURATION_MIN', -5)">−</button>
-            <input type="number"
-                step="10"
-                id="RAMP_DURATION_MIN"
-                class="compact-input">
-            <button type="button" onclick="step('RAMP_DURATION_MIN', 5)">+</button>
-        </div>
-    </div>
-</div>
-</div>
-
-
-
-
-
 </div>
 
 <script>
@@ -374,152 +293,217 @@ const TENT_ID = {{ tent_id|tojson }};
 const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
 const PROFILE_URL = name => `/api/tents/${encodeURIComponent(TENT_ID)}/profile/${encodeURIComponent(name)}`;
 
+const ids = [
+    "DAY_TEMP","DAY_TEMP_TOL","NIGHT_TEMP","NIGHT_TEMP_TOL",
+    "DAY_HUM","DAY_HUM_TOL","NIGHT_HUM","NIGHT_HUM_TOL",
+    "TEMP_ALERT_TOL","HUM_ALERT_TOL",
+    "MIN_TEMP","MAX_TEMP","MIN_HUM","MAX_HUM",
+    "RAMP_DURATION_MIN"
+];
+
+function el(id){ return document.getElementById(id); }
+function num(id){ return Number(el(id)?.value); }
+
+function feedback(text, cls=""){
+    const box = el("save-feedback");
+    box.className = `feedback ${cls}`;
+    box.textContent = text || "";
+}
+
 function minToTime(m){
-    const h = String(Math.floor(m/60)).padStart(2,"0");
-    const min = String(m%60).padStart(2,"0");
+    const h = String(Math.floor(Number(m)/60)).padStart(2,"0");
+    const min = String(Number(m)%60).padStart(2,"0");
     return `${h}:${min}`;
 }
 function timeToMin(t){
-    const [h,m] = t.split(":").map(Number);
+    const [h,m] = String(t).split(":").map(Number);
     return h*60+m;
 }
 
+function band(base,tol,unit){
+    if(!Number.isFinite(base) || !Number.isFinite(tol)) return "--";
+    return `${(base-tol).toFixed(1)} bis ${(base+tol).toFixed(1)} ${unit}`;
+}
+
+function updatePreview(){
+    el("temp-preview").innerHTML = `
+        <strong>Temperatur</strong><br>
+        Tag Regelbereich: ${band(num("DAY_TEMP"),num("DAY_TEMP_TOL"),"°C")}<br>
+        Tag Alarm ab: ≤ ${(num("DAY_TEMP")-num("TEMP_ALERT_TOL")).toFixed(1)} °C
+        oder ≥ ${(num("DAY_TEMP")+num("TEMP_ALERT_TOL")).toFixed(1)} °C<br>
+        Nacht Regelbereich: ${band(num("NIGHT_TEMP"),num("NIGHT_TEMP_TOL"),"°C")}<br>
+        Nacht Alarm ab: ≤ ${(num("NIGHT_TEMP")-num("TEMP_ALERT_TOL")).toFixed(1)} °C
+        oder ≥ ${(num("NIGHT_TEMP")+num("TEMP_ALERT_TOL")).toFixed(1)} °C<br>
+        Absolute Schutzgrenze: ${num("MIN_TEMP").toFixed(1)} bis ${num("MAX_TEMP").toFixed(1)} °C
+    `;
+
+    el("hum-preview").innerHTML = `
+        <strong>Luftfeuchtigkeit</strong><br>
+        Tag Regelbereich: ${band(num("DAY_HUM"),num("DAY_HUM_TOL"),"%")}<br>
+        Tag Alarm ab: ≤ ${(num("DAY_HUM")-num("HUM_ALERT_TOL")).toFixed(1)} %
+        oder ≥ ${(num("DAY_HUM")+num("HUM_ALERT_TOL")).toFixed(1)} %<br>
+        Nacht Regelbereich: ${band(num("NIGHT_HUM"),num("NIGHT_HUM_TOL"),"%")}<br>
+        Nacht Alarm ab: ≤ ${(num("NIGHT_HUM")-num("HUM_ALERT_TOL")).toFixed(1)} %
+        oder ≥ ${(num("NIGHT_HUM")+num("HUM_ALERT_TOL")).toFixed(1)} %<br>
+        Absolute Alarmgrenze: ${num("MIN_HUM").toFixed(1)} bis ${num("MAX_HUM").toFixed(1)} %
+    `;
+}
+
+function applyLimits(c){
+    el("DAY_TEMP").min = c.MIN_TEMP;
+    el("DAY_TEMP").max = c.MAX_TEMP;
+    el("NIGHT_TEMP").min = c.MIN_TEMP;
+    el("NIGHT_TEMP").max = c.MAX_TEMP;
+
+    el("DAY_TEMP_TOL").min = 0;
+    el("DAY_TEMP_TOL").max = 10;
+    el("NIGHT_TEMP_TOL").min = 0;
+    el("NIGHT_TEMP_TOL").max = 10;
+
+    el("DAY_HUM").min = c.MIN_HUM;
+    el("DAY_HUM").max = c.MAX_HUM;
+    el("NIGHT_HUM").min = c.MIN_HUM;
+    el("NIGHT_HUM").max = c.MAX_HUM;
+
+    el("DAY_HUM_TOL").min = 0;
+    el("DAY_HUM_TOL").max = 30;
+    el("NIGHT_HUM_TOL").min = 0;
+    el("NIGHT_HUM_TOL").max = 30;
+
+    el("TEMP_ALERT_TOL").min = 0.1;
+    el("TEMP_ALERT_TOL").max = 30;
+    el("HUM_ALERT_TOL").min = 0.1;
+    el("HUM_ALERT_TOL").max = 100;
+
+    el("MIN_HUM").min = 0;
+    el("MIN_HUM").max = 99.9;
+    el("MAX_HUM").min = 0.1;
+    el("MAX_HUM").max = 100;
+
+    el("RAMP_DURATION_MIN").min = 5;
+    el("RAMP_DURATION_MIN").max = 240;
+}
+
 async function load(){
-    const response = await fetch(CONFIG_URL);
-    if (!response.ok) return;
-    const payload = await response.json();
+    const response = await fetch(CONFIG_URL,{cache:"no-store"});
+    const payload = await response.json().catch(()=>({}));
+    if(!response.ok){
+        feedback(payload.error || "Konfiguration konnte nicht geladen werden.","err");
+        return;
+    }
     const c = payload.config || payload;
 
-    DAY_TEMP.value = c.DAY_TEMP;
-    DAY_TEMP_TOL.value = c.DAY_TEMP_TOL;
-    NIGHT_TEMP.value = c.NIGHT_TEMP;
-    NIGHT_TEMP_TOL.value = c.NIGHT_TEMP_TOL;
+    for(const id of ids){
+        if(el(id) && c[id] !== undefined) el(id).value = c[id];
+    }
 
-    DAY_HUM.value = c.DAY_HUM;
-    DAY_HUM_TOL.value = c.DAY_HUM_TOL;
-    NIGHT_HUM.value = c.NIGHT_HUM;
-    NIGHT_HUM_TOL.value = c.NIGHT_HUM_TOL;
-
-    DAY_START_TIME.value = minToTime(c.DAY_START_MIN);
-    NIGHT_START_TIME.value = minToTime(c.NIGHT_START_MIN);
-
-    RAMP_ENABLED.checked = !!c.RAMP_ENABLED;
-    RAMP_DURATION_MIN.value = c.RAMP_DURATION_MIN;
+    el("DAY_START_TIME").value = minToTime(c.DAY_START_MIN);
+    el("NIGHT_START_TIME").value = minToTime(c.NIGHT_START_MIN);
+    el("RAMP_ENABLED").checked = !!c.RAMP_ENABLED;
 
     highlightActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
-
     applyLimits(c);
+    updatePreview();
 }
 
 async function save(){
-    await fetch(CONFIG_URL, {
+    updatePreview();
+    feedback("Speichere …");
+
+    const body = {
+        DAY_TEMP:num("DAY_TEMP"),
+        DAY_TEMP_TOL:num("DAY_TEMP_TOL"),
+        NIGHT_TEMP:num("NIGHT_TEMP"),
+        NIGHT_TEMP_TOL:num("NIGHT_TEMP_TOL"),
+        DAY_HUM:num("DAY_HUM"),
+        DAY_HUM_TOL:num("DAY_HUM_TOL"),
+        NIGHT_HUM:num("NIGHT_HUM"),
+        NIGHT_HUM_TOL:num("NIGHT_HUM_TOL"),
+        TEMP_ALERT_TOL:num("TEMP_ALERT_TOL"),
+        HUM_ALERT_TOL:num("HUM_ALERT_TOL"),
+        MIN_TEMP:num("MIN_TEMP"),
+        MAX_TEMP:num("MAX_TEMP"),
+        MIN_HUM:num("MIN_HUM"),
+        MAX_HUM:num("MAX_HUM"),
+        DAY_START_MIN:timeToMin(el("DAY_START_TIME").value),
+        NIGHT_START_MIN:timeToMin(el("NIGHT_START_TIME").value),
+        RAMP_ENABLED:el("RAMP_ENABLED").checked ? 1 : 0,
+        RAMP_DURATION_MIN:num("RAMP_DURATION_MIN")
+    };
+
+    const response = await fetch(CONFIG_URL,{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-            DAY_TEMP:Number(DAY_TEMP.value),
-            DAY_TEMP_TOL:Number(DAY_TEMP_TOL.value),
-            NIGHT_TEMP:Number(NIGHT_TEMP.value),
-            NIGHT_TEMP_TOL:Number(NIGHT_TEMP_TOL.value),
-            DAY_HUM:Number(DAY_HUM.value),
-            DAY_HUM_TOL:Number(DAY_HUM_TOL.value),
-            NIGHT_HUM:Number(NIGHT_HUM.value),
-            NIGHT_HUM_TOL:Number(NIGHT_HUM_TOL.value),
-            DAY_START_MIN:timeToMin(DAY_START_TIME.value),
-            NIGHT_START_MIN:timeToMin(NIGHT_START_TIME.value),
-            RAMP_ENABLED:RAMP_ENABLED.checked?1:0,
-            RAMP_DURATION_MIN:Number(RAMP_DURATION_MIN.value)
-        })
+        body:JSON.stringify(body)
     });
+    const payload = await response.json().catch(()=>({}));
+
+    if(!response.ok || payload.success === false){
+        feedback(payload.error || "Speichern fehlgeschlagen.","err");
+        return;
+    }
+
+    const c = payload.config || body;
+    applyLimits(c);
+    updatePreview();
+    feedback("Einstellungen gespeichert.","ok");
 }
 
-async function setProfile(name) {
-
-    const res = await fetch(CONFIG_URL);
-    const payload = await res.json();
+async function setProfile(name){
+    const response = await fetch(CONFIG_URL,{cache:"no-store"});
+    const payload = await response.json().catch(()=>({}));
     const c = payload.config || payload;
     const activeProfile = payload.active_profile ?? c.ACTIVE_PROFILE;
 
-    if (activeProfile === name) {
-        return; // bereits aktiv → nichts tun
-    }
+    if(activeProfile === name) return;
 
     const ok = confirm(
         "⚠️ Profil wirklich wechseln?\n\n" +
-        "• Aktives Profil wird geändert\n" +
-        "• Eine laufende Rampe wird beendet\n\n" +
+        "• Profil-Sollwerte werden geladen\n" +
+        "• Eine laufende Rampe wird beendet\n" +
+        "• Alarm-/Schutzgrenzen bleiben stationsbezogen\n\n" +
         "Fortfahren?"
     );
+    if(!ok) return;
 
-    if (!ok) return;
+    const result = await fetch(PROFILE_URL(name),{method:"POST"});
+    if(!result.ok){
+        const data = await result.json().catch(()=>({}));
+        feedback(data.error || "Profilwechsel fehlgeschlagen.","err");
+        return;
+    }
 
-    await fetch(PROFILE_URL(name), { method: "POST" });
-    load();
+    await load();
 }
 
+function step(id,delta){
+    const input = el(id);
+    if(!input) return;
 
-function step(id, delta) {
-    const el = document.getElementById(id);
-    if (!el) return;
+    let value = Number(input.value);
+    if(!Number.isFinite(value)) value = 0;
 
-    let v = parseFloat(el.value);
-    if (isNaN(v)) v = 0;
+    const min = input.min !== "" ? Number(input.min) : -Infinity;
+    const max = input.max !== "" ? Number(input.max) : Infinity;
 
-    const min = el.min !== "" ? parseFloat(el.min) : -Infinity;
-    const max = el.max !== "" ? parseFloat(el.max) : Infinity;
-
-    v = Math.round((v + delta) * 10) / 10;
-
-    // 🔒 Begrenzen
-    if (v < min) v = min;
-    if (v > max) v = max;
-
-    el.value = v;
+    value = Math.round((value + delta) * 10) / 10;
+    value = Math.min(max,Math.max(min,value));
+    input.value = value;
     save();
 }
 
-function applyLimits(c) {
-    // 🌡️ Temperatur
-    DAY_TEMP.min = c.MIN_TEMP;
-    DAY_TEMP.max = c.MAX_TEMP;
-    NIGHT_TEMP.min = c.MIN_TEMP;
-    NIGHT_TEMP.max = c.MAX_TEMP;
-
-    DAY_TEMP_TOL.min = 0;
-    DAY_TEMP_TOL.max = 5;
-    NIGHT_TEMP_TOL.min = 0;
-    NIGHT_TEMP_TOL.max = 5;
-
-    // 💧 Luftfeuchtigkeit
-    DAY_HUM.min = 30;
-    DAY_HUM.max = c.MAX_HUM;
-
-    NIGHT_HUM.min = 30;
-    NIGHT_HUM.max = c.MAX_HUM;
-
-    DAY_HUM_TOL.min = 0.1;
-    DAY_HUM_TOL.max = 20;
-
-    NIGHT_HUM_TOL.min = 0.1;
-    NIGHT_HUM_TOL.max = 20;
-
-    // ⏱️ Rampe
-    RAMP_DURATION_MIN.min = 5;
-    RAMP_DURATION_MIN.max = 240;
-}
-
-function highlightActiveProfile(active) {
-    document.querySelectorAll(".profile-btn").forEach(btn => {
-        btn.classList.toggle(
-            "active",
-            btn.dataset.profile === active
-        );
+function highlightActiveProfile(active){
+    document.querySelectorAll(".profile-btn").forEach(btn=>{
+        btn.classList.toggle("active",btn.dataset.profile === active);
     });
 }
 
+document.querySelectorAll("input").forEach(input=>{
+    input.addEventListener("change",save);
+    if(input.type === "number") input.addEventListener("input",updatePreview);
+});
 
-document.querySelectorAll("input").forEach(i=>i.onchange=save);
 load();
 </script>
-
 </body>
 </html>
