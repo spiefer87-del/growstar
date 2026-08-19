@@ -2,6 +2,8 @@ import os
 
 import requests
 
+import core.context as ctx
+
 
 RPC_DEBUG_ENV = "GROWSTAR_SHELLY_RPC_DEBUG"
 
@@ -160,11 +162,16 @@ class ShellyAPI:
 
         try:
 
-            response = requests.post(
-                f"{self.base}/{method}",
-                json=params or {},
-                timeout=5
-            )
+            # Phase 4V.4:
+            # Inventar-, BLE- und sonstige Shelly-RPCs dürfen nicht mehr
+            # gleichzeitig mit Aktor-Health, Relay-Schaltungen oder dem
+            # bestehenden Energy/Failsafe-Zyklus auf die Shellys feuern.
+            with ctx.shelly_lock:
+                response = requests.post(
+                    f"{self.base}/{method}",
+                    json=params or {},
+                    timeout=5
+                )
 
             # Phase 4J.2:
             # Erfolgreiche RPC-Antworten bleiben im Normalbetrieb ruhig.
