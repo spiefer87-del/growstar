@@ -15,6 +15,61 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.0",
+        "date": "2026-08-18",
+        "phase": "4V",
+        "title": "Zentrale Alarm-Engine und Telegram-Benachrichtigungen",
+        "summary": (
+            "Growstar kann kritische Sensor-, Regelkreis-, Hardware-, Safety- "
+            "und Systemfehler jetzt zentral als Alarme verwalten und unabhängig "
+            "vom geöffneten Browser per Telegram an ein Handy senden. "
+            "Alarmüberwachung und Versand laufen getrennt von der Regelung."
+        ),
+        "changes": (
+            "Neue zentrale Alarm-Engine verarbeitet ausschließlich den bestehenden read-only Watchdog-Health-Snapshot.",
+            "Alarmüberwachung läuft in einem eigenen growstar-alerts Thread und führt keine Aktor- oder Shelly-Schreibzugriffe aus.",
+            "Telegram-Versand läuft in einem getrennten growstar-notifications Queue-Worker und kann Watchdog oder Regelkreise nicht blockieren.",
+            "Telegram-Nachrichten werden bei temporären Versandfehlern mit 5, 30 und 120 Sekunden Abstand automatisch erneut versucht.",
+            "Neue Alarme werden dedupliziert; eine dauerhaft aktive Störung erzeugt nicht bei jedem 5-Sekunden-Zyklus eine neue Nachricht.",
+            "Für weiterhin aktive Störungen kann ein Wiederholungsintervall von 15, 30, 60, 120 oder 240 Minuten gewählt oder vollständig deaktiviert werden.",
+            "Bei Behebung einer zuvor gemeldeten Störung kann Growstar automatisch eine Entwarnung senden.",
+            "Aktive Alarmzustände und eine begrenzte Alarmhistorie werden lokal unter instance/alarm_state.json persistiert.",
+            "Nach jedem Growstar-Neustart gilt ein 90-Sekunden-Startschutz, damit anlaufende Sensor-/Threadzustände keine Fehlalarme erzeugen.",
+            "Überwacht werden Sensor-Timeouts für Temperatur und Luftfeuchte.",
+            "Kritische Temperaturwerte werden gegen die bestehende MIN_TEMP/MAX_TEMP-Konfiguration geprüft.",
+            "Kritische Luftfeuchte wird gegen MAX_HUM und – falls später konfiguriert – MIN_HUM geprüft.",
+            "Nicht erreichbare Aktoren werden nach mindestens zwei aufeinanderfolgenden Hardwarefehlern alarmiert.",
+            "Safety-Supervisor-Stale und aktive stationsbezogene Safety-Failsafes erzeugen kritische Alarme.",
+            "Stale Regelkreise und ungültige Stationskonfigurationen werden alarmiert.",
+            "Ausgefallene zentrale Growstar-Threads sowie benötigter, stale MQTT-Sensortraffic können als Systemalarm gemeldet werden.",
+            "Neue Seite /system/notifications zeigt Telegram-Einrichtung, Alarmregeln, aktive Alarme und Versandstatus.",
+            "Neue Grow-Control-Dashboard-Kachel 'Alarm & Benachrichtigungen' führt direkt zur Benachrichtigungsseite.",
+            "Telegram-Bot-Verbindung wird über den offiziellen Bot-Token geprüft; nach /start kann Growstar den privaten Chat automatisch über getUpdates finden.",
+            "Eine Testnachricht kann direkt aus Growstar gesendet werden.",
+            "Bot-Token und Chat-ID werden ausschließlich lokal in instance/notifications.json mit Dateimodus 0600 gespeichert und niemals in GitHub geschrieben.",
+            "Der gespeicherte Bot-Token wird von der Growstar-API nie wieder an den Browser zurückgegeben.",
+            "Telegram-Einstellungen sind mit settings.view lesbar und Änderungen/Testversand mit settings.manage geschützt; bestehender CSRF-Schutz bleibt aktiv.",
+            "Telegram ist ein reiner Benachrichtigungskanal; die Funktion verändert weder Regelparameter noch Hardwarezustände.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-Baselines von app.py, core/release.py und grow_control_dashboard.html werden vor dem Patch per Git-Blob-SHA verifiziert.",
+            "core/release.py meldet Version 3.9.0 und Build-Kennung 4V.",
+            "Telegram-Client verwendet ausschließlich HTTPS über urllib und enthält keine shell=True-Ausführung.",
+            "Telegram-Token wird syntaktisch validiert und weder geloggt noch als Prozessargument verwendet.",
+            "Öffentliche Notification-Einstellungen enthalten kein bot_token-Feld.",
+            "Lokale notification.json wird atomar geschrieben und auf Dateimodus 0600 gesetzt.",
+            "Alarm-Engine importiert keine Aktor- oder Shelly-Schaltfunktionen.",
+            "Ein simulierter stale Temperatursensor erzeugt genau einen stabilen Alarm-Key.",
+            "Ein simulierter Temperaturwert über MAX_TEMP erzeugt einen critical sensor_limits Alarm.",
+            "Ein simulierter Hardwarefehler unterhalb der Zwei-Fehler-Schwelle erzeugt noch keinen Alarm; ab zwei Fehlern wird alarmiert.",
+            "app.py registriert Notification-Routen sowie getrennte Notification- und Alarm-Threads.",
+            "Grow-Control-Dashboard enthält die neue Alarm-&-Benachrichtigungen-Kachel.",
+            "Notification-Routen verlangen settings.view beziehungsweise settings.manage.",
+            "python3 tests/regression/check_notifications.py läuft vollständig grün.",
+            "Bestehender tests/regression/check_repository_baseline.py bleibt unverändert nutzbar.",
+        ),
+    },
+    {
         "version": "3.8.0",
         "date": "2026-08-18",
         "phase": "4U",
