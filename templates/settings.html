@@ -43,6 +43,19 @@ button:hover{background:#475569}
 .feedback{min-height:20px;margin:10px 0 0;text-align:center;font-size:.76rem;color:var(--muted)}
 .feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
 .divider{height:1px;background:var(--border);margin:14px 0}
+.lighting-duration{
+    margin:4px auto 0;
+    padding:10px 12px;
+    max-width:360px;
+    text-align:center;
+    border-radius:11px;
+    background:rgba(250,204,21,.07);
+    border:1px solid rgba(250,204,21,.22);
+    color:#fde68a;
+    font-size:.8rem;
+    line-height:1.45;
+}
+.lighting-duration strong{color:#facc15}
 @media(max-width:620px){
     body{padding:13px}
     .levels{grid-template-columns:1fr}
@@ -104,6 +117,9 @@ button:hover{background:#475569}
                     <label>Nacht Start</label>
                     <input type="time" id="NIGHT_START_TIME" class="compact-input">
                 </div>
+            </div>
+            <div id="lighting-duration" class="lighting-duration">
+                💡 Beleuchtungsdauer: <strong>--</strong>
             </div>
         </div>
 
@@ -320,6 +336,38 @@ function timeToMin(t){
     return h*60+m;
 }
 
+function formatLightingDuration(totalMinutes){
+    const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+
+    if(rest === 0){
+        return `${hours} ${hours === 1 ? "Stunde" : "Stunden"}`;
+    }
+
+    return `${hours} Std. ${rest} Min.`;
+}
+
+function updateLightingDuration(){
+    const dayValue = el("DAY_START_TIME")?.value;
+    const nightValue = el("NIGHT_START_TIME")?.value;
+    const target = el("lighting-duration");
+
+    if(!target || !dayValue || !nightValue){
+        if(target) target.innerHTML = "💡 Beleuchtungsdauer: <strong>--</strong>";
+        return;
+    }
+
+    const dayStart = timeToMin(dayValue);
+    const nightStart = timeToMin(nightValue);
+
+    // Tagesphase kann über Mitternacht laufen.
+    const durationMinutes = (nightStart - dayStart + 1440) % 1440;
+
+    target.innerHTML =
+        `💡 Beleuchtungsdauer: <strong>${formatLightingDuration(durationMinutes)}</strong>`;
+}
+
 function band(base,tol,unit){
     if(!Number.isFinite(base) || !Number.isFinite(tol)) return "--";
     return `${(base-tol).toFixed(1)} bis ${(base+tol).toFixed(1)} ${unit}`;
@@ -400,6 +448,7 @@ async function load(){
     el("DAY_START_TIME").value = minToTime(c.DAY_START_MIN);
     el("NIGHT_START_TIME").value = minToTime(c.NIGHT_START_MIN);
     el("RAMP_ENABLED").checked = !!c.RAMP_ENABLED;
+    updateLightingDuration();
 
     highlightActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
     applyLimits(c);
@@ -408,6 +457,7 @@ async function load(){
 
 async function save(){
     updatePreview();
+    updateLightingDuration();
     feedback("Speichere …");
 
     const body = {
@@ -501,6 +551,10 @@ function highlightActiveProfile(active){
 document.querySelectorAll("input").forEach(input=>{
     input.addEventListener("change",save);
     if(input.type === "number") input.addEventListener("input",updatePreview);
+});
+
+["DAY_START_TIME","NIGHT_START_TIME"].forEach(id=>{
+    el(id)?.addEventListener("input",updateLightingDuration);
 });
 
 load();
