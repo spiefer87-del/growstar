@@ -35,6 +35,8 @@ from threads.blu import start_blu_thread
 from services.hardware_recovery import start_hardware_recovery_thread
 from services.live_control import live_arming_loop
 from services.restart_policy import apply_shutdown_restart_policy
+from services.notifications import notification_worker_loop
+from services.alerts import alarm_monitor_loop
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.plant_management import register as register_plant_management_routes
@@ -54,6 +56,7 @@ from routes.auth import register as register_auth_routes
 from routes.admin import register as register_admin_routes
 from routes.release import register as register_release_routes
 from routes.restart_policy import register as register_restart_policy_routes
+from routes.notifications import register as register_notification_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -133,6 +136,7 @@ def create_flask_app():
     register_sensor_routes(app)
     register_tent_routes(app)
     register_restart_policy_routes(app)
+    register_notification_routes(app)
 
     # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
     install_auth(app)
@@ -240,6 +244,12 @@ def start_backend():
             print("📡 BLU Sensor Thread läuft")
 
             _start_daemon_thread(
+                "growstar-notifications",
+                notification_worker_loop,
+            )
+            print("🔔 Notification Worker gestartet")
+
+            _start_daemon_thread(
                 "growstar-watchdog",
                 watchdog_loop,
             )
@@ -303,6 +313,12 @@ def start_backend():
             # vollständig parallel; er blockiert den Regelungsstart nicht.
             start_hardware_recovery_thread()
             print("♻️ Hardware Auto-Recovery Thread gestartet")
+
+            _start_daemon_thread(
+                "growstar-alerts",
+                alarm_monitor_loop,
+            )
+            print("🚨 Alarm Monitor gestartet")
 
             _backend_started = True
             print("✅ Grow-Backend läuft")
