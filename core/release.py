@@ -15,6 +15,37 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.3",
+        "date": "2026-08-19",
+        "phase": "4V.3",
+        "title": "Beleuchtungsdauer direkt aus Tag- und Nachtstart",
+        "summary": (
+            "Die Klima-&-Profile-Seite zeigt jetzt direkt unter Tag Start und "
+            "Nacht Start die daraus resultierende Dauer der Tag- beziehungsweise "
+            "Beleuchtungsphase an."
+        ),
+        "changes": (
+            "Unter Tag Start und Nacht Start erscheint eine neue Anzeige 'Beleuchtungsdauer'.",
+            "Die Beleuchtungsdauer wird ausschließlich aus DAY_START_MIN und NIGHT_START_MIN berechnet und benötigt keinen zusätzlichen Konfigurationswert.",
+            "Bei Tag Start 06:00 und Nacht Start 23:00 zeigt Growstar automatisch 17 Stunden an.",
+            "Zeitfenster über Mitternacht werden mit einem 24-Stunden-Modulo korrekt berechnet.",
+            "Bei nicht vollen Stunden zeigt die Oberfläche zusätzlich die verbleibenden Minuten, zum Beispiel 17 Std. 30 Min.",
+            "Die Anzeige aktualisiert sich bereits während einer Änderung der beiden Uhrzeitfelder und erneut nach dem Laden der Stationskonfiguration.",
+            "Die bestehende Lichtsteuerung, DAY_START_MIN/NIGHT_START_MIN-Persistenz und Profilsteuerung bleiben unverändert.",
+            "Es wird kein neuer persistenter Config-Schlüssel eingeführt; dadurch besteht kein Migrationsbedarf für bestehende Stationen.",
+            "Alarm-Engine, Telegram, Hardware, Safety, Netzwerk und Restart-Policy werden durch diesen UI-Patch nicht verändert.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-main-Baselines von settings.html, release.py und check_notifications.py wurden vor dem Patch per Git-Blob-SHA verifiziert.",
+            "Die Zeit-Kachel enthält die neue Beleuchtungsdauer-Anzeige.",
+            "Die Berechnung verwendet (Nachtstart - Tagstart + 1440) modulo 1440 und unterstützt damit Tagphasen über Mitternacht.",
+            "Änderungen an Tag Start oder Nacht Start aktualisieren die Anzeige unmittelbar.",
+            "Volle Stunden werden als 'Stunden' dargestellt; Restminuten werden bei Bedarf zusätzlich angezeigt.",
+            "Bestehende Klima-, Alarm- und Telegram-Regressionen bleiben im konsolidierten check_notifications.py erhalten.",
+            "core/release.py meldet Version 3.9.3 und Build-Kennung 4V.3.",
+        ),
+    },
+    {
         "version": "3.9.2",
         "date": "2026-08-19",
         "phase": "4V.2",
