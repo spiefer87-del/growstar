@@ -102,18 +102,29 @@ def _candidate(key, rule, severity, title, detail, *, station=None, station_name
     }
 
 
-def _station_limits(station_id):
+def _station_alarm_config(station_id):
     try:
         runtime = get_runtime(station_id)
     except Exception:
         return {}
 
     cfg = runtime.config
+    state = getattr(runtime, "state", None)
+    live = getattr(state, "live_state", {}) if state is not None else {}
+    if not isinstance(live, dict):
+        live = {}
+
     return {
         "min_temp": _number(cfg.get("MIN_TEMP")),
         "max_temp": _number(cfg.get("MAX_TEMP")),
         "min_hum": _number(cfg.get("MIN_HUM")),
         "max_hum": _number(cfg.get("MAX_HUM")),
+        "temp_alert_tol": _number(cfg.get("TEMP_ALERT_TOL")),
+        "hum_alert_tol": _number(cfg.get("HUM_ALERT_TOL")),
+        # Die Live-Sollwerte berücksichtigen Tag/Nacht und bei Temperatur
+        # zusätzlich eine eventuell laufende Rampe.
+        "temp_target": _number(live.get("temp_target")),
+        "hum_target": _number(live.get("hum_target")),
     }
 
 
@@ -172,13 +183,18 @@ def extract_alarm_candidates(snapshot):
             )
             candidates[item["key"]] = item
 
-        limits = _station_limits(station_id)
+        limits = _station_alarm_config(station_id)
+
         temp = station.get("temperature") or {}
         temp_value = _number(temp.get("value"))
         if temp.get("configured") and not temp.get("stale") and temp_value is not None:
             min_temp = limits.get("min_temp")
             max_temp = limits.get("max_temp")
+            target = limits.get("temp_target")
+            alert_tol = limits.get("temp_alert_tol")
 
+            # Absolute Schutzgrenzen besitzen Priorität und verwenden bewusst
+            # denselben stabilen Alarm-Key wie bisher.
             if min_temp is not None and temp_value < min_temp:
                 item = _candidate(
                     f"station:{station_id}:sensor:temperature:limit",
@@ -201,12 +217,52 @@ def extract_alarm_candidates(snapshot):
                     station_name=station_name,
                 )
                 candidates[item["key"]] = item
+            elif (
+                target is not None
+                and alert_tol is not None
+                and alert_tol > 0
+                and temp_value <= target - alert_tol
+            ):
+                item = _candidate(
+                    f"station:{station_id}:sensor:temperature:limit",
+                    "sensor_limits",
+                    "error",
+                    "Temperatur deutlich unter Sollwert",
+                    (
+                        f"{temp_value:.1f} °C · Soll {target:.1f} °C · "
+                        f"Alarmtoleranz ±{alert_tol:.1f} °C."
+                    ),
+                    station=station_id,
+                    station_name=station_name,
+                )
+                candidates[item["key"]] = item
+            elif (
+                target is not None
+                and alert_tol is not None
+                and alert_tol > 0
+                and temp_value >= target + alert_tol
+            ):
+                item = _candidate(
+                    f"station:{station_id}:sensor:temperature:limit",
+                    "sensor_limits",
+                    "error",
+                    "Temperatur deutlich über Sollwert",
+                    (
+                        f"{temp_value:.1f} °C · Soll {target:.1f} °C · "
+                        f"Alarmtoleranz ±{alert_tol:.1f} °C."
+                    ),
+                    station=station_id,
+                    station_name=station_name,
+                )
+                candidates[item["key"]] = item
 
         hum = station.get("humidity") or {}
         hum_value = _number(hum.get("value"))
         if hum.get("configured") and not hum.get("stale") and hum_value is not None:
             min_hum = limits.get("min_hum")
             max_hum = limits.get("max_hum")
+            target = limits.get("hum_target")
+            alert_tol = limits.get("hum_alert_tol")
 
             if min_hum is not None and hum_value < min_hum:
                 item = _candidate(
@@ -226,6 +282,44 @@ def extract_alarm_candidates(snapshot):
                     "critical",
                     "Luftfeuchte kritisch hoch",
                     f"{hum_value:.1f} % liegt über MAX_HUM {max_hum:.1f} %.",
+                    station=station_id,
+                    station_name=station_name,
+                )
+                candidates[item["key"]] = item
+            elif (
+                target is not None
+                and alert_tol is not None
+                and alert_tol > 0
+                and hum_value <= target - alert_tol
+            ):
+                item = _candidate(
+                    f"station:{station_id}:sensor:humidity:limit",
+                    "sensor_limits",
+                    "error",
+                    "Luftfeuchte deutlich unter Sollwert",
+                    (
+                        f"{hum_value:.1f} % · Soll {target:.1f} % · "
+                        f"Alarmtoleranz ±{alert_tol:.1f} %."
+                    ),
+                    station=station_id,
+                    station_name=station_name,
+                )
+                candidates[item["key"]] = item
+            elif (
+                target is not None
+                and alert_tol is not None
+                and alert_tol > 0
+                and hum_value >= target + alert_tol
+            ):
+                item = _candidate(
+                    f"station:{station_id}:sensor:humidity:limit",
+                    "sensor_limits",
+                    "error",
+                    "Luftfeuchte deutlich über Sollwert",
+                    (
+                        f"{hum_value:.1f} % · Soll {target:.1f} % · "
+                        f"Alarmtoleranz ±{alert_tol:.1f} %."
+                    ),
                     station=station_id,
                     station_name=station_name,
                 )
