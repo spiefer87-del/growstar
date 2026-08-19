@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}Benachrichtigungen · Growstar{% endblock %}
+
+{% block head %}
+<style>
+:root{
+  --bg:#0f172a;--panel:#1e293b;--panel2:#111827;--text:#e5e7eb;
+  --muted:#94a3b8;--green:#22c55e;--blue:#38bdf8;--amber:#f59e0b;
+  --red:#f87171;--border:rgba(148,163,184,.18)
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:18px 14px 70px}
+.back{color:var(--muted);text-decoration:none;font-size:.86rem}
+h1{margin:7px 0 4px;font-size:1.65rem}.sub{color:var(--muted);font-size:.82rem}
+.status-pill{display:inline-flex;align-items:center;gap:7px;margin-top:12px;padding:7px 11px;border:1px solid var(--border);border-radius:999px;background:#162238;font-size:.78rem}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}.dot.ok{background:var(--green)}.dot.warn{background:var(--amber)}.dot.err{background:var(--red)}
+.notice{margin:17px 0;padding:13px 14px;border:1px solid rgba(56,189,248,.25);border-radius:13px;background:rgba(56,189,248,.07);color:#bae6fd;font-size:.8rem;line-height:1.55}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{margin-top:14px;background:linear-gradient(145deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:17px;padding:17px}
+.card h2{margin:0 0 12px;font-size:1rem}.muted{color:var(--muted);font-size:.76rem;line-height:1.5}
+.step{margin:9px 0;padding:10px;border-radius:10px;background:rgba(15,23,42,.62);font-size:.78rem;line-height:1.5}
+.field{margin-top:12px}label{display:block;margin-bottom:6px;color:var(--muted);font-size:.76rem}
+input,select{width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:10px;background:#0f172a;color:var(--text);font:inherit}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+button{border:1px solid var(--border);border-radius:10px;padding:10px 12px;background:#162238;color:var(--text);font:inherit;cursor:pointer}
+button.primary{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.12);color:#bbf7d0}
+button.danger{border-color:rgba(248,113,113,.35);color:#fecaca}button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid var(--border)}
+.row:first-child{border-top:0}.row strong{font-size:.82rem}.row span{color:var(--muted);font-size:.74rem}
+.toggle{display:flex;align-items:center;gap:9px}.toggle input{width:19px;height:19px}
+.feedback{min-height:18px;margin-top:10px;font-size:.76rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
+.alarm{padding:11px 0;border-top:1px solid var(--border)}.alarm:first-child{border-top:0}.alarm-title{font-size:.82rem;font-weight:800}.alarm-detail{margin-top:4px;color:var(--muted);font-size:.73rem;line-height:1.45}
+.sev-critical{color:#fca5a5}.sev-error{color:#fdba74}.sev-warning{color:#fde68a}
+.empty{color:var(--muted);font-size:.78rem}
+.secret-note{color:#86efac;font-size:.74rem;margin-top:8px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}}
+</style>
+{% endblock %}
+
+{% block page %}
+<div class="wrap">
+  <a class="back" href="{{ url_for('grow_control_dashboard') }}">← Grow Control</a>
+  <h1>🔔 Alarm & Benachrichtigungen</h1>
+  <div class="sub">Phase 4V · Telegram auch bei geschlossenem Browser</div>
+  <div class="status-pill"><span id="status-dot" class="dot"></span><span id="status-text">Lade …</span></div>
+
+  <div class="notice">
+    Growstar überwacht Sensor-Timeouts, kritische Temperatur-/Feuchtegrenzen,
+    Regelkreise, Aktor-Erreichbarkeit, Konfigurationsfehler und Safety-Failsafes.
+    Telegram läuft unabhängig vom geöffneten Browser. Voraussetzung ist eine
+    funktionierende Internetverbindung des Raspberry Pi.
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Telegram einrichten</h2>
+      <div class="step"><strong>1.</strong> In Telegram <strong>@BotFather</strong> öffnen, <code>/newbot</code> senden und einen Bot anlegen.</div>
+      <div class="step"><strong>2.</strong> Den Bot-Token hier einfügen. Growstar speichert ihn ausschließlich lokal unter <code>instance/</code>.</div>
+
+      {% if has_permission('settings.manage') %}
+      <div class="field">
+        <label for="bot-token">Bot-Token</label>
+        <input id="bot-token" type="password" autocomplete="new-password" placeholder="123456789:AA...">
+      </div>
+      <div class="actions">
+        <button id="connect-btn" class="primary" type="button">Bot verbinden</button>
+      </div>
+      {% endif %}
+      <div id="bot-state" class="feedback"></div>
+
+      <div class="step"><strong>3.</strong> Den eigenen Bot in Telegram öffnen und ihm <strong>/start</strong> schicken.</div>
+      <div class="step"><strong>4.</strong> Danach „Chat finden“ drücken. Growstar übernimmt automatisch deine private Chat-ID.</div>
+
+      {% if has_permission('settings.manage') %}
+      <div class="actions">
+        <button id="discover-btn" type="button">Chat finden</button>
+        <button id="test-btn" type="button">Testnachricht senden</button>
+        <button id="clear-btn" class="danger" type="button">Telegram trennen</button>
+      </div>
+      {% endif %}
+      <div id="chat-state" class="feedback"></div>
+      <div class="secret-note">Der gespeicherte Bot-Token wird nach dem Speichern niemals wieder an den Browser ausgegeben.</div>
+    </section>
+
+    <section class="card">
+      <h2>Alarmregeln</h2>
+      <div id="rules"></div>
+
+      <div class="field">
+        <label for="repeat">Erinnerung bei weiterhin aktivem Alarm</label>
+        <select id="repeat" {% if not has_permission('settings.manage') %}disabled{% endif %}>
+          <option value="0">Nicht wiederholen</option>
+          <option value="15">Alle 15 Minuten</option>
+          <option value="30">Alle 30 Minuten</option>
+          <option value="60">Alle 60 Minuten</option>
+          <option value="120">Alle 2 Stunden</option>
+          <option value="240">Alle 4 Stunden</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <div><strong>Entwarnung senden</strong><br><span>Nachrichten, sobald eine gemeldete Störung behoben ist.</span></div>
+        <label class="toggle"><input id="recovery" type="checkbox" {% if not has_permission('settings.manage') %}disabled{% endif %}></label>
+      </div>
+
+      <div class="row">
+        <div><strong>Telegram aktiv</strong><br><span>Alarmversand an den verbundenen Chat.</span></div>
+        <label class="toggle"><input id="telegram-enabled" type="checkbox" {% if not has_permission('settings.manage') %}disabled{% endif %}></label>
+      </div>
+
+      {% if has_permission('settings.manage') %}
+      <div class="actions"><button id="save-btn" class="primary" type="button">Einstellungen speichern</button></div>
+      {% endif %}
+      <div id="settings-feedback" class="feedback"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Aktive Alarme</h2>
+    <div id="active-alarms"><div class="empty">Lade …</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Versandstatus</h2>
+    <div id="runtime-status" class="muted">Lade …</div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const CAN_MANAGE = {{ has_permission('settings.manage')|tojson }};
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || "";
+  const $ = id => document.getElementById(id);
+  let current = null;
+
+  const RULES = [
+    ["sensor_stale", "Sensor ohne Daten", "Temperatur- oder Feuchtesensor überschreitet den Sensor-Timeout."],
+    ["sensor_limits", "Kritische Sensorgrenzen", "MIN_TEMP, MAX_TEMP, optional MIN_HUM und MAX_HUM werden überwacht."],
+    ["hardware", "Aktor nicht erreichbar", "Mindestens zwei aufeinanderfolgende Hardwarefehler."],
+    ["safety", "Safety / Failsafe", "Safety-Supervisor oder stationsbezogener Failsafe."],
+    ["control_loop", "Regelkreis ausgefallen", "Regelkreis-Heartbeat ist nicht mehr frisch."],
+    ["configuration", "Konfigurationsfehler", "Ungültige Stations- oder Geräte-Konfiguration."],
+    ["controller", "Growstar-Systemdienste", "Zentrale Threads oder benötigter MQTT-Sensortraffic fallen aus."],
+  ];
+
+  const esc = value => String(value ?? "")
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+
+  async function api(path, options={}){
+    const response = await fetch(path, {
+      cache:"no-store",
+      headers:{
+        "Accept":"application/json",
+        ...(options.body ? {"Content-Type":"application/json"} : {}),
+        ...(options.method && options.method !== "GET" ? {"X-CSRF-Token":csrfToken} : {}),
+      },
+      ...options,
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok || data.success === false){
+      throw new Error(data.error || data.message || `HTTP ${response.status}`);
+    }
+    return data;
+  }
+
+  function setFeedback(id, text, cls=""){
+    const el = $(id);
+    if(!el) return;
+    el.className = `feedback ${cls}`;
+    el.textContent = text || "";
+  }
+
+  function renderRules(settings){
+    $("rules").innerHTML = RULES.map(([key,title,desc]) => `
+      <div class="row">
+        <div><strong>${esc(title)}</strong><br><span>${esc(desc)}</span></div>
+        <label class="toggle"><input data-rule="${key}" type="checkbox"
+          ${settings.rules?.[key] ? "checked" : ""}
+          ${CAN_MANAGE ? "" : "disabled"}></label>
+      </div>
+    `).join("");
+  }
+
+  function renderStatus(data){
+    current = data;
+    const settings = data.settings || {};
+    const tg = settings.telegram || {};
+    const notifications = data.notifications || {};
+    const alarms = data.alarms || {};
+
+    renderRules(settings);
+    $("repeat").value = String(settings.repeat_minutes ?? 60);
+    $("recovery").checked = Boolean(settings.send_recovery);
+    $("telegram-enabled").checked = Boolean(tg.enabled);
+
+    setFeedback(
+      "bot-state",
+      tg.token_configured
+        ? `Bot verbunden: ${tg.bot_name || ""}${tg.bot_username ? " (@" + tg.bot_username + ")" : ""}`
+        : "Noch kein Telegram-Bot verbunden.",
+      tg.token_configured ? "ok" : ""
+    );
+
+    setFeedback(
+      "chat-state",
+      tg.chat_configured
+        ? `Empfänger: ${tg.chat_label || "Privater Chat"}${tg.chat_username ? " (@" + tg.chat_username + ")" : ""}`
+        : "Noch kein privater Chat verbunden.",
+      tg.chat_configured ? "ok" : ""
+    );
+
+    const ready = Boolean(
+      tg.enabled &&
+      tg.token_configured &&
+      tg.chat_configured &&
+      notifications.thread_alive &&
+      alarms.thread_alive
+    );
+    $("status-dot").className = `dot ${ready ? "ok" : (tg.enabled ? "warn" : "")}`;
+    $("status-text").textContent = ready
+      ? "Telegram-Alarmierung aktiv"
+      : (tg.enabled ? "Telegram noch nicht vollständig bereit" : "Telegram deaktiviert");
+
+    const active = Array.isArray(alarms.active) ? alarms.active : [];
+    $("active-alarms").innerHTML = active.length
+      ? active.map(item => `
+          <div class="alarm">
+            <div class="alarm-title sev-${esc(item.severity)}">
+              ${item.severity === "critical" ? "🛑" : "🚨"} ${esc(item.title)}
+            </div>
+            <div class="alarm-detail">
+              ${item.station_name ? esc(item.station_name) + " · " : ""}${esc(item.detail)}
+            </div>
+          </div>
+        `).join("")
+      : '<div class="empty">Keine aktiven Alarme.</div>';
+
+    const lastSuccess = notifications.last_success_at
+      ? new Date(notifications.last_success_at * 1000).toLocaleString()
+      : "--";
+    const lastError = notifications.last_error || "--";
+    const grace = Number(alarms.startup_grace_remaining || 0);
+
+    $("runtime-status").innerHTML = `
+      Notification-Worker: <strong>${notifications.thread_alive ? "läuft" : "FEHLER"}</strong><br>
+      Alarm-Monitor: <strong>${alarms.thread_alive ? "läuft" : "FEHLER"}</strong><br>
+      Warteschlange: <strong>${Number(notifications.queue_depth || 0)}</strong><br>
+      Erfolgreich an Telegram übergeben: <strong>${Number(notifications.sent_count || 0)}</strong><br>
+      Letzte erfolgreiche Übergabe: <strong>${esc(lastSuccess)}</strong><br>
+      Letzter Versandfehler: <strong>${esc(lastError)}</strong>
+      ${grace > 0 ? `<br>Startschutz aktiv: <strong>noch ${grace}s</strong>` : ""}
+    `;
+  }
+
+  async function refresh(){
+    try{
+      renderStatus(await api("/system/notifications/status"));
+    }catch(error){
+      $("status-dot").className = "dot err";
+      $("status-text").textContent = error.message;
+    }
+  }
+
+  $("connect-btn")?.addEventListener("click", async () => {
+    const token = $("bot-token").value.trim();
+    if(!token){ setFeedback("bot-state","Bitte Bot-Token eingeben.","err"); return; }
+    $("connect-btn").disabled = true;
+    setFeedback("bot-state","Bot wird geprüft …");
+    try{
+      await api("/system/notifications/telegram/connect", {
+        method:"POST", body:JSON.stringify({token})
+      });
+      $("bot-token").value = "";
+      setFeedback("bot-state","Bot erfolgreich verbunden.","ok");
+      await refresh();
+    }catch(error){
+      setFeedback("bot-state",error.message,"err");
+    }finally{
+      $("connect-btn").disabled = false;
+    }
+  });
+
+  $("discover-btn")?.addEventListener("click", async () => {
+    $("discover-btn").disabled = true;
+    setFeedback("chat-state","Suche letzten privaten Bot-Chat …");
+    try{
+      await api("/system/notifications/telegram/discover", {method:"POST",body:"{}"});
+      setFeedback("chat-state","Privater Telegram-Chat gefunden.","ok");
+      await refresh();
+    }catch(error){
+      setFeedback("chat-state",error.message,"err");
+    }finally{
+      $("discover-btn").disabled = false;
+    }
+  });
+
+  $("test-btn")?.addEventListener("click", async () => {
+    $("test-btn").disabled = true;
+    setFeedback("chat-state","Sende Testnachricht …");
+    try{
+      await api("/system/notifications/telegram/test", {method:"POST",body:"{}"});
+      setFeedback("chat-state","Testnachricht wurde von Telegram angenommen.","ok");
+      await refresh();
+    }catch(error){
+      setFeedback("chat-state",error.message,"err");
+    }finally{
+      $("test-btn").disabled = false;
+    }
+  });
+
+  $("clear-btn")?.addEventListener("click", async () => {
+    if(!confirm("Telegram-Verbindung einschließlich lokal gespeichertem Bot-Token entfernen?")) return;
+    try{
+      await api("/system/notifications/telegram/clear", {method:"POST",body:"{}"});
+      await refresh();
+    }catch(error){
+      setFeedback("chat-state",error.message,"err");
+    }
+  });
+
+  $("save-btn")?.addEventListener("click", async () => {
+    const rules = {};
+    document.querySelectorAll("[data-rule]").forEach(el => {
+      rules[el.dataset.rule] = el.checked;
+    });
+
+    try{
+      await api("/system/notifications/preferences", {
+        method:"POST",
+        body:JSON.stringify({
+          rules,
+          send_recovery:$("recovery").checked,
+          repeat_minutes:Number($("repeat").value),
+          telegram_enabled:$("telegram-enabled").checked,
+        }),
+      });
+      setFeedback("settings-feedback","Einstellungen gespeichert.","ok");
+      await refresh();
+    }catch(error){
+      setFeedback("settings-feedback",error.message,"err");
+    }
+  });
+
+  refresh();
+  window.setInterval(refresh, 10000);
+})();
+</script>
+{% endblock %}
