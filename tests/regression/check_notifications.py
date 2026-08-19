@@ -399,6 +399,22 @@ def main():
         "Setup erklärt die drei Ebenen Sollwert, Regelung und Alarm",
     )
 
+    require(
+        'id="lighting-duration"' in climate_template
+        and "Beleuchtungsdauer" in climate_template
+        and "updateLightingDuration" in climate_template,
+        "Zeit-Kachel zeigt die automatisch berechnete Beleuchtungsdauer",
+    )
+    require(
+        "(nightStart - dayStart + 1440) % 1440" in climate_template
+        and '["DAY_START_TIME","NIGHT_START_TIME"]' in climate_template,
+        "Beleuchtungsdauer berücksichtigt Mitternacht und aktualisiert sich bei Zeitänderungen",
+    )
+    require(
+        'hours === 1 ? "Stunde" : "Stunden"' in climate_template,
+        "Volle Beleuchtungsstunden werden verständlich als Stunden angezeigt",
+    )
+
     setup_template = read("templates/grow_control_setup.html")
     require(
         "Klima & Grenzwerte" in setup_template
