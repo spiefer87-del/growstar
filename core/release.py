@@ -15,6 +15,35 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.1",
+        "date": "2026-08-19",
+        "phase": "4V.1",
+        "title": "Regressionstests von der laufenden Versionsnummer entkoppelt",
+        "summary": (
+            "Die neue 3.9-Alarmfunktion war korrekt, aber zwei Regressionstests "
+            "hatten die vorherige bzw. ursprüngliche Versionsnummer fest "
+            "eingebaut. Die Tests prüfen jetzt dauerhaft gültige Invarianten "
+            "statt bei jedem kommenden Patch erneut angepasst werden zu müssen."
+        ),
+        "changes": (
+            "Der Repository-Baseline-Test erwartet nicht mehr fest Growstar 3.8.0 / Phase 4U.",
+            "Der Repository-Baseline-Test prüft stattdessen, dass GROWSTAR_VERSION und GROWSTAR_INTERNAL_PHASE exakt dem obersten RELEASES-Eintrag folgen.",
+            "Zusätzlich validiert der Baseline-Test die aktuelle Versionskennung als dreiteilige semantische Growstar-Version und verlangt eine nicht leere interne Phase.",
+            "Die Abschlussmeldung des Baseline-Tests zeigt die tatsächlich aktuelle Growstar-Version und Phase dynamisch an.",
+            "Der Alarm-&-Notifications-Test erwartet nicht mehr, dass 3.9.0 / 4V für immer die aktuelle Version bleibt.",
+            "Der Alarm-&-Notifications-Test prüft stattdessen, dass der historische Feature-Release 3.9.0 / 4V weiterhin in RELEASES dokumentiert ist.",
+            "Damit bleiben beide Regressionstests bei künftigen Patch- und Serienversionen wiederverwendbar.",
+            "Alarm-Engine, Telegram-Versand, Regelung, Hardware, Restart-Policy, Netzwerk und Benutzeroberfläche werden durch 4V.1 nicht verändert.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-Versionen von core/release.py, check_repository_baseline.py und check_notifications.py wurden vor dem Patch per Git-Blob-SHA verifiziert.",
+            "Der Repository-Baseline-Test enthält keine harte Anforderung mehr an 3.8.0 / 4U.",
+            "Der Notification-Test enthält keine harte Anforderung mehr, dass 3.9.0 / 4V die aktuell laufende Version sein muss.",
+            "Der Notification-Test bestätigt weiterhin, dass der Feature-Release 3.9.0 / 4V in den Patch Notes dokumentiert ist.",
+            "core/release.py meldet Version 3.9.1 und Build-Kennung 4V.1.",
+        ),
+    },
+    {
         "version": "3.9.0",
         "date": "2026-08-18",
         "phase": "4V",
