@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar 3.9.0 / Phase 4V – Alarm- und Telegram-Regressionstest."""
+"""Growstar – Alarm- und Telegram-Regressionstest (Feature seit 3.9.0 / 4V)."""
 
 from pathlib import Path
 import ast
@@ -74,11 +74,19 @@ def main():
         ast.parse(read(rel), filename=rel)
         print("✅ Python-Syntax", rel)
 
-    release = load_module("growstar_390_release", "core/release.py")
+    release = load_module("growstar_notifications_release", "core/release.py")
+    feature_release = next(
+        (
+            item
+            for item in release.RELEASES
+            if item.get("version") == "3.9.0"
+            and item.get("phase") == "4V"
+        ),
+        None,
+    )
     require(
-        release.GROWSTAR_VERSION == "3.9.0"
-        and release.GROWSTAR_INTERNAL_PHASE == "4V",
-        "Growstar meldet Version 3.9.0 / Phase 4V",
+        feature_release is not None,
+        "Feature-Release 3.9.0 / Phase 4V bleibt in den Patch Notes dokumentiert",
     )
 
     telegram = load_module("growstar_390_telegram", "services/telegram.py")
@@ -266,7 +274,7 @@ def main():
         "Benachrichtigungsseite enthält den vollständigen Telegram-Setupfluss",
     )
 
-    print("✅ Growstar 3.9.0 Alarm & Notifications vollständig")
+    print(f"✅ Growstar Alarm & Notifications vollständig · aktuell {release.GROWSTAR_VERSION} / Phase {release.GROWSTAR_INTERNAL_PHASE}")
 
 
 if __name__ == "__main__":

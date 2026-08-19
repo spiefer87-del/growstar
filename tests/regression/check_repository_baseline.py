@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar 3.8.0 – konsolidierter Repository-Baseline-Test.
+"""Growstar – konsolidierter Repository-Baseline-Test.
 
 Der Test ist read-only:
 - keine Shelly-Schreibzugriffe
@@ -120,10 +120,23 @@ def main():
     tracked = tracked_paths()
     release = load_release()
 
+    current_release = release.RELEASES[0]
+    current_version = str(current_release.get("version") or "")
+    current_phase = str(current_release.get("phase") or "")
+
     require(
-        release.GROWSTAR_VERSION == "3.8.0"
-        and release.GROWSTAR_INTERNAL_PHASE == "4U",
-        "Growstar meldet Version 3.8.0 / Phase 4U",
+        release.GROWSTAR_VERSION == current_version
+        and release.GROWSTAR_INTERNAL_PHASE == current_phase,
+        (
+            "Release-Konstanten folgen dem obersten RELEASES-Eintrag "
+            f"({current_version} / {current_phase})"
+        ),
+    )
+
+    require(
+        re.fullmatch(r"\d+\.\d+\.\d+", current_version) is not None
+        and bool(current_phase.strip()),
+        "Aktuelle Growstar-Version und interne Phase sind formal gültig",
     )
 
     root_checks = sorted(
@@ -263,7 +276,7 @@ def main():
     check_template_references(tracked)
     check_python_syntax(tracked)
 
-    print("✅ Growstar 3.8.0 Repository-Baseline vollständig")
+    print(f"✅ Growstar Repository-Baseline vollständig · {release.GROWSTAR_VERSION} / Phase {release.GROWSTAR_INTERNAL_PHASE}")
 
 
 if __name__ == "__main__":
