@@ -44,3 +44,39 @@ Telegram benötigt eine funktionierende Internetverbindung des Raspberry Pi.
 `sendMessage` bestätigt, dass Telegram die Nachricht angenommen hat; Growstar
 bezeichnet dies deshalb bewusst als „an Telegram übergeben“ und nicht als
 garantierte Anzeige auf dem Telefon.
+
+
+## Getrennte Regel- und Alarmtoleranz seit 3.9.2
+
+Die normale Aktorregelung verwendet weiterhin die bestehenden Werte:
+
+- `DAY_TEMP_TOL` / `NIGHT_TEMP_TOL`
+- `DAY_HUM_TOL` / `NIGHT_HUM_TOL`
+
+Telegram/Alarm & Notifications besitzt zusätzlich stationsbezogen:
+
+- `TEMP_ALERT_TOL`
+- `HUM_ALERT_TOL`
+
+Beispiel:
+
+- aktiver Temperatursollwert: 20 °C
+- Regel-Toleranz: ±2 °C
+- Alarm-Toleranz: ±5 °C
+
+Die normale Regelung arbeitet damit um 18–22 °C. Ein Abweichungsalarm wird
+erst bei ≤15 °C oder ≥25 °C erzeugt.
+
+Absolute Grenzen bleiben unabhängig davon aktiv:
+
+- `MIN_TEMP` / `MAX_TEMP`
+- `MIN_HUM` / `MAX_HUM`
+
+Eine absolute Grenzverletzung hat Priorität vor dem relativen
+Abweichungsalarm und wird als `critical` eingestuft. Die relative
+Alarm-Toleranz ist ein Benachrichtigungsparameter und führt selbst keine
+Hardware-Schaltung aus.
+
+Bei einer laufenden Temperaturrampe verwendet die Alarm-Engine den aktuell
+wirksamen `temp_target`; die Alarmgrenze folgt damit der Rampe statt nur dem
+späteren End-Sollwert.
