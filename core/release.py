@@ -15,6 +15,47 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.2",
+        "date": "2026-08-19",
+        "phase": "4V.2",
+        "title": "Getrennte Regel- und Alarmtoleranzen pro Station",
+        "summary": (
+            "Sollwert-Regelung und Handy-Alarmierung besitzen jetzt bewusst "
+            "unabhängige Toleranzen. Zusätzlich können die absoluten Temperatur- "
+            "und Luftfeuchte-Grenzen pro Station direkt im Klima-Setup angepasst werden."
+        ),
+        "changes": (
+            "Neue stationsbezogene TEMP_ALERT_TOL trennt die Temperatur-Benachrichtigung von DAY_TEMP_TOL/NIGHT_TEMP_TOL.",
+            "Neue stationsbezogene HUM_ALERT_TOL trennt die Feuchte-Benachrichtigung von DAY_HUM_TOL/NIGHT_HUM_TOL.",
+            "Bei 20 °C Soll und TEMP_ALERT_TOL=5 wird ein relativer Temperaturalarm ab 15 °C beziehungsweise 25 °C erzeugt, unabhängig von der engeren Regel-Toleranz.",
+            "Relative Alarmgrenzen verwenden den aktuell wirksamen Live-Sollwert; eine laufende Temperaturrampe wird dadurch automatisch berücksichtigt.",
+            "MIN_TEMP und MAX_TEMP bleiben absolute Temperatur-Schutzgrenzen und besitzen Alarmpriorität vor der relativen Abweichung.",
+            "MIN_HUM wird als neue stationsbezogene untere Luftfeuchte-Alarmgrenze ergänzt; rückwärtskompatibler Default ist 0 Prozent.",
+            "MAX_HUM bleibt die absolute obere Luftfeuchte-Alarmgrenze.",
+            "Absolute Grenzverletzungen werden weiterhin als critical gemeldet; reine Sollwertabweichungen als error.",
+            "Absolute und relative Sensoralarme verwenden denselben stabilen Alarm-Key, damit ein Grenzwechsel keine doppelten Recovery-/Neu-Alarm-Nachrichten erzeugt.",
+            "Neue zentrale Validierung blockiert MIN_TEMP >= MAX_TEMP, ungültige Feuchtebereiche, nicht positive Alarmtoleranzen und negative Regel-Toleranzen atomar vor dem Config-Commit.",
+            "Die stationsbezogene Klima-&-Profile-Seite zeigt Sollwert, Regel-Toleranz, Alarm-Toleranz und absolute Grenzen getrennt und mit berechneter Vorschau.",
+            "Im Grow-Control-Setup erhält jede Station einen direkten Button 'Klima & Grenzwerte'.",
+            "Die globale Benachrichtigungsregel heißt jetzt 'Sensorabweichung & Grenzwerte' und erklärt beide Alarmarten.",
+            "Die Alarm-Toleranz selbst schaltet keine Aktoren und verändert die bestehende Regelungslogik nicht.",
+            "Bestehende Telegram-Konfiguration, Bot-Token, Chat-ID, Wiederholungsintervall und Entwarnungslogik bleiben unverändert.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-Baselines von release.py, alerts.py, notifications.html, grow_control_setup.html und check_notifications.py wurden per Git-Blob-SHA verifiziert.",
+            "20 °C Soll mit ±5 °C Alarmtoleranz erzeugt bei 24.9 °C noch keinen relativen Alarm.",
+            "20 °C Soll mit ±5 °C Alarmtoleranz erzeugt ab 25.0 °C einen error-Alarm.",
+            "60 Prozent Soll mit ±10 Prozent Alarmtoleranz erzeugt ab 70 Prozent einen error-Alarm.",
+            "MAX_TEMP-Überschreitung bleibt critical und hat Priorität vor der relativen Sollwertabweichung.",
+            "Ungültige MIN_TEMP/MAX_TEMP-Kombination wird durch die zentrale Grenzvalidierung blockiert.",
+            "Setup enthält TEMP_ALERT_TOL, HUM_ALERT_TOL, MIN_HUM und MAX_HUM sowie erklärende Vorschauen.",
+            "Grow-Control-Setup verlinkt jede Station direkt auf Klima & Grenzwerte.",
+            "Config-Update ruft die Grenzvalidierung vor dem in-place Commit auf.",
+            "python3 tests/regression/check_notifications.py läuft vollständig grün.",
+            "tests/regression/check_repository_baseline.py bleibt als versionsunabhängiger Baseline-Test unverändert nutzbar.",
+        ),
+    },
+    {
         "version": "3.9.1",
         "date": "2026-08-19",
         "phase": "4V.1",

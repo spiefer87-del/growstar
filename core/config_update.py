@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 from core.devices import AUX_DEVICE_NAMES, normalize_device_label
+from core.environment_limits import validate_environment_limits
 from core.profile import get_active_profile
 from core.ramp import resync_active_ramp, stop_ramp, update_ramp_duration
 from core.runtime import resolve_runtime
@@ -155,6 +156,9 @@ def apply_config_patch(data, runtime=None):
 
         working[key] = _coerce_scalar(key, value)
         changed_keys.add(key)
+
+    # Phase 4V.2: Klima-/Alarmgrenzen werden VOR dem Commit validiert.
+    validate_environment_limits(working)
 
     # Erst nach vollständiger Validierung den vorhandenen Dict in-place
     # aktualisieren. Referenzen auf runtime.config bleiben dadurch gültig.

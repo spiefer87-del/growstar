@@ -33,9 +33,16 @@ DEFAULT_CONFIG = {
     "NIGHT_HUM": 60.0,
     "NIGHT_HUM_TOL": 5.0,
 
+    # Absolute Schutz-/Alarmgrenzen.
     "MIN_TEMP": 12.0,
     "MAX_TEMP": 30.0,
+    "MIN_HUM": 0.0,
     "MAX_HUM": 75.0,
+
+    # Benachrichtigungsabweichung relativ zum aktuell wirksamen Sollwert.
+    # Diese Werte sind bewusst von DAY/NIGHT_*_TOL entkoppelt.
+    "TEMP_ALERT_TOL": 5.0,
+    "HUM_ALERT_TOL": 10.0,
 
     "TEMP_OFFSET": 0.0,
     "HUM_OFFSET": 0.0,
@@ -50,15 +57,15 @@ DEFAULT_CONFIG = {
             "field": "temperature",
             "label": "Alter Temperatursensor"
         },
-    
+
         "humidity": {
             "source_id": "mqtt:dht22",
             "field": "humidity",
             "label": "Alter Feuchtesensor"
         }
-    
+
     },
-    
+
     "SENSOR_UPDATE_INTERVAL_SEC": 60,
 
     # ================= DEVICE SYSTEM =================
@@ -90,7 +97,7 @@ DEFAULT_CONFIG = {
             "logic": "OR",
             "direction": "HIGH"   # HIGH = bei zu hoher Temp/Hum an, LOW = bei zu niedriger Temp/Hum an
         },
-        
+
         "vent": {
             "use_temp": False,
             "use_hum": False,
