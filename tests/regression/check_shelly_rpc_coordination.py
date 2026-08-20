@@ -234,10 +234,24 @@ def main():
         syntax(rel)
 
     release = importlib.import_module("core.release")
+
+    # Phase 4V.6:
+    # Dieser Checker schützt die in 3.9.4 eingeführte Shelly-RPC-Koordination.
+    # Er darf deshalb nicht verlangen, dass 3.9.4 für immer die aktuell
+    # laufende Growstar-Version bleibt. Entscheidend ist, dass der historische
+    # Feature-Release weiterhin in den Patch Notes dokumentiert ist.
+    feature_release = next(
+        (
+            item
+            for item in release.RELEASES
+            if item.get("version") == "3.9.4"
+            and item.get("phase") == "4V.4"
+        ),
+        None,
+    )
     require(
-        release.GROWSTAR_VERSION == "3.9.4"
-        and release.GROWSTAR_INTERNAL_PHASE == "4V.4",
-        "Growstar meldet Version 3.9.4 / Phase 4V.4",
+        feature_release is not None,
+        "Feature-Release 3.9.4 / Phase 4V.4 bleibt in den Patch Notes dokumentiert",
     )
 
     context_source = read("core/context.py")
