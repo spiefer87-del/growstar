@@ -12,12 +12,10 @@ from services.energy import (
     do_energy_day_reset,
 )
 from services.shelly import run_failsafe
-from services.safety import run_all_live_safety
 
 
 ENERGY_INTERVAL = 30
 FAILSAFE_INTERVAL = 30
-SAFETY_INTERVAL = 2
 
 
 def _run_all_live_failsafes():
@@ -35,20 +33,16 @@ def _run_all_live_failsafes():
 
 
 def shelly_background_loop():
-    last_safety_poll = 0.0
+    """Shelly-/Energy-Hintergrund ohne Safety-Heartbeat.
+
+    Seit Phase 4V.5 läuft der stationsbezogene Safety-Supervisor in einem
+    eigenen Daemon-Thread. Dadurch können langsame Shelly-/Energy-Zyklen den
+    Safety-Heartbeat nicht mehr verzögern.
+    """
 
     while True:
         try:
             now = time.time()
-
-            # =========================================
-            # 🚨 STATIONS-SAFETY – unabhaengig vom Regelkreis
-            # =========================================
-            if now - last_safety_poll >= SAFETY_INTERVAL:
-                last_safety_poll = now
-
-                with ctx.shelly_lock:
-                    run_all_live_safety(now=now, enforce=True)
 
             # =========================================
             # 🛡️ RELAY-SYNC FAILSAFE – multi-station
