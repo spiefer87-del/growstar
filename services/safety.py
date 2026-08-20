@@ -1,9 +1,10 @@
 """Unabhaengiger stationsbezogener Safety-Supervisor.
 
-Der Supervisor laeuft im bereits unabhaengigen Shelly-Background-Thread und
-bewertet alle lokalen LIVE-Runtimes. Er verwendet keinerlei eigene Health-
-Pings. Fuer sichere AUS-Aktionen nutzt er den normalen Aktorpfad, waehrend
-core.actuators gleichzeitig ein erneutes Einschalten blockiert.
+Der Supervisor laeuft seit Phase 4V.5 in einem eigenen Safety-Thread und
+bewertet alle lokalen LIVE-Runtimes unabhaengig von Shelly-/Energy-Polls.
+Er verwendet keinerlei eigene Health-Pings. Fuer sichere AUS-Aktionen nutzt er
+den normalen Aktorpfad, waehrend core.actuators gleichzeitig ein erneutes
+Einschalten blockiert.
 """
 
 from __future__ import annotations
@@ -98,8 +99,11 @@ def run_runtime_safety(runtime=None, *, now=None, enforce=True):
     previous = get_runtime_safety_snapshot(rt, now=now)
     snapshot = evaluate_runtime_safety(rt, now=now)
 
-    # Override zuerst atomar setzen. Dadurch kann ein parallel laufender
-    # Regelzyklus ab diesem Moment keinen blockierten EIN-Befehl mehr senden.
+    # Override und Heartbeat zuerst atomar setzen. Dadurch kann ein parallel
+    # laufender Regelzyklus ab diesem Moment keinen blockierten EIN-Befehl mehr
+    # senden. Eine danach nötige reale Safe-Off-Aktion darf am Shelly-Lock warten,
+    # ohne dass die Netzwerkkommunikation der eigentlichen Safety-Bewertung
+    # vorangestellt wird.
     store_runtime_safety(rt, snapshot)
     _log_transition(rt, previous, snapshot)
 
