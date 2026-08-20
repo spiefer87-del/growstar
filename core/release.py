@@ -15,6 +15,44 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.7",
+        "date": "2026-08-20",
+        "phase": "4V.7",
+        "title": "Safety-Supervisor-Regressionstest dauerhaft versionsunabhängig",
+        "summary": (
+            "Der Phase-4V.5-Regressionstest verlangt nicht mehr fälschlich, "
+            "dass Growstar weiterhin exakt auf Version 3.9.5 / Phase 4V.5 "
+            "laufen muss. Er schützt stattdessen dauerhaft die damals "
+            "eingeführte Safety-Supervisor-Entkopplung und prüft den "
+            "historischen Release-Eintrag."
+        ),
+        "changes": (
+            "tests/regression/check_safety_supervisor_thread.py verlangt nicht mehr, dass GROWSTAR_VERSION aktuell 3.9.5 ist.",
+            "Der Test verlangt nicht mehr, dass GROWSTAR_INTERNAL_PHASE aktuell 4V.5 ist.",
+            "Stattdessen sucht der Checker in RELEASES nach dem historischen Feature-Release 3.9.5 / Phase 4V.5.",
+            "Die eigentlichen Phase-4V.5-Funktionstests für den dedizierten Safety-Thread, das 2-Sekunden-Intervall, die fehlende direkte Shelly-Abhängigkeit, die Startreihenfolge und die Lock-Unabhängigkeit bleiben unverändert erhalten.",
+            "Die produktive Safety-Stale-Grenze von 6 Sekunden wird weiterhin unverändert geprüft.",
+            "Der Phase-4V.4-Shelly-RPC-Checker ist bereits seit 3.9.6 versionsunabhängig und bleibt unverändert.",
+            "Repository-Baseline und Notifications verwenden bereits dynamische beziehungsweise historische Release-Prüfungen und benötigen keine Änderung.",
+            "Damit sind die vier konsolidierten Regressionstests im aktuellen tests/regression-Verzeichnis von veralteten festen Aktuellversionsprüfungen bereinigt.",
+            "Regelung, Safety-Laufzeitlogik, Shelly-RPC, Aktor-Health, Telegram, Netzwerk, UI und Restart-Policy werden durch Phase 4V.7 nicht verändert.",
+            "Es werden keine Konfigurationswerte, Hardware-Zuordnungen oder Laufzeitdaten geändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.9.6 / Phase 4V.6.",
+            "core/release.py wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA ec050482489cdaa1b99257f22de87d91039394a9 verifiziert.",
+            "tests/regression/check_safety_supervisor_thread.py wurde gegen GitHub-Blob-SHA 4a8da00b6ea5aa8906ec5652bbf4e5f8cfb85d5f verifiziert.",
+            "Der feste Vergleich GROWSTAR_VERSION == 3.9.5 ist aus dem Phase-4V.5-Checker entfernt.",
+            "Der feste Vergleich GROWSTAR_INTERNAL_PHASE == 4V.5 ist aus dem Phase-4V.5-Checker entfernt.",
+            "Der historische RELEASES-Eintrag 3.9.5 / 4V.5 wird weiterhin explizit verlangt.",
+            "Der Phase-4V.4-Shelly-RPC-Checker wurde im aktuellen GitHub-main kontrolliert und verwendet bereits die historische 3.9.4 / 4V.4-Prüfung.",
+            "Die vier aktuellen Regressionstests wurden als Notifications, Repository-Baseline, Safety-Supervisor und Shelly-RPC identifiziert.",
+            "Die erzeugten Python-Dateien wurden syntaktisch per ast.parse validiert.",
+            "Die Release-Historie wurde geladen und bestätigt 3.9.7 / 4V.7 als neuen obersten Eintrag sowie 3.9.6 / 4V.6 direkt darunter.",
+            "Der korrigierte Safety-Supervisor-Regressionstest wurde in einer isolierten Testumgebung erfolgreich ausgeführt.",
+        ),
+    },
+    {
         "version": "3.9.6",
         "date": "2026-08-20",
         "phase": "4V.6",
