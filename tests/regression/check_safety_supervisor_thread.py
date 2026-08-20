@@ -123,10 +123,23 @@ def main():
 
     from core import release
 
+    # Phase 4V.7:
+    # Dieser Checker schützt die in 3.9.5 eingeführte Entkopplung des
+    # Safety-Supervisors. Er darf nicht verlangen, dass 3.9.5 dauerhaft die
+    # aktuelle Growstar-Version bleibt. Entscheidend ist, dass der historische
+    # Feature-Release weiterhin dokumentiert ist.
+    feature_release = next(
+        (
+            item
+            for item in release.RELEASES
+            if item.get("version") == "3.9.5"
+            and item.get("phase") == "4V.5"
+        ),
+        None,
+    )
     require(
-        release.GROWSTAR_VERSION == "3.9.5"
-        and release.GROWSTAR_INTERNAL_PHASE == "4V.5",
-        "Growstar meldet Version 3.9.5 / Phase 4V.5",
+        feature_release is not None,
+        "Feature-Release 3.9.5 / Phase 4V.5 bleibt in den Patch Notes dokumentiert",
     )
 
     safety_thread_source = read("threads/safety.py")
