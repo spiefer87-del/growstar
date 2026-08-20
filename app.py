@@ -29,6 +29,7 @@ from services.shelly import sync_relay
 
 from threads.mqtt import mqtt_thread
 from threads.shelly import shelly_background_loop
+from threads.safety import safety_supervisor_loop
 from threads.main import main_loop
 from threads.hardware import hardware_loop
 from threads.blu import start_blu_thread
@@ -224,6 +225,14 @@ def start_backend():
 
         try:
             _sync_all_relays(runtime=runtime)
+
+            # Phase 4V.5: Der Safety-Heartbeat besitzt bewusst einen eigenen
+            # Thread. Er darf nicht hinter Shelly-/Energy-Netzwerkzyklen warten.
+            _start_daemon_thread(
+                "growstar-safety",
+                safety_supervisor_loop,
+            )
+            print("🛡️ Safety Supervisor Thread gestartet")
 
             _start_daemon_thread(
                 "growstar-shelly",
