@@ -15,6 +15,46 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.5",
+        "date": "2026-08-20",
+        "phase": "4V.5",
+        "title": "Safety-Supervisor vom Shelly-Netzwerkthread entkoppelt",
+        "summary": (
+            "Der stationsbezogene Safety-Heartbeat läuft jetzt in einem eigenen "
+            "Daemon-Thread. Langsame Shelly-, Energy- oder Relay-Failsafe-Zyklen "
+            "können die reine Safety-Bewertung dadurch nicht mehr verzögern und "
+            "keinen falschen 'Safety Supervisor Heartbeat stale'-Fehler erzeugen."
+        ),
+        "changes": (
+            "Neue threads/safety.py führt den stationsübergreifenden Safety-Supervisor in einem eigenen growstar-safety Daemon-Thread aus.",
+            "Das bisherige 2-Sekunden-Safety-Intervall bleibt unverändert bestehen.",
+            "threads/shelly.py enthält ab 4V.5 keinen Safety-Zyklus und keinen äußeren Shelly-Lock mehr um run_all_live_safety.",
+            "Der Shelly-Background bleibt ausschließlich für Relay-Sync-Failsafe, Energie-Polling, Verlauf und Tagesreset zuständig.",
+            "Die normale Safety-Auswertung bleibt vollständig netzwerkfrei und liest weiterhin nur Runtime-State, Sensor-Freshness und den zentralen Aktor-Health-Cache.",
+            "Ein Safety-Snapshot inklusive Heartbeat und Overrides wird weiterhin atomar gespeichert, bevor eine eventuell nötige reale Safe-Off-Aktion ausgeführt wird.",
+            "Muss Safety einen Aktor wirklich AUS schalten, verwendet services.safety weiterhin set_device; der reale Shelly-Zugriff bleibt dadurch unter dem Transport-Lock aus Phase 4V.4.",
+            "Der 3.9.4-Shelly-RPC-Lock und der Aktor-Health-Retry bleiben vollständig erhalten.",
+            "Die bestehende Safety-Stale-Grenze von 6 Sekunden wird bewusst nicht erhöht; der Patch beseitigt die Blockierungsursache statt die Diagnose zu verstecken.",
+            "app.py startet den neuen Safety-Supervisor unabhängig und vor dem Shelly-Background-Thread.",
+            "Fehler einzelner Stationen bleiben wie bisher innerhalb run_all_live_safety isoliert und führen für die betroffene Runtime fail-closed zu Emergency-Safety.",
+            "Restart-Policy, Regelung, Sensorgrenzen, Telegram, Netzwerkmanagement und Hardware-Zuordnungen werden durch Phase 4V.5 nicht verändert.",
+            "Es werden keine neuen Konfigurationsschlüssel oder Migrationsdaten eingeführt.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist GitHub main Commit fb9bf81ac41198baa9773b7d2d05d01f45f22804 mit Growstar 3.9.4 / Phase 4V.4.",
+            "app.py, core/release.py, core/context.py, threads/shelly.py und services/safety.py wurden vor der Patch-Erzeugung gegen ihre aktuellen GitHub-Blob-SHAs verifiziert.",
+            "Der neue Safety-Thread enthält keinen Shelly-Lock, keine Requests- oder ShellyAPI-Abhängigkeit und delegiert ausschließlich an run_all_live_safety.",
+            "Ein Safety-Zyklus kann im Regressionstest ausgeführt werden, während ein anderer Thread den Shelly-Transport-Lock hält.",
+            "threads/shelly.py enthält weder run_all_live_safety noch SAFETY_INTERVAL und kann den Safety-Heartbeat damit nicht mehr durch Energy-/Relay-Polls verzögern.",
+            "app.py startet growstar-safety mit safety_supervisor_loop und behält growstar-shelly separat bei.",
+            "services/safety.py speichert den Snapshot weiterhin vor der physischen _enforce_snapshot-Aktion.",
+            "Der produktive Safety-Stale-Schwellwert in core/safety.py bleibt unverändert bei 6 Sekunden.",
+            "Der bestehende Phase-4V.4-Shelly-RPC-Regressionstest bleibt zusätzlich ausführbar.",
+            "Notification- und Repository-Baseline-Regressionen bleiben zusätzlich ausführbar.",
+            "core/release.py meldet Version 3.9.5 und Build-Kennung 4V.5.",
+        ),
+    },
+    {
         "version": "3.9.4",
         "date": "2026-08-19",
         "phase": "4V.4",
