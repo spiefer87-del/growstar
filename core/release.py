@@ -15,6 +15,43 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.9.6",
+        "date": "2026-08-20",
+        "phase": "4V.6",
+        "title": "Shelly-RPC-Regressionstest von der aktuellen Version entkoppelt",
+        "summary": (
+            "Der Phase-4V.4-Regressionstest prüft nicht mehr fälschlich, dass "
+            "Growstar weiterhin exakt auf Version 3.9.4 / Phase 4V.4 laufen "
+            "muss. Stattdessen schützt er dauerhaft die damals eingeführte "
+            "Shelly-RPC-Funktionalität und bestätigt den historischen Release-Eintrag."
+        ),
+        "changes": (
+            "tests/regression/check_shelly_rpc_coordination.py verlangt nicht mehr, dass GROWSTAR_VERSION aktuell 3.9.4 ist.",
+            "Der Test verlangt nicht mehr, dass GROWSTAR_INTERNAL_PHASE aktuell 4V.4 ist.",
+            "Stattdessen sucht der Checker in RELEASES nach dem historischen Feature-Release 3.9.4 / Phase 4V.4.",
+            "Die eigentlichen Phase-4V.4-Funktionstests für RLock, Shelly-RPC-Serialisierung, diagnostische Relay-Probe und Aktor-Health-Retry bleiben unverändert erhalten.",
+            "Der Checker bleibt dadurch bei 3.9.6 und zukünftigen Growstar-Patches wiederverwendbar.",
+            "Der Repository-Baseline-Test benötigt keine Änderung, weil er die aktuelle Version bereits dynamisch aus RELEASES[0] ableitet.",
+            "Der Alarm-&-Notifications-Test benötigt keine Änderung, weil er ältere Feature-Releases bereits als historische RELEASES-Einträge prüft.",
+            "Eine GitHub-Codeprüfung auf GROWSTAR_VERSION hat keinen weiteren historischen Regressionstest mit derselben 3.9.4-Fehlannahme ergeben.",
+            "Regelung, Safety-Supervisor, Shelly-RPC-Laufzeitcode, Aktor-Health, Telegram, Netzwerk und Benutzeroberfläche werden durch Phase 4V.6 nicht verändert.",
+            "Es werden keine Konfigurationswerte, Hardware-Zuordnungen oder Laufzeitdaten geändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand nach Growstar 3.9.5 / Phase 4V.5; letzter vor dem Build geprüfter Commit ist 005949f811d2af609694e03c882e0e04038f0e40.",
+            "core/release.py wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA 5316d9e89db8990a01d4d988ea7484549c095c3e verifiziert.",
+            "tests/regression/check_shelly_rpc_coordination.py wurde gegen GitHub-Blob-SHA 59dc30c50b89f05ce6145d0de690c00d97f88f01 verifiziert.",
+            "Der feste Vergleich GROWSTAR_VERSION == 3.9.4 ist aus dem Phase-4V.4-Checker entfernt.",
+            "Der feste Vergleich GROWSTAR_INTERNAL_PHASE == 4V.4 ist aus dem Phase-4V.4-Checker entfernt.",
+            "Der historische RELEASES-Eintrag 3.9.4 / 4V.4 wird weiterhin explizit verlangt.",
+            "Der Repository-Baseline-Test wurde geprüft und leitet Version und Phase bereits dynamisch vom obersten RELEASES-Eintrag ab.",
+            "Der Notifications-Regressionstest wurde geprüft und verwendet für ältere Features bereits historische Release-Suchen.",
+            "Die erzeugten Python-Dateien wurden syntaktisch per ast.parse validiert.",
+            "Die Release-Historie wurde geladen und bestätigt 3.9.6 / 4V.6 als neuen obersten Eintrag sowie 3.9.5 / 4V.5 direkt darunter.",
+            "Der neue historische 3.9.4-Release-Check wurde gegen die erzeugte 3.9.6-Release-Historie erfolgreich ausgeführt.",
+        ),
+    },
+    {
         "version": "3.9.5",
         "date": "2026-08-20",
         "phase": "4V.5",
