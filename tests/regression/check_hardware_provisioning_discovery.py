@@ -230,6 +230,133 @@ def main():
         "Power-Strip-Gen4-Name erzeugt den passenden unverbindlichen Modell-Hinweis",
     )
 
+    require(
+        candidate.get("rssi") == -48,
+        "Bluetooth-Discovery liefert einen plausiblen RSSI-Wert",
+    )
+
+    require(
+        provisioning.ShellyProvisioningDiscovery._normalize_mac(
+            "48F6EEBFAD10"
+        ) == "48:F6:EE:BF:AD:10"
+        and provisioning.ShellyProvisioningDiscovery._normalize_mac(
+            "48:f6:ee:bf:ad:10"
+        ) == "48:F6:EE:BF:AD:10",
+        "Shelly-Geräte-MAC wird stabil normalisiert",
+    )
+
+    plug_candidate = {
+        "address": "48:F6:EE:BF:AD:12",
+        "name": "ShellyPlugMG3-48F6EEBFAD10",
+        "alias": "ShellyPlugMG3-48F6EEBFAD10",
+        "manufacturer": "Shelly",
+        "read_only": True,
+    }
+
+    known_classification = (
+        provisioning.ShellyProvisioningDiscovery.classify_candidates(
+            [plug_candidate],
+            [
+                {
+                    "id": "192.168.178.88",
+                    "name": "Shelly Plug Mini Gen3",
+                    "model": "S3PL-00112EU",
+                    "manufacturer": "Shelly",
+                    "ip": "192.168.178.88",
+                    "mac": "48F6EEBFAD10",
+                    "online": True,
+                }
+            ],
+        )
+    )
+
+    known_candidate = known_classification["candidates"][0]
+
+    require(
+        known_candidate.get("identity_mac") == "48:F6:EE:BF:AD:10"
+        and known_candidate.get("inventory_state") == "known"
+        and known_candidate.get("provisioned") is True
+        and known_candidate.get("known_gateway", {}).get("ip") == "192.168.178.88"
+        and known_classification.get("known_count") == 1,
+        "Advertised Shelly-MAC erkennt ein bereits vorhandenes Growstar-Gateway",
+    )
+
+    require(
+        known_candidate.get("address") == "48:F6:EE:BF:AD:12"
+        and known_candidate.get("identity_mac") == "48:F6:EE:BF:AD:10",
+        "Bluetooth-Adresse und Shelly-Geräte-MAC bleiben bewusst getrennt",
+    )
+
+    new_classification = (
+        provisioning.ShellyProvisioningDiscovery.classify_candidates(
+            [
+                {
+                    "address": "D8:85:AC:E2:43:A2",
+                    "name": "ShellyPStripG4-A1B2C3D4E5F6",
+                    "manufacturer": "Shelly",
+                    "read_only": True,
+                }
+            ],
+            [
+                {
+                    "id": "192.168.178.88",
+                    "mac": "48:F6:EE:BF:AD:10",
+                    "online": True,
+                }
+            ],
+        )
+    )
+
+    require(
+        new_classification["candidates"][0].get("identity_mac")
+        == "A1:B2:C3:D4:E5:F6"
+        and new_classification["candidates"][0].get("inventory_state") == "new"
+        and new_classification["candidates"][0].get("provisioned") is False
+        and new_classification.get("new_count") == 1,
+        "Eindeutige unbekannte Shelly-Geräte-MAC wird als neues Gerät markiert",
+    )
+
+    unknown_classification = (
+        provisioning.ShellyProvisioningDiscovery.classify_candidates(
+            [
+                {
+                    # Absichtlich dieselbe Adresse wie die bekannte Gateway-MAC:
+                    # BLE-Adresse allein darf niemals für den Bestandsabgleich
+                    # verwendet werden.
+                    "address": "48:F6:EE:BF:AD:10",
+                    "name": "Generic Device",
+                    "manufacturer": "Shelly",
+                    "read_only": True,
+                }
+            ],
+            [
+                {
+                    "id": "192.168.178.88",
+                    "mac": "48:F6:EE:BF:AD:10",
+                    "online": True,
+                }
+            ],
+        )
+    )
+
+    require(
+        unknown_classification["candidates"][0].get("identity_mac") is None
+        and unknown_classification["candidates"][0].get("inventory_state") == "unknown"
+        and unknown_classification["candidates"][0].get("provisioned") is None
+        and unknown_classification.get("unknown_count") == 1,
+        "Bluetooth-Adresse allein erzeugt bewusst keinen Growstar-Bestandstreffer",
+    )
+
+    require(
+        provisioning.ShellyProvisioningDiscovery._rssi_from_observed_lines(
+            [
+                "[NEW] Device 11:22:33:44:55:66 ShellyPStripG4-A1B2C3D4E5F6",
+                "[CHG] Device 11:22:33:44:55:66 RSSI: -57",
+            ]
+        ) == -57,
+        "RSSI kann read-only direkt aus dem aktiven Bluetooth-Scan übernommen werden",
+    )
+
     manufacturer_candidate = run_fake_discovery(
         provisioning,
         manufacturer_only=True,
@@ -306,6 +433,15 @@ def main():
         "Read-only Provisioning-Status-API ist registriert",
     )
 
+    require(
+        "gateway_snapshot" in routes
+        and "classify_candidates(" in routes
+        and 'result["known_count"]' in routes
+        and 'result["new_count"]' in routes
+        and 'result["unknown_count"]' in routes,
+        "Provisioning-Route gleicht Kandidaten read-only mit dem vorhandenen Gateway-Snapshot ab",
+    )
+
     service = read("services/hardware.py")
 
     require(
@@ -367,6 +503,22 @@ def main():
         "noch keine WLAN-Daten" in template
         or "keine WLAN-Daten" in template,
         "Hardware-UI kennzeichnet Phase 4W ausdrücklich als noch nicht provisionierend",
+    )
+
+    require(
+        "BEREITS IN GROWSTAR" in template
+        and "NEU · READ-ONLY" in template
+        and "IDENTITÄT UNKLAR · READ-ONLY" in template
+        and "Geräte-MAC" in template
+        and "Bluetooth " in template,
+        "Hardware-UI trennt bekannte, neue und unklare Shelly-Identitäten sichtbar",
+    )
+
+    require(
+        "candidate.known_gateway" in template
+        and "candidate.identity_mac" in template
+        and "candidate.address" in template,
+        "Hardware-UI zeigt Geräte-MAC und Bluetooth-Adresse als getrennte Identitäten",
     )
 
     release_spec = importlib.util.spec_from_file_location(
