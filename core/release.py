@@ -15,6 +15,49 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.4",
+        "date": "2026-08-21",
+        "phase": "4W.4",
+        "title": "Sicherer BLE-RPC-Preflight vor der Shelly-WLAN-Erstinbetriebnahme",
+        "summary": (
+            "Eindeutig neue Shellys können jetzt vor der eigentlichen "
+            "WLAN-Provisionierung kontrolliert auf ihren offiziellen "
+            "Shelly-RPC-GATT-Service geprüft werden. Growstar revalidiert "
+            "das Gerät unmittelbar vor dem Connect, verbindet nur temporär "
+            "und trennt anschließend wieder."
+        ),
+        "changes": (
+            "Der bisherige Bluetooth-Discovery-Lauf bleibt unverändert verbindungslos und führt weiterhin keinen Connect aus.",
+            "Für eindeutig als neu klassifizierte Shellys ergänzt core/hardware/shelly/provisioning.py einen expliziten read-only BLE-RPC-Preflight.",
+            "Der Preflight verwendet die offizielle Shelly-RPC-GATT-Service-UUID 5f6d4f53-5f52-5043-5f53-56435f49445f.",
+            "Vor dem Preflight führt die API einen frischen kurzen Bluetooth-Scan aus und gleicht den Kandidaten erneut gegen den aktuellen Growstar-Hardwarebestand ab.",
+            "Bereits bekannte Geräte sowie Kandidaten mit unklarer Geräteidentität werden serverseitig vor jedem Bluetooth-Connect blockiert.",
+            "Die vom Browser gesendete Bluetooth-Adresse allein reicht ausdrücklich nicht aus, um einen Connect auszulösen.",
+            "Der Preflight führt ausschließlich bluetoothctl info/connect/info/disconnect aus; kein Pairing, Trust, Remove, Power-Umschalten oder GATT-Schreibzugriff wird ausgeführt.",
+            "Nach einem von Growstar aufgebauten Preflight-Connect wird die Bluetooth-Verbindung in einem finally-Pfad wieder getrennt.",
+            "Ist der Shelly-RPC-Service verfügbar, meldet Growstar BLE-RPC bereit; es wird noch kein RPC-Methodenaufruf ausgeführt.",
+            "Ist der Shelly-RPC-Service nicht verfügbar, weist Growstar auf ein möglicherweise abgelaufenes initiales Provisionierungsfenster hin und empfiehlt einen kurzen Power-Cycle.",
+            "Die Hardware-Oberfläche zeigt den Button BLE-RPC prüfen ausschließlich bei Kandidaten im Zustand NEU READ-ONLY.",
+            "Phase 4W.4 liest noch kein WLAN-Passwort, überträgt keine WLAN-Zugangsdaten, ruft kein Wifi.SetConfig auf und schreibt nichts in Hardware-Inventar oder Stations-Zuordnungen.",
+            "Bestehende Gateway-, BTHome-, Aktor-, Safety-, Netzwerk- und Regelungslogik bleiben unverändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.3 / Phase 4W.3.",
+            "Alle fünf als Basis verwendeten Dateien wurden vor der Patch-Erzeugung bytegenau gegen ihre aktuellen GitHub-Blob-SHAs verifiziert.",
+            "Der bestehende Discovery-Regressionspfad bestätigt weiterhin, dass ein normaler Scan weder connect noch pair, trust, remove oder power ausführt.",
+            "Der neue Preflight-Test bestätigt einen temporären Connect und den anschließenden Disconnect.",
+            "Der offizielle Shelly-RPC-GATT-Service wird in einem simulierten ServicesResolved-Status korrekt erkannt.",
+            "Ein fehlender RPC-Service wird kontrolliert als rpc-unavailable gemeldet, ohne einen Provisionierungsversuch auszuführen.",
+            "Der Preflight führt weiterhin kein pair, trust, remove, power oder GATT-write aus.",
+            "Ein bereits als known klassifiziertes Growstar-Gerät wird vor jedem Bluetooth-Connect blockiert.",
+            "Die API enthält die serverseitige Revalidierung durch frischen Scan plus aktuellen Gateway-Snapshot.",
+            "Die Hardware-UI enthält den Preflight-Endpunkt ausschließlich im neuen-Gerät-Pfad.",
+            "Die bestehenden Schutzprüfungen gegen Wifi.SetConfig, nmcli, HardwareManager-Schreibzugriffe und shell=True bleiben aktiv.",
+            "Alle geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.4 / 4W.4 als neuen obersten Eintrag und 3.10.3 / 4W.3 direkt darunter.",
+        ),
+    },
+    {
         "version": "3.10.3",
         "date": "2026-08-21",
         "phase": "4W.3",
