@@ -110,6 +110,24 @@ def register(app):
                 seconds=data.get("seconds")
             )
 
+            if result.get("success"):
+                gateway_snapshot = [
+                    gateway.to_dict()
+                    for gateway in hardware.gateways()
+                ]
+
+                classification = (
+                    provisioning_discovery.classify_candidates(
+                        result.get("candidates") or [],
+                        gateway_snapshot,
+                    )
+                )
+
+                result["candidates"] = classification["candidates"]
+                result["known_count"] = classification["known_count"]
+                result["new_count"] = classification["new_count"]
+                result["unknown_count"] = classification["unknown_count"]
+
             return jsonify({
                 "success": bool(result.get("success")),
                 "mode": "provisioning",
