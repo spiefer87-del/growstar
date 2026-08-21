@@ -49,9 +49,16 @@ class Completed:
 
 
 class FakeBluetoothctl:
-    def __init__(self, *, manufacturer_only=False):
+    def __init__(
+        self,
+        *,
+        manufacturer_only=False,
+        rpc_service=True,
+    ):
         self.commands = []
         self.manufacturer_only = manufacturer_only
+        self.rpc_service = rpc_service
+        self.connected = False
 
     def which(self, name):
         if name == "bluetoothctl":
@@ -107,6 +114,17 @@ class FakeBluetoothctl:
                 if self.manufacturer_only
                 else "ShellyPStripG4-A1B2C3D4E5F6"
             )
+
+            rpc_lines = ""
+
+            if self.connected:
+                rpc_lines += "\tServicesResolved: yes\n"
+                if self.rpc_service:
+                    rpc_lines += (
+                        "\tUUID: Vendor specific "
+                        "(5f6d4f53-5f52-5043-5f53-56435f49445f)\n"
+                    )
+
             return Completed(
                 stdout=(
                     "Device 11:22:33:44:55:66\n"
@@ -114,10 +132,23 @@ class FakeBluetoothctl:
                     f"\tAlias: {name}\n"
                     "\tPaired: no\n"
                     "\tTrusted: no\n"
-                    "\tConnected: no\n"
+                    f"\tConnected: {'yes' if self.connected else 'no'}\n"
                     "\tRSSI: -48\n"
                     "\tManufacturerData Key: 0x0ba9 (2985)\n"
+                    + rpc_lines
                 )
+            )
+
+        if tail == ["connect", "11:22:33:44:55:66"]:
+            self.connected = True
+            return Completed(
+                stdout="Connection successful\n"
+            )
+
+        if tail == ["disconnect", "11:22:33:44:55:66"]:
+            self.connected = False
+            return Completed(
+                stdout="Successful disconnected\n"
             )
 
         if tail == ["info", "22:33:44:55:66:77"]:
@@ -206,6 +237,83 @@ def run_fake_discovery(module, *, manufacturer_only=False):
         )
 
     return candidate
+
+
+def run_fake_rpc_preflight(module, *, rpc_service=True):
+    fake = FakeBluetoothctl(
+        rpc_service=rpc_service
+    )
+
+    discovery = module.ShellyProvisioningDiscovery(
+        runner=fake.run,
+        which=fake.which,
+        scan_seconds=8,
+        sleeper=lambda _seconds: None,
+    )
+
+    candidate = {
+        "address": "11:22:33:44:55:66",
+        "identity_mac": "A1:B2:C3:D4:E5:F6",
+        "inventory_state": "new",
+        "read_only": True,
+    }
+
+    result = discovery.rpc_preflight(
+        candidate
+    )
+
+    require(
+        result.get("success") is True,
+        "BLE-RPC-Preflight beendet kontrolliert",
+    )
+
+    require(
+        result.get("rpc_ready") is bool(rpc_service),
+        "BLE-RPC-Preflight unterscheidet vorhandenen und fehlenden RPC-Service",
+    )
+
+    require(
+        result.get("connected_temporarily") is True
+        and result.get("disconnected_after_check") is True,
+        "BLE-RPC-Preflight verbindet nur temporär und trennt danach wieder",
+    )
+
+    command_tails = [
+        command[1:]
+        for command in fake.commands
+    ]
+
+    require(
+        ["connect", "11:22:33:44:55:66"] in command_tails
+        and ["disconnect", "11:22:33:44:55:66"] in command_tails,
+        "Preflight verwendet genau den begrenzten Connect/Disconnect-Pfad",
+    )
+
+    all_tokens = [
+        str(token).lower()
+        for command in fake.commands
+        for token in command[1:]
+    ]
+
+    for forbidden in (
+        "pair",
+        "trust",
+        "remove",
+        "power",
+        "write",
+    ):
+        require(
+            forbidden not in all_tokens,
+            f"BLE-RPC-Preflight führt keinen bluetoothctl-{forbidden}-Befehl aus",
+        )
+
+    require(
+        fake.connected is False,
+        "Simulierte Shelly-Verbindung ist nach dem Preflight getrennt",
+    )
+
+    return result
+
 
 
 def main():
@@ -357,6 +465,57 @@ def main():
         "RSSI kann read-only direkt aus dem aktiven Bluetooth-Scan übernommen werden",
     )
 
+    rpc_ready_result = run_fake_rpc_preflight(
+        provisioning,
+        rpc_service=True,
+    )
+
+    require(
+        rpc_ready_result.get("state") == "rpc-ready"
+        and provisioning.SHELLY_RPC_SERVICE_UUID
+        in rpc_ready_result.get("service_uuids", []),
+        "Offizielle Shelly-RPC-GATT-Service-UUID wird erkannt",
+    )
+
+    rpc_locked_result = run_fake_rpc_preflight(
+        provisioning,
+        rpc_service=False,
+    )
+
+    require(
+        rpc_locked_result.get("state") == "rpc-unavailable"
+        and rpc_locked_result.get("rpc_ready") is False,
+        "Fehlender Shelly-RPC-Service wird ohne Provisionierungsversuch gemeldet",
+    )
+
+    fake_blocked = FakeBluetoothctl()
+    blocked_discovery = provisioning.ShellyProvisioningDiscovery(
+        runner=fake_blocked.run,
+        which=fake_blocked.which,
+        sleeper=lambda _seconds: None,
+    )
+
+    try:
+        blocked_discovery.rpc_preflight({
+            "address": "11:22:33:44:55:66",
+            "identity_mac": "A1:B2:C3:D4:E5:F6",
+            "inventory_state": "known",
+        })
+    except provisioning.BluetoothDiscoveryError:
+        pass
+    else:
+        raise AssertionError(
+            "Bekanntes Growstar-Gerät wurde nicht vom Preflight blockiert"
+        )
+
+    require(
+        not any(
+            "connect" in [str(token).lower() for token in command[1:]]
+            for command in fake_blocked.commands
+        ),
+        "Bereits bekanntes Growstar-Gerät wird vor jedem Bluetooth-Connect blockiert",
+    )
+
     manufacturer_candidate = run_fake_discovery(
         provisioning,
         manufacturer_only=True,
@@ -431,6 +590,15 @@ def main():
     require(
         '@app.get("/api/hardware/provisioning/status")' in routes,
         "Read-only Provisioning-Status-API ist registriert",
+    )
+
+    require(
+        '@app.post("/api/hardware/provisioning/preflight")' in routes
+        and "provisioning_discovery.scan(" in routes
+        and 'candidate.get("inventory_state") == "known"' in routes
+        and 'candidate.get("inventory_state") != "new"' in routes
+        and "provisioning_discovery.rpc_preflight(" in routes,
+        "BLE-RPC-Preflight revalidiert das Gerät serverseitig vor jedem Connect",
     )
 
     require(
@@ -519,6 +687,13 @@ def main():
         and "candidate.identity_mac" in template
         and "candidate.address" in template,
         "Hardware-UI zeigt Geräte-MAC und Bluetooth-Adresse als getrennte Identitäten",
+    )
+
+    require(
+        "BLE-RPC prüfen" in template
+        and "/api/hardware/provisioning/preflight" in template
+        and 'candidate.inventory_state !== "new"' in template,
+        "Hardware-UI bietet den BLE-RPC-Preflight ausschließlich für neue Kandidaten an",
     )
 
     release_spec = importlib.util.spec_from_file_location(
