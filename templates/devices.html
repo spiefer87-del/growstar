@@ -374,7 +374,9 @@ h3{
 
 <div class="grid" id="gateway-grid">
 
-<div class="card">
+<div
+class="card"
+data-static-gateway-card="true">
 
 <h2>🔎 LAN-Gateway suchen</h2>
 
@@ -395,7 +397,9 @@ LAN-Gateways suchen
 
 </div>
 
-<div class="card">
+<div
+class="card"
+data-static-gateway-card="true">
 
 <h2>✨ Neue Shelly ohne Hersteller-App</h2>
 
@@ -925,18 +929,25 @@ function renderGateways(gateways){
     const grid =
         document.getElementById("gateway-grid");
 
-    const firstCard =
-        grid.firstElementChild;
+    // Phase 4W.2:
+    // Der Gateway-Renderer darf nur dynamische Gateway-Karten ersetzen.
+    // Alle statischen Aktionskarten (LAN-Scan + Factory-Discovery und
+    // zukünftige weitere Aktionen) bleiben beim /api/hardware-Refresh erhalten.
+    const staticCards = Array.from(
+        grid.querySelectorAll(
+            '[data-static-gateway-card="true"]'
+        )
+    );
 
     grid.innerHTML = "";
 
-    if(firstCard){
+    staticCards.forEach(card=>{
 
         grid.appendChild(
-            firstCard
+            card
         );
 
-    }
+    });
 
     gateways.forEach(gateway=>{
 
