@@ -642,7 +642,11 @@ async function scanGateways(){
 
 function provisioningName(candidate){
 
+    const knownGateway =
+        candidate.known_gateway || {};
+
     return (
+        knownGateway.name ||
         candidate.model_name_hint ||
         candidate.name ||
         candidate.alias ||
@@ -670,10 +674,10 @@ function renderProvisioningCandidates(candidates){
 
         container.innerHTML = `
             <div class="provisioning-device">
-                <strong>Keine neue Shelly erkannt</strong>
+                <strong>Keine Shelly erkannt</strong>
                 <div class="sub">
-                    Falls das Gerät fabrikneu ist, kurz einschalten bzw.
-                    neu starten und den Scan erneut ausführen.
+                    Gerät kurz einschalten bzw. neu starten und den Scan
+                    erneut ausführen.
                 </div>
             </div>
         `;
@@ -684,29 +688,110 @@ function renderProvisioningCandidates(candidates){
 
     candidates.forEach(candidate=>{
 
-        const item = document.createElement("div");
+        const item =
+            document.createElement("div");
 
-        item.className = "provisioning-device";
+        item.className =
+            "provisioning-device";
 
-        const state = candidate.paired
-            ? "Bereits Bluetooth-gepairt"
-            : "Nicht gepairt";
+        const inventoryState =
+            candidate.inventory_state || "unknown";
+
+        const known =
+            inventoryState === "known";
+
+        const fresh =
+            inventoryState === "new";
+
+        const knownGateway =
+            candidate.known_gateway || {};
+
+        const bluetoothState =
+            candidate.paired
+                ? "Bluetooth gepairt"
+                : "Bluetooth nicht gepairt";
+
+        const identityMac =
+            known
+                ? (knownGateway.mac || candidate.identity_mac)
+                : candidate.identity_mac;
+
+        const icon =
+            known
+                ? "✅"
+                : (fresh ? "✨" : "⚠️");
+
+        const badge =
+            known
+                ? "BEREITS IN GROWSTAR"
+                : (
+                    fresh
+                        ? "NEU · READ-ONLY"
+                        : "IDENTITÄT UNKLAR · READ-ONLY"
+                );
+
+        let inventoryDetails = "";
+
+        if(known){
+
+            inventoryDetails = `
+                <div class="sub">
+                    IP ${escapeHtml(knownGateway.ip || "--")} ·
+                    ${knownGateway.online ? "ONLINE" : "zuletzt bekannt"}
+                </div>
+                <div class="provisioning-note">
+                    Dieses Gerät ist bereits im Growstar-Hardwarebestand.
+                    Bluetooth-Pairing ist dafür nicht erforderlich.
+                    Eine erneute Erstinbetriebnahme wird nicht angeboten.
+                </div>
+            `;
+
+        }
+        else if(fresh){
+
+            inventoryDetails = `
+                <div class="provisioning-note">
+                    Eindeutige Shelly-Gerätekennung erkannt und noch nicht
+                    im Growstar-Hardwarebestand gefunden. Es wurden weiterhin
+                    keine WLAN-Daten übertragen.
+                </div>
+            `;
+
+        }
+        else{
+
+            inventoryDetails = `
+                <div class="provisioning-note">
+                    Shelly erkannt, aber noch keine eindeutige Geräte-MAC aus
+                    dem Advertised Name ableitbar. Dieses Gerät bleibt deshalb
+                    von einer späteren Erstinbetriebnahme ausgeschlossen.
+                </div>
+            `;
+
+        }
 
         item.innerHTML = `
-            <strong>✨ ${escapeHtml(provisioningName(candidate))}</strong>
-            <div class="sub">Adresse ${escapeHtml(candidate.address || "--")}</div>
-            <div class="sub">RSSI ${candidate.rssi ?? "--"} dBm · ${escapeHtml(state)}</div>
+            <strong>${icon} ${escapeHtml(provisioningName(candidate))}</strong>
+            ${identityMac
+                ? `<div class="sub">Geräte-MAC ${escapeHtml(identityMac)}</div>`
+                : `<div class="sub">Geräte-MAC noch nicht eindeutig</div>`}
+            <div class="sub">
+                Bluetooth ${escapeHtml(candidate.address || "--")}
+            </div>
+            <div class="sub">
+                RSSI ${candidate.rssi ?? "--"} dBm ·
+                ${escapeHtml(bluetoothState)}
+            </div>
             ${candidate.model_hint
                 ? `<div class="sub">Modell-Hinweis ${escapeHtml(candidate.model_hint)}</div>`
                 : ""}
-            <div class="badge online">ERKANNT · READ-ONLY</div>
-            <div class="provisioning-note">
-                Noch keine WLAN-Daten übertragen. Die eigentliche
-                Erstinbetriebnahme folgt im nächsten sicheren Schritt.
-            </div>
+            <div class="badge online">${escapeHtml(badge)}</div>
+            ${inventoryDetails}
         `;
 
-        container.appendChild(item);
+        container.appendChild(
+            item
+        );
 
     });
 
@@ -855,8 +940,13 @@ async function scanProvisioningDevices(){
 
         status.textContent =
             (result.count || 0) +
-            " Shelly-Kandidat(en) erkannt · " +
-            "keine Gerätekonfiguration verändert.";
+            " Shelly erkannt · " +
+            (result.known_count || 0) +
+            " bereits in Growstar · " +
+            (result.new_count || 0) +
+            " neu · " +
+            (result.unknown_count || 0) +
+            " Identität unklar.";
 
     }
 
