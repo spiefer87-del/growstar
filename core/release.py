@@ -15,6 +15,50 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.0",
+        "date": "2026-08-21",
+        "phase": "4W",
+        "title": "Herstellerfreie Hardware-Erstinbetriebnahme – Discovery-Basis",
+        "summary": (
+            "Growstar kann nun über den lokalen Bluetooth-Adapter des Raspberry "
+            "nach fabrikneuen Shelly-Geräten suchen, ohne die Shelly-App zu "
+            "benötigen. Phase 4W bleibt absichtlich read-only: Es werden noch "
+            "keine WLAN-Zugangsdaten übertragen, keine Geräte gepairt und keine "
+            "Relais geschaltet."
+        ),
+        "changes": (
+            "Vor der Implementierung wurden Gateway-Scan, Shelly-LAN-Discovery, BTHome/BLE-Gateway-Scan, HardwareManager, Recovery und Hardware-Oberfläche auf dem aktuellen GitHub-main geprüft.",
+            "Der bestehende HardwareScanner und ShellyDiscovery bleiben unverändert für bereits im LAN erreichbare Shelly-Gateways zuständig.",
+            "Der bestehende Shelly-Gateway-BTHome-Scan bleibt unverändert für BLU/BTHome-Sensoren zuständig und wird nicht für die Hersteller-App-freie Erstinbetriebnahme zweckentfremdet.",
+            "Neue core/hardware/shelly/provisioning.py ergänzt ausschließlich die bisher fehlende lokale Raspberry-/BlueZ-Erkennung fabrikneuer Shellys.",
+            "Der Discovery-Adapter verwendet bluetoothctl mit festen Argumentlisten ohne shell=True und validiert Bluetooth-Adressen vor Detailabfragen.",
+            "Shelly-Kandidaten werden über den beworbenen Namen beziehungsweise die Shelly/Allterco ManufacturerData-Kennung 0x0BA9 erkannt.",
+            "Ein passender Power-Strip-Gen4-Advertised-Name kann als unverbindlicher Modell-Hinweis S4PL-00416EU angezeigt werden; die endgültige Modellidentität bleibt nach der Provisionierung Aufgabe von Shelly.GetDeviceInfo und dem vorhandenen MODEL_NAMES-Katalog.",
+            "Gefundene Erstinbetriebnahme-Kandidaten bleiben flüchtig und werden bewusst nicht in instance/hardware_inventory.json oder den HardwareManager geschrieben.",
+            "Der vorhandene POST-Endpunkt /api/hardware/scan bleibt für den LAN-Gateway-Scan rückwärtskompatibel und unterstützt zusätzlich den expliziten Modus provisioning.",
+            "Neue GET-Diagnose /api/hardware/provisioning/status zeigt, ob bluetoothctl und der lokale Raspberry-Bluetooth-Adapter für die Erkennung bereit sind.",
+            "Die Hardware-Seite trennt jetzt sichtbar zwischen 'LAN-Gateway suchen' für bereits eingerichtete Shellys und 'Neue Shelly ohne Hersteller-App' für fabrikneue Geräte.",
+            "Phase 4W verändert kein Raspberry-WLAN, überträgt kein WLAN-Passwort, führt kein Pairing/Trust/Connect aus, schaltet keine Shelly-Ausgänge und verändert keine Stations-Zuordnungen.",
+            "Das bereits vorhandene Modell S4PL-00416EU für die Shelly Power Strip bleibt unverändert im bestehenden Shelly-Modellkatalog.",
+            "Die vorhandene Hardware-Recovery bleibt unverändert und startet weiterhin keine versteckten Pairings unbekannter Geräte.",
+            "Die eigentliche sichere WLAN-Provisionierung wird erst auf dieser getesteten Discovery-Basis in einem folgenden Schritt ergänzt.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist GitHub main Commit 260a6bce549a5845b5ff987553cd8a71cf24f624 mit Growstar 3.9.7 / Phase 4V.7.",
+            "routes/hardware.py, templates/devices.html und core/release.py wurden vor der Patch-Erzeugung per Git-Blob-SHA gegen den aktuellen GitHub-main verifiziert.",
+            "Der neue Discovery-Parser erkennt einen Shelly Power Strip Gen4 anhand eines Shelly-Advertised-Namens.",
+            "Der neue Discovery-Parser erkennt einen Shelly auch ohne eindeutigen Namen anhand ManufacturerData Key 0x0BA9.",
+            "Ein fremdes Bluetooth-Gerät ohne Shelly-Namen und ohne Shelly-ManufacturerData wird nicht als Provisioning-Kandidat ausgegeben.",
+            "Der Regressionstest verwendet einen simulierten bluetoothctl-Runner und berührt damit weder den echten Raspberry-Bluetooth-Adapter noch reale Geräte.",
+            "Der neue Discovery-Pfad enthält kein pair, trust, connect, Wifi.SetConfig, nmcli oder HardwareManager-Persistenz.",
+            "Der bestehende /api/hardware/scan-Endpunkt und scanner.register(ShellyDiscovery()) bleiben weiterhin vorhanden.",
+            "Der neue provisioning-Modus wird ausschließlich auf ausdrückliche Benutzeraktion gestartet und nicht in Hardware-Recovery oder Background-Threads eingebaut.",
+            "Die vorhandene S4PL-00416EU-Modellkennung wird weiterhin im Shelly-Modellkatalog verlangt.",
+            "Die geänderten Python-Dateien wurden syntaktisch validiert und der neue Regressionstest lokal mit simuliertem BlueZ-Output ausgeführt.",
+            "Der Feature-Test prüft 3.10.0 / 4W als historischen RELEASES-Eintrag und bleibt dadurch bei späteren Growstar-Versionen wiederverwendbar.",
+        ),
+    },
+    {
         "version": "3.9.7",
         "date": "2026-08-20",
         "phase": "4V.7",
