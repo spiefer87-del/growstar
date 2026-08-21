@@ -15,6 +15,40 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.1",
+        "date": "2026-08-21",
+        "phase": "4W.1",
+        "title": "Hardware-Discovery-Regressionstest ohne Kommentar-False-Positive",
+        "summary": (
+            "Der Phase-4W-Regressionstest wertet den erklärenden Begriff "
+            "'HardwareManager' in Docstrings nicht mehr fälschlich als "
+            "produktiven Mutationspfad. Statt einer pauschalen Textsuche prüft "
+            "der Test jetzt echte Python-Imports und Namensreferenzen."
+        ),
+        "changes": (
+            "tests/regression/check_hardware_provisioning_discovery.py entfernt den fehlerhaften pauschalen Textcheck auf 'hardwaremanager'.",
+            "Der Test parst core/hardware/shelly/provisioning.py nun per AST und prüft, dass core.hardware.manager nicht importiert wird.",
+            "Zusätzlich wird geprüft, dass kein echter Python-Name HardwareManager im Discovery-Code referenziert wird.",
+            "Die bestehenden Schutzprüfungen gegen Wifi.SetConfig, nmcli, manager.add, manager.save und shell=True bleiben erhalten.",
+            "Erklärende Kommentare und Docstrings dürfen weiterhin ausdrücklich dokumentieren, dass der HardwareManager nicht beschrieben oder verändert wird.",
+            "Die produktive Phase-4W-Bluetooth-Discovery bleibt byte-identisch und wird durch 4W.1 nicht verändert.",
+            "Gateway-Scan, BTHome/BLE-Gateway-Scan, HardwareManager, Hardware-Inventar, Recovery, Netzwerk, Safety und Regelung bleiben unverändert.",
+            "Es werden weiterhin keine WLAN-Zugangsdaten übertragen, keine Bluetooth-Geräte gepairt und keine Relais geschaltet.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.0 / Phase 4W.",
+            "core/release.py wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA d2136ae978f85a713d5175486a37087393c547a0 verifiziert.",
+            "tests/regression/check_hardware_provisioning_discovery.py wurde gegen GitHub-Blob-SHA 9035d2331da2464ed050c93c56557325bfe35c24 verifiziert.",
+            "Der fehlerhafte Literal-Check auf 'hardwaremanager' wurde entfernt.",
+            "Ein erklärender Docstring mit dem Wort HardwareManager löst den Regressionstest nicht mehr aus.",
+            "Ein echter Import von core.hardware.manager würde vom AST-basierten Test weiterhin erkannt und blockiert.",
+            "Eine echte Referenz auf den Python-Namen HardwareManager würde weiterhin erkannt und blockiert.",
+            "Die übrigen Mutationsschutzprüfungen aus Phase 4W bleiben unverändert aktiv.",
+            "Die geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie wurde geladen und bestätigt 3.10.1 / 4W.1 als neuen obersten Eintrag sowie 3.10.0 / 4W direkt darunter.",
+        ),
+    },
+    {
         "version": "3.10.0",
         "date": "2026-08-21",
         "phase": "4W",
