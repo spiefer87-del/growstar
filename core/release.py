@@ -15,6 +15,40 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.2",
+        "date": "2026-08-21",
+        "phase": "4W.2",
+        "title": "Factory-Discovery-Karte bleibt nach Hardware-Refresh sichtbar",
+        "summary": (
+            "Die neue Hardware-Erstinbetriebnahme-Karte wurde beim initialen "
+            "/api/hardware-Refresh direkt nach dem Seitenaufbau wieder entfernt. "
+            "Der Gateway-Renderer erhält nun alle statischen Hardware-Aktionskarten "
+            "und ersetzt ausschließlich dynamisch erkannte Gateway-Karten."
+        ),
+        "changes": (
+            "templates/devices.html markiert die bestehende LAN-Gateway-Scan-Karte und die neue Factory-Discovery-Karte ausdrücklich als statische Gateway-Aktionskarten.",
+            "renderGateways() bewahrt nicht mehr nur grid.firstElementChild, sondern sammelt und erhält alle mit data-static-gateway-card markierten Aktionskarten.",
+            "Der initiale loadHardware()-Aufruf kann die Karte 'Neue Shelly ohne Hersteller-App' dadurch nicht mehr nach wenigen Millisekunden aus dem DOM entfernen.",
+            "Auch spätere Hardware-Refreshes und LAN-Gateway-Scans erhalten beide Aktionskarten.",
+            "Die vorhandenen DOM-Knoten werden wiederverwendet, sodass bereits registrierte Click-Handler für LAN-Scan und Bluetooth-Discovery erhalten bleiben.",
+            "Der Fix ist zukunftssicherer als eine feste Zwei-Karten-Sonderbehandlung: Weitere statische Gateway-Aktionen können dieselbe Markierung verwenden.",
+            "Bluetooth-Discovery, BlueZ-Aufrufe, Gateway-Scan, BTHome-Scan, HardwareManager, Inventar, Recovery und Stations-Zuordnungen bleiben unverändert.",
+            "Es werden weiterhin keine WLAN-Zugangsdaten übertragen, keine Bluetooth-Geräte gepairt und keine Shelly-Ausgänge geschaltet.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.1 / Phase 4W.1.",
+            "templates/devices.html wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA 42bcd14570b07e4f8fb67c8dd55456102dc52ca6 verifiziert.",
+            "core/release.py wurde gegen GitHub-Blob-SHA 1a892f653fadf3c0ed3fbb2e17fa96cc9e14bf01 verifiziert.",
+            "tests/regression/check_hardware_provisioning_discovery.py wurde gegen GitHub-Blob-SHA e8baeeb23f34024fd53d0d0acea33618b6c554b5 verifiziert.",
+            "Der Regressionstest verlangt mindestens zwei statisch markierte Gateway-Aktionskarten.",
+            "Der Regressionstest blockiert die alte firstElementChild-Logik, die ausschließlich die erste Aktionskarte erhalten hatte.",
+            "Der Regressionstest verlangt den Selektor für alle data-static-gateway-card-Karten und deren Wiederanfügen per staticCards.forEach.",
+            "Die bestehenden Phase-4W-Schutztests gegen Pairing, Connect, WLAN-Mutation und HardwareManager-Mutation bleiben vollständig erhalten.",
+            "Die geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.2 / 4W.2 als neuen obersten Eintrag sowie 3.10.1 / 4W.1 direkt darunter.",
+        ),
+    },
+    {
         "version": "3.10.1",
         "date": "2026-08-21",
         "phase": "4W.1",
