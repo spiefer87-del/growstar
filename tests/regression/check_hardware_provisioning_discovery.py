@@ -346,6 +346,24 @@ def main():
     )
 
     require(
+        template.count('data-static-gateway-card="true"') >= 2,
+        "LAN-Scan und Factory-Discovery sind als statische Gateway-Aktionskarten markiert",
+    )
+
+    require(
+        "grid.firstElementChild" not in template
+        and "const firstCard" not in template,
+        "Gateway-Renderer bewahrt nicht mehr nur die erste statische Aktionskarte",
+    )
+
+    require(
+        "querySelectorAll(" in template
+        and '[data-static-gateway-card="true"]' in template
+        and "staticCards.forEach" in template,
+        "Gateway-Renderer erhält alle statischen Hardware-Aktionskarten beim Refresh",
+    )
+
+    require(
         "noch keine WLAN-Daten" in template
         or "keine WLAN-Daten" in template,
         "Hardware-UI kennzeichnet Phase 4W ausdrücklich als noch nicht provisionierend",
