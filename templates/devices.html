@@ -434,8 +434,9 @@ class="provisioning-results"></div>
 
 <div class="provisioning-note">
 
-Phase 4W ist zunächst reine Discovery: Erkannte Geräte werden noch nicht
-gespeichert, nicht geschaltet und nicht mit einem WLAN verbunden.
+Phase 4W.4 ergänzt einen sicheren BLE-RPC-Preflight für eindeutig neue
+Geräte. Dabei wird nur kurz verbunden und der Shelly-RPC-Service geprüft.
+Es werden noch keine WLAN-Daten übertragen und kein Pairing durchgeführt.
 
 </div>
 
@@ -755,6 +756,15 @@ function renderProvisioningCandidates(candidates){
                     im Growstar-Hardwarebestand gefunden. Es wurden weiterhin
                     keine WLAN-Daten übertragen.
                 </div>
+                <button
+                    class="button secondary provisioning-preflight"
+                    type="button">
+                    BLE-RPC prüfen
+                </button>
+                <div
+                    class="sub provisioning-preflight-status">
+                    Noch keine Verbindung zum Gerät aufgebaut.
+                </div>
             `;
 
         }
@@ -793,7 +803,123 @@ function renderProvisioningCandidates(candidates){
             item
         );
 
+        if(fresh){
+
+            const preflightButton =
+                item.querySelector(".provisioning-preflight");
+
+            const preflightStatus =
+                item.querySelector(".provisioning-preflight-status");
+
+            if(preflightButton && preflightStatus){
+
+                preflightButton.addEventListener(
+                    "click",
+                    ()=>runProvisioningPreflight(
+                        candidate,
+                        preflightButton,
+                        preflightStatus
+                    )
+                );
+
+            }
+
+        }
+
     });
+
+}
+
+
+async function runProvisioningPreflight(
+    candidate,
+    button,
+    status
+){
+
+    if(
+        !candidate ||
+        candidate.inventory_state !== "new" ||
+        !candidate.address
+    ){
+
+        status.textContent =
+            "Preflight blockiert: Geräteidentität ist nicht eindeutig neu.";
+
+        return;
+
+    }
+
+    button.disabled = true;
+    button.innerText = "BLE-RPC wird geprüft …";
+
+    status.textContent =
+        "Growstar verifiziert das Gerät erneut und baut kurz eine " +
+        "Bluetooth-Verbindung auf. Keine WLAN-Daten werden übertragen.";
+
+    try{
+
+        const response = await fetch(
+            "/api/hardware/provisioning/preflight",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    address:candidate.address
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        if(!response.ok || !data.success){
+
+            throw new Error(
+                data.error ||
+                "BLE-RPC-Preflight fehlgeschlagen."
+            );
+
+        }
+
+        if(data.rpc_ready){
+
+            status.textContent =
+                "✅ BLE-RPC bereit · temporäre Verbindung wieder getrennt · " +
+                "noch keine WLAN-Daten übertragen.";
+
+        }
+        else{
+
+            status.textContent =
+                "⚠️ " +
+                (
+                    data.message ||
+                    "BLE-RPC ist momentan nicht verfügbar."
+                );
+
+        }
+
+    }
+    catch(err){
+
+        console.error(err);
+
+        status.textContent =
+            "❌ " +
+            (
+                err.message ||
+                "BLE-RPC-Preflight fehlgeschlagen."
+            );
+
+    }
+    finally{
+
+        button.disabled = false;
+        button.innerText = "BLE-RPC prüfen";
+
+    }
 
 }
 
