@@ -1,6 +1,10 @@
 from flask import jsonify, request
 
 from services.hardware import hardware
+from services.shelly_provisioning import (
+    ShellyProvisioningError,
+    shelly_wifi_provisioning,
+)
 from core.hardware.shelly.provisioning import provisioning_discovery
 from core.mqtt_sensor_devices import list_mqtt_sensor_devices
 from core.hardware_assignments import hardware_snapshot
@@ -232,6 +236,79 @@ def register(app):
             }), 409
 
         return jsonify(result)
+
+
+    @app.post("/api/hardware/provisioning/wifi")
+    def hardware_provisioning_wifi():
+
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        try:
+            result = shelly_wifi_provisioning.start(
+                data.get("address"),
+                password_override=data.get("password"),
+            )
+        except (
+            ShellyProvisioningError,
+            ValueError,
+        ) as exc:
+            return jsonify({
+                "success": False,
+                "error": str(exc),
+            }), 409
+        except Exception as exc:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Shelly-WLAN-Erstinbetriebnahme ist fehlgeschlagen: "
+                    + str(exc)
+                ),
+            }), 503
+
+        if result.get("password_required"):
+            return jsonify(result), 409
+
+        if result.get("adopted"):
+            return jsonify(result), 200
+
+        if result.get("verification_pending"):
+            return jsonify(result), 202
+
+        return jsonify(result), 409
+
+
+    @app.post("/api/hardware/provisioning/verify")
+    def hardware_provisioning_verify():
+
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        try:
+            result = shelly_wifi_provisioning.verify(
+                data.get("token")
+            )
+        except ShellyProvisioningError as exc:
+            return jsonify({
+                "success": False,
+                "error": str(exc),
+            }), 409
+        except Exception as exc:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "LAN-Verifikation fehlgeschlagen: "
+                    + str(exc)
+                ),
+            }), 503
+
+        return jsonify(result), (
+            200
+            if result.get("adopted")
+            else 202
+        )
 
 
     @app.get("/api/hardware/provisioning/status")
