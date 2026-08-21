@@ -434,9 +434,10 @@ class="provisioning-results"></div>
 
 <div class="provisioning-note">
 
-Phase 4W.4 ergänzt einen sicheren BLE-RPC-Preflight für eindeutig neue
-Geräte. Dabei wird nur kurz verbunden und der Shelly-RPC-Service geprüft.
-Es werden noch keine WLAN-Daten übertragen und kein Pairing durchgeführt.
+Phase 4W.5 kann eindeutig neue Shellys nach erfolgreichem BLE-RPC-Preflight
+mit dem aktuell verbundenen Growstar-WLAN verbinden. Vor und nach dem Schreiben
+wird die Geräte-MAC geprüft; ein unklarer Schreibstatus wird niemals automatisch
+wiederholt. Bluetooth-Pairing ist für die Erstinbetriebnahme weiterhin nicht nötig.
 
 </div>
 
@@ -753,8 +754,8 @@ function renderProvisioningCandidates(candidates){
             inventoryDetails = `
                 <div class="provisioning-note">
                     Eindeutige Shelly-Gerätekennung erkannt und noch nicht
-                    im Growstar-Hardwarebestand gefunden. Es wurden weiterhin
-                    keine WLAN-Daten übertragen.
+                    im Growstar-Hardwarebestand gefunden. Vor dem Schreiben
+                    wird das Gerät erneut serverseitig verifiziert.
                 </div>
                 <button
                     class="button secondary provisioning-preflight"
@@ -764,6 +765,30 @@ function renderProvisioningCandidates(candidates){
                 <div
                     class="sub provisioning-preflight-status">
                     Noch keine Verbindung zum Gerät aufgebaut.
+                </div>
+                <button
+                    class="button provisioning-wifi"
+                    type="button"
+                    disabled>
+                    WLAN-Erstinbetriebnahme
+                </button>
+                <div
+                    class="provisioning-secret"
+                    hidden>
+                    <div class="sub">
+                        NetworkManager kennt nur einen abgeleiteten Schlüssel.
+                        Bitte die echte Passphrase des aktuell verbundenen
+                        Growstar-WLANs einmalig eingeben.
+                    </div>
+                    <input
+                        class="provisioning-wifi-password"
+                        type="password"
+                        autocomplete="new-password"
+                        placeholder="WLAN-Passphrase">
+                </div>
+                <div
+                    class="sub provisioning-wifi-status">
+                    Erst nach erfolgreichem BLE-RPC-Preflight verfügbar.
                 </div>
             `;
 
@@ -811,6 +836,18 @@ function renderProvisioningCandidates(candidates){
             const preflightStatus =
                 item.querySelector(".provisioning-preflight-status");
 
+            const wifiButton =
+                item.querySelector(".provisioning-wifi");
+
+            const wifiStatus =
+                item.querySelector(".provisioning-wifi-status");
+
+            const passwordWrap =
+                item.querySelector(".provisioning-secret");
+
+            const passwordInput =
+                item.querySelector(".provisioning-wifi-password");
+
             if(preflightButton && preflightStatus){
 
                 preflightButton.addEventListener(
@@ -819,6 +856,21 @@ function renderProvisioningCandidates(candidates){
                         candidate,
                         preflightButton,
                         preflightStatus
+                    )
+                );
+
+            }
+
+            if(wifiButton && wifiStatus){
+
+                wifiButton.addEventListener(
+                    "click",
+                    ()=>runProvisioningWifi(
+                        candidate,
+                        wifiButton,
+                        wifiStatus,
+                        passwordWrap,
+                        passwordInput
                     )
                 );
 
@@ -889,6 +941,32 @@ async function runProvisioningPreflight(
                 "✅ BLE-RPC bereit · temporäre Verbindung wieder getrennt · " +
                 "noch keine WLAN-Daten übertragen.";
 
+            const deviceCard =
+                status.closest(".provisioning-device");
+
+            const wifiButton =
+                deviceCard
+                    ? deviceCard.querySelector(".provisioning-wifi")
+                    : null;
+
+            const wifiStatus =
+                deviceCard
+                    ? deviceCard.querySelector(".provisioning-wifi-status")
+                    : null;
+
+            if(wifiButton){
+
+                wifiButton.disabled = false;
+
+            }
+
+            if(wifiStatus){
+
+                wifiStatus.textContent =
+                    "Bereit für die kontrollierte WLAN-Erstinbetriebnahme.";
+
+            }
+
         }
         else{
 
@@ -923,6 +1001,212 @@ async function runProvisioningPreflight(
 
 }
 
+
+async function runProvisioningWifi(
+    candidate,
+    button,
+    status,
+    passwordWrap,
+    passwordInput
+){
+
+    if(
+        !candidate ||
+        candidate.inventory_state !== "new"
+    ){
+
+        status.textContent =
+            "❌ Gerät ist nicht eindeutig als neu klassifiziert.";
+
+        return;
+
+    }
+
+    const verifyToken =
+        button.dataset.verifyToken || "";
+
+    button.disabled = true;
+
+    try{
+
+        let response;
+
+        if(verifyToken){
+
+            button.innerText =
+                "LAN wird erneut geprüft …";
+
+            response = await fetch(
+                "/api/hardware/provisioning/verify",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":"application/json"
+                    },
+                    body:JSON.stringify({
+                        token:verifyToken
+                    })
+                }
+            );
+
+        }
+        else{
+
+            button.innerText =
+                "WLAN wird übertragen …";
+
+            status.textContent =
+                "Growstar prüft Gerät und aktuelle WLAN-Verbindung erneut. " +
+                "Das Ziel-WLAN kann nicht vom Browser verändert werden.";
+
+            const password =
+                passwordInput
+                    ? passwordInput.value
+                    : "";
+
+            response = await fetch(
+                "/api/hardware/provisioning/wifi",
+                {
+                    method:"POST",
+                    headers:{
+                        "Content-Type":"application/json"
+                    },
+                    body:JSON.stringify({
+                        address:candidate.address,
+                        password:password || undefined
+                    })
+                }
+            );
+
+            if(passwordInput){
+
+                passwordInput.value = "";
+
+            }
+
+        }
+
+        const data =
+            await response.json();
+
+        if(data.password_required){
+
+            if(passwordWrap){
+
+                passwordWrap.hidden = false;
+
+            }
+
+            status.textContent =
+                "🔐 " +
+                (
+                    data.error ||
+                    "Bitte die echte WLAN-Passphrase einmalig eingeben."
+                );
+
+            return;
+
+        }
+
+        if(data.verification_pending){
+
+            if(data.verification_token){
+
+                button.dataset.verifyToken =
+                    data.verification_token;
+
+            }
+
+            button.innerText =
+                "LAN-Verifikation erneut versuchen";
+
+            status.textContent =
+                "⏳ " +
+                (
+                    data.message ||
+                    "WLAN-Schreibvorgang wurde begonnen. " +
+                    "Growstar wiederholt ihn nicht automatisch."
+                );
+
+            return;
+
+        }
+
+        if(
+            !response.ok ||
+            !data.success
+        ){
+
+            throw new Error(
+                data.error ||
+                "Shelly-WLAN-Erstinbetriebnahme fehlgeschlagen."
+            );
+
+        }
+
+        if(data.adopted){
+
+            delete button.dataset.verifyToken;
+
+            button.innerText =
+                "In Growstar übernommen";
+
+            button.disabled = true;
+
+            status.textContent =
+                "✅ WLAN verbunden · Geräte-MAC im LAN bestätigt · " +
+                "Shelly sicher in Growstar übernommen.";
+
+            setTimeout(
+                ()=>loadHardware(),
+                1000
+            );
+
+            return;
+
+        }
+
+        throw new Error(
+            data.error ||
+            "Unerwarteter Provisionierungsstatus."
+        );
+
+    }
+    catch(err){
+
+        console.error(err);
+
+        status.textContent =
+            "❌ " +
+            (
+                err.message ||
+                "Shelly-WLAN-Erstinbetriebnahme fehlgeschlagen."
+            );
+
+    }
+    finally{
+
+        if(
+            !button.dataset.verifyToken &&
+            button.innerText !== "In Growstar übernommen"
+        ){
+
+            button.innerText =
+                "WLAN-Erstinbetriebnahme";
+
+        }
+
+        if(
+            button.innerText !== "In Growstar übernommen"
+        ){
+
+            button.disabled = false;
+
+        }
+
+    }
+
+}
 
 
 async function loadProvisioningStatus(){
