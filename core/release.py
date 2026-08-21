@@ -15,6 +15,59 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.5",
+        "date": "2026-08-21",
+        "phase": "4W.5",
+        "title": "Shelly-WLAN-Erstinbetriebnahme über sicheren BLE-RPC-Workflow",
+        "summary": (
+            "Eindeutig neue Shellys können jetzt ohne Hersteller-App mit dem "
+            "aktuell verbundenen Growstar-WLAN provisioniert werden. Growstar "
+            "verifiziert die Geräte-MAC vor dem Schreibzugriff und nach dem "
+            "LAN-Beitritt erneut und übernimmt das Gerät erst danach in den "
+            "Hardwarebestand."
+        ),
+        "changes": (
+            "Die Ziel-SSID wird ausschließlich serverseitig aus Growstars aktuell aktiver WLAN-Verbindung bestimmt und kann nicht vom Browser frei vorgegeben werden.",
+            "Der bestehende NetworkManager-Unterbau bleibt unverändert; Phase 4W.5 verwendet dessen vorhandene aktive WLAN-Erkennung, WLAN-Scan- und Secret-Abfragefunktionen.",
+            "Rücklesbare NetworkManager-Passphrasen bleiben serverseitig; ein 64-stelliger derived_psk wird nicht als angebliche ursprüngliche Passphrase an Shelly weitergegeben.",
+            "Wenn NetworkManager nur einen derived_psk besitzt, fordert die Hardware-UI einmalig die echte WLAN-Passphrase an.",
+            "core/hardware/shelly/ble_rpc_helper.py implementiert ausschließlich Shelly.GetDeviceInfo gefolgt von Wifi.SetConfig und besitzt bewusst keinen generischen RPC-Endpunkt.",
+            "Der BLE-RPC-Helper verwendet die offiziellen Shelly/mOS Data-, TX-Control- und RX-Control-Characteristics sowie 4-Byte-Big-Endian-Framing.",
+            "RPC-Requests enthalten eine feste Growstar-Source-ID und werden nach TX-Control in konservativen ATT-MTU-Chunks an die Data-Characteristic geschrieben.",
+            "RX-Control-Wert 0 wird bis zum Zeitlimit als noch nicht fertige Antwort behandelt und nicht als leere RPC-Antwort fehlinterpretiert.",
+            "Vor Wifi.SetConfig muss Shelly.GetDeviceInfo exakt die erwartete Geräte-MAC und den Secure-Provisioning-State pending oder confirmed liefern.",
+            "complete, locked, fehlende/unklare Provisioning-States und MAC-Abweichungen blockieren Wifi.SetConfig.",
+            "Wifi.SetConfig setzt die aktuelle SSID, das zugehörige Secret beziehungsweise null bei offenen Netzen, aktiviert Station Mode und verwendet DHCP.",
+            "Das WLAN-Secret wird ausschließlich über stdin an den separaten /usr/bin/python3-BLE-Helper übergeben und erscheint weder in Prozessargumenten noch in einer Growstar-Statusdatei.",
+            "Ein persistenter, dateimodus-0600 No-Secret-State verhindert auch über mehrere Gunicorn-Worker hinweg einen automatischen zweiten Wifi.SetConfig für denselben begonnenen Vorgang.",
+            "Nach begonnenem Wifi.SetConfig wird ausschließlich per LAN/mDNS weiter verifiziert; bei BLE-Timeout oder Verbindungsabbruch gilt der Schreibstatus konservativ als unbekannt und wird nicht wiederholt.",
+            "Die manuelle LAN-Nachprüfung verwendet einen zufälligen serverseitig gespeicherten Verifikationstoken; der Browser darf die erwartete Geräte-MAC dabei nicht frei vorgeben.",
+            "Ein Shelly wird erst nach erneutem LAN-RPC/MAC-Treffer gezielt in den bestehenden HardwareManager übernommen und atomar im vorhandenen Hardware-Inventar gespeichert.",
+            "Bereits bekannte Gateways mit derselben Geräte-MAC werden nicht als zweiter Hardware-Eintrag angelegt.",
+            "Die bestehende Read-only Discovery und der BLE-RPC-Preflight bleiben als vorgeschaltete Sicherheitsstufen erhalten.",
+            "Es wird weiterhin kein Bluetooth-Pairing/Trust, kein Switch.Set, kein FactoryReset und keine Stations-/Aktor-Zuordnung automatisch durchgeführt.",
+            "install/install_shelly_ble_rpc.sh installiert ausschließlich python3-bleak; Growstar/Gunicorn bleibt unprivilegiert und erhält keine zusätzlichen sudo-Rechte.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der verifizierte GitHub-main-Stand mit Growstar 3.10.4 / Phase 4W.4.",
+            "routes/hardware.py, templates/devices.html und core/release.py wurden vor der Patch-Erzeugung bytegenau über ihre aktuellen Git-Blob-SHAs gegen GitHub main verifiziert.",
+            "Der BLE-RPC-Regressionspfad bestätigt die Reihenfolge Shelly.GetDeviceInfo vor Wifi.SetConfig.",
+            "Ein zunächst mit Länge 0 gemeldeter RX-Control-Status wird kontrolliert weiter abgefragt.",
+            "Der Test bestätigt, dass RPC-Requests die Growstar-Source-ID enthalten und über mehrere Data-Characteristic-Chunks übertragen werden können.",
+            "MAC-Mismatch und Secure-Provisioning-State locked blockieren Wifi.SetConfig vollständig.",
+            "Der BLE-Helper enthält keinen Switch.Set-, FactoryReset- oder BLE.StartPairing-Pfad.",
+            "Der Parent-Prozess startet den Helper mit fester Argumentliste /usr/bin/python3 plus Helper-Pfad und übergibt die Provisionierungsdaten per stdin.",
+            "Der persistente State-Guard liefert bei erneutem Claim derselben Geräte-MAC denselben Vorgang statt eines zweiten Write-Claims.",
+            "Die persistente Provisionierungsstatusdatei enthält kein WLAN-Passwort.",
+            "Unsichere oder unterbrochene Schreibvorgänge wechseln ausschließlich in den Zustand verify_pending.",
+            "Die API enthält getrennte Endpunkte für den einmaligen WLAN-Schreibworkflow und für reine LAN-Nachverifikation.",
+            "Die UI bietet WLAN-Erstinbetriebnahme erst nach erfolgreichem BLE-RPC-Preflight an und kann bei derived_psk einmalig die echte Passphrase abfragen.",
+            "Die vorhandenen Phase-4W-Discovery-, Shelly-RPC-, Safety-, Notification- und Repository-Baseline-Tests bleiben Bestandteil der Raspberry-Abnahme.",
+            "Alle neuen und geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.5 / 4W.5 als obersten Eintrag und 3.10.4 / 4W.4 direkt darunter.",
+        ),
+    },
+    {
         "version": "3.10.4",
         "date": "2026-08-21",
         "phase": "4W.4",
