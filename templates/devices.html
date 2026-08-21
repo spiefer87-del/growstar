@@ -190,6 +190,71 @@ h3{
 
 }
 
+.button.secondary{
+
+    background:#0f766e;
+
+}
+
+.provisioning-status{
+
+    margin-top:12px;
+    padding:10px 12px;
+    border-radius:10px;
+    background:rgba(148,163,184,.10);
+    color:var(--muted);
+    font-size:.8rem;
+    line-height:1.45;
+
+}
+
+.provisioning-status.ok{
+
+    background:rgba(34,197,94,.10);
+    color:#86efac;
+
+}
+
+.provisioning-status.error{
+
+    background:rgba(239,68,68,.10);
+    color:#fca5a5;
+
+}
+
+.provisioning-results{
+
+    display:grid;
+    gap:10px;
+    margin-top:14px;
+
+}
+
+.provisioning-device{
+
+    padding:12px;
+    border:1px solid rgba(148,163,184,.16);
+    border-radius:12px;
+    background:rgba(15,23,42,.55);
+
+}
+
+.provisioning-device strong{
+
+    display:block;
+    margin-bottom:5px;
+
+}
+
+.provisioning-note{
+
+    margin-top:10px;
+    color:#bae6fd;
+    font-size:.76rem;
+    line-height:1.45;
+
+}
+
 .badge{
 
     display:inline-block;
@@ -311,11 +376,12 @@ h3{
 
 <div class="card">
 
-<h2>➕ Gateway hinzufügen</h2>
+<h2>🔎 LAN-Gateway suchen</h2>
 
 <div class="sub">
 
-Suche automatisch nach Shelly Gateways.
+Bereits eingerichtete Shellys im aktuellen WLAN/LAN erkennen.
+Der vorhandene Gateway-Scan bleibt unverändert bestehen.
 
 </div>
 
@@ -323,9 +389,51 @@ Suche automatisch nach Shelly Gateways.
 id="scan-gateway"
 class="button">
 
-Gateway suchen
+LAN-Gateways suchen
 
 </button>
+
+</div>
+
+<div class="card">
+
+<h2>✨ Neue Shelly ohne Hersteller-App</h2>
+
+<div class="sub">
+
+Fabrikneue Shellys über den Bluetooth-Adapter des Raspberry erkennen.
+Dieser Schritt überträgt noch keine WLAN-Daten und führt kein Pairing aus.
+
+</div>
+
+<div
+id="provisioning-status"
+class="provisioning-status">
+
+Bluetooth-Status wird geprüft …
+
+</div>
+
+<button
+id="scan-provisioning"
+class="button secondary"
+type="button"
+disabled>
+
+Neue Geräte suchen
+
+</button>
+
+<div
+id="provisioning-results"
+class="provisioning-results"></div>
+
+<div class="provisioning-note">
+
+Phase 4W ist zunächst reine Discovery: Erkannte Geräte werden noch nicht
+gespeichert, nicht geschaltet und nicht mit einem WLAN verbunden.
+
+</div>
 
 </div>
 
@@ -522,7 +630,251 @@ async function scanGateways(){
     }
 
     btn.disabled = false;
-    btn.innerText = "Gateway suchen";
+    btn.innerText = "LAN-Gateways suchen";
+
+}
+
+
+
+function provisioningName(candidate){
+
+    return (
+        candidate.model_name_hint ||
+        candidate.name ||
+        candidate.alias ||
+        "Shelly Gerät"
+    );
+
+}
+
+
+
+function renderProvisioningCandidates(candidates){
+
+    const container =
+        document.getElementById("provisioning-results");
+
+    if(!container){
+
+        return;
+
+    }
+
+    container.innerHTML = "";
+
+    if(!Array.isArray(candidates) || candidates.length === 0){
+
+        container.innerHTML = `
+            <div class="provisioning-device">
+                <strong>Keine neue Shelly erkannt</strong>
+                <div class="sub">
+                    Falls das Gerät fabrikneu ist, kurz einschalten bzw.
+                    neu starten und den Scan erneut ausführen.
+                </div>
+            </div>
+        `;
+
+        return;
+
+    }
+
+    candidates.forEach(candidate=>{
+
+        const item = document.createElement("div");
+
+        item.className = "provisioning-device";
+
+        const state = candidate.paired
+            ? "Bereits Bluetooth-gepairt"
+            : "Nicht gepairt";
+
+        item.innerHTML = `
+            <strong>✨ ${escapeHtml(provisioningName(candidate))}</strong>
+            <div class="sub">Adresse ${escapeHtml(candidate.address || "--")}</div>
+            <div class="sub">RSSI ${candidate.rssi ?? "--"} dBm · ${escapeHtml(state)}</div>
+            ${candidate.model_hint
+                ? `<div class="sub">Modell-Hinweis ${escapeHtml(candidate.model_hint)}</div>`
+                : ""}
+            <div class="badge online">ERKANNT · READ-ONLY</div>
+            <div class="provisioning-note">
+                Noch keine WLAN-Daten übertragen. Die eigentliche
+                Erstinbetriebnahme folgt im nächsten sicheren Schritt.
+            </div>
+        `;
+
+        container.appendChild(item);
+
+    });
+
+}
+
+
+
+async function loadProvisioningStatus(){
+
+    const status =
+        document.getElementById("provisioning-status");
+
+    const button =
+        document.getElementById("scan-provisioning");
+
+    if(!status || !button){
+
+        return;
+
+    }
+
+    try{
+
+        const response = await fetch(
+            "/api/hardware/provisioning/status",
+            {
+                cache:"no-store"
+            }
+        );
+
+        const data = await response.json();
+
+        if(
+            data.success &&
+            data.available &&
+            data.powered
+        ){
+
+            status.className =
+                "provisioning-status ok";
+
+            status.textContent =
+                "Raspberry-Bluetooth bereit · " +
+                (data.adapter || "Adapter erkannt") +
+                " · Scan ca. " +
+                (data.scan_seconds || 8) +
+                " s";
+
+            button.disabled = false;
+
+            return;
+
+        }
+
+        status.className =
+            "provisioning-status error";
+
+        status.textContent =
+            data.error ||
+            "Raspberry-Bluetooth ist momentan nicht bereit.";
+
+        button.disabled = true;
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        status.className =
+            "provisioning-status error";
+
+        status.textContent =
+            "Bluetooth-Status konnte nicht geladen werden.";
+
+        button.disabled = true;
+
+    }
+
+}
+
+
+
+async function scanProvisioningDevices(){
+
+    const button =
+        document.getElementById("scan-provisioning");
+
+    const status =
+        document.getElementById("provisioning-status");
+
+    const results =
+        document.getElementById("provisioning-results");
+
+    if(!button || !status || !results){
+
+        return;
+
+    }
+
+    button.disabled = true;
+    button.innerText = "Bluetooth-Scan läuft …";
+
+    results.innerHTML = "";
+
+    status.className =
+        "provisioning-status";
+
+    status.textContent =
+        "Raspberry sucht lokal nach neuen Shelly-Geräten …";
+
+    try{
+
+        const response = await fetch(
+            "/api/hardware/scan",
+            {
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({
+                    mode:"provisioning"
+                })
+            }
+        );
+
+        const data = await response.json();
+
+        const result = data.result || {};
+
+        if(!data.success || !result.success){
+
+            throw new Error(
+                result.error ||
+                "Bluetooth-Discovery ist fehlgeschlagen."
+            );
+
+        }
+
+        renderProvisioningCandidates(
+            result.candidates || []
+        );
+
+        status.className =
+            "provisioning-status ok";
+
+        status.textContent =
+            (result.count || 0) +
+            " Shelly-Kandidat(en) erkannt · " +
+            "keine Gerätekonfiguration verändert.";
+
+    }
+
+    catch(err){
+
+        console.error(err);
+
+        status.className =
+            "provisioning-status error";
+
+        status.textContent =
+            String(
+                err?.message ||
+                err ||
+                "Bluetooth-Discovery ist fehlgeschlagen."
+            );
+
+    }
+
+    button.innerText = "Neue Geräte suchen";
+
+    await loadProvisioningStatus();
 
 }
 
@@ -915,6 +1267,15 @@ document
     "click",
     scanGateways
 );
+
+document
+.getElementById("scan-provisioning")
+?.addEventListener(
+    "click",
+    scanProvisioningDevices
+);
+
+loadProvisioningStatus();
 
 loadHardware();
 
