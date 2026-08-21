@@ -144,6 +144,96 @@ def register(app):
         })
 
 
+    @app.post("/api/hardware/provisioning/preflight")
+    def hardware_provisioning_preflight():
+
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        address = str(
+            data.get("address")
+            or ""
+        ).strip().upper()
+
+        # Sicherheitsprinzip:
+        # Die UI-Angabe allein ist niemals ausreichend. Vor jedem BLE-Connect
+        # führt Growstar einen kurzen frischen Scan aus und klassifiziert den
+        # Kandidaten erneut gegen den aktuellen Hardwarebestand.
+        scan_result = provisioning_discovery.scan(
+            seconds=3
+        )
+
+        if not scan_result.get("success"):
+            return jsonify({
+                "success": False,
+                "error": (
+                    scan_result.get("error")
+                    or "Bluetooth-Scan vor dem Preflight fehlgeschlagen."
+                ),
+            }), 503
+
+        gateway_snapshot = [
+            gateway.to_dict()
+            for gateway in hardware.gateways()
+        ]
+
+        classification = (
+            provisioning_discovery.classify_candidates(
+                scan_result.get("candidates") or [],
+                gateway_snapshot,
+            )
+        )
+
+        candidate = next(
+            (
+                item
+                for item in classification["candidates"]
+                if str(item.get("address") or "").upper() == address
+            ),
+            None,
+        )
+
+        if candidate is None:
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Das gewählte Shelly ist im frischen Bluetooth-Scan "
+                    "nicht mehr sichtbar."
+                ),
+            }), 409
+
+        if candidate.get("inventory_state") == "known":
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Dieses Shelly ist inzwischen bereits im Growstar-"
+                    "Hardwarebestand vorhanden. Preflight wurde blockiert."
+                ),
+            }), 409
+
+        if candidate.get("inventory_state") != "new":
+            return jsonify({
+                "success": False,
+                "error": (
+                    "Die Shelly-Geräteidentität ist nicht eindeutig. "
+                    "Preflight wurde sicherheitshalber blockiert."
+                ),
+            }), 409
+
+        try:
+            result = provisioning_discovery.rpc_preflight(
+                candidate
+            )
+        except Exception as exc:
+            return jsonify({
+                "success": False,
+                "error": str(exc),
+            }), 409
+
+        return jsonify(result)
+
+
     @app.get("/api/hardware/provisioning/status")
     def hardware_provisioning_status():
 
