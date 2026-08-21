@@ -1,6 +1,7 @@
 from flask import jsonify, request
 
 from services.hardware import hardware
+from core.hardware.shelly.provisioning import provisioning_discovery
 from core.mqtt_sensor_devices import list_mqtt_sensor_devices
 from core.hardware_assignments import hardware_snapshot
 from core.tents import manager as tent_manager
@@ -94,13 +95,43 @@ def register(app):
     @app.post("/api/hardware/scan")
     def hardware_scan():
 
+        data = request.get_json(
+            silent=True
+        ) or {}
+
+        # Phase 4W:
+        # Der bestehende Hardware-Scan-Endpunkt bleibt erhalten. Ein expliziter
+        # Modus startet zusätzlich den lokalen Raspberry-Bluetooth-Discovery-
+        # Adapter für fabrikneue Shellys. Diese Kandidaten werden NICHT in den
+        # HardwareManager übernommen und nicht gepairt/provisioniert.
+        if data.get("mode") == "provisioning":
+
+            result = provisioning_discovery.scan(
+                seconds=data.get("seconds")
+            )
+
+            return jsonify({
+                "success": bool(result.get("success")),
+                "mode": "provisioning",
+                "result": result,
+            })
+
         found = hardware.scan_gateways()
 
         return jsonify({
             "success": True,
+            "mode": "gateways",
             "found": found,
             "gateways": len(hardware.gateways())
         })
+
+
+    @app.get("/api/hardware/provisioning/status")
+    def hardware_provisioning_status():
+
+        return jsonify(
+            provisioning_discovery.status()
+        )
 
 
     @app.get("/api/hardware")
