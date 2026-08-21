@@ -15,6 +15,51 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.3",
+        "date": "2026-08-21",
+        "phase": "4W.3",
+        "title": "Shelly-Geräteidentität und Bestandsabgleich über MAC",
+        "summary": (
+            "Der lokale Raspberry-Bluetooth-Scan unterscheidet jetzt zwischen "
+            "bereits in Growstar bekannten Shellys, eindeutig neuen Geräten "
+            "und Kandidaten mit noch unklarer Identität. Maßgeblich ist die "
+            "Shelly-Geräte-MAC aus dem Advertised Name; die Bluetooth-Adresse "
+            "wird bewusst separat behandelt."
+        ),
+        "changes": (
+            "core/hardware/shelly/provisioning.py normalisiert Shelly-Geräte-MACs aus bekannten Schreibweisen in ein einheitliches AA:BB:CC:DD:EE:FF-Format.",
+            "Die Gerätekennung wird ausschließlich aus einem eindeutigen Shelly Advertised Name mit abschließender 12-stelliger Hex-ID abgeleitet.",
+            "Die Bluetooth-Adresse eines Kandidaten wird ausdrücklich nicht als WLAN-/Geräte-MAC interpretiert; reale Geräte können für BLE und WLAN unterschiedliche Adressen besitzen.",
+            "Die Discovery klassifiziert Kandidaten read-only als known, new oder unknown anhand eines von der Route übergebenen Snapshots der bereits vorhandenen Growstar-Gateways.",
+            "Ein MAC-Treffer auf ein vorhandenes Gateway liefert nur eine minimierte Anzeigeansicht mit Name, Modell, IP, MAC und Onlinezustand zurück; keine Inventardaten werden verändert.",
+            "Bei historisch mehrfach vorhandenen Gateway-Einträgen mit gleicher MAC bleibt das Gerät sicher als bekannt klassifiziert; für die Anzeige wird ein aktuell online gemeldeter Eintrag bevorzugt.",
+            "Kandidaten mit eindeutiger Shelly-Geräte-MAC ohne Bestandstreffer werden als neu markiert, bleiben in Phase 4W.3 aber weiterhin vollständig read-only.",
+            "Kandidaten ohne eindeutige Geräte-MAC bleiben im Zustand Identität unklar und sind damit ausdrücklich nicht für eine spätere Erstinbetriebnahme freigegeben.",
+            "RSSI wird bei fehlendem bluetoothctl-info-Wert als read-only Fallback aus dem aktiven Scan übernommen.",
+            "routes/hardware.py reicht ausschließlich einen bereits vorhandenen Gateway-Snapshot in die Klassifizierung; provisioning.py importiert weiterhin keinen HardwareManager.",
+            "templates/devices.html zeigt Geräte-MAC und Bluetooth-Adresse getrennt sowie die Zustände BEREITS IN GROWSTAR, NEU READ-ONLY und IDENTITÄT UNKLAR READ-ONLY.",
+            "Bereits bekannte Shellys werden in der Factory-Discovery nicht mehr irreführend als neue Erstinbetriebnahme-Kandidaten dargestellt.",
+            "Phase 4W.3 überträgt weiterhin keine WLAN-Zugangsdaten, führt kein Bluetooth-Pairing/Trust/Connect aus, schaltet keine Relais und schreibt nichts in Hardware-Inventar oder Stations-Zuordnungen.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.2 / Phase 4W.2.",
+            "Die fünf als Basis verwendeten Dateien wurden vor der Patch-Erzeugung bytegenau über ihre Git-Blob-SHAs gegen GitHub main verifiziert.",
+            "MAC-Normalisierung akzeptiert 12-stellige Shelly-IDs sowie übliche Doppelpunkt-Schreibweise und erzeugt ein einheitliches Format.",
+            "ShellyPlugMG3-48F6EEBFAD10 wird als Geräte-MAC 48:F6:EE:BF:AD:10 erkannt.",
+            "Ein Gateway mit derselben Geräte-MAC klassifiziert den BLE-Kandidaten als bereits in Growstar vorhanden.",
+            "Die abweichende BLE-Adresse 48:F6:EE:BF:AD:12 bleibt getrennt von der Geräte-MAC 48:F6:EE:BF:AD:10.",
+            "Eine eindeutige unbekannte Shelly-Geräte-MAC wird als neues read-only Gerät klassifiziert.",
+            "Eine BLE-Adresse allein erzeugt selbst bei Gleichheit mit einer bekannten Gateway-MAC keinen Bestandstreffer.",
+            "Ein Kandidat ohne eindeutige Advertised-Name-MAC bleibt Identität unklar.",
+            "RSSI -57 wird aus einer bluetoothctl-Scan-Zeile korrekt übernommen.",
+            "Die Route enthält den read-only Gateway-Snapshot-Abgleich und liefert known/new/unknown-Zähler.",
+            "Die Hardware-UI enthält alle drei Identitätszustände und trennt Geräte-MAC von Bluetooth-Adresse.",
+            "Die bestehenden Phase-4W-Schutztests gegen Pairing, Trust, Connect, WLAN-Mutation, Shell-Ausführung und HardwareManager-Schreibzugriffe bleiben aktiv.",
+            "Alle geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.3 / 4W.3 als neuen obersten Eintrag sowie 3.10.2 / 4W.2 direkt darunter.",
+        ),
+    },
+    {
         "version": "3.10.2",
         "date": "2026-08-21",
         "phase": "4W.2",
