@@ -240,20 +240,56 @@ def main():
         "Shelly wird auch ohne eindeutigen Namen über ManufacturerData 0x0BA9 erkannt",
     )
 
-    source = read(
+    provisioning_source = read(
         "core/hardware/shelly/provisioning.py"
-    ).lower()
+    )
+    provisioning_source_lower = provisioning_source.lower()
+    provisioning_tree = ast.parse(
+        provisioning_source,
+        filename="core/hardware/shelly/provisioning.py",
+    )
+
+    # Phase 4W.1:
+    # Kommentare und Docstrings dürfen Begriffe wie "HardwareManager" erklären,
+    # ohne dass daraus ein produktiver Codepfad entsteht. Deshalb prüfen wir
+    # echte Python-Struktur statt eines pauschalen Texttreffers.
+    imported_modules = set()
+    referenced_names = set()
+
+    for node in ast.walk(provisioning_tree):
+
+        if isinstance(node, ast.Import):
+            imported_modules.update(
+                alias.name
+                for alias in node.names
+            )
+
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                imported_modules.add(
+                    node.module
+                )
+
+        elif isinstance(node, ast.Name):
+            referenced_names.add(
+                node.id
+            )
+
+    require(
+        "core.hardware.manager" not in imported_modules
+        and "HardwareManager" not in referenced_names,
+        "Discovery importiert oder referenziert keinen HardwareManager",
+    )
 
     for forbidden in (
         "wifi.setconfig",
         "nmcli",
-        "hardwaremanager",
         "manager.add",
         "manager.save",
         "shell=true",
     ):
         require(
-            forbidden not in source,
+            forbidden not in provisioning_source_lower,
             f"Discovery enthält keinen produktiven Mutationspfad '{forbidden}'",
         )
 
