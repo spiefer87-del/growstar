@@ -49,6 +49,14 @@ _FIELD_RE = re.compile(
     r"^\s*(Name|Alias|RSSI|Paired|Connected|Trusted):\s*(.*?)\s*$",
     re.MULTILINE,
 )
+_RSSI_RE = re.compile(
+    r"\bRSSI:\s*(-?\d+)\b",
+    re.IGNORECASE,
+)
+_SHELLY_ADVERTISED_ID_RE = re.compile(
+    r"^Shelly[A-Za-z0-9_-]*[-_]([0-9A-Fa-f]{12})$",
+    re.IGNORECASE,
+)
 
 
 class BluetoothDiscoveryError(RuntimeError):
@@ -145,6 +153,211 @@ class ShellyProvisioningDiscovery:
             "true",
             "1",
             "on",
+        }
+
+    @staticmethod
+    def _normalize_mac(value):
+        """Normalisiert eine echte Geräte-MAC ohne BLE-Adressen umzudeuten."""
+
+        raw = str(value or "").strip()
+
+        if re.fullmatch(
+            r"[0-9A-Fa-f]{12}",
+            raw,
+        ):
+            compact = raw.upper()
+
+        elif re.fullmatch(
+            r"(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}",
+            raw,
+        ):
+            compact = re.sub(
+                r"[:-]",
+                "",
+                raw,
+            ).upper()
+
+        else:
+            return None
+
+        return ":".join(
+            compact[index:index + 2]
+            for index in range(0, 12, 2)
+        )
+
+    @classmethod
+    def _advertised_device_mac(cls, candidate):
+        """Liest die Shelly-Gerätekennung nur aus einem Shelly Advertised Name.
+
+        Wichtig: Die Bluetooth-Adresse ``candidate["address"]`` wird bewusst
+        NICHT als Geräte-/WLAN-MAC verwendet. Reale Shellys können für BLE und
+        WLAN unterschiedliche Adressen besitzen.
+        """
+
+        for key in ("name", "alias"):
+            value = str(
+                (candidate or {}).get(key)
+                or ""
+            ).strip()
+
+            match = _SHELLY_ADVERTISED_ID_RE.fullmatch(
+                value
+            )
+
+            if not match:
+                continue
+
+            normalized = cls._normalize_mac(
+                match.group(1)
+            )
+
+            if normalized:
+                return normalized
+
+        return None
+
+    @staticmethod
+    def _rssi_from_observed_lines(observed_lines):
+        """Nimmt den letzten plausiblen RSSI-Wert aus dem aktiven Scan."""
+
+        result = None
+
+        for line in observed_lines or []:
+            for match in _RSSI_RE.finditer(
+                str(line or "")
+            ):
+                try:
+                    value = int(
+                        match.group(1)
+                    )
+                except (TypeError, ValueError):
+                    continue
+
+                if -127 <= value <= 20:
+                    result = value
+
+        return result
+
+    @classmethod
+    def classify_candidates(
+        cls,
+        candidates,
+        known_gateways,
+    ):
+        """Ordnet BLE-Kandidaten read-only dem bekannten Growstar-Bestand zu.
+
+        Die einzige stabile Identität für den Bestandsabgleich ist die aus dem
+        Shelly Advertised Name abgeleitete Geräte-MAC. Die BLE-Adresse wird
+        ausschließlich als Bluetooth-Adresse angezeigt und niemals als
+        Ersatz-MAC verwendet.
+
+        ``known_gateways`` ist absichtlich nur ein bereits erzeugter Snapshot.
+        Dieses Modul importiert weiterhin keinen HardwareManager und schreibt
+        keinerlei Inventardaten.
+        """
+
+        gateways_by_mac = {}
+
+        for gateway in known_gateways or []:
+            if not isinstance(gateway, dict):
+                continue
+
+            mac = cls._normalize_mac(
+                gateway.get("mac")
+            )
+
+            if not mac:
+                continue
+
+            gateways_by_mac.setdefault(
+                mac,
+                [],
+            ).append(gateway)
+
+        classified = []
+        known_count = 0
+        new_count = 0
+        unknown_count = 0
+
+        for raw_candidate in candidates or []:
+            if not isinstance(raw_candidate, dict):
+                continue
+
+            candidate = dict(
+                raw_candidate
+            )
+
+            identity_mac = cls._advertised_device_mac(
+                candidate
+            )
+
+            candidate["identity_mac"] = identity_mac
+            candidate["identity_source"] = (
+                "shelly-advertised-name"
+                if identity_mac
+                else None
+            )
+            candidate["known_gateway"] = None
+            candidate["known_gateway_count"] = 0
+
+            matches = list(
+                gateways_by_mac.get(
+                    identity_mac,
+                    [],
+                )
+            ) if identity_mac else []
+
+            if matches:
+                # Bei historischen doppelten IP-Einträgen bleibt die Identität
+                # trotzdem "bekannt". Für die Anzeige bevorzugen wir einen
+                # aktuell online gemeldeten Datensatz.
+                matches.sort(
+                    key=lambda gateway: (
+                        not bool(gateway.get("online")),
+                        not bool(str(gateway.get("ip") or "").strip()),
+                        str(gateway.get("ip") or ""),
+                    )
+                )
+
+                gateway = matches[0]
+
+                candidate["inventory_state"] = "known"
+                candidate["provisioned"] = True
+                candidate["known_gateway_count"] = len(matches)
+                candidate["known_gateway"] = {
+                    "id": gateway.get("id"),
+                    "name": gateway.get("name"),
+                    "model": gateway.get("model"),
+                    "manufacturer": gateway.get("manufacturer"),
+                    "ip": gateway.get("ip"),
+                    "mac": cls._normalize_mac(
+                        gateway.get("mac")
+                    ),
+                    "online": bool(
+                        gateway.get("online")
+                    ),
+                }
+                known_count += 1
+
+            elif identity_mac:
+                candidate["inventory_state"] = "new"
+                candidate["provisioned"] = False
+                new_count += 1
+
+            else:
+                candidate["inventory_state"] = "unknown"
+                candidate["provisioned"] = None
+                unknown_count += 1
+
+            classified.append(
+                candidate
+            )
+
+        return {
+            "candidates": classified,
+            "known_count": known_count,
+            "new_count": new_count,
+            "unknown_count": unknown_count,
         }
 
     def status(self):
@@ -350,6 +563,29 @@ class ShellyProvisioningDiscovery:
         ):
             return None
 
+        # ``bluetoothctl info`` liefert bei realen, nicht gepairten Shellys
+        # nicht immer einen RSSI. Der aktive Scan hat den Wert aber bereits
+        # gesehen; deshalb verwenden wir ihn ausschließlich als read-only
+        # Fallback für die Anzeige.
+        if candidate.get("rssi") is None:
+            candidate["rssi"] = self._rssi_from_observed_lines(
+                observed_lines
+            )
+
+        # Wenn bluetoothctl info keinen Namen liefert, verwenden wir nur dann
+        # einen aus der Scan-Zeile, wenn dort tatsächlich "Shelly" vorkommt.
+        if not candidate.get("name"):
+            for line in observed_lines:
+                if "shelly" not in line.lower():
+                    continue
+                tail = line.upper().split(
+                    str(address).upper(),
+                    1,
+                )[-1].strip()
+                if tail:
+                    candidate["name"] = tail
+                    break
+
         model_hint = self._model_hint(candidate)
 
         candidate.update(
@@ -371,20 +607,6 @@ class ShellyProvisioningDiscovery:
                 "detail_error": info_error,
             }
         )
-
-        # Wenn bluetoothctl info keinen Namen liefert, verwenden wir nur dann
-        # einen aus der Scan-Zeile, wenn dort tatsächlich "Shelly" vorkommt.
-        if not candidate.get("name"):
-            for line in observed_lines:
-                if "shelly" not in line.lower():
-                    continue
-                tail = line.upper().split(
-                    str(address).upper(),
-                    1,
-                )[-1].strip()
-                if tail:
-                    candidate["name"] = tail
-                    break
 
         return candidate
 
