@@ -9,7 +9,9 @@ Phase 4W ergänzt bewusst KEIN zweites Gateway- oder BTHome-System:
 
 Der Discovery-Lauf:
 - verändert keine WLAN-Konfiguration,
-- führt kein Bluetooth-Pairing/Trust/Connect aus,
+- führt im Discovery-Lauf kein Bluetooth-Pairing/Trust/Connect aus,
+- Phase 4W.4 darf für einen expliziten Read-only-Preflight kurz verbinden,
+  trennt danach wieder und führt weiterhin kein Pairing/Trust aus,
 - schaltet keine Shelly-Ausgänge,
 - schreibt nichts in den HardwareManager,
 - überträgt keinerlei WLAN-Passwort.
@@ -24,6 +26,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 
 
 BLUEZ_BACKEND = "bluez-bluetoothctl"
@@ -32,6 +35,11 @@ MIN_SCAN_SECONDS = 3
 MAX_SCAN_SECONDS = 20
 
 SHELLY_MANUFACTURER_KEY = "0x0ba9"
+
+# Offizielle Shelly-RPC-GATT-Service-UUID für RPC over BLE.
+SHELLY_RPC_SERVICE_UUID = "5f6d4f53-5f52-5043-5f53-56435f49445f"
+PREFLIGHT_SCAN_SECONDS = 3
+PREFLIGHT_SERVICE_WAIT_SECONDS = 4.0
 
 _MAC_RE = re.compile(
     r"\b([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})\b"
@@ -57,6 +65,14 @@ _SHELLY_ADVERTISED_ID_RE = re.compile(
     r"^Shelly[A-Za-z0-9_-]*[-_]([0-9A-Fa-f]{12})$",
     re.IGNORECASE,
 )
+_UUID_RE = re.compile(
+    r"\b([0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-"
+    r"[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12})\b"
+)
+_SERVICES_RESOLVED_RE = re.compile(
+    r"^\s*ServicesResolved:\s*(yes|no)\s*$",
+    re.MULTILINE | re.IGNORECASE,
+)
 
 
 class BluetoothDiscoveryError(RuntimeError):
@@ -72,11 +88,14 @@ class ShellyProvisioningDiscovery:
         runner=subprocess.run,
         which=shutil.which,
         scan_seconds=DEFAULT_SCAN_SECONDS,
+        sleeper=time.sleep,
     ):
         self._runner = runner
         self._which = which
+        self._sleeper = sleeper
         self.scan_seconds = self._normalize_scan_seconds(scan_seconds)
         self._scan_lock = threading.Lock()
+        self._preflight_lock = threading.Lock()
 
     @staticmethod
     def _normalize_scan_seconds(value):
@@ -154,6 +173,44 @@ class ShellyProvisioningDiscovery:
             "1",
             "on",
         }
+
+    @staticmethod
+    def _normalize_bluetooth_address(value):
+        address = str(value or "").strip().upper()
+
+        if not re.fullmatch(
+            r"(?:[0-9A-F]{2}:){5}[0-9A-F]{2}",
+            address,
+        ):
+            raise BluetoothDiscoveryError(
+                "Ungültige Bluetooth-Adresse."
+            )
+
+        return address
+
+    @staticmethod
+    def _service_uuids(info_output):
+        return sorted(
+            {
+                match.group(1).lower()
+                for match in _UUID_RE.finditer(
+                    str(info_output or "")
+                )
+            }
+        )
+
+    @staticmethod
+    def _services_resolved(info_output):
+        match = _SERVICES_RESOLVED_RE.search(
+            str(info_output or "")
+        )
+
+        return bool(
+            match
+            and ShellyProvisioningDiscovery._yes(
+                match.group(1)
+            )
+        )
 
     @staticmethod
     def _normalize_mac(value):
@@ -359,6 +416,161 @@ class ShellyProvisioningDiscovery:
             "new_count": new_count,
             "unknown_count": unknown_count,
         }
+
+    def rpc_preflight(self, candidate):
+        """Prüft die BLE-RPC-Erreichbarkeit eines sicher als neu klassifizierten Shellys.
+
+        Dieser Schritt ist bewusst noch KEINE Provisionierung:
+        - kein Pairing,
+        - kein Trust,
+        - kein GATT-Schreibzugriff,
+        - kein RPC-Aufruf,
+        - keine WLAN-Zugangsdaten.
+
+        Es wird ausschließlich kurz verbunden, auf den offiziellen Shelly-RPC-
+        GATT-Service geprüft und anschließend der vorherige Verbindungszustand
+        wiederhergestellt.
+        """
+
+        candidate = dict(candidate or {})
+
+        if candidate.get("inventory_state") != "new":
+            raise BluetoothDiscoveryError(
+                "BLE-RPC-Preflight ist nur für eindeutig neue Shellys erlaubt."
+            )
+
+        identity_mac = self._normalize_mac(
+            candidate.get("identity_mac")
+        )
+
+        if not identity_mac:
+            raise BluetoothDiscoveryError(
+                "Shelly-Geräteidentität ist nicht eindeutig."
+            )
+
+        address = self._normalize_bluetooth_address(
+            candidate.get("address")
+        )
+
+        result = {
+            "success": True,
+            "address": address,
+            "identity_mac": identity_mac,
+            "rpc_service_uuid": SHELLY_RPC_SERVICE_UUID,
+            "rpc_ready": False,
+            "services_resolved": False,
+            "paired": False,
+            "connected_temporarily": False,
+            "disconnected_after_check": False,
+            "service_uuids": [],
+            "state": "unknown",
+            "message": None,
+            "error": None,
+        }
+
+        with self._preflight_lock:
+            before_output = self._run(
+                "info",
+                address,
+                timeout=6,
+            )
+            before = self._parse_info(
+                address,
+                before_output,
+            )
+
+            result["paired"] = bool(
+                before.get("paired")
+            )
+
+            connected_before = bool(
+                before.get("connected")
+            )
+            connected_here = False
+
+            try:
+                if not connected_before:
+                    self._run(
+                        "connect",
+                        address,
+                        timeout=12,
+                    )
+                    connected_here = True
+                    result["connected_temporarily"] = True
+
+                deadline = (
+                    time.monotonic()
+                    + PREFLIGHT_SERVICE_WAIT_SECONDS
+                )
+                last_info = ""
+
+                while True:
+                    last_info = self._run(
+                        "info",
+                        address,
+                        timeout=6,
+                    )
+
+                    uuids = self._service_uuids(
+                        last_info
+                    )
+
+                    result["service_uuids"] = uuids
+                    result["services_resolved"] = (
+                        self._services_resolved(
+                            last_info
+                        )
+                    )
+
+                    if (
+                        SHELLY_RPC_SERVICE_UUID
+                        in uuids
+                    ):
+                        result["rpc_ready"] = True
+                        result["state"] = "rpc-ready"
+                        result["message"] = (
+                            "Shelly BLE-RPC-Service ist erreichbar. "
+                            "Es wurden noch keine WLAN-Daten übertragen."
+                        )
+                        break
+
+                    if (
+                        result["services_resolved"]
+                        or time.monotonic() >= deadline
+                    ):
+                        result["state"] = "rpc-unavailable"
+                        result["message"] = (
+                            "Shelly wurde per Bluetooth erreicht, der BLE-RPC-"
+                            "Service ist aber momentan nicht verfügbar. "
+                            "Bei fabrikneuen Shellys kann das Provisionierungsfenster "
+                            "abgelaufen sein; Gerät kurz aus- und wieder einschalten "
+                            "und erneut prüfen."
+                        )
+                        break
+
+                    self._sleeper(0.4)
+
+            finally:
+                if connected_here:
+                    try:
+                        self._run(
+                            "disconnect",
+                            address,
+                            timeout=8,
+                        )
+                        result["disconnected_after_check"] = True
+                    except BluetoothDiscoveryError as exc:
+                        # Ein fehlgeschlagenes Disconnect darf nicht als
+                        # erfolgreich verschwiegen werden. Es verändert aber
+                        # keinerlei Shelly-Konfiguration.
+                        result["success"] = False
+                        result["state"] = "disconnect-error"
+                        result["error"] = (
+                            "BLE-Preflight abgeschlossen, temporäre Verbindung "
+                            f"konnte aber nicht sauber getrennt werden: {exc}"
+                        )
+
+        return result
 
     def status(self):
         """Liefert ausschließlich den lokalen Adapterstatus."""
