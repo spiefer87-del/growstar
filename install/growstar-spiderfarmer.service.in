@@ -1,40 +1,31 @@
 [Unit]
-Description=Growstar Spider Farmer Read-Only Bridge (SF.1)
-After=network-online.target growstar-spiderfarmer-network.service
+Description=Growstar Spider Farmer isolated network boundary (SF.1N)
+After=NetworkManager.service network-online.target
 Wants=network-online.target
-Requires=growstar-spiderfarmer-network.service
+Requires=NetworkManager.service
 
 [Service]
-Type=simple
-User=__GROWSTAR_USER__
-Group=__GROWSTAR_GROUP__
-WorkingDirectory=__GROWSTAR_DIR__
+Type=oneshot
+RemainAfterExit=yes
+Environment="GROWSTAR_PROJECT_DIR=__GROWSTAR_DIR__"
+Environment="GROWSTAR_SF_NETWORK_CONFIG=__SF_NETWORK_CONFIG__"
+Environment="GROWSTAR_SF_NETWORK_STATE=__SF_NETWORK_STATE__"
+ExecStart=/usr/local/libexec/growstar-spiderfarmer-network start
+ExecStop=/usr/local/libexec/growstar-spiderfarmer-network stop
+TimeoutStartSec=60
+TimeoutStopSec=45
 
-Environment="PYTHONUNBUFFERED=1"
-Environment="PYTHONDONTWRITEBYTECODE=1"
-Environment="GROWSTAR_SF_LISTEN_HOST=0.0.0.0"
-Environment="GROWSTAR_SF_LISTEN_PORT=18883"
-Environment="GROWSTAR_SF_UPSTREAM_HOST=sf.mqtt.spider-farmer.com"
-Environment="GROWSTAR_SF_UPSTREAM_PORT=8883"
-Environment="GROWSTAR_SF_STATE_DIR=__SF_STATE_DIR__"
-Environment="GROWSTAR_SF_CERT_FILE=__SF_CERT_DIR__/server.pem"
-Environment="GROWSTAR_SF_KEY_FILE=__SF_CERT_DIR__/server_key.pem"
-Environment="GROWSTAR_SF_UPSTREAM_CA_FILE=__SF_CERT_DIR__/upstream_ca.pem"
-Environment="GROWSTAR_SF_CAPTURE_PAYLOADS=1"
-
-ExecStart=/usr/bin/python3 -m bridge.spiderfarmer.main
-
-Restart=on-failure
-RestartSec=5
-TimeoutStopSec=20
+# Root is required only for NetworkManager/nftables. The executable is fixed,
+# root-owned and accepts no shell snippets.
+User=root
+Group=root
 UMask=0077
-
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=__SF_STATE_DIR__
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=__SF_NETWORK_DIR__ __GROWSTAR_DIR__/instance/secrets /etc/NetworkManager/system-connections /run
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
 
 [Install]
 WantedBy=multi-user.target
