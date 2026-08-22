@@ -34,8 +34,10 @@ Der Installer verändert ausdrücklich nicht:
 - IP-Forwarding
 - Mosquitto
 
-Die Bridge lauscht standardmäßig auf TCP/TLS Port 8000. Erst in einem folgenden
-Netzwerkschritt wird entschieden, ob der GGS-Controller über
+Die Bridge lauscht standardmäßig auf TCP/TLS Port 18883. Port 8000 bleibt
+bewusst Growstars Gunicorn-Webbackend vorbehalten; beide Dienste können daher
+parallel laufen. Erst in einem folgenden Netzwerkschritt wird entschieden, ob
+der GGS-Controller über
 
 1. Router/NAT/DNS-Redirect oder
 2. einen dedizierten Growstar-Spider-Farmer-Hotspot
