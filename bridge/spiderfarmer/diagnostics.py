@@ -9,6 +9,8 @@ import re
 import tempfile
 import time
 
+from .state_model import apply_publish, new_state
+
 
 _SAFE_ID = re.compile(r"[^a-zA-Z0-9_.-]+")
 MAX_CAPTURE_PAYLOAD_BYTES = 256 * 1024
@@ -36,11 +38,16 @@ def normalize_session_id(client_id: str | None) -> str:
 
 
 class BridgeDiagnostics:
-    """Maintains a small state file plus a rotating raw JSONL capture.
+    """Maintains private bridge diagnostics and the SF.2 canonical read model.
 
-    The state file only contains summary metadata. The JSONL capture can contain
-    device MACs, UIDs and configuration values and is therefore created mode
-    0600 below Growstar's local instance directory.
+    bridge_state.json:
+        compact transport/session diagnostics
+
+    raw_frames.jsonl:
+        private rotating raw JSON capture
+
+    spiderfarmer_state.json:
+        normalized, read-only operational state for Growstar
     """
 
     def __init__(
@@ -53,6 +60,7 @@ class BridgeDiagnostics:
         self.state_dir = Path(state_dir).expanduser().resolve()
         self.state_path = self.state_dir / "bridge_state.json"
         self.capture_path = self.state_dir / "raw_frames.jsonl"
+        self.growstar_state_path = self.state_dir / "spiderfarmer_state.json"
         self.capture_payloads = bool(capture_payloads)
         self.max_capture_bytes = max(256 * 1024, int(max_capture_bytes))
 
@@ -79,8 +87,16 @@ class BridgeDiagnostics:
             "sessions": {},
             "last_error": None,
         }
+
+        # SF.2 state is intentionally rebuilt from observed traffic after every
+        # bridge restart. No stale command/config cache is silently trusted.
+        self.growstar_state = new_state()
+
         self._last_flush_monotonic = 0.0
+        self._last_growstar_flush_monotonic = 0.0
+
         self.flush(force=True)
+        self.flush_growstar_state(force=True)
 
     def configure(self, *, listen_host, listen_port, upstream_host, upstream_port):
         self.state["listener"] = {
@@ -152,6 +168,7 @@ class BridgeDiagnostics:
         session["last_payload_bytes"] = len(message or b"")
 
         decoded, payload_text = _decode_payload(message)
+
         if isinstance(decoded, dict):
             session["last_method"] = decoded.get("method")
             data = decoded.get("data")
@@ -164,6 +181,17 @@ class BridgeDiagnostics:
                 session["last_pid"] = str(decoded.get("pid"))
             if decoded.get("uid") not in (None, ""):
                 session["uid_seen"] = True
+
+            changed = apply_publish(
+                self.growstar_state,
+                session_id,
+                direction=direction,
+                topic=topic,
+                payload=decoded,
+                timestamp=now,
+            )
+            if changed:
+                self.flush_growstar_state()
         else:
             session["last_method"] = None
             session["last_data_keys"] = []
@@ -222,6 +250,13 @@ class BridgeDiagnostics:
             return
         self._atomic_json(self.state_path, self.state)
         self._last_flush_monotonic = now
+
+    def flush_growstar_state(self, *, force=False):
+        now = time.monotonic()
+        if not force and (now - self._last_growstar_flush_monotonic) < 0.25:
+            return
+        self._atomic_json(self.growstar_state_path, self.growstar_state)
+        self._last_growstar_flush_monotonic = now
 
     def _append_capture(self, record):
         self._rotate_capture_if_needed()
