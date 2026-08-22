@@ -18,6 +18,8 @@ import subprocess
 import threading
 import time
 
+from services.network_secrets import network_secret_store
+
 
 NMCLI_TIMEOUT_SECONDS = 8
 WIFI_SCAN_TIMEOUT_SECONDS = 15
@@ -627,11 +629,37 @@ def _password_required(network):
     return security not in {"", "--", "NONE", "OPEN"}
 
 
+def _current_wifi_security(ssid):
+    """Best-effort Security-Info für das aktuell verbundene WLAN."""
+
+    scan = wifi_scan(force=False)
+
+    if not scan.get("success"):
+        return None
+
+    for item in scan.get("networks") or []:
+        if item.get("ssid") == ssid and not item.get("hidden"):
+            return str(item.get("security") or "--").strip().upper()
+
+    return None
+
+
+def _security_is_open(security):
+    return str(security or "").strip().upper() in {
+        "",
+        "--",
+        "NONE",
+        "OPEN",
+    }
+
+
 def connect_wifi(ssid, password=None):
     """Wechselt kontrolliert auf ein sichtbares WLAN.
 
-    Die Web-Anwendung bleibt unprivilegiert. Die eigentliche NetworkManager-
-    Mutation und der Rollback laufen ausschließlich im root-eigenen Helper.
+    Nach erfolgreich verifiziertem Wechsel wird die ursprüngliche Passphrase
+    zusätzlich lokal als zentrale Growstar-Geräte-Provisionierungsquelle
+    gespeichert. Ein fehlgeschlagener WLAN-Wechsel verändert den Secret-Store
+    nicht.
     """
 
     ssid = _validate_ssid(ssid)
@@ -668,8 +696,25 @@ def connect_wifi(ssid, password=None):
                 },
                 timeout=WIFI_CONNECT_TIMEOUT_SECONDS + WIFI_VERIFY_TIMEOUT_SECONDS + 20,
             )
+
+            if result.get("success"):
+                result["provisioning_secret_saved"] = False
+
+                try:
+                    if not requires_password:
+                        network_secret_store.remove(ssid)
+                        result["provisioning_secret_saved"] = True
+                    elif secret and not result.get("already_connected"):
+                        network_secret_store.save(
+                            ssid,
+                            secret,
+                            source="network_connect",
+                        )
+                        result["provisioning_secret_saved"] = True
+                except Exception as exc:
+                    result["provisioning_secret_error"] = str(exc)
+
         finally:
-            # Lokale Referenz so früh wie möglich leeren.
             secret = ""
 
     if not result.get("success"):
@@ -683,7 +728,7 @@ def connect_wifi(ssid, password=None):
     return result
 
 def update_current_wifi_password(ssid, password):
-    """Ändert transaktional das Passwort des aktuell verbundenen WLANs."""
+    """Ändert Passwort und zentralen Provisionierungs-Secret transaktional."""
 
     ssid = _validate_ssid(ssid)
     secret = "" if password is None else str(password)
@@ -717,6 +762,20 @@ def update_current_wifi_password(ssid, password):
                 + WIFI_VERIFY_TIMEOUT_SECONDS
                 + 35,
             )
+
+            if result.get("success"):
+                result["provisioning_secret_saved"] = False
+
+                try:
+                    network_secret_store.save(
+                        ssid,
+                        secret,
+                        source="network_password_update",
+                    )
+                    result["provisioning_secret_saved"] = True
+                except Exception as exc:
+                    result["provisioning_secret_error"] = str(exc)
+
         finally:
             secret = ""
 
@@ -775,4 +834,211 @@ def get_current_wifi_password(ssid):
         response["password"] = password
 
     return response
+
+def verify_current_wifi_password(ssid, password):
+    """Prüft eine Passphrase im privilegierten Helper, ohne Secrets zu lesen."""
+
+    ssid = _validate_ssid(ssid)
+    secret = "" if password is None else str(password)
+
+    if not secret:
+        raise ValueError("Bitte die WLAN-Passphrase eingeben")
+    if any(char in secret for char in ("\x00", "\n", "\r")):
+        raise ValueError(
+            "Das WLAN-Passwort enthält ungültige Steuerzeichen"
+        )
+    if len(secret) > 128:
+        raise ValueError("Das WLAN-Passwort ist zu lang")
+
+    permissions = network_permissions()
+
+    if not permissions.get("write_ready"):
+        raise NetworkChangeError(
+            permissions.get("error")
+            or "Growstar-Netzwerk-Helper ist nicht freigegeben"
+        )
+
+    try:
+        result = _run_network_helper(
+            {
+                "action": "verify_password",
+                "ssid": ssid,
+                "password": secret,
+            },
+            timeout=15,
+        )
+    finally:
+        secret = ""
+
+    if not result.get("success"):
+        raise NetworkChangeError(
+            result.get("error")
+            or "WLAN-Passphrase konnte nicht geprüft werden"
+        )
+
+    return {
+        "success": True,
+        "ssid": ssid,
+        "valid": bool(result.get("valid")),
+        "credential_type": result.get("credential_type") or "unknown",
+    }
+
+
+def network_provisioning_secret_status():
+    """Öffentlicher Status ohne Passphrase für das aktive Raspberry-WLAN."""
+
+    snapshot = _active_wifi_snapshot()
+
+    if not snapshot or not snapshot.get("ssid"):
+        stored = network_secret_store.status()
+        return {
+            "success": True,
+            "active_ssid": None,
+            "wifi_connected": False,
+            "secret_required": False,
+            "stored_for_active": False,
+            "stored_count": stored.get("stored_count", 0),
+            "source": None,
+            "updated_at": None,
+            "secret_path": stored.get("secret_path"),
+        }
+
+    ssid = _validate_ssid(snapshot.get("ssid"))
+    security = _current_wifi_security(ssid)
+    open_network = _security_is_open(security)
+    stored = network_secret_store.status(ssid)
+
+    return {
+        "success": True,
+        "active_ssid": ssid,
+        "wifi_connected": True,
+        "security": security,
+        "open_network": open_network,
+        "secret_required": not open_network,
+        "stored_for_active": (
+            True
+            if open_network
+            else bool(stored.get("stored_for_active"))
+        ),
+        "stored_count": stored.get("stored_count", 0),
+        "source": stored.get("source"),
+        "updated_at": stored.get("updated_at"),
+        "secret_path": stored.get("secret_path"),
+    }
+
+
+def save_current_wifi_provisioning_secret(password):
+    """Verifiziert und speichert die Passphrase des AKTIVEN WLANs.
+
+    Die SSID kommt absichtlich nicht aus dem Browser. Der privilegierte Helper
+    vergleicht die eingegebene Passphrase mit NetworkManagers aktivem Profil.
+    Erst bei gültigem Treffer wird lokal gespeichert.
+    """
+
+    snapshot = _active_wifi_snapshot()
+
+    if not snapshot or not snapshot.get("ssid"):
+        raise NetworkChangeError(
+            "Growstar ist aktuell mit keinem verwalteten WLAN verbunden"
+        )
+
+    ssid = _validate_ssid(snapshot.get("ssid"))
+    security = _current_wifi_security(ssid)
+
+    if _security_is_open(security):
+        network_secret_store.remove(ssid)
+        return network_provisioning_secret_status()
+
+    verification = verify_current_wifi_password(
+        ssid,
+        password,
+    )
+
+    if not verification.get("valid"):
+        raise ValueError(
+            "Die eingegebene Passphrase stimmt nicht mit dem aktuell verbundenen WLAN überein"
+        )
+
+    secret = "" if password is None else str(password)
+
+    try:
+        network_secret_store.save(
+            ssid,
+            secret,
+            source="manual_verified",
+        )
+    finally:
+        secret = ""
+
+    return network_provisioning_secret_status()
+
+
+def current_wifi_provisioning_credentials():
+    """Zentrale serverseitige Quelle für spätere Geräte-Provisionierung."""
+
+    snapshot = _active_wifi_snapshot()
+
+    if not snapshot or not snapshot.get("ssid"):
+        raise NetworkChangeError(
+            "Growstar ist aktuell mit keinem verwalteten WLAN verbunden"
+        )
+
+    ssid = _validate_ssid(snapshot.get("ssid"))
+    security = _current_wifi_security(ssid)
+
+    if _security_is_open(security):
+        return {
+            "success": True,
+            "ssid": ssid,
+            "password": "",
+            "password_required": False,
+            "credential_type": "open",
+            "credential_source": "open_network",
+        }
+
+    secret = network_secret_store.get(ssid)
+
+    if secret:
+        return {
+            "success": True,
+            "ssid": ssid,
+            "password": secret,
+            "password_required": False,
+            "credential_type": "passphrase",
+            "credential_source": "growstar_secret_store",
+        }
+
+    stored = get_current_wifi_password(ssid)
+
+    if stored.get("revealable"):
+        secret = stored.get("password")
+
+        if not isinstance(secret, str) or not secret:
+            raise NetworkChangeError(
+                "NetworkManager meldet eine Passphrase, liefert sie aber nicht"
+            )
+
+        network_secret_store.save(
+            ssid,
+            secret,
+            source="networkmanager_import",
+        )
+
+        return {
+            "success": True,
+            "ssid": ssid,
+            "password": secret,
+            "password_required": False,
+            "credential_type": "passphrase",
+            "credential_source": "networkmanager_import",
+        }
+
+    return {
+        "success": True,
+        "ssid": ssid,
+        "password": None,
+        "password_required": True,
+        "credential_type": stored.get("credential_type") or "unknown",
+        "credential_source": None,
+    }
 

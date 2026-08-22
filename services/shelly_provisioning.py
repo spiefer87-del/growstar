@@ -1,11 +1,12 @@
 """Growstar Phase 4W.5 – sichere Shelly-WLAN-Erstinbetriebnahme.
 
-Der bestehende Hardware-/Netzwerk-Unterbau bleibt unverändert:
+Der bestehende Hardware-/Netzwerk-Unterbau bleibt erhalten:
 - aktuelles WLAN aus services.network,
+- zentrale Geräte-Passphrase aus services.network_secrets,
 - LAN-Erkennung aus ShellyDiscovery,
 - Persistenz aus dem vorhandenen HardwareManager.
 
-Das WLAN-Secret wird nie persistiert.
+Der Shelly-Workflow selbst persistiert weiterhin kein Secret.
 """
 
 from __future__ import annotations
@@ -25,9 +26,7 @@ from core.hardware.shelly.provisioning import provisioning_discovery
 from services.hardware import hardware
 from services.network import (
     NetworkChangeError,
-    _active_wifi_snapshot,
-    get_current_wifi_password,
-    wifi_scan,
+    current_wifi_provisioning_credentials,
 )
 
 
@@ -88,181 +87,6 @@ def _normalize_mac(value):
             2,
         )
     )
-
-
-def _validate_password(value):
-
-    secret = (
-        ""
-        if value is None
-        else str(value)
-    )
-
-    if any(
-        char in secret
-        for char in (
-            "\x00",
-            "\n",
-            "\r",
-        )
-    ):
-        raise ValueError(
-            "Das WLAN-Passwort enthält ungültige Steuerzeichen"
-        )
-
-    if len(secret) > 128:
-        raise ValueError(
-            "Das WLAN-Passwort ist zu lang"
-        )
-
-    return secret
-
-
-def _current_wifi_security(
-    ssid,
-):
-    """Best-effort Security-Info aus dem vorhandenen NM-Scan."""
-
-    scan = wifi_scan(
-        force=False
-    )
-
-    if not scan.get(
-        "success"
-    ):
-        return None
-
-    for item in (
-        scan.get("networks")
-        or []
-    ):
-        if (
-            item.get("ssid")
-            == ssid
-            and not item.get(
-                "hidden"
-            )
-        ):
-            return str(
-                item.get("security")
-                or "--"
-            ).strip().upper()
-
-    return None
-
-
-def _security_is_open(
-    security,
-):
-    return str(
-        security
-        or ""
-    ).strip().upper() in {
-        "",
-        "--",
-        "NONE",
-        "OPEN",
-    }
-
-
-def current_wifi_credentials(
-    password_override=None,
-):
-    """Ermittelt Ziel-SSID und Secret ausschließlich serverseitig."""
-
-    snapshot = _active_wifi_snapshot()
-
-    if (
-        not snapshot
-        or not snapshot.get(
-            "ssid"
-        )
-    ):
-        raise NetworkChangeError(
-            "Growstar ist aktuell mit keinem verwalteten WLAN verbunden"
-        )
-
-    ssid = str(
-        snapshot.get("ssid")
-        or ""
-    ).strip()
-
-    if not ssid:
-        raise NetworkChangeError(
-            "Aktuelle WLAN-SSID konnte nicht ermittelt werden"
-        )
-
-    security = _current_wifi_security(
-        ssid
-    )
-
-    if _security_is_open(
-        security
-    ):
-        return {
-            "success": True,
-            "ssid": ssid,
-            "password": "",
-            "password_required": False,
-            "credential_type": "open",
-        }
-
-    stored = get_current_wifi_password(
-        ssid
-    )
-
-    if stored.get(
-        "revealable"
-    ):
-
-        secret = stored.get(
-            "password"
-        )
-
-        if (
-            not isinstance(
-                secret,
-                str,
-            )
-            or not secret
-        ):
-            raise NetworkChangeError(
-                "NetworkManager meldet eine Passphrase, liefert sie aber nicht"
-            )
-
-        return {
-            "success": True,
-            "ssid": ssid,
-            "password": secret,
-            "password_required": False,
-            "credential_type": "passphrase",
-        }
-
-    override = _validate_password(
-        password_override
-    )
-
-    if override:
-        return {
-            "success": True,
-            "ssid": ssid,
-            "password": override,
-            "password_required": False,
-            "credential_type": "user_passphrase",
-        }
-
-    return {
-        "success": True,
-        "ssid": ssid,
-        "password": None,
-        "password_required": True,
-        "credential_type": (
-            stored.get(
-                "credential_type"
-            )
-            or "unknown"
-        ),
-    }
 
 
 class ProvisioningStateStore:
@@ -798,7 +622,7 @@ class ShellyWifiProvisioningService:
         hardware_service=hardware,
         discovery_factory=ShellyDiscovery,
         ble_runner=_run_ble_helper,
-        credential_resolver=current_wifi_credentials,
+        credential_resolver=current_wifi_provisioning_credentials,
         sleeper=time.sleep,
     ):
         self.state = (
@@ -1076,7 +900,6 @@ class ShellyWifiProvisioningService:
     def start(
         self,
         address,
-        password_override=None,
     ):
         candidate = self._fresh_candidate(
             address
@@ -1128,16 +951,14 @@ class ShellyWifiProvisioningService:
                 ),
             }
 
-        wifi = self.credential_resolver(
-            password_override=password_override
-        )
+        wifi = self.credential_resolver()
 
         if wifi.get(
             "password_required"
         ):
             return {
                 "success": False,
-                "password_required": True,
+                "network_secret_required": True,
                 "ssid": wifi.get(
                     "ssid"
                 ),
@@ -1145,8 +966,9 @@ class ShellyWifiProvisioningService:
                     "credential_type"
                 ),
                 "error": (
-                    "NetworkManager besitzt nur einen nicht rückrechenbaren "
-                    "Schlüssel. Bitte die echte WLAN-Passphrase einmalig eingeben."
+                    "Für das aktuell verbundene Growstar-WLAN fehlt der zentrale "
+                    "Geräte-Provisionierungs-Secret. Bitte unter System → Netzwerk "
+                    "die echte Passphrase einmalig sicher hinterlegen."
                 ),
             }
 
