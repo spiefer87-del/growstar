@@ -58,6 +58,7 @@ from routes.admin import register as register_admin_routes
 from routes.release import register as register_release_routes
 from routes.restart_policy import register as register_restart_policy_routes
 from routes.notifications import register as register_notification_routes
+from routes.capability_routing import register as register_capability_routing_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -138,6 +139,7 @@ def create_flask_app():
     register_tent_routes(app)
     register_restart_policy_routes(app)
     register_notification_routes(app)
+    register_capability_routing_routes(app)
 
     # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
     install_auth(app)
