@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Spider Farmer</title>
+
+<style>
+:root{
+  --bg:#0f172a;
+  --card:#1e293b;
+  --card2:#111c30;
+  --text:#e5e7eb;
+  --muted:#94a3b8;
+  --line:rgba(148,163,184,.16);
+  --green:#22c55e;
+  --green-soft:rgba(34,197,94,.13);
+  --red:#ef4444;
+  --red-soft:rgba(239,68,68,.12);
+  --blue:#38bdf8;
+  --blue-soft:rgba(56,189,248,.12);
+  --amber:#f59e0b;
+  --amber-soft:rgba(245,158,11,.12);
+}
+
+*{box-sizing:border-box}
+
+body{
+  margin:0;
+  padding:16px;
+  background:var(--bg);
+  color:var(--text);
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+}
+
+header{
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  align-items:flex-start;
+  margin-bottom:18px;
+}
+
+h1{
+  margin:0;
+  font-size:1.45rem;
+}
+
+.subtitle{
+  margin-top:5px;
+  color:var(--muted);
+  font-size:.88rem;
+}
+
+.back{
+  color:var(--muted);
+  text-decoration:none;
+  white-space:nowrap;
+}
+
+.notice{
+  border:1px solid rgba(56,189,248,.22);
+  background:var(--blue-soft);
+  color:#bae6fd;
+  border-radius:14px;
+  padding:12px 14px;
+  line-height:1.45;
+  font-size:.84rem;
+  margin-bottom:16px;
+}
+
+.statusbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+}
+
+.status-text{
+  color:var(--muted);
+  font-size:.85rem;
+}
+
+button{
+  border:0;
+  border-radius:10px;
+  padding:9px 12px;
+  background:#334155;
+  color:var(--text);
+  font-weight:700;
+  cursor:pointer;
+}
+
+.controller-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+  gap:16px;
+}
+
+.controller{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+  box-shadow:0 10px 28px rgba(0,0,0,.24);
+}
+
+.controller-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:flex-start;
+  padding-bottom:14px;
+  border-bottom:1px solid var(--line);
+}
+
+.controller-name{
+  font-weight:800;
+  font-size:1.08rem;
+  word-break:break-word;
+}
+
+.meta{
+  color:var(--muted);
+  font-size:.78rem;
+  line-height:1.5;
+  margin-top:4px;
+  word-break:break-word;
+}
+
+.badge{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:.72rem;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.online{background:var(--green-soft);color:#86efac}
+.offline{background:var(--red-soft);color:#fca5a5}
+.readonly{background:var(--blue-soft);color:#7dd3fc}
+
+.devices{
+  display:grid;
+  gap:12px;
+  margin-top:14px;
+}
+
+.device{
+  background:var(--card2);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:13px;
+}
+
+.device-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  margin-bottom:10px;
+}
+
+.device-title{
+  font-weight:750;
+}
+
+.capabilities{
+  color:var(--muted);
+  font-size:.72rem;
+  margin-top:3px;
+  word-break:break-word;
+}
+
+.values{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+  gap:8px;
+}
+
+.value{
+  border-radius:10px;
+  background:rgba(15,23,42,.72);
+  padding:9px 10px;
+  min-width:0;
+}
+
+.value-key{
+  color:var(--muted);
+  font-size:.67rem;
+  text-transform:uppercase;
+  letter-spacing:.045em;
+}
+
+.value-data{
+  margin-top:3px;
+  font-size:.88rem;
+  font-weight:700;
+  overflow-wrap:anywhere;
+}
+
+.channel{
+  margin-top:10px;
+  border-top:1px solid var(--line);
+  padding-top:10px;
+}
+
+.channel-title{
+  color:#cbd5e1;
+  font-weight:750;
+  font-size:.83rem;
+  margin-bottom:7px;
+}
+
+.empty,
+.error{
+  border-radius:14px;
+  padding:18px;
+  color:var(--muted);
+  background:var(--card);
+  border:1px solid var(--line);
+}
+
+.error{
+  color:#fecaca;
+  background:var(--red-soft);
+}
+
+@media(max-width:600px){
+  body{padding:12px}
+  .controller-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <div>
+    <h1>🕷️ Spider Farmer</h1>
+    <div class="subtitle">GGS Controller · nativer Growstar Readout</div>
+  </div>
+  <a class="back" href="/system">← System</a>
+</header>
+
+<div class="notice">
+  <strong>SF.3C · READ-ONLY:</strong>
+  Diese Seite zeigt ausschließlich den bereits von Growstar normalisierten
+  Spider-Farmer-State. Es existiert in diesem Patch weiterhin kein
+  Steuer-/MQTT-Publish-Pfad zum GGS.
+</div>
+
+<div class="statusbar">
+  <div id="status" class="status-text">Controller werden geladen …</div>
+  <button type="button" id="refresh">Aktualisieren</button>
+</div>
+
+<div id="controllers" class="controller-grid"></div>
+
+<script>
+const endpoint = "/api/spiderfarmer/controllers";
+
+function esc(value){
+  if(value === null || value === undefined){
+    return "";
+  }
+
+  return String(value)
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
+
+function displayKey(key){
+  const labels = {
+    temperature_c:"Temperatur",
+    humidity_percent:"Luftfeuchte",
+    vpd_kpa:"VPD",
+    day_environment_target:"Tag-Ziel",
+    day_sensor:"Tag-Sensor",
+    on:"Ein/Aus",
+    level:"Level",
+    mode_type:"Modus",
+    standby_level:"Standby-Level",
+    run_level:"Run-Level",
+    oscillation_level:"Oszillation",
+    natural_wind:"Natural Wind",
+    cycle:"Zyklus",
+    schedule:"Zeitplan",
+    ps_mode:"Powerstrip-Modus",
+    temperature_offset:"Temperatur-Offset",
+    humidity_offset:"Feuchte-Offset",
+    sensor_binding_present:"Sensorbindung",
+    watering_automation_present:"Bewässerungsautomatik"
+  };
+
+  return labels[key] || key.replaceAll("_"," ");
+}
+
+function displayValue(key, value){
+  if(value === null || value === undefined){
+    return "--";
+  }
+
+  if(key === "temperature_c"){
+    return `${value} °C`;
+  }
+
+  if(key === "humidity_percent"){
+    return `${value} %`;
+  }
+
+  if(key === "vpd_kpa"){
+    return `${value} kPa`;
+  }
+
+  if(key === "on"){
+    return Number(value) ? "Ein" : "Aus";
+  }
+
+  if(key === "natural_wind"){
+    return Number(value) ? "Ein" : "Aus";
+  }
+
+  if(typeof value === "object"){
+    return JSON.stringify(value);
+  }
+
+  return String(value);
+}
+
+function valuesHtml(values){
+  const entries = Object.entries(values || {});
+
+  if(entries.length === 0){
+    return `<div class="meta">Noch keine Werte beobachtet.</div>`;
+  }
+
+  return `
+    <div class="values">
+      ${entries.map(([key,value])=>`
+        <div class="value">
+          <div class="value-key">${esc(displayKey(key))}</div>
+          <div class="value-data">${esc(displayValue(key,value))}</div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function channelsHtml(channels){
+  if(!Array.isArray(channels) || channels.length === 0){
+    return "";
+  }
+
+  return channels.map(channel=>`
+    <div class="channel">
+      <div class="channel-title">
+        ${esc(channel.label || channel.id || "Kanal")}
+      </div>
+      ${valuesHtml(channel.effective || {})}
+    </div>
+  `).join("");
+}
+
+function deviceHtml(device){
+  return `
+    <div class="device">
+      <div class="device-head">
+        <div>
+          <div class="device-title">${esc(device.label || device.id || "Gerät")}</div>
+          <div class="capabilities">
+            ${esc((device.capabilities || []).join(" · ") || "keine Capability")}
+          </div>
+        </div>
+        <span class="badge readonly">READ-ONLY</span>
+      </div>
+
+      ${valuesHtml(device.effective || {})}
+      ${channelsHtml(device.channels)}
+    </div>
+  `;
+}
+
+function controllerHtml(controller){
+  const id = controller.id || "--";
+  const suffix = String(id).slice(-4).toUpperCase();
+
+  return `
+    <section class="controller">
+      <div class="controller-head">
+        <div>
+          <div class="controller-name">Spider Farmer GGS ${esc(suffix || "GGS")}</div>
+          <div class="meta">
+            ID ${esc(id)}<br>
+            PID ${esc(controller.pid || "--")} · Prefix ${esc(controller.prefix || "--")}<br>
+            Letztes Signal ${esc(controller.last_seen || "--")}
+          </div>
+        </div>
+        <span class="badge ${controller.online ? "online" : "offline"}">
+          ${controller.online ? "ONLINE" : "OFFLINE"}
+        </span>
+      </div>
+
+      <div class="devices">
+        ${(controller.devices || []).map(deviceHtml).join("")}
+      </div>
+    </section>
+  `;
+}
+
+async function loadControllers(){
+  const status = document.getElementById("status");
+  const root = document.getElementById("controllers");
+
+  status.textContent = "Controller werden geladen …";
+
+  try{
+    const response = await fetch(endpoint, {
+      method:"GET",
+      headers:{
+        "Accept":"application/json"
+      }
+    });
+
+    const data = await response.json();
+
+    if(!response.ok || !data.success){
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    const controllers = Array.isArray(data.controllers)
+      ? data.controllers
+      : [];
+
+    status.textContent =
+      `${controllers.length} Controller · ${data.read_only ? "READ-ONLY" : "Status unbekannt"}`;
+
+    if(controllers.length === 0){
+      root.innerHTML = `
+        <div class="empty">
+          Noch kein Spider-Farmer-Controller im normalisierten Growstar-State.
+        </div>
+      `;
+      return;
+    }
+
+    root.innerHTML = controllers.map(controllerHtml).join("");
+  }
+  catch(error){
+    console.error(error);
+    status.textContent = "Abruf fehlgeschlagen";
+    root.innerHTML = `
+      <div class="error">
+        Spider-Farmer-State konnte nicht geladen werden:
+        ${esc(error.message || error)}
+      </div>
+    `;
+  }
+}
+
+document.getElementById("refresh").addEventListener("click", loadControllers);
+
+loadControllers();
+setInterval(loadControllers, 5000);
+</script>
+
+</body>
+</html>
