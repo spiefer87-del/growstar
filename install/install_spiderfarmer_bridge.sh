@@ -136,18 +136,20 @@ Upstream:     sf.mqtt.spider-farmer.com:8883
 Modus:        READ-ONLY
 
 Wichtig:
-- Dieses Installationsskript ändert KEIN NetworkManager-Profil.
-- Es ändert KEIN DNS.
-- Es ändert KEINE Firewall-/NAT-Regel.
-- Es ändert KEIN Mosquitto.
-- Ohne separate Umleitung des GGS-Verkehrs erreicht noch kein Controller den Listener.
+- Dieses Installationsskript selbst ändert KEIN NetworkManager-Profil.
+- Es ändert KEIN DNS und KEIN Mosquitto.
+- Die Netzwerkgrenze wird separat durch growstar-spiderfarmer-network.service verwaltet.
+- Der Bridge-Dienst verlangt diese Netzwerkgrenze als systemd-Abhängigkeit.
 EOF2
 
 if [[ "${START_NOW}" -eq 0 ]]; then
     cat <<EOF2
 
 Der Dienst wurde absichtlich NICHT aktiviert oder gestartet.
-Wenn die Netzwerkseite vorbereitet ist:
-  sudo bash install/install_spiderfarmer_bridge.sh --start
+Zuerst die Netzwerkgrenze installieren und prüfen:
+  sudo bash install/install_spiderfarmer_network.sh
+
+Erst nach erfolgreichem AP-Test die Bridge starten:
+  sudo systemctl start growstar-spiderfarmer.service
 EOF2
 fi
