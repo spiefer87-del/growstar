@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar Phase 4W.7 – robuster Shelly-WLAN-Provisionierungshelper.
+"""Growstar Phase 4W.8 – Shelly-Provisionierungsstate kompatibel behandeln.
 
 Dieser Prozess kann ausschließlich:
 1. Shelly.GetDeviceInfo lesen,
@@ -38,6 +38,7 @@ CONNECT_TIMEOUT_SECONDS = 15.0
 DEVICE_SCAN_TIMEOUT_SECONDS = 5.0
 TX_CTL_SETTLE_SECONDS = 0.25
 PROVISIONING_STATES_ALLOWED = {"pending", "confirmed"}
+PROVISIONING_STATE_NOT_REPORTED = "not-reported"
 
 
 class ProvisioningError(RuntimeError):
@@ -373,23 +374,35 @@ async def _provision_with_client(
             "Shelly-Geräte-MAC stimmt nicht mit dem Bluetooth-Kandidaten überein"
         )
 
+    # Das `provision`-Feld gehört zur Shelly-Secure-Provisioning-
+    # Zustandsmaschine und existiert erst ab Firmware 1.7.5. Ältere bzw.
+    # noch nicht aktualisierte Gen3/Gen4-Firmwares können über den offiziellen
+    # BLE-RPC-Service erreichbar sein, ohne dieses Feld zu liefern.
+    #
+    # Explizite Sperrzustände (z. B. locked/complete) bleiben weiterhin
+    # fail-closed. Nur ein tatsächlich NICHT gemeldeter Zustand wird als
+    # kompatibler Legacy-/Firmware-Fall behandelt. Der nachfolgende
+    # Wifi.SetConfig-Aufruf bleibt die einzige Schreiboperation und sein
+    # RPC-Ergebnis wird weiterhin ausgewertet.
+    provision_raw = info.get("provision")
+
     provision_state = str(
-        info.get("provision")
+        provision_raw
         or ""
     ).strip().lower()
 
-    if (
-        provision_state
-        not in PROVISIONING_STATES_ALLOWED
-    ):
-        shown = (
+    if provision_state:
+        if (
             provision_state
-            or "unbekannt"
-        )
-
-        raise ProvisioningError(
-            "Shelly Secure-Provisioning erlaubt keinen WLAN-Schreibzugriff "
-            f"(Status: {shown})"
+            not in PROVISIONING_STATES_ALLOWED
+        ):
+            raise ProvisioningError(
+                "Shelly Secure-Provisioning erlaubt keinen WLAN-Schreibzugriff "
+                f"(Status: {provision_state})"
+            )
+    else:
+        provision_state = (
+            PROVISIONING_STATE_NOT_REPORTED
         )
 
     # pass muss beim Setzen einer SSID mitgeführt werden.
