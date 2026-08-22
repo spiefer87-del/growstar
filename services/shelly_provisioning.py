@@ -1,4 +1,4 @@
-"""Growstar Phase 4W.5 – sichere Shelly-WLAN-Erstinbetriebnahme.
+"""Growstar Phase 4W.7 – sichere Shelly-WLAN-Erstinbetriebnahme.
 
 Der bestehende Hardware-/Netzwerk-Unterbau bleibt erhalten:
 - aktuelles WLAN aus services.network,
@@ -53,7 +53,9 @@ BLE_HELPER_PYTHON = "/usr/bin/python3"
 STATE_MAX_AGE_SECONDS = 15 * 60
 LAN_VERIFY_ATTEMPTS = 6
 LAN_VERIFY_PAUSE_SECONDS = 2.0
-BLE_HELPER_TIMEOUT_SECONDS = 40
+# Der Helper führt vor dem Connect jetzt absichtlich einen kurzen frischen
+# Bleak-Scan aus; der Parent-Timeout muss dessen Worst-Case mit abdecken.
+BLE_HELPER_TIMEOUT_SECONDS = 55
 
 
 class ShellyProvisioningError(
