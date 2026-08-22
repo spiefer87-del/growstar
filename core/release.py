@@ -15,6 +15,52 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.6",
+        "date": "2026-08-21",
+        "phase": "4W.6",
+        "title": "Zentraler WLAN-Secret-Store für Raspberry und Geräte-Provisionierung",
+        "summary": (
+            "Growstar verwaltet die echte Passphrase des aktuell eingerichteten "
+            "Raspberry-WLANs jetzt als zentrale lokale Provisionierungsquelle. "
+            "Erfolgreiche WLAN-Einrichtung und Passwortwechsel pflegen den Secret-"
+            "Store automatisch; bestehende Installationen können die Passphrase "
+            "einmalig gegen NetworkManager verifizieren und sicher hinterlegen."
+        ),
+        "changes": (
+            "services/network_secrets.py ergänzt einen atomaren Cross-Worker-Secret-Store unter instance/secrets/network_credentials.json.",
+            "Das Secret-Verzeichnis wird auf Modus 0700 und Secret-/Lockdatei auf Modus 0600 gesetzt; instance bleibt vollständig außerhalb des Git-Repositories.",
+            "Der öffentliche Secret-Status enthält ausschließlich SSID, Verfügbarkeit, Quelle und Zeitstempel, niemals die gespeicherte Passphrase.",
+            "services/network.py speichert die echte Passphrase nach einem erfolgreich verifizierten Growstar-WLAN-Wechsel automatisch als zentrale Geräte-Provisionierungsquelle.",
+            "Eine erfolgreich verifizierte Änderung des Raspberry-WLAN-Passworts aktualisiert denselben zentralen Secret-Store erst nach erfolgreicher NetworkManager-Bestätigung.",
+            "Fehlgeschlagene WLAN-Wechsel oder Rollbacks verändern den zentralen Secret-Store nicht.",
+            "Bei offenen WLANs wird kein unnötiges Passphrase-Secret benötigt; ein eventuell alter Eintrag für dieses WLAN wird beim erfolgreichen Verbindungswechsel entfernt.",
+            "install/growstar_network_helper.py ergänzt ausschließlich die neue Aktion verify_password und prüft die eingegebene Passphrase gegen das aktive NetworkManager-Profil.",
+            "Bei einem 64-stelligen derived_psk berechnet der root-eigene Helper den WPA2-PSK aus der eingegebenen Passphrase per PBKDF2-HMAC-SHA1 und vergleicht ihn timing-sicher; weder gespeicherter PSK noch Passphrase werden zurückgegeben.",
+            "Die Passphrase-Verifikation akzeptiert ausschließlich die aktuell verbundene SSID und weiterhin nur WPA/WPA2/WPA3-Personal; Growstar/Gunicorn bleibt unprivilegiert.",
+            "routes/config.py ergänzt einen read-only Status-Endpunkt und einen settings.manage-geschützten Schreibendpunkt für die zentrale Passphrase; die Ziel-SSID wird serverseitig aus dem aktiven Raspberry-WLAN bestimmt und kann nicht vom Browser vorgegeben werden.",
+            "templates/network.html zeigt den Zustand des zentralen Geräte-Provisionierungs-Secrets und erlaubt bei bestehenden Installationen eine einmalige verifizierte Hinterlegung, ohne das Secret später wieder anzuzeigen.",
+            "services/network.current_wifi_provisioning_credentials bevorzugt das passende zentrale Growstar-Secret; nur wenn noch keines existiert, kann eine von NetworkManager tatsächlich rücklesbare Passphrase einmalig importiert werden.",
+            "services/shelly_provisioning.py verwendet ausschließlich die zentrale Netzwerk-Credential-Quelle und besitzt keinen eigenen Password-Override-Pfad mehr.",
+            "routes/hardware.py akzeptiert für Shelly-WLAN-Erstinbetriebnahme nur noch die Bluetooth-Adresse des eindeutig neuen Kandidaten; ein separates WLAN-Passwort aus dem Browser wird vollständig ignoriert beziehungsweise nicht mehr gelesen.",
+            "templates/devices.html enthält kein Shelly-spezifisches Passwortfeld mehr und verweist bei fehlendem zentralem Secret auf System → Netzwerk.",
+            "Der bestehende Phase-4W.5-Sicherheitsworkflow bleibt erhalten: frischer BLE/MAC-Abgleich, Shelly.GetDeviceInfo vor Wifi.SetConfig, Secure-Provisioning-State-Check, No-Secret-Idempotenzstatus, keine automatische Write-Wiederholung und LAN-MAC-Verifikation vor Inventarübernahme.",
+            "Bestehende Read-only Discovery-, Preflight-, Aktor-, Safety-, Notification- und Netzwerk-Rollback-Pfade bleiben funktional getrennt.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Commit 65788189c046e001383f15bd066a9fdd13cf6f71 mit Growstar 3.10.5 / Phase 4W.5.",
+            "Alle neun verwendeten Bestandsdateien wurden vor der Patch-Erzeugung über ihre Git-Blob-SHAs gegen den aktuellen GitHub-main-Stand verifiziert.",
+            "Der neue Secret-Store-Test bestätigt atomare Speicherung, serverinternen Leseweg, Modus 0600 für Secret-/Lockdatei sowie Modus 0700 für das Secret-Verzeichnis.",
+            "Der öffentliche Secret-Status wird darauf geprüft, keine Passphrase oder Passwortfelder auszugeben.",
+            "Die Helper-Regression verifiziert eine korrekte Passphrase gegen einen simulierten derived_psk und lehnt eine falsche Passphrase ab, ohne den gespeicherten PSK auszugeben.",
+            "Der Netzwerk-Service-Test bestätigt, dass ein erfolgreich verifizierter Raspberry-WLAN-Wechsel den Secret-Store pflegt, ein fehlgeschlagener Wechsel ihn nicht verändert und ein erfolgreicher Passwortwechsel ihn aktualisiert.",
+            "Die zentrale Credential-Auflösung wird darauf geprüft, dass ein passendes Growstar-Secret NetworkManager vorgezogen wird.",
+            "Statische Vertragsprüfungen bestätigen, dass die manuelle Secret-Hinterlegung keine Browser-SSID akzeptiert und die Shelly-Hardware-API kein separates Passwort mehr liest.",
+            "Die aktualisierte Shelly-WLAN-Regression bestätigt weiterhin BLE-RPC-Framing, GetDeviceInfo-vor-Wifi.SetConfig, MAC-/Secure-Provisioning-Guards, stdin-Secret-Transport, Cross-Worker-Idempotenz und reine LAN-Nachverifikation.",
+            "Alle neuen und geänderten Python-Dateien wurden syntaktisch validiert; die HTML/JavaScript-Änderungen wurden zusätzlich auf die erwarteten Endpunkte und das Entfernen des gerätespezifischen Passwortfelds geprüft.",
+            "Die Release-Historie bestätigt 3.10.6 / 4W.6 als neuen obersten Eintrag und 3.10.5 / 4W.5 direkt darunter.",
+        ),
+    },
+    {
         "version": "3.10.5",
         "date": "2026-08-21",
         "phase": "4W.5",
