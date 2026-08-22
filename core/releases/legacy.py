@@ -1,0 +1,1425 @@
+"""Zentrale Growstar-Release- und Patch-Informationen.
+
+Wichtig:
+- Die aktuelle Version wird ausschließlich vom ersten RELEASES-Eintrag
+  abgeleitet.
+- Für einen neuen Patch wird ein neuer Eintrag oben ergänzt.
+- Regelung, Hardware und Runtime greifen auf dieses Modul nicht zu.
+"""
+
+from __future__ import annotations
+
+from copy import deepcopy
+import datetime
+
+
+RELEASES = (
+    {
+        "version": "3.11.2",
+        "date": "2026-08-22",
+        "phase": "SF.2A",
+        "title": "Spider-Farmer-GGS als native Growstar-Sensorquelle",
+        "summary": (
+            "Der in SF.2 normalisierte Spider-Farmer-GGS-Zustand wird jetzt "
+            "read-only in Growstars bestehende controller-weite Sensorquellen-"
+            "Architektur übernommen. Temperatur und Luftfeuchte des GGS können "
+            "dadurch über den bereits vorhandenen SENSOR_ASSIGNMENTS-Pfad wie "
+            "Pico-, MQTT- oder Shelly-BLU-Sensoren einer Grow-Station zugeordnet "
+            "werden, ohne einen parallelen Regelkreis oder einen neuen MQTT-"
+            "Commandpfad einzuführen."
+        ),
+        "changes": (
+            "services/spiderfarmer.py liest ausschließlich instance/spiderfarmer/spiderfarmer_state.json aus der bestehenden SF.2-Bridge und erzeugt daraus eine stabile Quelle spiderfarmer:<controller-id>:environment.",
+            "Der Adapter übernimmt GGS-Temperatur und Luftfeuchte in core.sensor_sources; VPD und Tag-/Nacht-Metadaten bleiben als normalisierte Zusatzdaten erhalten.",
+            "Ein unveränderter Bridge-last_seen-Zeitstempel wird nicht erneut veröffentlicht, damit ein ausgefallener GGS niemals durch lokales Polling künstlich frisch gehalten wird.",
+            "Beschädigte, fehlende oder unvollständige Spider-Farmer-State-Dateien fallen fail-closed auf einen leeren read-only Zustand zurück und können den bestehenden Hardware-Thread nicht beenden.",
+            "threads/hardware.py verwendet den bestehenden 30-Sekunden-Hardware-Poll zusätzlich für den read-only Spider-Farmer-Sensor-Sync; Shelly-, Pico-, MQTT-, Actuator-Health- und Inventory-Pfade bleiben unverändert.",
+            "Der Spider-Farmer-Adapter enthält keinen Socket-, MQTT-Encoder-, setConfigField- oder anderen Command-Sendepfad; SF.2A bleibt vollständig read-only.",
+            "Die vorhandene Sensorquellen-/Stationszuordnung muss nicht erweitert werden: sobald der GGS mindestens einen echten Sensorstand geliefert hat, erscheint die Quelle über die bestehende Sensorquellen-API und kann pro Zelt ausgewählt werden.",
+        ),
+        "tests": (
+            "check_spiderfarmer_growstar_adapter.py simuliert einen echten SF.2-GGS-State mit Temperatur, Luftfeuchte, VPD, Licht, Fan und Blower.",
+            "Die Regression verlangt eine stabile spiderfarmer:<id>:environment-Quellen-ID sowie unveränderte Temperatur-/Feuchtewerte.",
+            "Ein identischer last_seen-Wert darf update_sensor_source kein zweites Mal aufrufen; erst ein neuer echter Bridge-Zeitstempel darf die Quelle erneut frisch markieren.",
+            "Beschädigte JSON-State-Dateien müssen sicher als leerer read-only Zustand behandelt werden.",
+            "Statische Guards verbieten Netzwerk-/Commandpfade im SF.2A-Adapter und bestätigen den unveränderten 30-Sekunden-Hardware-Poll.",
+            "Die bestehenden SF.1-/SF.2-Regressionen bleiben zusätzlich auszuführen.",
+        ),
+    },
+    {
+        "version": "3.11.1",
+        "date": "2026-08-22",
+        "phase": "SF.1N",
+        "title": "Isoliertes Spider-Farmer-GGS-Netz mit Ethernet-Uplink",
+        "summary": (
+            "Growstar kann den Raspberry jetzt kontrolliert aufteilen: eth0 bleibt "
+            "der einzige Heimnetz-/Internet-Uplink, während wlan0 als eigener "
+            "2,4-GHz-WPA2-Access-Point Growstar-SF für den Spider-Farmer-GGS-"
+            "Controller betrieben werden kann. Der GGS-MQTT-Verkehr auf TCP/8883 "
+            "wird ausschließlich vom isolierten WLAN zur lokalen read-only Bridge "
+            "auf Port 18883 umgeleitet; die bestehende Shelly-Provisionierung bleibt "
+            "auf dem separat gespeicherten Heimnetz-Ziel."
+        ),
+        "changes": (
+            "install/growstar_spiderfarmer_network.py ergänzt eine root-eigene, eng begrenzte Netzwerkgrenze mit Preflight, Start, Stop, Status und Rollback; sie wird nicht aus Gunicorn heraus ausgeführt.",
+            "Der Preflight verlangt einen verbundenen IPv4-Ethernet-Uplink auf eth0, Default- und Spider-Farmer-Cloud-Route über eth0, AP-Fähigkeit von wlan0 sowie ein gesetztes und gespeichertes Growstar-Geräte-Provisionierungsziel, das nicht Growstar-SF heißen darf.",
+            "Der Access Point verwendet ein eigenes NetworkManager-Profil Growstar-SF mit 2,4 GHz, WPA2/RSN-CCMP, festem 10.42.77.1/24 und ipv4.method shared; bestehende Heim-WLAN-Profile werden weder gelöscht noch editiert.",
+            "Das zufällig erzeugte Spider-Farmer-WLAN-Passwort wird root-only unter instance/spiderfarmer_network/config.json gespeichert und beim NetworkManager-Editor ausschließlich über stdin gesetzt, nicht als Prozessargument.",
+            "Eine eigene nftables-NAT-Regel leitet nur TCP/8883 von wlan0 auf den lokalen Bridge-Port 18883 um; der lokale Bridge-Upstream über eth0 bleibt davon unberührt.",
+            "Eine zusätzliche nftables-Grenze blockiert Zugriffe des Spider-Farmer-WLANs auf private IPv4-Netze und lässt am Raspberry nur DHCP, DNS, Ping und die TLS-Bridge zu; SSH und Growstar-Weboberfläche werden nicht über Growstar-SF freigegeben.",
+            "Bei einem Startfehler entfernt Growstar die eigenen nftables-Tabellen, fährt das AP-Profil herunter und versucht die zuvor aktive wlan0-Verbindung wiederherzustellen.",
+            "growstar-spiderfarmer.service verlangt die Netzwerkgrenze als systemd-Abhängigkeit; beide Dienste bleiben nach Installation zunächst deaktiviert und werden erst nach bewusstem Teststart aktiviert.",
+            "Die in 3.11.0 getrennte Shelly-Geräte-Provisionierung wird nicht verändert: neue Shellys erhalten weiterhin die gespeicherte FRITZ!Box-SSID und deren Growstar-Secret, unabhängig vom späteren AP-Betrieb auf wlan0.",
+        ),
+        "tests": (
+            "check_spiderfarmer_network.py prüft offline den Ethernet-/AP-/Provisionierungs-Preflight, die NetworkManager-Shared-Konfiguration, secret-freien Prozessaufruf, den eng begrenzten nftables-Redirect, LAN-Isolation und Rollback-Vertrag.",
+            "Die bestehende SF.1-Bridge-Regression bleibt read-only und der Shelly-WLAN-Regressionstest wird auf Growstar 3.11.1 / SF.1N sowie die direkte Historie 3.11.0 / SF.1 aktualisiert.",
+            "Ausgangsbasis ist GitHub main 7150b290b39ffb76b227a17c82c8acacf014d396 mit Growstar 3.11.0 / Phase SF.1 und vollständig grünem Shelly-/Provisionierungsbestand.",
+        ),
+    },
+    {
+        "version": "3.11.0",
+        "date": "2026-08-22",
+        "phase": "SF.1",
+        "title": "Spider-Farmer-Basis mit festem Geräte-Provisionierungsnetz",
+        "summary": (
+            "Growstar trennt das WLAN-Ziel für neue Geräte erstmals dauerhaft "
+            "vom aktuellen Raspberry-WLAN-Uplink. Das bestehende verifizierte "
+            "Heimnetz kann dadurch für Shelly-BLE-Provisionierung erhalten bleiben, "
+            "während wlan0 in der nächsten Spider-Farmer-Stufe als eigener GGS-"
+            "Access-Point verwendet wird. Gleichzeitig weicht die read-only "
+            "Spider-Farmer-Bridge vom belegten Gunicorn-Port 8000 auf 18883 aus."
+        ),
+        "changes": (
+            "services/network_secrets.py erweitert den bestehenden lokalen Secret-Store rückwärtskompatibel auf Schema v2 und speichert zusätzlich genau ein festes Geräte-Provisionierungsziel mit SSID, Security-Metadaten und Quelle; Passphrasen bleiben ausschließlich in den bestehenden Secret-Einträgen.",
+            "Bestehende Schema-v1-Dateien bleiben ohne manuelle Migration lesbar und werden erst bei einem legitimen Schreibvorgang atomar als v2 persistiert.",
+            "services/network.py migriert ein bereits verifiziert gespeichertes aktives Heim-WLAN einmalig als festes Provisionierungsziel; ein geschütztes WLAN ohne passendes Growstar-Secret wird niemals automatisch festgeschrieben.",
+            "current_wifi_provisioning_credentials verwendet nach gesetztem Ziel immer dessen SSID und Secret, unabhängig davon, ob der Raspberry später per Ethernet uplinkt, gar kein Client-WLAN besitzt oder wlan0 als Growstar-SF-Access-Point betreibt.",
+            "Die bestehende manuelle Verifikation unter System → Netzwerk setzt das verifizierte aktive WLAN nun ausdrücklich als Geräte-Provisionierungsziel; die SSID kommt weiterhin ausschließlich serverseitig und nicht aus dem Browser.",
+            "Der öffentliche Provisionierungsstatus enthält zusätzlich Ziel-/Uplink-Metadaten, aber weiterhin weder Passwort noch Passphrase; bestehende UI-Felder bleiben als Kompatibilitätsalias erhalten.",
+            "Die Shelly-Kette bleibt unverändert: BLE-Scan, BLE-RPC-Prüfung, Shelly.GetDeviceInfo, Wifi.SetConfig, LAN-MAC-Verifikation und HardwareManager werden nicht ersetzt oder parallel implementiert.",
+            "bridge/spiderfarmer/main.py und die systemd-Vorlage verwenden für den lokalen read-only Listener jetzt Port 18883 statt 8000, weil 127.0.0.1:8000 auf der realen Growstar-Installation bereits von Gunicorn belegt ist.",
+            "Der Spider-Farmer-Installer bleibt weiterhin ohne NetworkManager-, DNS-, Firewall-, NAT- oder Mosquitto-Mutation; der eigentliche GGS-Hotspot folgt erst in der nächsten abgesicherten Stufe.",
+        ),
+        "tests": (
+            "Die neue Regression check_provisioning_network_decoupling.py simuliert den 3.10.8-Bestand mit verifiziertem Heimnetz, migriert dieses Ziel und schaltet das gedachte Raspberry-WLAN anschließend auf Growstar-SF um.",
+            "Die Regression verlangt, dass neue Geräte weiterhin exakt Heimnetz-SSID und Heimnetz-Secret erhalten, selbst wenn wlan0 Growstar-SF meldet oder überhaupt kein Raspberry-Client-WLAN mehr aktiv ist.",
+            "Schema-v1-Lesbarkeit, Schema-v2-Persistenz, 0600-Dateirechte und secret-freier öffentlicher Status werden zusätzlich geprüft.",
+            "Die Spider-Farmer-Read-only-Regression prüft weiterhin, dass kein Command-Encoder und keine Netzwerk-/Mosquitto-Mutation vorhanden ist, und verwendet jetzt den konfliktfreien Listener-Port 18883.",
+            "Ausgangsbasis ist GitHub main b35c14a4c98409f0f94efa54714ad363dc07d95f mit Growstar 3.10.8 / Phase 4W.8 plus der bereits read-only eingecheckten SF.1-Brückengrundlage.",
+        ),
+    },
+    {
+        "version": "3.10.8",
+        "date": "2026-08-22",
+        "phase": "4W.8",
+        "title": "Fehlendes Shelly-Provisioning-Feld blockiert Gen4-WLAN-Setup nicht mehr",
+        "summary": (
+            "Growstar interpretiert ein von Shelly.GetDeviceInfo nicht geliefertes "
+            "provision-Feld nicht mehr als unbekannten Sperrzustand. Explizite "
+            "Secure-Provisioning-Sperren bleiben weiterhin blockiert; ältere oder "
+            "noch nicht aktualisierte Firmware kann den bestehenden BLE-RPC-"
+            "Wifi.SetConfig-Pfad dagegen wieder verwenden."
+        ),
+        "changes": (
+            "core/hardware/shelly/ble_rpc_helper.py unterscheidet jetzt zwischen einem tatsächlich fehlenden provision-Feld und einem explizit gemeldeten Secure-Provisioning-Zustand.",
+            "pending und confirmed bleiben die ausdrücklich erlaubten Secure-Provisioning-Zustände.",
+            "Explizite Zustände wie locked, complete oder andere unbekannte nicht-leere Werte bleiben fail-closed und blockieren Wifi.SetConfig vor jedem Schreibzugriff.",
+            "Fehlt das provision-Feld vollständig, wird intern not-reported verwendet und der bereits vorhandene Wifi.SetConfig-Pfad fortgesetzt.",
+            "Diese Kompatibilität ist erforderlich, weil Shelly das provision-Feld erst mit Secure Provisioning ab Firmware 1.7.5 eingeführt hat.",
+            "Der bestehende Geräte-MAC-Abgleich vor Wifi.SetConfig bleibt unverändert zwingend.",
+            "BLE-Gerätelookup, Request-ID-Filterung, Secret-Transport über stdin, Idempotenzstatus und LAN-MAC-Verifikation aus 3.10.7 bleiben unverändert erhalten.",
+            "Es wird keine zusätzliche RPC-Methode und kein zweiter BLE-Client eingeführt.",
+        ),
+        "tests": (
+            "Die Regression simuliert erstmals Shelly.GetDeviceInfo ohne provision-Feld und verlangt anschließend den bestehenden Wifi.SetConfig-Aufruf.",
+            "Der fehlende Zustand wird im Helper-Ergebnis als not-reported dokumentiert.",
+            "Der bestehende locked-Test bestätigt weiterhin, dass ein expliziter Sperrzustand Wifi.SetConfig vollständig blockiert.",
+            "MAC-Mismatch, RPC-Framing, asynchrone Notifications, BLE-Lookup und WLAN-Secret-Transport bleiben zusätzlich geschützt.",
+            "Ausgangsbasis ist GitHub main b40d7e583210b757e50225eef7caa2c0a43fdf2f mit Growstar 3.10.7 / Phase 4W.7.",
+        ),
+    },
+    {
+        "version": "3.10.7",
+        "date": "2026-08-22",
+        "phase": "4W.7",
+        "title": "Robuster BLE-RPC-Transport für Shelly-Gen4-Provisionierung",
+        "summary": (
+            "Der bestehende Shelly-WLAN-Provisionierungspfad bleibt erhalten, "
+            "wird aber an einem auf echter Gen4-Hardware beobachteten BlueZ- und "
+            "einem protokollbedingten RPC-Sonderfall gehärtet: Growstar löst das "
+            "BLE-Gerät unmittelbar vor "
+            "dem Connect frisch auf und ignoriert asynchrone Shelly-RPC-"
+            "Notifications, bis die Antwort mit der eigenen Request-ID eintrifft."
+        ),
+        "changes": (
+            "core/hardware/shelly/ble_rpc_helper.py verwendet vor BleakClient einen frischen BleakScanner.find_device_by_address-Aufruf und übergibt das aufgelöste BLEDevice statt nur der Adresse.",
+            "Der bestehende RPC-Framing-, Chunking- und Wifi.SetConfig-Pfad bleibt unverändert; es wird kein zweiter RPC-Client und kein generischer RPC-Endpunkt eingeführt.",
+            "Asynchrone NotifyEvent-/NotifyStatus-Frames oder verspätete Frames anderer Request-IDs werden auf dem symmetrischen Shelly-RPC-Kanal verworfen, bis die passende Antwort-ID vorliegt.",
+            "RPC-Fehler behalten zusätzlich ihren numerischen Fehlercode in der sicheren Fehlermeldung; WLAN-SSID und insbesondere das Secret werden dadurch nicht protokolliert.",
+            "Der auf dem Raspberry beobachtete dbus-fast EOFError beim Disconnect ist nur noch ein Cleanup-Hinweis und kann einen davor entstandenen BLE-RPC-Fehler nicht mehr maskieren.",
+            "services/shelly_provisioning.py erhält ausschließlich einen angepassten Helper-Timeout für den zusätzlichen frischen BLE-Lookup; Credential-Auflösung, Secret-Store, Idempotenz und LAN-MAC-Verifikation bleiben unverändert.",
+            "Wifi.SetConfig überträgt weiterhin exakt die serverseitig aufgelöste SSID und das zugehörige WLAN-Secret im offiziellen sta.pass-Feld; es wird kein Shelly-spezifisches Passwortfeld im Browser eingeführt.",
+            "Switch.Set, FactoryReset, BLE.StartPairing sowie die vorhandenen Gateway-RPC-Funktionen bleiben vollständig außerhalb dieses Provisionierungshelpers.",
+        ),
+        "tests": (
+            "Die Shelly-WLAN-Regression simuliert jetzt ein asynchrones NotifyEvent vor der eigentlichen RPC-Antwort und verlangt trotzdem einen erfolgreichen GetDeviceInfo-/Wifi.SetConfig-Ablauf.",
+            "Die bestehende Regression bestätigt weiterhin, dass Wifi.SetConfig SSID, WLAN-Secret, enable=true und DHCP korrekt erhält.",
+            "Statische Vertragsprüfungen verlangen den frischen Bleak-Gerätelookup und verhindern, dass ein Disconnect-Fehler wieder einen primären RPC-Fehler überschreibt.",
+            "Die bisherigen MAC-, Secure-Provisioning-, No-Secret-State-, stdin-Secret-Transport- und LAN-Verifikationsprüfungen bleiben erhalten.",
+            "Ausgangsbasis ist GitHub main 3c83419a90aa43d8be8862c59d13279a129306df mit Growstar 3.10.6 / Phase 4W.6.",
+        ),
+    },
+    {
+        "version": "3.10.6",
+        "date": "2026-08-21",
+        "phase": "4W.6",
+        "title": "Zentraler WLAN-Secret-Store für Raspberry und Geräte-Provisionierung",
+        "summary": (
+            "Growstar verwaltet die echte Passphrase des aktuell eingerichteten "
+            "Raspberry-WLANs jetzt als zentrale lokale Provisionierungsquelle. "
+            "Erfolgreiche WLAN-Einrichtung und Passwortwechsel pflegen den Secret-"
+            "Store automatisch; bestehende Installationen können die Passphrase "
+            "einmalig gegen NetworkManager verifizieren und sicher hinterlegen."
+        ),
+        "changes": (
+            "services/network_secrets.py ergänzt einen atomaren Cross-Worker-Secret-Store unter instance/secrets/network_credentials.json.",
+            "Das Secret-Verzeichnis wird auf Modus 0700 und Secret-/Lockdatei auf Modus 0600 gesetzt; instance bleibt vollständig außerhalb des Git-Repositories.",
+            "Der öffentliche Secret-Status enthält ausschließlich SSID, Verfügbarkeit, Quelle und Zeitstempel, niemals die gespeicherte Passphrase.",
+            "services/network.py speichert die echte Passphrase nach einem erfolgreich verifizierten Growstar-WLAN-Wechsel automatisch als zentrale Geräte-Provisionierungsquelle.",
+            "Eine erfolgreich verifizierte Änderung des Raspberry-WLAN-Passworts aktualisiert denselben zentralen Secret-Store erst nach erfolgreicher NetworkManager-Bestätigung.",
+            "Fehlgeschlagene WLAN-Wechsel oder Rollbacks verändern den zentralen Secret-Store nicht.",
+            "Bei offenen WLANs wird kein unnötiges Passphrase-Secret benötigt; ein eventuell alter Eintrag für dieses WLAN wird beim erfolgreichen Verbindungswechsel entfernt.",
+            "install/growstar_network_helper.py ergänzt ausschließlich die neue Aktion verify_password und prüft die eingegebene Passphrase gegen das aktive NetworkManager-Profil.",
+            "Bei einem 64-stelligen derived_psk berechnet der root-eigene Helper den WPA2-PSK aus der eingegebenen Passphrase per PBKDF2-HMAC-SHA1 und vergleicht ihn timing-sicher; weder gespeicherter PSK noch Passphrase werden zurückgegeben.",
+            "Die Passphrase-Verifikation akzeptiert ausschließlich die aktuell verbundene SSID und weiterhin nur WPA/WPA2/WPA3-Personal; Growstar/Gunicorn bleibt unprivilegiert.",
+            "routes/config.py ergänzt einen read-only Status-Endpunkt und einen settings.manage-geschützten Schreibendpunkt für die zentrale Passphrase; die Ziel-SSID wird serverseitig aus dem aktiven Raspberry-WLAN bestimmt und kann nicht vom Browser vorgegeben werden.",
+            "templates/network.html zeigt den Zustand des zentralen Geräte-Provisionierungs-Secrets und erlaubt bei bestehenden Installationen eine einmalige verifizierte Hinterlegung, ohne das Secret später wieder anzuzeigen.",
+            "services/network.current_wifi_provisioning_credentials bevorzugt das passende zentrale Growstar-Secret; nur wenn noch keines existiert, kann eine von NetworkManager tatsächlich rücklesbare Passphrase einmalig importiert werden.",
+            "services/shelly_provisioning.py verwendet ausschließlich die zentrale Netzwerk-Credential-Quelle und besitzt keinen eigenen Password-Override-Pfad mehr.",
+            "routes/hardware.py akzeptiert für Shelly-WLAN-Erstinbetriebnahme nur noch die Bluetooth-Adresse des eindeutig neuen Kandidaten; ein separates WLAN-Passwort aus dem Browser wird vollständig ignoriert beziehungsweise nicht mehr gelesen.",
+            "templates/devices.html enthält kein Shelly-spezifisches Passwortfeld mehr und verweist bei fehlendem zentralem Secret auf System → Netzwerk.",
+            "Der bestehende Phase-4W.5-Sicherheitsworkflow bleibt erhalten: frischer BLE/MAC-Abgleich, Shelly.GetDeviceInfo vor Wifi.SetConfig, Secure-Provisioning-State-Check, No-Secret-Idempotenzstatus, keine automatische Write-Wiederholung und LAN-MAC-Verifikation vor Inventarübernahme.",
+            "Bestehende Read-only Discovery-, Preflight-, Aktor-, Safety-, Notification- und Netzwerk-Rollback-Pfade bleiben funktional getrennt.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Commit 65788189c046e001383f15bd066a9fdd13cf6f71 mit Growstar 3.10.5 / Phase 4W.5.",
+            "Alle neun verwendeten Bestandsdateien wurden vor der Patch-Erzeugung über ihre Git-Blob-SHAs gegen den aktuellen GitHub-main-Stand verifiziert.",
+            "Der neue Secret-Store-Test bestätigt atomare Speicherung, serverinternen Leseweg, Modus 0600 für Secret-/Lockdatei sowie Modus 0700 für das Secret-Verzeichnis.",
+            "Der öffentliche Secret-Status wird darauf geprüft, keine Passphrase oder Passwortfelder auszugeben.",
+            "Die Helper-Regression verifiziert eine korrekte Passphrase gegen einen simulierten derived_psk und lehnt eine falsche Passphrase ab, ohne den gespeicherten PSK auszugeben.",
+            "Der Netzwerk-Service-Test bestätigt, dass ein erfolgreich verifizierter Raspberry-WLAN-Wechsel den Secret-Store pflegt, ein fehlgeschlagener Wechsel ihn nicht verändert und ein erfolgreicher Passwortwechsel ihn aktualisiert.",
+            "Die zentrale Credential-Auflösung wird darauf geprüft, dass ein passendes Growstar-Secret NetworkManager vorgezogen wird.",
+            "Statische Vertragsprüfungen bestätigen, dass die manuelle Secret-Hinterlegung keine Browser-SSID akzeptiert und die Shelly-Hardware-API kein separates Passwort mehr liest.",
+            "Die aktualisierte Shelly-WLAN-Regression bestätigt weiterhin BLE-RPC-Framing, GetDeviceInfo-vor-Wifi.SetConfig, MAC-/Secure-Provisioning-Guards, stdin-Secret-Transport, Cross-Worker-Idempotenz und reine LAN-Nachverifikation.",
+            "Alle neuen und geänderten Python-Dateien wurden syntaktisch validiert; die HTML/JavaScript-Änderungen wurden zusätzlich auf die erwarteten Endpunkte und das Entfernen des gerätespezifischen Passwortfelds geprüft.",
+            "Die Release-Historie bestätigt 3.10.6 / 4W.6 als neuen obersten Eintrag und 3.10.5 / 4W.5 direkt darunter.",
+        ),
+    },
+    {
+        "version": "3.10.5",
+        "date": "2026-08-21",
+        "phase": "4W.5",
+        "title": "Shelly-WLAN-Erstinbetriebnahme über sicheren BLE-RPC-Workflow",
+        "summary": (
+            "Eindeutig neue Shellys können jetzt ohne Hersteller-App mit dem "
+            "aktuell verbundenen Growstar-WLAN provisioniert werden. Growstar "
+            "verifiziert die Geräte-MAC vor dem Schreibzugriff und nach dem "
+            "LAN-Beitritt erneut und übernimmt das Gerät erst danach in den "
+            "Hardwarebestand."
+        ),
+        "changes": (
+            "Die Ziel-SSID wird ausschließlich serverseitig aus Growstars aktuell aktiver WLAN-Verbindung bestimmt und kann nicht vom Browser frei vorgegeben werden.",
+            "Der bestehende NetworkManager-Unterbau bleibt unverändert; Phase 4W.5 verwendet dessen vorhandene aktive WLAN-Erkennung, WLAN-Scan- und Secret-Abfragefunktionen.",
+            "Rücklesbare NetworkManager-Passphrasen bleiben serverseitig; ein 64-stelliger derived_psk wird nicht als angebliche ursprüngliche Passphrase an Shelly weitergegeben.",
+            "Wenn NetworkManager nur einen derived_psk besitzt, fordert die Hardware-UI einmalig die echte WLAN-Passphrase an.",
+            "core/hardware/shelly/ble_rpc_helper.py implementiert ausschließlich Shelly.GetDeviceInfo gefolgt von Wifi.SetConfig und besitzt bewusst keinen generischen RPC-Endpunkt.",
+            "Der BLE-RPC-Helper verwendet die offiziellen Shelly/mOS Data-, TX-Control- und RX-Control-Characteristics sowie 4-Byte-Big-Endian-Framing.",
+            "RPC-Requests enthalten eine feste Growstar-Source-ID und werden nach TX-Control in konservativen ATT-MTU-Chunks an die Data-Characteristic geschrieben.",
+            "RX-Control-Wert 0 wird bis zum Zeitlimit als noch nicht fertige Antwort behandelt und nicht als leere RPC-Antwort fehlinterpretiert.",
+            "Vor Wifi.SetConfig muss Shelly.GetDeviceInfo exakt die erwartete Geräte-MAC und den Secure-Provisioning-State pending oder confirmed liefern.",
+            "complete, locked, fehlende/unklare Provisioning-States und MAC-Abweichungen blockieren Wifi.SetConfig.",
+            "Wifi.SetConfig setzt die aktuelle SSID, das zugehörige Secret beziehungsweise null bei offenen Netzen, aktiviert Station Mode und verwendet DHCP.",
+            "Das WLAN-Secret wird ausschließlich über stdin an den separaten /usr/bin/python3-BLE-Helper übergeben und erscheint weder in Prozessargumenten noch in einer Growstar-Statusdatei.",
+            "Ein persistenter, dateimodus-0600 No-Secret-State verhindert auch über mehrere Gunicorn-Worker hinweg einen automatischen zweiten Wifi.SetConfig für denselben begonnenen Vorgang.",
+            "Nach begonnenem Wifi.SetConfig wird ausschließlich per LAN/mDNS weiter verifiziert; bei BLE-Timeout oder Verbindungsabbruch gilt der Schreibstatus konservativ als unbekannt und wird nicht wiederholt.",
+            "Die manuelle LAN-Nachprüfung verwendet einen zufälligen serverseitig gespeicherten Verifikationstoken; der Browser darf die erwartete Geräte-MAC dabei nicht frei vorgeben.",
+            "Ein Shelly wird erst nach erneutem LAN-RPC/MAC-Treffer gezielt in den bestehenden HardwareManager übernommen und atomar im vorhandenen Hardware-Inventar gespeichert.",
+            "Bereits bekannte Gateways mit derselben Geräte-MAC werden nicht als zweiter Hardware-Eintrag angelegt.",
+            "Die bestehende Read-only Discovery und der BLE-RPC-Preflight bleiben als vorgeschaltete Sicherheitsstufen erhalten.",
+            "Es wird weiterhin kein Bluetooth-Pairing/Trust, kein Switch.Set, kein FactoryReset und keine Stations-/Aktor-Zuordnung automatisch durchgeführt.",
+            "install/install_shelly_ble_rpc.sh installiert ausschließlich python3-bleak; Growstar/Gunicorn bleibt unprivilegiert und erhält keine zusätzlichen sudo-Rechte.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der verifizierte GitHub-main-Stand mit Growstar 3.10.4 / Phase 4W.4.",
+            "routes/hardware.py, templates/devices.html und core/release.py wurden vor der Patch-Erzeugung bytegenau über ihre aktuellen Git-Blob-SHAs gegen GitHub main verifiziert.",
+            "Der BLE-RPC-Regressionspfad bestätigt die Reihenfolge Shelly.GetDeviceInfo vor Wifi.SetConfig.",
+            "Ein zunächst mit Länge 0 gemeldeter RX-Control-Status wird kontrolliert weiter abgefragt.",
+            "Der Test bestätigt, dass RPC-Requests die Growstar-Source-ID enthalten und über mehrere Data-Characteristic-Chunks übertragen werden können.",
+            "MAC-Mismatch und Secure-Provisioning-State locked blockieren Wifi.SetConfig vollständig.",
+            "Der BLE-Helper enthält keinen Switch.Set-, FactoryReset- oder BLE.StartPairing-Pfad.",
+            "Der Parent-Prozess startet den Helper mit fester Argumentliste /usr/bin/python3 plus Helper-Pfad und übergibt die Provisionierungsdaten per stdin.",
+            "Der persistente State-Guard liefert bei erneutem Claim derselben Geräte-MAC denselben Vorgang statt eines zweiten Write-Claims.",
+            "Die persistente Provisionierungsstatusdatei enthält kein WLAN-Passwort.",
+            "Unsichere oder unterbrochene Schreibvorgänge wechseln ausschließlich in den Zustand verify_pending.",
+            "Die API enthält getrennte Endpunkte für den einmaligen WLAN-Schreibworkflow und für reine LAN-Nachverifikation.",
+            "Die UI bietet WLAN-Erstinbetriebnahme erst nach erfolgreichem BLE-RPC-Preflight an und kann bei derived_psk einmalig die echte Passphrase abfragen.",
+            "Die vorhandenen Phase-4W-Discovery-, Shelly-RPC-, Safety-, Notification- und Repository-Baseline-Tests bleiben Bestandteil der Raspberry-Abnahme.",
+            "Alle neuen und geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.5 / 4W.5 als obersten Eintrag und 3.10.4 / 4W.4 direkt darunter.",
+        ),
+    },
+    {
+        "version": "3.10.4",
+        "date": "2026-08-21",
+        "phase": "4W.4",
+        "title": "Sicherer BLE-RPC-Preflight vor der Shelly-WLAN-Erstinbetriebnahme",
+        "summary": (
+            "Eindeutig neue Shellys können jetzt vor der eigentlichen "
+            "WLAN-Provisionierung kontrolliert auf ihren offiziellen "
+            "Shelly-RPC-GATT-Service geprüft werden. Growstar revalidiert "
+            "das Gerät unmittelbar vor dem Connect, verbindet nur temporär "
+            "und trennt anschließend wieder."
+        ),
+        "changes": (
+            "Der bisherige Bluetooth-Discovery-Lauf bleibt unverändert verbindungslos und führt weiterhin keinen Connect aus.",
+            "Für eindeutig als neu klassifizierte Shellys ergänzt core/hardware/shelly/provisioning.py einen expliziten read-only BLE-RPC-Preflight.",
+            "Der Preflight verwendet die offizielle Shelly-RPC-GATT-Service-UUID 5f6d4f53-5f52-5043-5f53-56435f49445f.",
+            "Vor dem Preflight führt die API einen frischen kurzen Bluetooth-Scan aus und gleicht den Kandidaten erneut gegen den aktuellen Growstar-Hardwarebestand ab.",
+            "Bereits bekannte Geräte sowie Kandidaten mit unklarer Geräteidentität werden serverseitig vor jedem Bluetooth-Connect blockiert.",
+            "Die vom Browser gesendete Bluetooth-Adresse allein reicht ausdrücklich nicht aus, um einen Connect auszulösen.",
+            "Der Preflight führt ausschließlich bluetoothctl info/connect/info/disconnect aus; kein Pairing, Trust, Remove, Power-Umschalten oder GATT-Schreibzugriff wird ausgeführt.",
+            "Nach einem von Growstar aufgebauten Preflight-Connect wird die Bluetooth-Verbindung in einem finally-Pfad wieder getrennt.",
+            "Ist der Shelly-RPC-Service verfügbar, meldet Growstar BLE-RPC bereit; es wird noch kein RPC-Methodenaufruf ausgeführt.",
+            "Ist der Shelly-RPC-Service nicht verfügbar, weist Growstar auf ein möglicherweise abgelaufenes initiales Provisionierungsfenster hin und empfiehlt einen kurzen Power-Cycle.",
+            "Die Hardware-Oberfläche zeigt den Button BLE-RPC prüfen ausschließlich bei Kandidaten im Zustand NEU READ-ONLY.",
+            "Phase 4W.4 liest noch kein WLAN-Passwort, überträgt keine WLAN-Zugangsdaten, ruft kein Wifi.SetConfig auf und schreibt nichts in Hardware-Inventar oder Stations-Zuordnungen.",
+            "Bestehende Gateway-, BTHome-, Aktor-, Safety-, Netzwerk- und Regelungslogik bleiben unverändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.3 / Phase 4W.3.",
+            "Alle fünf als Basis verwendeten Dateien wurden vor der Patch-Erzeugung bytegenau gegen ihre aktuellen GitHub-Blob-SHAs verifiziert.",
+            "Der bestehende Discovery-Regressionspfad bestätigt weiterhin, dass ein normaler Scan weder connect noch pair, trust, remove oder power ausführt.",
+            "Der neue Preflight-Test bestätigt einen temporären Connect und den anschließenden Disconnect.",
+            "Der offizielle Shelly-RPC-GATT-Service wird in einem simulierten ServicesResolved-Status korrekt erkannt.",
+            "Ein fehlender RPC-Service wird kontrolliert als rpc-unavailable gemeldet, ohne einen Provisionierungsversuch auszuführen.",
+            "Der Preflight führt weiterhin kein pair, trust, remove, power oder GATT-write aus.",
+            "Ein bereits als known klassifiziertes Growstar-Gerät wird vor jedem Bluetooth-Connect blockiert.",
+            "Die API enthält die serverseitige Revalidierung durch frischen Scan plus aktuellen Gateway-Snapshot.",
+            "Die Hardware-UI enthält den Preflight-Endpunkt ausschließlich im neuen-Gerät-Pfad.",
+            "Die bestehenden Schutzprüfungen gegen Wifi.SetConfig, nmcli, HardwareManager-Schreibzugriffe und shell=True bleiben aktiv.",
+            "Alle geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.4 / 4W.4 als neuen obersten Eintrag und 3.10.3 / 4W.3 direkt darunter.",
+        ),
+    },
+    {
+        "version": "3.10.3",
+        "date": "2026-08-21",
+        "phase": "4W.3",
+        "title": "Shelly-Geräteidentität und Bestandsabgleich über MAC",
+        "summary": (
+            "Der lokale Raspberry-Bluetooth-Scan unterscheidet jetzt zwischen "
+            "bereits in Growstar bekannten Shellys, eindeutig neuen Geräten "
+            "und Kandidaten mit noch unklarer Identität. Maßgeblich ist die "
+            "Shelly-Geräte-MAC aus dem Advertised Name; die Bluetooth-Adresse "
+            "wird bewusst separat behandelt."
+        ),
+        "changes": (
+            "core/hardware/shelly/provisioning.py normalisiert Shelly-Geräte-MACs aus bekannten Schreibweisen in ein einheitliches AA:BB:CC:DD:EE:FF-Format.",
+            "Die Gerätekennung wird ausschließlich aus einem eindeutigen Shelly Advertised Name mit abschließender 12-stelliger Hex-ID abgeleitet.",
+            "Die Bluetooth-Adresse eines Kandidaten wird ausdrücklich nicht als WLAN-/Geräte-MAC interpretiert; reale Geräte können für BLE und WLAN unterschiedliche Adressen besitzen.",
+            "Die Discovery klassifiziert Kandidaten read-only als known, new oder unknown anhand eines von der Route übergebenen Snapshots der bereits vorhandenen Growstar-Gateways.",
+            "Ein MAC-Treffer auf ein vorhandenes Gateway liefert nur eine minimierte Anzeigeansicht mit Name, Modell, IP, MAC und Onlinezustand zurück; keine Inventardaten werden verändert.",
+            "Bei historisch mehrfach vorhandenen Gateway-Einträgen mit gleicher MAC bleibt das Gerät sicher als bekannt klassifiziert; für die Anzeige wird ein aktuell online gemeldeter Eintrag bevorzugt.",
+            "Kandidaten mit eindeutiger Shelly-Geräte-MAC ohne Bestandstreffer werden als neu markiert, bleiben in Phase 4W.3 aber weiterhin vollständig read-only.",
+            "Kandidaten ohne eindeutige Geräte-MAC bleiben im Zustand Identität unklar und sind damit ausdrücklich nicht für eine spätere Erstinbetriebnahme freigegeben.",
+            "RSSI wird bei fehlendem bluetoothctl-info-Wert als read-only Fallback aus dem aktiven Scan übernommen.",
+            "routes/hardware.py reicht ausschließlich einen bereits vorhandenen Gateway-Snapshot in die Klassifizierung; provisioning.py importiert weiterhin keinen HardwareManager.",
+            "templates/devices.html zeigt Geräte-MAC und Bluetooth-Adresse getrennt sowie die Zustände BEREITS IN GROWSTAR, NEU READ-ONLY und IDENTITÄT UNKLAR READ-ONLY.",
+            "Bereits bekannte Shellys werden in der Factory-Discovery nicht mehr irreführend als neue Erstinbetriebnahme-Kandidaten dargestellt.",
+            "Phase 4W.3 überträgt weiterhin keine WLAN-Zugangsdaten, führt kein Bluetooth-Pairing/Trust/Connect aus, schaltet keine Relais und schreibt nichts in Hardware-Inventar oder Stations-Zuordnungen.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.2 / Phase 4W.2.",
+            "Die fünf als Basis verwendeten Dateien wurden vor der Patch-Erzeugung bytegenau über ihre Git-Blob-SHAs gegen GitHub main verifiziert.",
+            "MAC-Normalisierung akzeptiert 12-stellige Shelly-IDs sowie übliche Doppelpunkt-Schreibweise und erzeugt ein einheitliches Format.",
+            "ShellyPlugMG3-48F6EEBFAD10 wird als Geräte-MAC 48:F6:EE:BF:AD:10 erkannt.",
+            "Ein Gateway mit derselben Geräte-MAC klassifiziert den BLE-Kandidaten als bereits in Growstar vorhanden.",
+            "Die abweichende BLE-Adresse 48:F6:EE:BF:AD:12 bleibt getrennt von der Geräte-MAC 48:F6:EE:BF:AD:10.",
+            "Eine eindeutige unbekannte Shelly-Geräte-MAC wird als neues read-only Gerät klassifiziert.",
+            "Eine BLE-Adresse allein erzeugt selbst bei Gleichheit mit einer bekannten Gateway-MAC keinen Bestandstreffer.",
+            "Ein Kandidat ohne eindeutige Advertised-Name-MAC bleibt Identität unklar.",
+            "RSSI -57 wird aus einer bluetoothctl-Scan-Zeile korrekt übernommen.",
+            "Die Route enthält den read-only Gateway-Snapshot-Abgleich und liefert known/new/unknown-Zähler.",
+            "Die Hardware-UI enthält alle drei Identitätszustände und trennt Geräte-MAC von Bluetooth-Adresse.",
+            "Die bestehenden Phase-4W-Schutztests gegen Pairing, Trust, Connect, WLAN-Mutation, Shell-Ausführung und HardwareManager-Schreibzugriffe bleiben aktiv.",
+            "Alle geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.3 / 4W.3 als neuen obersten Eintrag sowie 3.10.2 / 4W.2 direkt darunter.",
+        ),
+    },
+    {
+        "version": "3.10.2",
+        "date": "2026-08-21",
+        "phase": "4W.2",
+        "title": "Factory-Discovery-Karte bleibt nach Hardware-Refresh sichtbar",
+        "summary": (
+            "Die neue Hardware-Erstinbetriebnahme-Karte wurde beim initialen "
+            "/api/hardware-Refresh direkt nach dem Seitenaufbau wieder entfernt. "
+            "Der Gateway-Renderer erhält nun alle statischen Hardware-Aktionskarten "
+            "und ersetzt ausschließlich dynamisch erkannte Gateway-Karten."
+        ),
+        "changes": (
+            "templates/devices.html markiert die bestehende LAN-Gateway-Scan-Karte und die neue Factory-Discovery-Karte ausdrücklich als statische Gateway-Aktionskarten.",
+            "renderGateways() bewahrt nicht mehr nur grid.firstElementChild, sondern sammelt und erhält alle mit data-static-gateway-card markierten Aktionskarten.",
+            "Der initiale loadHardware()-Aufruf kann die Karte 'Neue Shelly ohne Hersteller-App' dadurch nicht mehr nach wenigen Millisekunden aus dem DOM entfernen.",
+            "Auch spätere Hardware-Refreshes und LAN-Gateway-Scans erhalten beide Aktionskarten.",
+            "Die vorhandenen DOM-Knoten werden wiederverwendet, sodass bereits registrierte Click-Handler für LAN-Scan und Bluetooth-Discovery erhalten bleiben.",
+            "Der Fix ist zukunftssicherer als eine feste Zwei-Karten-Sonderbehandlung: Weitere statische Gateway-Aktionen können dieselbe Markierung verwenden.",
+            "Bluetooth-Discovery, BlueZ-Aufrufe, Gateway-Scan, BTHome-Scan, HardwareManager, Inventar, Recovery und Stations-Zuordnungen bleiben unverändert.",
+            "Es werden weiterhin keine WLAN-Zugangsdaten übertragen, keine Bluetooth-Geräte gepairt und keine Shelly-Ausgänge geschaltet.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.1 / Phase 4W.1.",
+            "templates/devices.html wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA 42bcd14570b07e4f8fb67c8dd55456102dc52ca6 verifiziert.",
+            "core/release.py wurde gegen GitHub-Blob-SHA 1a892f653fadf3c0ed3fbb2e17fa96cc9e14bf01 verifiziert.",
+            "tests/regression/check_hardware_provisioning_discovery.py wurde gegen GitHub-Blob-SHA e8baeeb23f34024fd53d0d0acea33618b6c554b5 verifiziert.",
+            "Der Regressionstest verlangt mindestens zwei statisch markierte Gateway-Aktionskarten.",
+            "Der Regressionstest blockiert die alte firstElementChild-Logik, die ausschließlich die erste Aktionskarte erhalten hatte.",
+            "Der Regressionstest verlangt den Selektor für alle data-static-gateway-card-Karten und deren Wiederanfügen per staticCards.forEach.",
+            "Die bestehenden Phase-4W-Schutztests gegen Pairing, Connect, WLAN-Mutation und HardwareManager-Mutation bleiben vollständig erhalten.",
+            "Die geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie bestätigt 3.10.2 / 4W.2 als neuen obersten Eintrag sowie 3.10.1 / 4W.1 direkt darunter.",
+        ),
+    },
+    {
+        "version": "3.10.1",
+        "date": "2026-08-21",
+        "phase": "4W.1",
+        "title": "Hardware-Discovery-Regressionstest ohne Kommentar-False-Positive",
+        "summary": (
+            "Der Phase-4W-Regressionstest wertet den erklärenden Begriff "
+            "'HardwareManager' in Docstrings nicht mehr fälschlich als "
+            "produktiven Mutationspfad. Statt einer pauschalen Textsuche prüft "
+            "der Test jetzt echte Python-Imports und Namensreferenzen."
+        ),
+        "changes": (
+            "tests/regression/check_hardware_provisioning_discovery.py entfernt den fehlerhaften pauschalen Textcheck auf 'hardwaremanager'.",
+            "Der Test parst core/hardware/shelly/provisioning.py nun per AST und prüft, dass core.hardware.manager nicht importiert wird.",
+            "Zusätzlich wird geprüft, dass kein echter Python-Name HardwareManager im Discovery-Code referenziert wird.",
+            "Die bestehenden Schutzprüfungen gegen Wifi.SetConfig, nmcli, manager.add, manager.save und shell=True bleiben erhalten.",
+            "Erklärende Kommentare und Docstrings dürfen weiterhin ausdrücklich dokumentieren, dass der HardwareManager nicht beschrieben oder verändert wird.",
+            "Die produktive Phase-4W-Bluetooth-Discovery bleibt byte-identisch und wird durch 4W.1 nicht verändert.",
+            "Gateway-Scan, BTHome/BLE-Gateway-Scan, HardwareManager, Hardware-Inventar, Recovery, Netzwerk, Safety und Regelung bleiben unverändert.",
+            "Es werden weiterhin keine WLAN-Zugangsdaten übertragen, keine Bluetooth-Geräte gepairt und keine Relais geschaltet.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.10.0 / Phase 4W.",
+            "core/release.py wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA d2136ae978f85a713d5175486a37087393c547a0 verifiziert.",
+            "tests/regression/check_hardware_provisioning_discovery.py wurde gegen GitHub-Blob-SHA 9035d2331da2464ed050c93c56557325bfe35c24 verifiziert.",
+            "Der fehlerhafte Literal-Check auf 'hardwaremanager' wurde entfernt.",
+            "Ein erklärender Docstring mit dem Wort HardwareManager löst den Regressionstest nicht mehr aus.",
+            "Ein echter Import von core.hardware.manager würde vom AST-basierten Test weiterhin erkannt und blockiert.",
+            "Eine echte Referenz auf den Python-Namen HardwareManager würde weiterhin erkannt und blockiert.",
+            "Die übrigen Mutationsschutzprüfungen aus Phase 4W bleiben unverändert aktiv.",
+            "Die geänderten Python-Dateien wurden syntaktisch validiert.",
+            "Die Release-Historie wurde geladen und bestätigt 3.10.1 / 4W.1 als neuen obersten Eintrag sowie 3.10.0 / 4W direkt darunter.",
+        ),
+    },
+    {
+        "version": "3.10.0",
+        "date": "2026-08-21",
+        "phase": "4W",
+        "title": "Herstellerfreie Hardware-Erstinbetriebnahme – Discovery-Basis",
+        "summary": (
+            "Growstar kann nun über den lokalen Bluetooth-Adapter des Raspberry "
+            "nach fabrikneuen Shelly-Geräten suchen, ohne die Shelly-App zu "
+            "benötigen. Phase 4W bleibt absichtlich read-only: Es werden noch "
+            "keine WLAN-Zugangsdaten übertragen, keine Geräte gepairt und keine "
+            "Relais geschaltet."
+        ),
+        "changes": (
+            "Vor der Implementierung wurden Gateway-Scan, Shelly-LAN-Discovery, BTHome/BLE-Gateway-Scan, HardwareManager, Recovery und Hardware-Oberfläche auf dem aktuellen GitHub-main geprüft.",
+            "Der bestehende HardwareScanner und ShellyDiscovery bleiben unverändert für bereits im LAN erreichbare Shelly-Gateways zuständig.",
+            "Der bestehende Shelly-Gateway-BTHome-Scan bleibt unverändert für BLU/BTHome-Sensoren zuständig und wird nicht für die Hersteller-App-freie Erstinbetriebnahme zweckentfremdet.",
+            "Neue core/hardware/shelly/provisioning.py ergänzt ausschließlich die bisher fehlende lokale Raspberry-/BlueZ-Erkennung fabrikneuer Shellys.",
+            "Der Discovery-Adapter verwendet bluetoothctl mit festen Argumentlisten ohne shell=True und validiert Bluetooth-Adressen vor Detailabfragen.",
+            "Shelly-Kandidaten werden über den beworbenen Namen beziehungsweise die Shelly/Allterco ManufacturerData-Kennung 0x0BA9 erkannt.",
+            "Ein passender Power-Strip-Gen4-Advertised-Name kann als unverbindlicher Modell-Hinweis S4PL-00416EU angezeigt werden; die endgültige Modellidentität bleibt nach der Provisionierung Aufgabe von Shelly.GetDeviceInfo und dem vorhandenen MODEL_NAMES-Katalog.",
+            "Gefundene Erstinbetriebnahme-Kandidaten bleiben flüchtig und werden bewusst nicht in instance/hardware_inventory.json oder den HardwareManager geschrieben.",
+            "Der vorhandene POST-Endpunkt /api/hardware/scan bleibt für den LAN-Gateway-Scan rückwärtskompatibel und unterstützt zusätzlich den expliziten Modus provisioning.",
+            "Neue GET-Diagnose /api/hardware/provisioning/status zeigt, ob bluetoothctl und der lokale Raspberry-Bluetooth-Adapter für die Erkennung bereit sind.",
+            "Die Hardware-Seite trennt jetzt sichtbar zwischen 'LAN-Gateway suchen' für bereits eingerichtete Shellys und 'Neue Shelly ohne Hersteller-App' für fabrikneue Geräte.",
+            "Phase 4W verändert kein Raspberry-WLAN, überträgt kein WLAN-Passwort, führt kein Pairing/Trust/Connect aus, schaltet keine Shelly-Ausgänge und verändert keine Stations-Zuordnungen.",
+            "Das bereits vorhandene Modell S4PL-00416EU für die Shelly Power Strip bleibt unverändert im bestehenden Shelly-Modellkatalog.",
+            "Die vorhandene Hardware-Recovery bleibt unverändert und startet weiterhin keine versteckten Pairings unbekannter Geräte.",
+            "Die eigentliche sichere WLAN-Provisionierung wird erst auf dieser getesteten Discovery-Basis in einem folgenden Schritt ergänzt.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist GitHub main Commit 260a6bce549a5845b5ff987553cd8a71cf24f624 mit Growstar 3.9.7 / Phase 4V.7.",
+            "routes/hardware.py, templates/devices.html und core/release.py wurden vor der Patch-Erzeugung per Git-Blob-SHA gegen den aktuellen GitHub-main verifiziert.",
+            "Der neue Discovery-Parser erkennt einen Shelly Power Strip Gen4 anhand eines Shelly-Advertised-Namens.",
+            "Der neue Discovery-Parser erkennt einen Shelly auch ohne eindeutigen Namen anhand ManufacturerData Key 0x0BA9.",
+            "Ein fremdes Bluetooth-Gerät ohne Shelly-Namen und ohne Shelly-ManufacturerData wird nicht als Provisioning-Kandidat ausgegeben.",
+            "Der Regressionstest verwendet einen simulierten bluetoothctl-Runner und berührt damit weder den echten Raspberry-Bluetooth-Adapter noch reale Geräte.",
+            "Der neue Discovery-Pfad enthält kein pair, trust, connect, Wifi.SetConfig, nmcli oder HardwareManager-Persistenz.",
+            "Der bestehende /api/hardware/scan-Endpunkt und scanner.register(ShellyDiscovery()) bleiben weiterhin vorhanden.",
+            "Der neue provisioning-Modus wird ausschließlich auf ausdrückliche Benutzeraktion gestartet und nicht in Hardware-Recovery oder Background-Threads eingebaut.",
+            "Die vorhandene S4PL-00416EU-Modellkennung wird weiterhin im Shelly-Modellkatalog verlangt.",
+            "Die geänderten Python-Dateien wurden syntaktisch validiert und der neue Regressionstest lokal mit simuliertem BlueZ-Output ausgeführt.",
+            "Der Feature-Test prüft 3.10.0 / 4W als historischen RELEASES-Eintrag und bleibt dadurch bei späteren Growstar-Versionen wiederverwendbar.",
+        ),
+    },
+    {
+        "version": "3.9.7",
+        "date": "2026-08-20",
+        "phase": "4V.7",
+        "title": "Safety-Supervisor-Regressionstest dauerhaft versionsunabhängig",
+        "summary": (
+            "Der Phase-4V.5-Regressionstest verlangt nicht mehr fälschlich, "
+            "dass Growstar weiterhin exakt auf Version 3.9.5 / Phase 4V.5 "
+            "laufen muss. Er schützt stattdessen dauerhaft die damals "
+            "eingeführte Safety-Supervisor-Entkopplung und prüft den "
+            "historischen Release-Eintrag."
+        ),
+        "changes": (
+            "tests/regression/check_safety_supervisor_thread.py verlangt nicht mehr, dass GROWSTAR_VERSION aktuell 3.9.5 ist.",
+            "Der Test verlangt nicht mehr, dass GROWSTAR_INTERNAL_PHASE aktuell 4V.5 ist.",
+            "Stattdessen sucht der Checker in RELEASES nach dem historischen Feature-Release 3.9.5 / Phase 4V.5.",
+            "Die eigentlichen Phase-4V.5-Funktionstests für den dedizierten Safety-Thread, das 2-Sekunden-Intervall, die fehlende direkte Shelly-Abhängigkeit, die Startreihenfolge und die Lock-Unabhängigkeit bleiben unverändert erhalten.",
+            "Die produktive Safety-Stale-Grenze von 6 Sekunden wird weiterhin unverändert geprüft.",
+            "Der Phase-4V.4-Shelly-RPC-Checker ist bereits seit 3.9.6 versionsunabhängig und bleibt unverändert.",
+            "Repository-Baseline und Notifications verwenden bereits dynamische beziehungsweise historische Release-Prüfungen und benötigen keine Änderung.",
+            "Damit sind die vier konsolidierten Regressionstests im aktuellen tests/regression-Verzeichnis von veralteten festen Aktuellversionsprüfungen bereinigt.",
+            "Regelung, Safety-Laufzeitlogik, Shelly-RPC, Aktor-Health, Telegram, Netzwerk, UI und Restart-Policy werden durch Phase 4V.7 nicht verändert.",
+            "Es werden keine Konfigurationswerte, Hardware-Zuordnungen oder Laufzeitdaten geändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand mit Growstar 3.9.6 / Phase 4V.6.",
+            "core/release.py wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA ec050482489cdaa1b99257f22de87d91039394a9 verifiziert.",
+            "tests/regression/check_safety_supervisor_thread.py wurde gegen GitHub-Blob-SHA 4a8da00b6ea5aa8906ec5652bbf4e5f8cfb85d5f verifiziert.",
+            "Der feste Vergleich GROWSTAR_VERSION == 3.9.5 ist aus dem Phase-4V.5-Checker entfernt.",
+            "Der feste Vergleich GROWSTAR_INTERNAL_PHASE == 4V.5 ist aus dem Phase-4V.5-Checker entfernt.",
+            "Der historische RELEASES-Eintrag 3.9.5 / 4V.5 wird weiterhin explizit verlangt.",
+            "Der Phase-4V.4-Shelly-RPC-Checker wurde im aktuellen GitHub-main kontrolliert und verwendet bereits die historische 3.9.4 / 4V.4-Prüfung.",
+            "Die vier aktuellen Regressionstests wurden als Notifications, Repository-Baseline, Safety-Supervisor und Shelly-RPC identifiziert.",
+            "Die erzeugten Python-Dateien wurden syntaktisch per ast.parse validiert.",
+            "Die Release-Historie wurde geladen und bestätigt 3.9.7 / 4V.7 als neuen obersten Eintrag sowie 3.9.6 / 4V.6 direkt darunter.",
+            "Der korrigierte Safety-Supervisor-Regressionstest wurde in einer isolierten Testumgebung erfolgreich ausgeführt.",
+        ),
+    },
+    {
+        "version": "3.9.6",
+        "date": "2026-08-20",
+        "phase": "4V.6",
+        "title": "Shelly-RPC-Regressionstest von der aktuellen Version entkoppelt",
+        "summary": (
+            "Der Phase-4V.4-Regressionstest prüft nicht mehr fälschlich, dass "
+            "Growstar weiterhin exakt auf Version 3.9.4 / Phase 4V.4 laufen "
+            "muss. Stattdessen schützt er dauerhaft die damals eingeführte "
+            "Shelly-RPC-Funktionalität und bestätigt den historischen Release-Eintrag."
+        ),
+        "changes": (
+            "tests/regression/check_shelly_rpc_coordination.py verlangt nicht mehr, dass GROWSTAR_VERSION aktuell 3.9.4 ist.",
+            "Der Test verlangt nicht mehr, dass GROWSTAR_INTERNAL_PHASE aktuell 4V.4 ist.",
+            "Stattdessen sucht der Checker in RELEASES nach dem historischen Feature-Release 3.9.4 / Phase 4V.4.",
+            "Die eigentlichen Phase-4V.4-Funktionstests für RLock, Shelly-RPC-Serialisierung, diagnostische Relay-Probe und Aktor-Health-Retry bleiben unverändert erhalten.",
+            "Der Checker bleibt dadurch bei 3.9.6 und zukünftigen Growstar-Patches wiederverwendbar.",
+            "Der Repository-Baseline-Test benötigt keine Änderung, weil er die aktuelle Version bereits dynamisch aus RELEASES[0] ableitet.",
+            "Der Alarm-&-Notifications-Test benötigt keine Änderung, weil er ältere Feature-Releases bereits als historische RELEASES-Einträge prüft.",
+            "Eine GitHub-Codeprüfung auf GROWSTAR_VERSION hat keinen weiteren historischen Regressionstest mit derselben 3.9.4-Fehlannahme ergeben.",
+            "Regelung, Safety-Supervisor, Shelly-RPC-Laufzeitcode, Aktor-Health, Telegram, Netzwerk und Benutzeroberfläche werden durch Phase 4V.6 nicht verändert.",
+            "Es werden keine Konfigurationswerte, Hardware-Zuordnungen oder Laufzeitdaten geändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist der aktuelle GitHub-main-Stand nach Growstar 3.9.5 / Phase 4V.5; letzter vor dem Build geprüfter Commit ist 005949f811d2af609694e03c882e0e04038f0e40.",
+            "core/release.py wurde vor der Patch-Erzeugung gegen GitHub-Blob-SHA 5316d9e89db8990a01d4d988ea7484549c095c3e verifiziert.",
+            "tests/regression/check_shelly_rpc_coordination.py wurde gegen GitHub-Blob-SHA 59dc30c50b89f05ce6145d0de690c00d97f88f01 verifiziert.",
+            "Der feste Vergleich GROWSTAR_VERSION == 3.9.4 ist aus dem Phase-4V.4-Checker entfernt.",
+            "Der feste Vergleich GROWSTAR_INTERNAL_PHASE == 4V.4 ist aus dem Phase-4V.4-Checker entfernt.",
+            "Der historische RELEASES-Eintrag 3.9.4 / 4V.4 wird weiterhin explizit verlangt.",
+            "Der Repository-Baseline-Test wurde geprüft und leitet Version und Phase bereits dynamisch vom obersten RELEASES-Eintrag ab.",
+            "Der Notifications-Regressionstest wurde geprüft und verwendet für ältere Features bereits historische Release-Suchen.",
+            "Die erzeugten Python-Dateien wurden syntaktisch per ast.parse validiert.",
+            "Die Release-Historie wurde geladen und bestätigt 3.9.6 / 4V.6 als neuen obersten Eintrag sowie 3.9.5 / 4V.5 direkt darunter.",
+            "Der neue historische 3.9.4-Release-Check wurde gegen die erzeugte 3.9.6-Release-Historie erfolgreich ausgeführt.",
+        ),
+    },
+    {
+        "version": "3.9.5",
+        "date": "2026-08-20",
+        "phase": "4V.5",
+        "title": "Safety-Supervisor vom Shelly-Netzwerkthread entkoppelt",
+        "summary": (
+            "Der stationsbezogene Safety-Heartbeat läuft jetzt in einem eigenen "
+            "Daemon-Thread. Langsame Shelly-, Energy- oder Relay-Failsafe-Zyklen "
+            "können die reine Safety-Bewertung dadurch nicht mehr verzögern und "
+            "keinen falschen 'Safety Supervisor Heartbeat stale'-Fehler erzeugen."
+        ),
+        "changes": (
+            "Neue threads/safety.py führt den stationsübergreifenden Safety-Supervisor in einem eigenen growstar-safety Daemon-Thread aus.",
+            "Das bisherige 2-Sekunden-Safety-Intervall bleibt unverändert bestehen.",
+            "threads/shelly.py enthält ab 4V.5 keinen Safety-Zyklus und keinen äußeren Shelly-Lock mehr um run_all_live_safety.",
+            "Der Shelly-Background bleibt ausschließlich für Relay-Sync-Failsafe, Energie-Polling, Verlauf und Tagesreset zuständig.",
+            "Die normale Safety-Auswertung bleibt vollständig netzwerkfrei und liest weiterhin nur Runtime-State, Sensor-Freshness und den zentralen Aktor-Health-Cache.",
+            "Ein Safety-Snapshot inklusive Heartbeat und Overrides wird weiterhin atomar gespeichert, bevor eine eventuell nötige reale Safe-Off-Aktion ausgeführt wird.",
+            "Muss Safety einen Aktor wirklich AUS schalten, verwendet services.safety weiterhin set_device; der reale Shelly-Zugriff bleibt dadurch unter dem Transport-Lock aus Phase 4V.4.",
+            "Der 3.9.4-Shelly-RPC-Lock und der Aktor-Health-Retry bleiben vollständig erhalten.",
+            "Die bestehende Safety-Stale-Grenze von 6 Sekunden wird bewusst nicht erhöht; der Patch beseitigt die Blockierungsursache statt die Diagnose zu verstecken.",
+            "app.py startet den neuen Safety-Supervisor unabhängig und vor dem Shelly-Background-Thread.",
+            "Fehler einzelner Stationen bleiben wie bisher innerhalb run_all_live_safety isoliert und führen für die betroffene Runtime fail-closed zu Emergency-Safety.",
+            "Restart-Policy, Regelung, Sensorgrenzen, Telegram, Netzwerkmanagement und Hardware-Zuordnungen werden durch Phase 4V.5 nicht verändert.",
+            "Es werden keine neuen Konfigurationsschlüssel oder Migrationsdaten eingeführt.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist GitHub main Commit fb9bf81ac41198baa9773b7d2d05d01f45f22804 mit Growstar 3.9.4 / Phase 4V.4.",
+            "app.py, core/release.py, core/context.py, threads/shelly.py und services/safety.py wurden vor der Patch-Erzeugung gegen ihre aktuellen GitHub-Blob-SHAs verifiziert.",
+            "Der neue Safety-Thread enthält keinen Shelly-Lock, keine Requests- oder ShellyAPI-Abhängigkeit und delegiert ausschließlich an run_all_live_safety.",
+            "Ein Safety-Zyklus kann im Regressionstest ausgeführt werden, während ein anderer Thread den Shelly-Transport-Lock hält.",
+            "threads/shelly.py enthält weder run_all_live_safety noch SAFETY_INTERVAL und kann den Safety-Heartbeat damit nicht mehr durch Energy-/Relay-Polls verzögern.",
+            "app.py startet growstar-safety mit safety_supervisor_loop und behält growstar-shelly separat bei.",
+            "services/safety.py speichert den Snapshot weiterhin vor der physischen _enforce_snapshot-Aktion.",
+            "Der produktive Safety-Stale-Schwellwert in core/safety.py bleibt unverändert bei 6 Sekunden.",
+            "Der bestehende Phase-4V.4-Shelly-RPC-Regressionstest bleibt zusätzlich ausführbar.",
+            "Notification- und Repository-Baseline-Regressionen bleiben zusätzlich ausführbar.",
+            "core/release.py meldet Version 3.9.5 und Build-Kennung 4V.5.",
+        ),
+    },
+    {
+        "version": "3.9.4",
+        "date": "2026-08-19",
+        "phase": "4V.4",
+        "title": "Shelly-RPC koordiniert und Aktor-Health gegen Einzelaussetzer gehärtet",
+        "summary": (
+            "Shelly-Inventar, BLE-RPC, Aktor-Schaltungen, Relay-Statusprüfungen "
+            "und der bereits bestehende Energy/Failsafe-Zyklus teilen jetzt "
+            "denselben reentranten Transport-Lock. Ein einzelner kurzzeitiger "
+            "Relay-Read-Fehler löst außerdem nicht mehr sofort einen "
+            "Safety-relevanten Offline-Eintrag aus."
+        ),
+        "changes": (
+            "Der bestehende controllerweite shelly_lock wird von Lock auf RLock umgestellt, damit bereits geschützte Background-Zyklen sicher in geschützte Shelly-Helfer eintreten können.",
+            "ShellyAPI.call serialisiert Inventar-, BLE- und weitere RPC-Aufrufe mit demselben Shelly-Transport-Lock.",
+            "switch_shelly serialisiert Gen2-Schaltungen und den Gen1-Fallback mit demselben Transport-Lock.",
+            "Die read-only Relay-Statusermittlung läuft ebenfalls unter dem Transport-Lock und kann damit nicht mehr gleichzeitig mit BLE-/Inventar-RPC oder regulären Relay-Schaltungen feuern.",
+            "Der bestehende Energy- und Relay-Failsafe-Background war bereits durch ctx.shelly_lock geschützt und ist durch die gemeinsame Lock-Nutzung nun mit Hardware-, BLE- und Aktor-RPC koordiniert.",
+            "Der Legacy-Helfer services.shelly.shelly_set verwendet ebenfalls den zentralen Transport-Lock.",
+            "Neue probe_shelly_relay_state-Diagnostik unterscheidet unter anderem Timeout, Verbindungsfehler, HTTP-Status, ungültiges JSON, fehlendes output/ison und ungültige Relay-Bereiche.",
+            "get_shelly_relay_state bleibt als rückwärtskompatibler bool/None-Wrapper erhalten.",
+            "Der zentrale Aktor-Health-Poll wiederholt einen fehlgeschlagenen read-only Relay-Status nach 250 ms genau einmal.",
+            "Erst wenn auch der zweite Versuch fehlschlägt, wird der Endpunkt als nicht erreichbar in den Safety-relevanten Health-Cache geschrieben.",
+            "Ein beim zweiten Versuch wieder erreichbarer Shelly erzeugt keinen Offline-Health-Eintrag und damit keinen daraus resultierenden Safety-Failsafe.",
+            "Bei einem echten zweifachen Ausfall bleibt die bestehende Safety-Reaktion unverändert aktiv.",
+            "Der Health-Fehlertext enthält nach endgültigem Fehlschlag den konkreten Diagnosegrund statt nur 'Keine Antwort / ungültiger Relay-Status'.",
+            "Der Aktor-Health-Poll bleibt vollständig read-only; der Retry sendet niemals Switch.Set oder Gen1-turn-Befehle.",
+            "Regelung, Restart-Policy, Alarmgrenzen, Telegram-Deduplizierung und Benutzeroberfläche werden durch Phase 4V.4 nicht verändert.",
+        ),
+        "tests": (
+            "Ausgangsbasis ist GitHub main Commit 1c38ff6367477e47421a3f0ab9cc66485fde4f54 mit Growstar 3.9.3 / Phase 4V.3.",
+            "Der aktuelle core/release.py-Blob wurde vor der Patch-Erzeugung gegen SHA adaf2260f016c501cda335455ab5df0da651dac1 verifiziert.",
+            "Der zentrale Shelly-Lock ist reentrant und kann im selben Thread verschachtelt betreten werden.",
+            "Parallel gestartete kritische Abschnitte werden durch den gemeinsamen Shelly-Lock serialisiert.",
+            "ShellyAPI.call, switch_shelly, Relay-Statusprobe und Legacy-shelly_set verwenden den gemeinsamen Transport-Lock.",
+            "Ein simuliert fehlgeschlagener erster Aktor-Health-Read mit anschließend erfolgreichem zweiten Read bleibt erreichbar und erzeugt keinen Offline-Eintrag.",
+            "Ein simuliert zweifach fehlgeschlagener Read bleibt offline und transportiert den konkreten Diagnosegrund.",
+            "Die diagnostische Relay-Probe liefert bei einem gültigen Gen2-output einen booleschen Istzustand.",
+            "Ein simulierter Timeout wird als Timeout-Diagnose statt als generischer ungültiger Relay-Status gemeldet.",
+            "Der Aktor-Health-Code enthält weiterhin keinen Switch.Set- oder turn=-Schreibpfad.",
+            "Bestehende Notification- und Repository-Baseline-Regressionen bleiben zusätzlich ausführbar.",
+            "core/release.py meldet Version 3.9.4 und Build-Kennung 4V.4.",
+        ),
+    },
+    {
+        "version": "3.9.3",
+        "date": "2026-08-19",
+        "phase": "4V.3",
+        "title": "Beleuchtungsdauer direkt aus Tag- und Nachtstart",
+        "summary": (
+            "Die Klima-&-Profile-Seite zeigt jetzt direkt unter Tag Start und "
+            "Nacht Start die daraus resultierende Dauer der Tag- beziehungsweise "
+            "Beleuchtungsphase an."
+        ),
+        "changes": (
+            "Unter Tag Start und Nacht Start erscheint eine neue Anzeige 'Beleuchtungsdauer'.",
+            "Die Beleuchtungsdauer wird ausschließlich aus DAY_START_MIN und NIGHT_START_MIN berechnet und benötigt keinen zusätzlichen Konfigurationswert.",
+            "Bei Tag Start 06:00 und Nacht Start 23:00 zeigt Growstar automatisch 17 Stunden an.",
+            "Zeitfenster über Mitternacht werden mit einem 24-Stunden-Modulo korrekt berechnet.",
+            "Bei nicht vollen Stunden zeigt die Oberfläche zusätzlich die verbleibenden Minuten, zum Beispiel 17 Std. 30 Min.",
+            "Die Anzeige aktualisiert sich bereits während einer Änderung der beiden Uhrzeitfelder und erneut nach dem Laden der Stationskonfiguration.",
+            "Die bestehende Lichtsteuerung, DAY_START_MIN/NIGHT_START_MIN-Persistenz und Profilsteuerung bleiben unverändert.",
+            "Es wird kein neuer persistenter Config-Schlüssel eingeführt; dadurch besteht kein Migrationsbedarf für bestehende Stationen.",
+            "Alarm-Engine, Telegram, Hardware, Safety, Netzwerk und Restart-Policy werden durch diesen UI-Patch nicht verändert.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-main-Baselines von settings.html, release.py und check_notifications.py wurden vor dem Patch per Git-Blob-SHA verifiziert.",
+            "Die Zeit-Kachel enthält die neue Beleuchtungsdauer-Anzeige.",
+            "Die Berechnung verwendet (Nachtstart - Tagstart + 1440) modulo 1440 und unterstützt damit Tagphasen über Mitternacht.",
+            "Änderungen an Tag Start oder Nacht Start aktualisieren die Anzeige unmittelbar.",
+            "Volle Stunden werden als 'Stunden' dargestellt; Restminuten werden bei Bedarf zusätzlich angezeigt.",
+            "Bestehende Klima-, Alarm- und Telegram-Regressionen bleiben im konsolidierten check_notifications.py erhalten.",
+            "core/release.py meldet Version 3.9.3 und Build-Kennung 4V.3.",
+        ),
+    },
+    {
+        "version": "3.9.2",
+        "date": "2026-08-19",
+        "phase": "4V.2",
+        "title": "Getrennte Regel- und Alarmtoleranzen pro Station",
+        "summary": (
+            "Sollwert-Regelung und Handy-Alarmierung besitzen jetzt bewusst "
+            "unabhängige Toleranzen. Zusätzlich können die absoluten Temperatur- "
+            "und Luftfeuchte-Grenzen pro Station direkt im Klima-Setup angepasst werden."
+        ),
+        "changes": (
+            "Neue stationsbezogene TEMP_ALERT_TOL trennt die Temperatur-Benachrichtigung von DAY_TEMP_TOL/NIGHT_TEMP_TOL.",
+            "Neue stationsbezogene HUM_ALERT_TOL trennt die Feuchte-Benachrichtigung von DAY_HUM_TOL/NIGHT_HUM_TOL.",
+            "Bei 20 °C Soll und TEMP_ALERT_TOL=5 wird ein relativer Temperaturalarm ab 15 °C beziehungsweise 25 °C erzeugt, unabhängig von der engeren Regel-Toleranz.",
+            "Relative Alarmgrenzen verwenden den aktuell wirksamen Live-Sollwert; eine laufende Temperaturrampe wird dadurch automatisch berücksichtigt.",
+            "MIN_TEMP und MAX_TEMP bleiben absolute Temperatur-Schutzgrenzen und besitzen Alarmpriorität vor der relativen Abweichung.",
+            "MIN_HUM wird als neue stationsbezogene untere Luftfeuchte-Alarmgrenze ergänzt; rückwärtskompatibler Default ist 0 Prozent.",
+            "MAX_HUM bleibt die absolute obere Luftfeuchte-Alarmgrenze.",
+            "Absolute Grenzverletzungen werden weiterhin als critical gemeldet; reine Sollwertabweichungen als error.",
+            "Absolute und relative Sensoralarme verwenden denselben stabilen Alarm-Key, damit ein Grenzwechsel keine doppelten Recovery-/Neu-Alarm-Nachrichten erzeugt.",
+            "Neue zentrale Validierung blockiert MIN_TEMP >= MAX_TEMP, ungültige Feuchtebereiche, nicht positive Alarmtoleranzen und negative Regel-Toleranzen atomar vor dem Config-Commit.",
+            "Die stationsbezogene Klima-&-Profile-Seite zeigt Sollwert, Regel-Toleranz, Alarm-Toleranz und absolute Grenzen getrennt und mit berechneter Vorschau.",
+            "Im Grow-Control-Setup erhält jede Station einen direkten Button 'Klima & Grenzwerte'.",
+            "Die globale Benachrichtigungsregel heißt jetzt 'Sensorabweichung & Grenzwerte' und erklärt beide Alarmarten.",
+            "Die Alarm-Toleranz selbst schaltet keine Aktoren und verändert die bestehende Regelungslogik nicht.",
+            "Bestehende Telegram-Konfiguration, Bot-Token, Chat-ID, Wiederholungsintervall und Entwarnungslogik bleiben unverändert.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-Baselines von release.py, alerts.py, notifications.html, grow_control_setup.html und check_notifications.py wurden per Git-Blob-SHA verifiziert.",
+            "20 °C Soll mit ±5 °C Alarmtoleranz erzeugt bei 24.9 °C noch keinen relativen Alarm.",
+            "20 °C Soll mit ±5 °C Alarmtoleranz erzeugt ab 25.0 °C einen error-Alarm.",
+            "60 Prozent Soll mit ±10 Prozent Alarmtoleranz erzeugt ab 70 Prozent einen error-Alarm.",
+            "MAX_TEMP-Überschreitung bleibt critical und hat Priorität vor der relativen Sollwertabweichung.",
+            "Ungültige MIN_TEMP/MAX_TEMP-Kombination wird durch die zentrale Grenzvalidierung blockiert.",
+            "Setup enthält TEMP_ALERT_TOL, HUM_ALERT_TOL, MIN_HUM und MAX_HUM sowie erklärende Vorschauen.",
+            "Grow-Control-Setup verlinkt jede Station direkt auf Klima & Grenzwerte.",
+            "Config-Update ruft die Grenzvalidierung vor dem in-place Commit auf.",
+            "python3 tests/regression/check_notifications.py läuft vollständig grün.",
+            "tests/regression/check_repository_baseline.py bleibt als versionsunabhängiger Baseline-Test unverändert nutzbar.",
+        ),
+    },
+    {
+        "version": "3.9.1",
+        "date": "2026-08-19",
+        "phase": "4V.1",
+        "title": "Regressionstests von der laufenden Versionsnummer entkoppelt",
+        "summary": (
+            "Die neue 3.9-Alarmfunktion war korrekt, aber zwei Regressionstests "
+            "hatten die vorherige bzw. ursprüngliche Versionsnummer fest "
+            "eingebaut. Die Tests prüfen jetzt dauerhaft gültige Invarianten "
+            "statt bei jedem kommenden Patch erneut angepasst werden zu müssen."
+        ),
+        "changes": (
+            "Der Repository-Baseline-Test erwartet nicht mehr fest Growstar 3.8.0 / Phase 4U.",
+            "Der Repository-Baseline-Test prüft stattdessen, dass GROWSTAR_VERSION und GROWSTAR_INTERNAL_PHASE exakt dem obersten RELEASES-Eintrag folgen.",
+            "Zusätzlich validiert der Baseline-Test die aktuelle Versionskennung als dreiteilige semantische Growstar-Version und verlangt eine nicht leere interne Phase.",
+            "Die Abschlussmeldung des Baseline-Tests zeigt die tatsächlich aktuelle Growstar-Version und Phase dynamisch an.",
+            "Der Alarm-&-Notifications-Test erwartet nicht mehr, dass 3.9.0 / 4V für immer die aktuelle Version bleibt.",
+            "Der Alarm-&-Notifications-Test prüft stattdessen, dass der historische Feature-Release 3.9.0 / 4V weiterhin in RELEASES dokumentiert ist.",
+            "Damit bleiben beide Regressionstests bei künftigen Patch- und Serienversionen wiederverwendbar.",
+            "Alarm-Engine, Telegram-Versand, Regelung, Hardware, Restart-Policy, Netzwerk und Benutzeroberfläche werden durch 4V.1 nicht verändert.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-Versionen von core/release.py, check_repository_baseline.py und check_notifications.py wurden vor dem Patch per Git-Blob-SHA verifiziert.",
+            "Der Repository-Baseline-Test enthält keine harte Anforderung mehr an 3.8.0 / 4U.",
+            "Der Notification-Test enthält keine harte Anforderung mehr, dass 3.9.0 / 4V die aktuell laufende Version sein muss.",
+            "Der Notification-Test bestätigt weiterhin, dass der Feature-Release 3.9.0 / 4V in den Patch Notes dokumentiert ist.",
+            "core/release.py meldet Version 3.9.1 und Build-Kennung 4V.1.",
+        ),
+    },
+    {
+        "version": "3.9.0",
+        "date": "2026-08-18",
+        "phase": "4V",
+        "title": "Zentrale Alarm-Engine und Telegram-Benachrichtigungen",
+        "summary": (
+            "Growstar kann kritische Sensor-, Regelkreis-, Hardware-, Safety- "
+            "und Systemfehler jetzt zentral als Alarme verwalten und unabhängig "
+            "vom geöffneten Browser per Telegram an ein Handy senden. "
+            "Alarmüberwachung und Versand laufen getrennt von der Regelung."
+        ),
+        "changes": (
+            "Neue zentrale Alarm-Engine verarbeitet ausschließlich den bestehenden read-only Watchdog-Health-Snapshot.",
+            "Alarmüberwachung läuft in einem eigenen growstar-alerts Thread und führt keine Aktor- oder Shelly-Schreibzugriffe aus.",
+            "Telegram-Versand läuft in einem getrennten growstar-notifications Queue-Worker und kann Watchdog oder Regelkreise nicht blockieren.",
+            "Telegram-Nachrichten werden bei temporären Versandfehlern mit 5, 30 und 120 Sekunden Abstand automatisch erneut versucht.",
+            "Neue Alarme werden dedupliziert; eine dauerhaft aktive Störung erzeugt nicht bei jedem 5-Sekunden-Zyklus eine neue Nachricht.",
+            "Für weiterhin aktive Störungen kann ein Wiederholungsintervall von 15, 30, 60, 120 oder 240 Minuten gewählt oder vollständig deaktiviert werden.",
+            "Bei Behebung einer zuvor gemeldeten Störung kann Growstar automatisch eine Entwarnung senden.",
+            "Aktive Alarmzustände und eine begrenzte Alarmhistorie werden lokal unter instance/alarm_state.json persistiert.",
+            "Nach jedem Growstar-Neustart gilt ein 90-Sekunden-Startschutz, damit anlaufende Sensor-/Threadzustände keine Fehlalarme erzeugen.",
+            "Überwacht werden Sensor-Timeouts für Temperatur und Luftfeuchte.",
+            "Kritische Temperaturwerte werden gegen die bestehende MIN_TEMP/MAX_TEMP-Konfiguration geprüft.",
+            "Kritische Luftfeuchte wird gegen MAX_HUM und – falls später konfiguriert – MIN_HUM geprüft.",
+            "Nicht erreichbare Aktoren werden nach mindestens zwei aufeinanderfolgenden Hardwarefehlern alarmiert.",
+            "Safety-Supervisor-Stale und aktive stationsbezogene Safety-Failsafes erzeugen kritische Alarme.",
+            "Stale Regelkreise und ungültige Stationskonfigurationen werden alarmiert.",
+            "Ausgefallene zentrale Growstar-Threads sowie benötigter, stale MQTT-Sensortraffic können als Systemalarm gemeldet werden.",
+            "Neue Seite /system/notifications zeigt Telegram-Einrichtung, Alarmregeln, aktive Alarme und Versandstatus.",
+            "Neue Grow-Control-Dashboard-Kachel 'Alarm & Benachrichtigungen' führt direkt zur Benachrichtigungsseite.",
+            "Telegram-Bot-Verbindung wird über den offiziellen Bot-Token geprüft; nach /start kann Growstar den privaten Chat automatisch über getUpdates finden.",
+            "Eine Testnachricht kann direkt aus Growstar gesendet werden.",
+            "Bot-Token und Chat-ID werden ausschließlich lokal in instance/notifications.json mit Dateimodus 0600 gespeichert und niemals in GitHub geschrieben.",
+            "Der gespeicherte Bot-Token wird von der Growstar-API nie wieder an den Browser zurückgegeben.",
+            "Telegram-Einstellungen sind mit settings.view lesbar und Änderungen/Testversand mit settings.manage geschützt; bestehender CSRF-Schutz bleibt aktiv.",
+            "Telegram ist ein reiner Benachrichtigungskanal; die Funktion verändert weder Regelparameter noch Hardwarezustände.",
+        ),
+        "tests": (
+            "Aktuelle GitHub-Baselines von app.py, core/release.py und grow_control_dashboard.html werden vor dem Patch per Git-Blob-SHA verifiziert.",
+            "core/release.py meldet Version 3.9.0 und Build-Kennung 4V.",
+            "Telegram-Client verwendet ausschließlich HTTPS über urllib und enthält keine shell=True-Ausführung.",
+            "Telegram-Token wird syntaktisch validiert und weder geloggt noch als Prozessargument verwendet.",
+            "Öffentliche Notification-Einstellungen enthalten kein bot_token-Feld.",
+            "Lokale notification.json wird atomar geschrieben und auf Dateimodus 0600 gesetzt.",
+            "Alarm-Engine importiert keine Aktor- oder Shelly-Schaltfunktionen.",
+            "Ein simulierter stale Temperatursensor erzeugt genau einen stabilen Alarm-Key.",
+            "Ein simulierter Temperaturwert über MAX_TEMP erzeugt einen critical sensor_limits Alarm.",
+            "Ein simulierter Hardwarefehler unterhalb der Zwei-Fehler-Schwelle erzeugt noch keinen Alarm; ab zwei Fehlern wird alarmiert.",
+            "app.py registriert Notification-Routen sowie getrennte Notification- und Alarm-Threads.",
+            "Grow-Control-Dashboard enthält die neue Alarm-&-Benachrichtigungen-Kachel.",
+            "Notification-Routen verlangen settings.view beziehungsweise settings.manage.",
+            "python3 tests/regression/check_notifications.py läuft vollständig grün.",
+            "Bestehender tests/regression/check_repository_baseline.py bleibt unverändert nutzbar.",
+        ),
+    },
+    {
+        "version": "3.8.0",
+        "date": "2026-08-18",
+        "phase": "4U",
+        "title": "Bereinigte Repository- und Sicherheitsbaseline",
+        "summary": (
+            "Die lange 3.7-Patchserie wird mit einer bereinigten 3.8-Basis "
+            "abgeschlossen. Historische Einmal- und Phasenartefakte werden aus "
+            "dem aktiven Repository entfernt, Pico-Zugangsdaten werden nicht "
+            "mehr versioniert und ein konsolidierter Repository-Baseline-Test "
+            "ersetzt die große Sammlung einzelner Root-Checker."
+        ),
+        "changes": (
+            "Start der neuen Growstar-3.8-Serie; die bestehende Regelungs-, Hardware-, Netzwerk- und Restart-Policy-Logik bleibt unverändert.",
+            "53 historische check_*.py-Phasen- und Patchtests werden aus dem Repository-Root entfernt; ihr vollständiger Stand bleibt über die Git-Historie bis Commit 0e44d73639c0060eb7f520ccb7ef692081ce5ec6 nachvollziehbar.",
+            "Neue konsolidierte Tests liegen ab 3.8 unter tests/regression statt als fortlaufende Patchdateien im Repository-Root.",
+            "app_backup.py, das leere tools/test.py und das leere templates/admin/new.py werden als nicht verwendete Entwicklungsreste entfernt.",
+            "Der veraltete Root-main.py-Pico-Prototyp wird entfernt; Growstar selbst startet weiterhin ausschließlich über Gunicorn mit app:flask_app.",
+            "Die nicht mehr gerouteten Legacy-Templates heizung.html, abluft.html, licht.html und ventilator.html werden entfernt; Geräteansichten verwenden weiterhin das generische device_control.html.",
+            "Die nicht mehr referenzierten Legacy-Templates tagebuch.html und pflanzendaten.html werden entfernt.",
+            "Das nicht verwendete presets.py und die nicht referenzierte Root-style.css werden entfernt.",
+            "Pico-WLAN-Zugangsdaten werden nicht mehr in pico_sensor_01/config.py oder pico_sensor_02/config.py versioniert.",
+            "Für beide Pico-Sensorcontroller gibt es stattdessen config.example.py ohne reale Zugangsdaten; die lokale config.py wird per .gitignore ausgeschlossen.",
+            ".gitignore nimmt zusätzlich lokale Growstar-Laufzeitdaten wie instance/, backups/, tent_configs/ und tests.json auf.",
+            "profiles.json, core/profile.py und routes/profile.py bleiben ausdrücklich erhalten, weil sie im aktuellen Laufzeitpfad weiterhin aktiv verwendet werden.",
+            "Die Phase-4T-Migrationswerkzeuge sowie Growstar-Service-, NetworkManager- und Netzwerk-Helper-Installer bleiben erhalten, damit bestehende Installations- und Upgradepfade nicht durch das Aufräumen beschädigt werden.",
+            "Neue SECURITY.md dokumentiert verbindlich, dass WLAN-Passwörter, API-Tokens, Session-Secrets und andere produktive Zugangsdaten nicht in Git gespeichert werden dürfen.",
+            "Ein zuvor versioniertes WLAN-Credential wird aus dem aktuellen Repository-Stand entfernt; da Git-Historie bereits veröffentlichte Secrets nicht zurücknimmt, muss das betroffene WLAN-Passwort kontrolliert rotiert werden.",
+        ),
+        "tests": (
+            "core/release.py meldet Version 3.8.0 und Build-Kennung 4U.",
+            "Im Repository-Root ist nach dem Cleanup kein check_*.py mehr versioniert.",
+            "Alle gezielt entfernten Backup-, Prototyp-, Leer- und Legacy-Template-Dateien sind nicht mehr getrackt.",
+            "pico_sensor_01/config.py und pico_sensor_02/config.py sind nicht mehr getrackt, ihre config.example.py-Dateien dagegen schon.",
+            ".gitignore schützt Pico-Secrets sowie instance/, backups/, tent_configs/ und tests.json.",
+            "Alle literalen render_template()-Ziele der aktiven Python-Routen werden gegen vorhandene Templates geprüft.",
+            "Alle getrackten Python-Dateien werden syntaktisch per ast.parse geprüft, ohne Hardwarezugriffe auszuführen.",
+            "app.py verwendet weiterhin apply_shutdown_restart_policy und registriert die aktive Profile- und Restart-Policy-Routenfamilie.",
+            "core/profile.py, profiles.json und routes/profile.py bleiben Bestandteil der Baseline.",
+            "install/activate_phase4t_without_old_shutdown.sh und tools/prepare_phase4t_restart.py bleiben für historische Upgradepfade erhalten.",
+            "install/growstar.service.in startet weiterhin Gunicorn mit app:flask_app und Restart=always.",
+            "services/network.py und install/growstar_network_helper.py bleiben ohne shell=True-Aufrufe.",
+            "python3 tests/regression/check_repository_baseline.py läuft nach dem vollständigen GitHub-Cleanup grün.",
+        ),
+    },
+    {
+        "version": "3.7.10",
+        "date": "2026-08-18",
+        "phase": "4T.1",
+        "title": "Phase-4T-Aktivierung und Setup-Einstieg korrigiert",
+        "summary": (
+            "Der einmalige Phase-4T-Migrationsweg kann das Vorbereitungsskript "
+            "jetzt zuverlässig direkt aus dem tools-Verzeichnis starten. "
+            "Zusätzlich ist das Neustart-Verhalten als sichtbare Unterkachel "
+            "im Grow-Control-Setup erreichbar."
+        ),
+        "changes": (
+            "tools/prepare_phase4t_restart.py ergänzt das Growstar-Projekt-Root vor allen core- und services-Imports selbst in sys.path.",
+            "Der direkte Aufruf des Vorbereitungsskripts benötigt dadurch keinen manuellen PYTHONPATH-Workaround mehr.",
+            "install/activate_phase4t_without_old_shutdown.sh übergibt zusätzlich explizit das erkannte PROJECT_DIR als PYTHONPATH.",
+            "Die bestehende Fehlerbehandlung des Aktivierungsskripts bleibt erhalten: Bei einem Fehler wird der zuvor eingefrorene alte Growstar-Prozess mit SIGCONT fortgesetzt.",
+            "Die Reihenfolge Freeze -> physische Restart-Policy -> alter Worker ohne historischen atexit-Shutdown beenden bleibt unverändert.",
+            "Im Grow-Control-Setup erscheint eine neue Unterkachel 'Neustart-Verhalten'.",
+            "Die Kachel führt auf die bereits vorhandene Seite /grow-control/setup/restart-policy.",
+            "Die Beschreibung erklärt direkt, dass pro Station und Aktor zwischen Zustand beibehalten und sicher AUS gewählt wird.",
+            "Die eigentliche Phase-4T-Restart-Policy, ihre sicheren Defaults und die Relay-Verifikation werden nicht verändert.",
+            "Gunicorn, systemd-Service, Netzwerkmanagement und Caddy werden durch 4T.1 nicht verändert.",
+        ),
+        "tests": (
+            "Projekt-Root-Bootstrap steht vor allen core-Imports im Vorbereitungsskript.",
+            "Vorbereitungsskript verwendet Path(__file__).resolve().parents[1] als Projekt-Root.",
+            "Aktivierungsskript setzt beim Aufruf zusätzlich PYTHONPATH auf das aus systemd erkannte PROJECT_DIR.",
+            "SIGCONT-Fallback bei Fehlern bleibt im Aktivierungsskript vorhanden.",
+            "SIGSTOP erfolgt weiterhin vor Policy-Vorbereitung und SIGKILL erst danach.",
+            "Grow-Control-Setup enthält die sichtbare Kachel 'Neustart-Verhalten'.",
+            "Die Setup-Kachel verlinkt über url_for('grow_control_restart_policy') auf die bestehende Restart-Policy-Seite.",
+            "Die bestehende Restart-Policy-Seite und API bleiben unverändert registriert.",
+            "python3 check_phase4t1_activation_setup.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.10 und Build-Kennung 4T.1.",
+        ),
+    },
+    {
+        "version": "3.7.9",
+        "date": "2026-08-18",
+        "phase": "4T",
+        "title": "Neustart-Verhalten pro Aktor konfigurierbar",
+        "summary": (
+            "Growstar schaltet bei einem geordneten Neustart nicht mehr pauschal "
+            "alle Aktoren aus. Pro Station und Aktor kann gewählt werden, ob der "
+            "physische Zustand unverändert bleiben oder das Relay sicher AUS "
+            "geschaltet werden soll."
+        ),
+        "changes": (
+            "Neue stationsbezogene RESTART_POLICY mit den ausschließlich erlaubten Aktionen KEEP und OFF.",
+            "Beleuchtung und Licht 2 verwenden als sicheren Migrationsstandard KEEP; alle übrigen Aktoren starten mit OFF.",
+            "KEEP sendet beim geordneten Growstar-/systemd-Shutdown ausdrücklich keinen Shelly-Schreibbefehl.",
+            "OFF sendet unabhängig vom In-Memory-State einen realen AUS-Befehl und verifiziert den Relayzustand.",
+            "shutdown_backend verwendet nicht mehr den historischen pauschalen set_device(..., False)-Not-Aus für alle Geräte.",
+            "Während der Shutdown-Policy wird die Runtime auf disarming gesetzt, damit Regelkreis und Safety nicht gegen die Policy arbeiten.",
+            "Beim Backend-Start werden vor allen Regel-/Failsafe-Threads die tatsächlichen Relayzustände synchronisiert.",
+            "Die Start-Synchronisierung verwendet jetzt DEVICE_HARDWARE generisch und umfasst damit auch AUX1 bis AUX4.",
+            "Neue Setup-Unterseite /grow-control/setup/restart-policy zeigt das Verhalten pro Station und Aktor.",
+            "Änderungen an der Neustart-Policy werden sofort gespeichert und gelten bereits für den nächsten geordneten Neustart; ein weiterer Neustart zum Speichern ist nicht nötig.",
+            "Neue stationsbezogene API /api/tents/<tent_id>/restart-policy verwendet die bestehende Grow-Konfigurationsberechtigung.",
+            "Ein erzwungenes automatisches EIN beim Neustart wird aus Sicherheitsgründen bewusst nicht angeboten.",
+            "Die Policy gilt für geordnete Prozess-/systemd-Neustarts und Shutdowns; ein abrupter Stromausfall kann softwareseitig keinen letzten Schaltbefehl ausführen.",
+            "Ein einmaliges Phase-4T-Aktivierungsskript verhindert beim Wechsel von 3.7.8, dass der alte pauschale Alles-AUS-aexit-Handler noch einmal das Licht unterbricht.",
+            "Das Aktivierungsskript friert den alten Growstar-Prozess zuerst per SIGSTOP ein, wendet die neue physische Policy an und beendet erst danach den alten Worker ohne dessen historischen Shutdown-Handler.",
+            "Gunicorn-Bindings, Caddy, Netzwerkmanagement und die bestehende Safety-Supervisor-Logik bleiben unverändert.",
+        ),
+        "tests": (
+            "Default-Policy meldet light/light2=KEEP und heating=OFF.",
+            "Ungültige Geräte-IDs und andere Aktionen als KEEP/OFF werden atomar abgelehnt.",
+            "KEEP erzeugt im simulierten Shutdown keinen Shelly-Schreibzugriff.",
+            "OFF erzeugt einen realen AUS-Befehl auch dann, wenn der Runtime-State bereits fälschlich False meldet.",
+            "OFF wird nach dem Schreiben direkt am Relay verifiziert und aktualisiert erst danach den Runtime-State.",
+            "Start-Synchronisierung basiert auf DEVICE_HARDWARE und umfasst AUX-Aktoren.",
+            "app.shutdown_backend enthält keinen pauschalen set_device(device, False)-Loop mehr.",
+            "Setup-API und Setup-Unterseite für Neustart-Verhalten sind registriert.",
+            "Das einmalige Aktivierungsskript enthält SIGSTOP vor Policy-Vorbereitung und SIGKILL erst danach.",
+            "python3 check_phase4t_restart_policy.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.9 und Build-Kennung 4T.",
+        ),
+    },
+    {
+        "version": "3.7.8",
+        "date": "2026-08-17",
+        "phase": "4S.3.5",
+        "title": "Abgeleiteten WLAN-PSK nicht mehr als Originalpasswort anzeigen",
+        "summary": (
+            "Growstar unterscheidet jetzt zuverlässig zwischen einer gespeicherten "
+            "WLAN-Passphrase und einem bereits abgeleiteten 64-stelligen WPA-PSK. "
+            "Ein abgeleiteter Schlüssel wird nicht mehr irreführend als Passwort "
+            "angezeigt und nicht an den Browser übertragen."
+        ),
+        "changes": (
+            "Der Netzwerk-Helper klassifiziert gespeicherte WPA-Credentials als Passphrase oder 64-stelligen Hex-PSK.",
+            "Ein 64-stelliger Hex-PSK wird als derived_psk erkannt.",
+            "Bei derived_psk gibt der Helper ausschließlich Metadaten zurück und niemals den vollständigen WLAN-Schlüssel.",
+            "Die Growstar-API überträgt den abgeleiteten PSK deshalb nicht an den Browser.",
+            "Die Netzwerkseite zeigt bei derived_psk klar 'Originalpasswort nicht auslesbar' statt eines falschen Passworts.",
+            "Nur wenn NetworkManager tatsächlich eine Passphrase speichert, kann 'Passwort anzeigen' weiterhin den Klartext kurz einblenden.",
+            "Die automatische 15-Sekunden-Maskierung für rücklesbare Passphrasen bleibt erhalten.",
+            "Passwort ändern, WLAN-Wechsel, Scan, Rollback und der privilegierte Netzwerk-Helper bleiben ansonsten unverändert.",
+            "Die SSID-Prüfung der get_password-Aktion behandelt Steuerzeichen wieder korrekt statt nach literalen Escape-Strings zu suchen.",
+            "Growstar liest Netplan nicht zusätzlich nach Klartext-Secrets aus; auf dem getesteten Raspberry enthält Netplan ebenfalls nur denselben abgeleiteten 64-Hex-PSK.",
+            "Gunicorn-, systemd- und Caddy-Konfigurationen werden durch diesen Patch nicht verändert.",
+            "Der Netzwerk-Helper muss nach git pull erneut mit dem bestehenden Installer nach /usr/local/libexec kopiert werden.",
+        ),
+        "tests": (
+            "Ein simuliertes 64-stelliges Hex-Credential wird als derived_psk erkannt.",
+            "Bei derived_psk enthält die Helper-Antwort kein password-Feld.",
+            "Der Webservice gibt derived_psk-Metadaten weiter, ohne ein Secret zu verlangen.",
+            "Die Netzwerkseite zeigt für derived_psk 'Originalpasswort nicht auslesbar'.",
+            "Eine normale simulierte Passphrase bleibt revealable und kann weiterhin angezeigt werden.",
+            "Eine Passphrase wird nach 15 Sekunden weiterhin automatisch maskiert.",
+            "Nicht aktive SSIDs und nicht unterstützte WLAN-Sicherheitsarten bleiben für die Credential-Abfrage gesperrt.",
+            "python3 check_phase4s35_wifi_credential_type.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.8 und Build-Kennung 4S.3.5.",
+        ),
+    },
+    {
+        "version": "3.7.7",
+        "date": "2026-08-17",
+        "phase": "4S.3.4",
+        "title": "WLAN-Passwort anzeigen und Growstar-Systemdienst reproduzierbar installieren",
+        "summary": (
+            "Das gespeicherte Passwort der aktuell verbundenen Personal-WLAN-"
+            "Verbindung kann jetzt auf ausdrückliche Administrator-Aktion kurz "
+            "angezeigt werden. Zusätzlich erhält Growstar einen reproduzierbaren "
+            "systemd-Installer für den bestehenden Gunicorn-Betrieb."
+        ),
+        "changes": (
+            "Die verbundene WPA/WPA2/WPA3-Personal-Verbindung zeigt das Passwort standardmäßig nur maskiert.",
+            "Ein expliziter Button 'Passwort anzeigen' lädt das Secret nur mit settings.manage und bestehendem CSRF-Schutz.",
+            "Die Secret-Antwort trägt Cache-Control no-store, Pragma no-cache und Expires 0.",
+            "Das eingeblendete WLAN-Passwort wird nach 15 Sekunden automatisch wieder maskiert und kann vorher manuell verborgen werden.",
+            "Der root-eigene Netzwerk-Helper erhält die eng definierte Aktion get_password.",
+            "Der Helper gibt nur das Passwort der tatsächlich aktuell verbundenen Personal-WLAN-Verbindung frei.",
+            "WEP, Enterprise-WLAN und nicht aktive SSIDs können über diese Aktion kein Secret auslesen.",
+            "Das WLAN-Passwort wird weiterhin nicht in Growstar-Dateien gespeichert und erscheint nicht in Prozessargumenten.",
+            "Neue growstar.service-Vorlage bildet den bestehenden Gunicorn-Systemdienst reproduzierbar ab.",
+            "Der Service-Installer ermittelt Growstar-Verzeichnis, Dienstbenutzer, Gruppe und Gunicorn-Binary dynamisch statt pi5 oder /home/pi5 fest zu codieren.",
+            "Growstar wird weiterhin ausdrücklich nicht als root gestartet.",
+            "Der Installer aktiviert growstar.service für den Systemstart, startet ihn standardmäßig aber nicht ungefragt neu.",
+            "Mit --start kann der Installer bei einer Factory-/Neuinstallation den Dienst direkt starten.",
+            "Vorhandene systemd-Drop-ins wie GROWSTAR_HTTPS_ONLY bleiben unangetastet.",
+            "Die bestehende gunicorn.conf.py bleibt unverändert: 127.0.0.1:8000 für Caddy und 0.0.0.0:8001 für lokale/Setup-Erreichbarkeit.",
+            "Caddy/DuckDNS bleiben bewusst außerhalb dieses Installers und werden in einem separaten Infrastruktur-Schritt behandelt.",
+        ),
+        "tests": (
+            "Beim verbundenen Personal-WLAN erscheint 'Passwort anzeigen' neben 'Passwort ändern'.",
+            "Ohne bewusste Aktion bleibt das Passwort ausschließlich maskiert.",
+            "Die Passwortanzeige verwendet POST, settings.manage, CSRF und no-store-Header.",
+            "Nach 15 Sekunden wird ein eingeblendetes Passwort wieder maskiert.",
+            "Der Helper verweigert get_password für eine andere als die aktuell verbundene SSID.",
+            "Der Helper verweigert die Passwortanzeige für nicht unterstützte Sicherheitsarten.",
+            "growstar.service.in enthält network-online-Abhängigkeit, Restart=always und app:flask_app.",
+            "Der Service-Installer enthält keinen fest codierten Benutzer pi5 und keinen fest codierten Pfad /home/pi5/growstar.",
+            "Der Service-Installer lehnt root als Growstar-Dienstbenutzer ab und erhält bestehende Drop-ins.",
+            "python3 check_phase4s34_password_service.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.7 und Build-Kennung 4S.3.4.",
+        ),
+    },
+    {
+        "version": "3.7.6",
+        "date": "2026-08-17",
+        "phase": "4S.3.3",
+        "title": "Passwort der bestehenden WLAN-Verbindung sicher ändern",
+        "summary": (
+            "Das Passwort der aktuell verbundenen WPA/WPA2/WPA3-Personal-"
+            "Verbindung kann jetzt direkt in Growstar geändert werden. "
+            "Growstar hält das bisherige Secret ausschließlich im privilegierten "
+            "Netzwerk-Helper als Rollback-Sicherung und bestätigt die neue "
+            "Verbindung erst nach erfolgreicher IPv4-Aktivierung."
+        ),
+        "changes": (
+            "Das aktuell verbundene geschützte WLAN erhält auf der Netzwerkseite die Aktion 'Passwort ändern'.",
+            "Das neue Passwort muss zur Vermeidung von Tippfehlern zweimal eingegeben werden.",
+            "Die Passwortänderung ist wie andere Netzwerkmutationen durch settings.manage und CSRF geschützt.",
+            "Das bisherige PSK wird ausschließlich im root-eigenen Netzwerk-Helper mit --show-secrets gelesen und niemals an Flask oder den Browser zurückgegeben.",
+            "Das neue PSK wird über den interaktiven nmcli-Verbindungseditor per stdin gespeichert und erscheint nicht in der Prozessargumentliste.",
+            "Nach dem Speichern wird das bestehende NetworkManager-Profil explizit neu aktiviert.",
+            "Die Passwortänderung gilt erst als erfolgreich, wenn dieselbe SSID wieder aktiv ist und eine IPv4-Adresse vorliegt.",
+            "Bei Aktivierungs- oder Verifikationsfehler schreibt der Helper automatisch das vorherige PSK zurück und aktiviert die bisherige Verbindung erneut.",
+            "WEP und Enterprise-WLAN bleiben für diese Funktion bewusst ausgeschlossen; unterstützt werden WPA/WPA2/WPA3-Personal-Profile.",
+            "WLAN-Scan, Gunicorn-Binding und Setup-Hotspot-Status bleiben unverändert.",
+            "Der Netzwerk-Helper muss nach git pull erneut mit dem bestehenden Installer nach /usr/local/libexec kopiert werden.",
+        ),
+        "tests": (
+            "Beim aktuell verbundenen WPA/WPA2/WPA3-Personal-WLAN erscheint 'Passwort ändern'.",
+            "Offene, WEP- und Enterprise-Netze erhalten keine Passwortänderungsaktion.",
+            "Zwei abweichende neue Passwörter werden bereits im Browser blockiert.",
+            "Der Webservice delegiert die Passwortänderung ausschließlich an die Helper-Aktion update_password.",
+            "Weder altes noch neues WLAN-Passwort erscheint in nmcli-Prozessargumenten.",
+            "Der Helper liest das alte PSK nur intern als Rollback-Sicherung.",
+            "Nach erfolgreicher Änderung wird das bestehende Profil neu aktiviert und auf SSID + IPv4 geprüft.",
+            "Ein simulierter Fehler stellt das alte PSK wieder her und aktiviert die vorherige Verbindung erneut.",
+            "python3 check_phase4s33_wifi_password.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.6 und Build-Kennung 4S.3.3.",
+        ),
+    },
+    {
+        "version": "3.7.5",
+        "date": "2026-08-17",
+        "phase": "4S.3.2",
+        "title": "WLAN-Scan nutzt den privilegierten Netzwerk-Helper",
+        "summary": (
+            "Der echte WLAN-Neuscan wird jetzt über denselben eng begrenzten "
+            "Netzwerk-Helper angefordert wie andere privilegierte "
+            "NetworkManager-Aktionen. Die fertige Access-Point-Liste wird danach "
+            "weiterhin unprivilegiert vom Growstar-Webprozess gelesen."
+        ),
+        "changes": (
+            "Fehler 'org.freedesktop.NetworkManager.wifi.scan request failed: not authorized' im Webprozess behoben.",
+            "Der Force-Scan ruft NetworkManager nicht mehr direkt aus Gunicorn auf.",
+            "Der root-eigene Growstar-Netzwerk-Helper erhält die neue fest definierte Aktion 'scan'.",
+            "Die Helper-Aktion fordert ausschließlich einen frischen Scan auf dem erkannten WLAN-Interface an und verändert keine Verbindung.",
+            "Nach erfolgreicher Scan-Anforderung wartet Growstar weiterhin fünf Sekunden auf NetworkManager und den WLAN-Treiber.",
+            "Die fertige Access-Point-Liste wird anschließend mit --rescan no ohne zusätzliche privilegierte Aktion gelesen.",
+            "Der normale Cache-/Listenabruf bleibt unprivilegiert.",
+            "WLAN-Verbindung, Passwortbehandlung, Rollback, Gunicorn-Binding und Authentifizierung bleiben unverändert.",
+            "Der bereits installierte Helper muss nach git pull einmalig mit dem bestehenden Installer aktualisiert werden.",
+        ),
+        "tests": (
+            "Direkter API-Aufruf /api/config/network/wifi?refresh=1 darf keinen 'not authorized'-Fehler mehr liefern.",
+            "Ein erzwungener Scan wird im Service ausschließlich über die Helper-Aktion 'scan' angefordert.",
+            "Der unprivilegierte Service führt bei force=True keinen direkten 'nmcli device wifi rescan'-Aufruf mehr aus.",
+            "Nach der Helper-Antwort wartet Growstar die definierte Settle-Zeit ab.",
+            "Die abschließende WLAN-Liste wird mit --rescan no gelesen.",
+            "Der Helper unterstützt ausschließlich die neue explizite Aktion 'scan' zusätzlich zu probe und connect.",
+            "Die Helper-Scan-Aktion verändert keine aktive Verbindung und legt kein NetworkManager-Profil an.",
+            "python3 check_phase4s32_privileged_scan.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.5 und Build-Kennung 4S.3.2.",
+        ),
+    },
+    {
+        "version": "3.7.4",
+        "date": "2026-08-17",
+        "phase": "4S.3.1",
+        "title": "Stabiler WLAN-Scan und zuverlässiger Netzwerk-Helper",
+        "summary": (
+            "Der erzwungene WLAN-Scan wartet jetzt auf das fertige "
+            "NetworkManager-Ergebnis. Schreibende Netzwerkaktionen werden nicht "
+            "mehr von der Polkit-Zuordnung des Gunicorn-Prozesses abhängig gemacht, "
+            "sondern über einen eng begrenzten root-eigenen Helper ausgeführt."
+        ),
+        "changes": (
+            "Ein manueller WLAN-Refresh fordert zuerst explizit einen NetworkManager-Scan an und liest die Access-Point-Liste erst nach einer Wartephase.",
+            "Der Refresh verwendet für die abschließende Liste --rescan no, damit kein zweiter paralleler Scan ein frühes Zwischenergebnis erzeugt.",
+            "Die bestehende WLAN-Liste bleibt im Browser sichtbar, während der neue Scan läuft; der Button zeigt 'Scan läuft …'.",
+            "Die fragile Phase-4S.3-Polkit-Freigabe für den Gunicorn-Prozess wird durch einen root-eigenen Netzwerk-Helper ersetzt.",
+            "Flask und Gunicorn bleiben weiterhin vollständig unprivilegiert.",
+            "sudoers erlaubt dem Growstar-Dienstbenutzer ausschließlich den fest installierten Netzwerk-Helper ohne Passwortabfrage.",
+            "Der Helper prüft zusätzlich seinen systemd-Cgroup-Kontext und verweigert Aufrufe außerhalb von growstar.service.",
+            "Der Helper akzeptiert nur fest implementierte JSON-Aktionen und führt nmcli weiterhin ohne Shell-Ausführung aus.",
+            "WLAN-Passwörter werden per stdin weitergereicht und erscheinen weder im Helper- noch im nmcli-Prozessargument.",
+            "WLAN-Verbindung und Rollback werden vollständig im privilegierten Helper ausgeführt.",
+            "Neue WLAN-Profile werden bewusst systemweit angelegt, damit NetworkManager sie auf einem headless Growstar bereits beim Boot automatisch verbinden kann.",
+            "Der Installer entfernt die alte /etc/polkit-1/rules.d/49-growstar-network.rules automatisch.",
+            "Der automatische Erstinbetriebnahme-Hotspot bleibt weiterhin deaktiviert, bis ein kontrollierter WLAN-Wechsel erfolgreich getestet wurde.",
+        ),
+        "tests": (
+            "Netzwerkseite öffnen: ein frischer Scan darf nach Abschluss nicht nur das aktuell verbundene WLAN anzeigen, wenn weitere Netze sichtbar sind.",
+            "Auf 'Aktualisieren' drücken: während des Scans bleibt die bisherige Liste sichtbar und der Button zeigt 'Scan läuft …'.",
+            "Capabilities-API meldet nach Helper-Installation write_ready=true und backend=privileged-helper.",
+            "Netzwerkseite zeigt danach 'WLAN-Verwaltung bereit' und unterstützte fremde WLANs erhalten den Button 'Verbinden'.",
+            "Der Helper wird root:root unter /usr/local/libexec installiert und die sudoers-Datei mit visudo geprüft.",
+            "Ein direkter Helper-Aufruf außerhalb von growstar.service wird durch den Cgroup-Guard abgelehnt.",
+            "Ein simuliertes WLAN-Passwort erscheint in keinem Prozessargument.",
+            "Ein simulierter Verifikationsfehler aktiviert weiterhin das vorherige WLAN als Rollback-Ziel.",
+            "python3 check_phase4s31_network_helper.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.4 und Build-Kennung 4S.3.1.",
+        ),
+    },
+    {
+        "version": "3.7.3",
+        "date": "2026-08-17",
+        "phase": "4S.3",
+        "title": "Frischer WLAN-Scan und gezielte NetworkManager-Freigabe",
+        "summary": (
+            "Growstar erzwingt beim Öffnen und Aktualisieren der Netzwerkseite "
+            "einen frischen WLAN-Scan. Die NetworkManager-Freigabe wird zugleich "
+            "auf den Growstar-Systemdienst und benutzereigene WLAN-Profile begrenzt."
+        ),
+        "changes": (
+            "Die Netzwerkseite erzwingt beim ersten Laden und über 'Aktualisieren' einen frischen WLAN-Scan mit --rescan yes.",
+            "Normale interne Scans dürfen weiterhin den NetworkManager-Cache mit --rescan auto verwenden.",
+            "WLAN-Ziellisten werden vor einem Verbindungsversuch nochmals mit einem frischen Scan geprüft.",
+            "NetworkManager-Schreibbereitschaft akzeptiert jetzt settings.modify.own als bevorzugte, engere Alternative zu settings.modify.system.",
+            "Neu angelegte WLAN-Verbindungen werden bei vorhandener modify-own-Berechtigung mit nmcli private yes dem Growstar-Dienstbenutzer zugeordnet.",
+            "Die Netzwerkseite zeigt die einzelnen NetworkManager-Berechtigungszustände verständlicher an.",
+            "Neue Polkit-Regel erlaubt nur growstar.service die Aktionen network-control, settings.modify.own und wifi.share.protected.",
+            "Die Polkit-Regel wird zusätzlich an den tatsächlich in growstar.service konfigurierten Dienstbenutzer gebunden und enthält keinen fest codierten pi5-Benutzer.",
+            "Ein idempotentes Installationsskript richtet die Regel einmalig unter /etc/polkit-1/rules.d ein; Flask und Gunicorn laufen weiterhin ohne Root-Rechte.",
+            "Ein Entfernungsskript ermöglicht das saubere Zurücknehmen der NetworkManager-Freigabe.",
+            "Der automatische Setup-Hotspot bleibt weiterhin deaktiviert und folgt erst nach bestätigtem grünem Schreibzugriff.",
+        ),
+        "tests": (
+            "Netzwerkseite neu öffnen: sichtbare WLANs werden ohne vorherigen Terminal-Scan frisch ermittelt.",
+            "Auf 'Aktualisieren' drücken: Backend verwendet --rescan yes statt --rescan auto.",
+            "NetworkManager-Berechtigungsanzeige zeigt network-control, modify-own und modify-system getrennt an.",
+            "Nach Installation der Polkit-Regel und Growstar-Neustart zeigt die Netzwerkseite 'WLAN-Verwaltung bereit'.",
+            "Nicht verbundenes unterstütztes WLAN zeigt anschließend 'Verbinden' statt 'Nur lesen'.",
+            "Neue WLAN-Verbindung wird bevorzugt als privates Benutzerprofil angelegt; settings.modify.system ist dafür nicht erforderlich.",
+            "Polkit-Regel enthält keine pauschale Freigabe für den interaktiven Raspberry-Benutzer und keine modify-system-Berechtigung.",
+            "python3 check_phase4s3_network_permissions.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.3 und Build-Kennung 4S.3.",
+        ),
+    },
+    {
+        "version": "3.7.2",
+        "date": "2026-08-17",
+        "phase": "4S.2",
+        "title": "WLAN-Wechsel direkt in Growstar mit sicherem Rückfall",
+        "summary": (
+            "Sichtbare WLAN-Netze können jetzt direkt über die Growstar-Oberfläche "
+            "ausgewählt werden. Vor einem Wechsel merkt sich Growstar die aktive "
+            "Verbindung und versucht bei einer fehlgeschlagenen Aktivierung "
+            "automatisch zurückzuwechseln."
+        ),
+        "changes": (
+            "Netzwerkseite kann sichtbare offene sowie WPA/WPA2/WPA3-Personal-WLANs direkt verbinden.",
+            "Vor schreibenden Aktionen prüft Growstar die NetworkManager-Polkit-Berechtigungen seines laufenden Dienstkontos.",
+            "WLAN-Schreibaktionen sind zusätzlich durch die bestehende settings.manage-Policy und CSRF-Schutz abgesichert.",
+            "Das WLAN-Passwort wird nicht in Growstar-Konfigurationsdateien gespeichert und nicht als nmcli-Prozessargument übergeben.",
+            "Geschützte WLAN-Secrets werden über die interaktive nmcli-Secret-Abfrage per stdin an NetworkManager übergeben.",
+            "Vor dem Wechsel wird die aktive WLAN-Verbindung als Rückfallziel gespeichert.",
+            "Das Ziel-WLAN gilt erst nach bestätigter Aktivierung und erhaltener IPv4-Adresse als erfolgreich.",
+            "Bei Aktivierungs- oder Verifikationsfehler versucht Growstar automatisch die vorherige WLAN-Verbindung wiederherzustellen.",
+            "WEP und Enterprise-WLAN 802.1X bleiben in dieser Ausbaustufe bewusst gesperrt.",
+            "Gunicorn bindet Port 8001 nicht mehr an die feste IP 192.168.178.66, sondern netzwerkneutral an 0.0.0.0.",
+            "Damit ist Growstar nicht mehr von der bisherigen Router-IP abhängig und für die kommende Setup-Hotspot-Erstinbetriebnahme vorbereitet.",
+            "Der automatische Erstinbetriebnahme-Hotspot wird erst in der nächsten Stufe aktiviert, nachdem die NetworkManager-Schreibrechte auf dem Ziel-Raspberry bestätigt wurden.",
+        ),
+        "tests": (
+            "Netzwerkseite zeigt unter 'Netzwerkverwaltung', ob NetworkManager-Schreibzugriff bereit ist.",
+            "Bei fehlender NetworkManager-Freigabe bleiben alle WLAN-Verbinden-Schaltflächen deaktiviert.",
+            "Bei vorhandener Freigabe zeigt ein nicht verbundenes WPA/WPA2/WPA3-Personal-WLAN eine Verbinden-Schaltfläche.",
+            "WLAN-Passwort wird nur im Dialog eingegeben und nach dem Verbindungsversuch aus dem Formular gelöscht.",
+            "Ein simuliertes geschütztes WLAN übergibt das Secret ausschließlich per stdin und niemals als Prozessargument.",
+            "Bei simulierter fehlender IPv4-Verifikation wird die vorherige Verbindung als Rollback-Ziel aktiviert.",
+            "python3 check_phase4s2_wifi_connect.py läuft vollständig grün.",
+            "Nach dem Neustart lauscht Gunicorn weiterhin lokal auf 127.0.0.1:8000 und zusätzlich netzwerkneutral auf 0.0.0.0:8001.",
+            "/api/system/version meldet Version 3.7.2 und Build-Kennung 4S.2.",
+        ),
+    },
+    {
+        "version": "3.7.1",
+        "date": "2026-08-17",
+        "phase": "4S.1",
+        "title": "Netzwerk direkt im Grow Control erreichbar",
+        "summary": (
+            "Die in Phase 4S eingeführte Netzwerkdiagnose ist jetzt direkt im "
+            "Grow-Control-Dashboard unter System & Infrastruktur erreichbar."
+        ),
+        "changes": (
+            "Neue Netzwerk-Kachel im Grow-Control-Dashboard unter System & Infrastruktur.",
+            "Die Kachel öffnet die bestehende Netzwerkseite über den registrierten Endpoint system_network_page.",
+            "Die Netzwerk-Kachel ist nur mit der Berechtigung settings.view sichtbar.",
+            "Das Layout und die mobile Darstellung verwenden die bestehende Modul-Kachelstruktur.",
+            "Die Netzwerkdiagnose aus Phase 4S bleibt vollständig read-only und unverändert.",
+            "Es werden weiterhin keine WLAN-Verbindungen, Hotspots oder NetworkManager-Profile verändert.",
+        ),
+        "tests": (
+            "Grow Control öffnen: Unter System & Infrastruktur erscheint die Kachel 'Netzwerk'.",
+            "Netzwerk-Kachel öffnen: /system/network muss ohne Umweg geladen werden.",
+            "Die Kachel wird nur innerhalb des settings.view-Berechtigungsblocks gerendert.",
+            "Status, Interfaces und WLAN-Scan auf der Netzwerkseite funktionieren weiterhin wie in Phase 4S.",
+            "python3 check_phase4s1_network_dashboard.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.1 und Build-Kennung 4S.1.",
+        ),
+    },
+    {
+        "version": "3.7.0",
+        "date": "2026-08-17",
+        "phase": "4S",
+        "title": "Network Management – sichere Diagnosebasis",
+        "summary": (
+            "Growstar erhält ein eigenes Netzwerkmodul. Die erste Stufe zeigt "
+            "NetworkManager-Status, aktive Interfaces, IP/Gateway/DNS und sichtbare "
+            "WLAN-Netze an, ohne Netzwerkverbindungen zu verändern."
+        ),
+        "changes": (
+            "Neue Systemseite /system/network für Netzwerkstatus und WLAN-Diagnose.",
+            "Read-only NetworkManager-Integration über nmcli mit festen Argumentlisten und Timeout.",
+            "Aktive LAN-/WLAN-Interfaces zeigen Verbindung, IPv4-Adressen, Gateway und DNS.",
+            "WLAN-Scan zeigt SSID, Signalstärke, Sicherheit und aktuell verbundenes Netz.",
+            "Doppelte SSIDs werden auf den stärksten sichtbaren Access Point zusammengefasst.",
+            "Fehlender NetworkManager/nmcli wird als Diagnosezustand behandelt und erzeugt keinen Serverfehler.",
+            "Netzwerkseite und APIs sind zusätzlich mit settings.view geschützt.",
+            "System-Dashboard trennt Netzwerkverwaltung von Shelly-/Hardware-Verbindungen.",
+            "Phase 4S bleibt vollständig read-only; Verbinden, Hotspot und Recovery verändern noch nichts.",
+        ),
+        "tests": (
+            "Unter System erscheint die neue Karte 'Netzwerk' und öffnet /system/network.",
+            "Auf dem Raspberry werden NetworkManager, Hostname und aktive Interfaces angezeigt.",
+            "IP-Adresse, Gateway und DNS eines verbundenen Interfaces werden plausibel dargestellt.",
+            "WLAN-Scan zeigt sichtbare SSIDs, Signalstärke und Sicherheitsart.",
+            "Das aktuell verbundene WLAN wird im Scan markiert.",
+            "Auf einem System ohne nmcli erscheint eine verständliche Diagnose statt eines HTTP-500-Fehlers.",
+            "Die Seite bietet keine Buttons zum Verbinden, Trennen oder Starten eines Hotspots.",
+            "python3 check_phase4s_network.py läuft vollständig grün.",
+            "/api/system/version meldet Version 3.7.0 und Build-Kennung 4S.",
+        ),
+    },
+    {
+        "version": "3.6.6",
+        "date": "2026-08-16",
+        "phase": "4R.2",
+        "title": "Doppelbelegung nennt Anforderer und Besitzer korrekt",
+        "summary": (
+            "Bei einer echten IP-/Relay-Doppelbelegung wird jetzt der tatsächlich "
+            "bearbeitete Aktor als Anforderer und die bereits vorhandene Zuordnung "
+            "als blockierender Besitzer gemeldet."
+        ),
+        "changes": (
+            "Konfliktrichtung wird aus der tatsächlich geänderten Zuordnung statt aus der Geräte-Reihenfolge abgeleitet.",
+            "Der bearbeitete Aktor wird immer als 'möchte ...' gemeldet.",
+            "Der bereits belegende Aktor wird immer als bestehender Besitzer gemeldet.",
+            "Die Geräte-Reihenfolge in DEVICE_HARDWARE beeinflusst die Fehlermeldung nicht mehr.",
+            "Der bestehende globale IP/Relay-Doppelbelegungsschutz bleibt unverändert aktiv.",
+        ),
+        "tests": (
+            "Entfeuchter besitzt einen Endpoint, Ventilator fordert ihn an: Ventilator muss als Anforderer erscheinen.",
+            "Ventilator besitzt einen Endpoint, Entfeuchter fordert ihn an: Entfeuchter muss als Anforderer erscheinen.",
+            "Identische unveränderte Zuordnung desselben Aktors bleibt konfliktfrei.",
+            "Eine echte Doppelbelegung bleibt weiterhin atomar gesperrt.",
+            "Fehlermeldung muss bestehenden Besitzer und kollidierenden Aktor nennen.",
+            "/api/system/version meldet Version 3.6.6 und Build-Kennung 4R.2.",
+        ),
+    },
+    {
+        "version": "3.6.5",
+        "date": "2026-08-16",
+        "phase": "4R.1",
+        "title": "Hardware-Zuordnung ohne falsche Doppelbelegung",
+        "summary": (
+            "Die Verbindungsseite speichert nur noch tatsächlich geänderte "
+            "Aktor-Zuordnungen. Unveränderte Geräte können dadurch keine "
+            "scheinbaren Doppelbelegungen mehr auslösen."
+        ),
+        "changes": (
+            "Verbindungen sendet beim Speichern nur noch geänderte Aktor-Zuordnungen an das Backend.",
+            "Unveränderte IP-/Relay-Felder werden nicht mehr nebenbei normalisiert oder neu gespeichert.",
+            "Eine unveränderte Zuordnung desselben Aktors bleibt ausdrücklich zulässig.",
+            "Doppelbelegungsfehler nennen jetzt sowohl den bestehenden Besitzer als auch den kollidierenden Aktor.",
+            "Der betroffene Aktor wird bei einem Konflikt auf der Verbindungsseite hervorgehoben.",
+            "Der Schutz gegen echte Doppelbelegung von IP/Hostname + Relay bleibt vollständig aktiv.",
+        ),
+        "tests": (
+            "Eine unveränderte bereits gespeicherte IP/Relay-Zuordnung erneut speichern: kein Konflikt.",
+            "Ventilator eine neue IP mit leerem Relay zuweisen: Relay 0 wird nur für diesen geänderten Aktor übernommen.",
+            "Ein anderer unveränderter Aktor mit unvollständiger IP-Zuordnung darf nicht automatisch Relay 0 erhalten.",
+            "Zweiten Aktor absichtlich auf dieselbe IP + dasselbe Relay legen: echte Doppelbelegung muss weiter blockiert werden.",
+            "Fehlermeldung muss bestehenden Besitzer und kollidierenden Aktor nennen.",
+            "/api/system/version meldet Version 3.6.5 und Build-Kennung 4R.1.",
+        ),
+    },
+    {
+        "version": "3.6.4",
+        "date": "2026-08-16",
+        "phase": "4R",
+        "title": "Bedienungssicherer Auto-Refresh",
+        "summary": (
+            "Automatische Live-Aktualisierungen überschreiben keine laufenden "
+            "Benutzereingaben mehr. Sensor-Offsets lassen sich auf dem Handy "
+            "ruhiger und zuverlässiger einstellen."
+        ),
+        "changes": (
+            "Gerätesteuerung trennt Live-Status strikt von noch nicht gespeicherten Formularwerten.",
+            "Modus, Zeit, Intervall und ENV-Auswahl werden durch den 3-Sekunden-Refresh nicht mehr zurückgesetzt.",
+            "Sensor-Zuweisungen und Offsets werden durch den 10-Sekunden-Refresh nicht mehr überschrieben.",
+            "Sensor-Livewerte und verfügbare Sensorquellen aktualisieren sich weiterhin automatisch.",
+            "Offset-Tasten speichern mit kurzem Debounce statt mit einem POST pro Tastendruck.",
+            "Offset-Speicherzugriffe werden pro Feld serialisiert, damit schnelle Eingaben nicht gegeneinander laufen.",
+            "Refresh- und Speicherzugriffe erhalten einfache In-Flight-Guards gegen überlappende Requests.",
+        ),
+        "tests": (
+            "Ventilator-Modus ändern und mindestens 5 Sekunden warten: Auswahl darf nicht zurückspringen.",
+            "Zeit-, Intervall- oder ENV-Felder ändern und auf einen Auto-Refresh warten: Eingaben müssen erhalten bleiben.",
+            "Temperatur- oder Feuchte-Sensor im Dropdown auswählen und länger als 10 Sekunden warten: Auswahl darf nicht zurückspringen.",
+            "Sensor-Offset mehrfach schnell mit + oder − verstellen: sichtbarer Wert muss direkt folgen und anschließend stabil gespeichert werden.",
+            "RAW-/Korrekturwerte und Hardware-/LIVE-Status müssen sich trotz aktiver Eingabe weiterhin automatisch aktualisieren.",
+            "/api/system/version meldet Version 3.6.4 und Build-Kennung 4R.",
+        ),
+    },
+    {
+        "version": "3.6.3",
+        "date": "2026-08-16",
+        "phase": "4Q.1",
+        "title": "Versionsanzeige ins Management Dashboard verschoben",
+        "summary": (
+            "Die Growstar-Version bleibt weiterhin direkt erreichbar, wird aber "
+            "nicht mehr dauerhaft über jeder Seite eingeblendet."
+        ),
+        "changes": (
+            "Globale schwebende Versionsanzeige aus base.html entfernt.",
+            "Version dezent direkt bei 'Management Dashboard' platziert.",
+            "NEU-Hinweis bleibt erhalten, bis die Patch-Information geöffnet wurde.",
+            "Patch-Historie, Test-Checkliste und Versions-API bleiben unverändert erhalten.",
+        ),
+        "tests": (
+            "Auf dem Management Dashboard steht dezent v3.6.3 neben der Überschrift.",
+            "Auf Grow Control, Energie und anderen Unterseiten erscheint keine dauerhafte Versionsanzeige mehr.",
+            "NEU erscheint auf dem Management Dashboard bei einer ungelesenen Version.",
+            "Nach Öffnen der Patch-Information verschwindet NEU beim nächsten Dashboard-Aufruf.",
+            "/api/system/version meldet Version 3.6.3 und Build-Kennung 4Q.1.",
+        ),
+    },
+    {
+        "version": "3.6.2",
+        "date": "2026-08-16",
+        "phase": "4Q",
+        "title": "Versions- und Patch-Informationssystem",
+        "summary": (
+            "Growstar zeigt seine Version jetzt dezent in der Oberfläche und "
+            "liefert zu jedem Update nachvollziehbare Änderungen und Testhinweise."
+        ),
+        "changes": (
+            "Zentrale Release-Datei als einzige Quelle für die Growstar-Version.",
+            "Dezenter Versions-Chip auf allen Seiten, die base.html verwenden.",
+            "NEU-Hinweis pro Browser, bis die Patch-Information geöffnet wurde.",
+            "Eigene Patch-Informationsseite mit Release-Historie.",
+            "Persistente Test-Checkliste pro Version im Browser.",
+            "Read-only API /api/system/version für Diagnose und Support.",
+            "Backend-Startlog zeigt die tatsächlich laufende Growstar-Version.",
+        ),
+        "tests": (
+            "Versions-Chip zeigt Growstar v3.6.2.",
+            "NEU erscheint nach dem Update und verschwindet nach Öffnen der Patch-Information.",
+            "Patch-Information zeigt die aktuelle Version und die Release-Historie.",
+            "Test-Checkboxen bleiben nach einem Neuladen im selben Browser erhalten.",
+            "/api/system/version meldet Version 3.6.2 und Build-Kennung 4Q.",
+        ),
+    },
+    {
+        "version": "3.6.1",
+        "date": "2026-08-16",
+        "phase": "4P",
+        "title": "Frei benennbare Universal-Aktoren",
+        "summary": (
+            "Vier sichere Zusatzgeräte wurden eingeführt. Der erste Slot heißt "
+            "standardmäßig Wasserpumpen und kann wie bestehende Aktoren gesteuert werden."
+        ),
+        "changes": (
+            "Vier stabile Zusatzgeräte aux1 bis aux4.",
+            "Frei wählbare Anzeigenamen pro Grow-Station.",
+            "Dauerbetrieb, Zeitsteuerung, Intervall und ENV-Regelung.",
+            "Integration in Dashboard, Verbindungen, Hardware, Watchdog und Energie.",
+            "Bestehende SHADOW-, LIVE-, Safety- und Hardware-Guards bleiben aktiv.",
+        ),
+        "tests": (
+            "Zusatzgerät im Design sichtbar schalten und frei benennen.",
+            "IP/Hostname und Relay unter Verbindungen zuordnen.",
+            "Intervallbetrieb prüfen.",
+            "ENV mit Temperatur und/oder Luftfeuchtigkeit prüfen.",
+            "Gerätenamen in Hardware, Watchdog und Energie kontrollieren.",
+        ),
+    },
+)
+
+
+def _display_date(value):
+    try:
+        return datetime.date.fromisoformat(str(value)).strftime("%d.%m.%Y")
+    except (TypeError, ValueError):
+        return str(value or "")
+
+
+def _copy_release(item):
+    result = deepcopy(dict(item))
+    result["changes"] = list(result.get("changes") or ())
+    result["tests"] = list(result.get("tests") or ())
+    result["date_label"] = _display_date(result.get("date"))
+    return result
+
+
+def current_release():
+    return _copy_release(RELEASES[0])
+
+
+def release_history():
+    return [_copy_release(item) for item in RELEASES]
+
+
+def release_summary():
+    current = RELEASES[0]
+    return {
+        "version": current["version"],
+        "release_date": current["date"],
+        "phase": current["phase"],
+        "title": current["title"],
+    }
+
+
+GROWSTAR_VERSION = RELEASES[0]["version"]
+GROWSTAR_RELEASE_DATE = RELEASES[0]["date"]
+GROWSTAR_INTERNAL_PHASE = RELEASES[0]["phase"]
