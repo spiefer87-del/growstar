@@ -98,7 +98,7 @@ def check_diagnostics():
         diag = BridgeDiagnostics(td, max_capture_bytes=300000)
         diag.configure(
             listen_host="127.0.0.1",
-            listen_port=8000,
+            listen_port=18883,
             upstream_host="sf.mqtt.spider-farmer.com",
             upstream_port=8883,
         )
