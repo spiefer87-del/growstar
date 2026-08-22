@@ -37,7 +37,13 @@ trap cleanup EXIT
 install -o root -g root -m 0644 "${TEMPLATE}" "${TMP_NEW}"
 
 echo "🔎 Prüfe neue Caddy-Konfiguration ..."
-"${CADDY_BIN}" validate --config "${TMP_NEW}" >/dev/null
+# TMP_NEW hat absichtlich keinen Dateisuffix. Ohne expliziten Adapter würde
+# `caddy validate` die Datei als JSON interpretieren und beim ersten ':' der
+# Caddyfile-Syntax mit "invalid character ':'" abbrechen.
+"${CADDY_BIN}" validate \
+    --adapter caddyfile \
+    --config "${TMP_NEW}" \
+    >/dev/null
 
 if [[ -f "${CADDYFILE}" ]]; then
     HAD_OLD=1
