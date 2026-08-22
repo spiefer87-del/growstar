@@ -24,7 +24,7 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=__SF_NETWORK_DIR__ /etc/NetworkManager/system-connections /run
+ReadWritePaths=__SF_NETWORK_DIR__ __GROWSTAR_DIR__/instance/secrets /etc/NetworkManager/system-connections /run
 RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
 
 [Install]
