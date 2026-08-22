@@ -15,6 +15,38 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.11.0",
+        "date": "2026-08-22",
+        "phase": "SF.1",
+        "title": "Spider-Farmer-Basis mit festem Geräte-Provisionierungsnetz",
+        "summary": (
+            "Growstar trennt das WLAN-Ziel für neue Geräte erstmals dauerhaft "
+            "vom aktuellen Raspberry-WLAN-Uplink. Das bestehende verifizierte "
+            "Heimnetz kann dadurch für Shelly-BLE-Provisionierung erhalten bleiben, "
+            "während wlan0 in der nächsten Spider-Farmer-Stufe als eigener GGS-"
+            "Access-Point verwendet wird. Gleichzeitig weicht die read-only "
+            "Spider-Farmer-Bridge vom belegten Gunicorn-Port 8000 auf 18883 aus."
+        ),
+        "changes": (
+            "services/network_secrets.py erweitert den bestehenden lokalen Secret-Store rückwärtskompatibel auf Schema v2 und speichert zusätzlich genau ein festes Geräte-Provisionierungsziel mit SSID, Security-Metadaten und Quelle; Passphrasen bleiben ausschließlich in den bestehenden Secret-Einträgen.",
+            "Bestehende Schema-v1-Dateien bleiben ohne manuelle Migration lesbar und werden erst bei einem legitimen Schreibvorgang atomar als v2 persistiert.",
+            "services/network.py migriert ein bereits verifiziert gespeichertes aktives Heim-WLAN einmalig als festes Provisionierungsziel; ein geschütztes WLAN ohne passendes Growstar-Secret wird niemals automatisch festgeschrieben.",
+            "current_wifi_provisioning_credentials verwendet nach gesetztem Ziel immer dessen SSID und Secret, unabhängig davon, ob der Raspberry später per Ethernet uplinkt, gar kein Client-WLAN besitzt oder wlan0 als Growstar-SF-Access-Point betreibt.",
+            "Die bestehende manuelle Verifikation unter System → Netzwerk setzt das verifizierte aktive WLAN nun ausdrücklich als Geräte-Provisionierungsziel; die SSID kommt weiterhin ausschließlich serverseitig und nicht aus dem Browser.",
+            "Der öffentliche Provisionierungsstatus enthält zusätzlich Ziel-/Uplink-Metadaten, aber weiterhin weder Passwort noch Passphrase; bestehende UI-Felder bleiben als Kompatibilitätsalias erhalten.",
+            "Die Shelly-Kette bleibt unverändert: BLE-Scan, BLE-RPC-Prüfung, Shelly.GetDeviceInfo, Wifi.SetConfig, LAN-MAC-Verifikation und HardwareManager werden nicht ersetzt oder parallel implementiert.",
+            "bridge/spiderfarmer/main.py und die systemd-Vorlage verwenden für den lokalen read-only Listener jetzt Port 18883 statt 8000, weil 127.0.0.1:8000 auf der realen Growstar-Installation bereits von Gunicorn belegt ist.",
+            "Der Spider-Farmer-Installer bleibt weiterhin ohne NetworkManager-, DNS-, Firewall-, NAT- oder Mosquitto-Mutation; der eigentliche GGS-Hotspot folgt erst in der nächsten abgesicherten Stufe.",
+        ),
+        "tests": (
+            "Die neue Regression check_provisioning_network_decoupling.py simuliert den 3.10.8-Bestand mit verifiziertem Heimnetz, migriert dieses Ziel und schaltet das gedachte Raspberry-WLAN anschließend auf Growstar-SF um.",
+            "Die Regression verlangt, dass neue Geräte weiterhin exakt Heimnetz-SSID und Heimnetz-Secret erhalten, selbst wenn wlan0 Growstar-SF meldet oder überhaupt kein Raspberry-Client-WLAN mehr aktiv ist.",
+            "Schema-v1-Lesbarkeit, Schema-v2-Persistenz, 0600-Dateirechte und secret-freier öffentlicher Status werden zusätzlich geprüft.",
+            "Die Spider-Farmer-Read-only-Regression prüft weiterhin, dass kein Command-Encoder und keine Netzwerk-/Mosquitto-Mutation vorhanden ist, und verwendet jetzt den konfliktfreien Listener-Port 18883.",
+            "Ausgangsbasis ist GitHub main b35c14a4c98409f0f94efa54714ad363dc07d95f mit Growstar 3.10.8 / Phase 4W.8 plus der bereits read-only eingecheckten SF.1-Brückengrundlage.",
+        ),
+    },
+    {
         "version": "3.10.8",
         "date": "2026-08-22",
         "phase": "4W.8",
