@@ -434,10 +434,10 @@ class="provisioning-results"></div>
 
 <div class="provisioning-note">
 
-Phase 4W.5 kann eindeutig neue Shellys nach erfolgreichem BLE-RPC-Preflight
-mit dem aktuell verbundenen Growstar-WLAN verbinden. Vor und nach dem Schreiben
-wird die Geräte-MAC geprüft; ein unklarer Schreibstatus wird niemals automatisch
-wiederholt. Bluetooth-Pairing ist für die Erstinbetriebnahme weiterhin nicht nötig.
+Phase 4W.6 verwendet für neue Shellys ausschließlich Growstars zentrales,
+lokal gespeichertes WLAN-Provisionierungs-Secret des aktuell verbundenen Raspberry-
+WLANs. Vor und nach dem Schreiben wird die Geräte-MAC geprüft; ein unklarer
+Schreibstatus wird niemals automatisch wiederholt.
 
 </div>
 
@@ -772,19 +772,9 @@ function renderProvisioningCandidates(candidates){
                     disabled>
                     WLAN-Erstinbetriebnahme
                 </button>
-                <div
-                    class="provisioning-secret"
-                    hidden>
-                    <div class="sub">
-                        NetworkManager kennt nur einen abgeleiteten Schlüssel.
-                        Bitte die echte Passphrase des aktuell verbundenen
-                        Growstar-WLANs einmalig eingeben.
-                    </div>
-                    <input
-                        class="provisioning-wifi-password"
-                        type="password"
-                        autocomplete="new-password"
-                        placeholder="WLAN-Passphrase">
+                <div class="sub">
+                    WLAN-Zugangsdaten kommen ausschließlich aus Growstars
+                    zentralem, lokalem Geräte-Provisionierungs-Secret.
                 </div>
                 <div
                     class="sub provisioning-wifi-status">
@@ -842,12 +832,6 @@ function renderProvisioningCandidates(candidates){
             const wifiStatus =
                 item.querySelector(".provisioning-wifi-status");
 
-            const passwordWrap =
-                item.querySelector(".provisioning-secret");
-
-            const passwordInput =
-                item.querySelector(".provisioning-wifi-password");
-
             if(preflightButton && preflightStatus){
 
                 preflightButton.addEventListener(
@@ -868,9 +852,7 @@ function renderProvisioningCandidates(candidates){
                     ()=>runProvisioningWifi(
                         candidate,
                         wifiButton,
-                        wifiStatus,
-                        passwordWrap,
-                        passwordInput
+                        wifiStatus
                     )
                 );
 
@@ -1005,9 +987,7 @@ async function runProvisioningPreflight(
 async function runProvisioningWifi(
     candidate,
     button,
-    status,
-    passwordWrap,
-    passwordInput
+    status
 ){
 
     if(
@@ -1059,11 +1039,6 @@ async function runProvisioningWifi(
                 "Growstar prüft Gerät und aktuelle WLAN-Verbindung erneut. " +
                 "Das Ziel-WLAN kann nicht vom Browser verändert werden.";
 
-            const password =
-                passwordInput
-                    ? passwordInput.value
-                    : "";
-
             response = await fetch(
                 "/api/hardware/provisioning/wifi",
                 {
@@ -1072,37 +1047,25 @@ async function runProvisioningWifi(
                         "Content-Type":"application/json"
                     },
                     body:JSON.stringify({
-                        address:candidate.address,
-                        password:password || undefined
+                        address:candidate.address
                     })
                 }
             );
-
-            if(passwordInput){
-
-                passwordInput.value = "";
-
-            }
 
         }
 
         const data =
             await response.json();
 
-        if(data.password_required){
+        if(data.network_secret_required){
 
-            if(passwordWrap){
-
-                passwordWrap.hidden = false;
-
-            }
-
-            status.textContent =
+            status.innerHTML =
                 "🔐 " +
-                (
+                escapeHtml(
                     data.error ||
-                    "Bitte die echte WLAN-Passphrase einmalig eingeben."
-                );
+                    "Zentrales WLAN-Provisionierungs-Secret fehlt."
+                ) +
+                ' <a href="/system/network">System → Netzwerk öffnen</a>';
 
             return;
 

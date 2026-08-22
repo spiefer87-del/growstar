@@ -79,15 +79,15 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     <div>
       <a href="/grow-control" class="back">← Grow Control</a>
       <h1>🌐 Netzwerk</h1>
-      <div class="sub">Phase 4S.3.5 · WLAN-Credential korrekt erkennen</div>
+      <div class="sub">Phase 4W.6 · zentraler Geräte-WLAN-Secret-Store</div>
     </div>
     <div class="badge"><span id="status-dot" class="dot"></span><span id="status-label">Lade …</span></div>
   </div>
 
   <div class="notice">
-    Growstar unterscheidet jetzt zwischen einer tatsächlich gespeicherten WLAN-Passphrase und einem bereits
-    abgeleiteten 64-stelligen WPA-Schlüssel. Nur eine echte Passphrase kann eingeblendet werden; ein abgeleiteter
-    PSK wird nicht als vermeintliches Originalpasswort dargestellt oder an den Browser übertragen.
+    Growstar speichert die echte Passphrase eines erfolgreich eingerichteten Raspberry-WLANs zusätzlich lokal als
+    zentrale Quelle für spätere Geräte-Provisionierung. Das Secret liegt nur unter <strong>instance/secrets</strong>,
+    wird niemals nach GitHub übernommen und niemals wieder über diese Status-API an den Browser ausgeliefert.
   </div>
 
   <div class="actions">
@@ -116,6 +116,36 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
         </div>
       </div>
       <div id="manage-warning" class="warning" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>Geräte-Provisionierungs-Secret</h2>
+      <div class="capability">
+        <span id="provision-secret-dot" class="dot"></span>
+        <div>
+          <strong id="provision-secret-label">Prüfe lokales WLAN-Secret …</strong>
+          <small id="provision-secret-detail">
+            Für neue Shellys, Pico-Sensoren und spätere WLAN-Geräte.
+          </small>
+        </div>
+      </div>
+      <div id="provision-secret-warning" class="warning" hidden></div>
+      <div id="provision-secret-form" class="field" hidden>
+        <label for="provision-secret-password">Passphrase des aktuell verbundenen WLANs</label>
+        <input
+          id="provision-secret-password"
+          type="password"
+          autocomplete="new-password"
+          autocapitalize="none"
+          spellcheck="false"
+        >
+        <div style="margin-top:9px;display:flex;justify-content:flex-end">
+          <button id="save-provision-secret-btn" type="button" class="primary">
+            Passphrase sicher hinterlegen
+          </button>
+        </div>
+        <div id="provision-secret-save-status" class="connect-status"></div>
+      </div>
     </section>
 
     <section class="card" style="grid-column:1/-1">
@@ -213,6 +243,96 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
   function passwordRequired(item){
     const security = String(item.security || "--").trim().toUpperCase();
     return !["", "--", "NONE", "OPEN"].includes(security);
+  }
+
+  function renderProvisioningSecret(data){
+    const dot = el("provision-secret-dot");
+    const label = el("provision-secret-label");
+    const detail = el("provision-secret-detail");
+    const warning = el("provision-secret-warning");
+    const form = el("provision-secret-form");
+    const input = el("provision-secret-password");
+
+    if(!data.wifi_connected){
+      dot.className = "dot warn";
+      label.textContent = "Kein aktives Raspberry-WLAN";
+      detail.textContent = "Sobald Growstar über WLAN verbunden ist, kann das Geräte-Secret verwaltet werden.";
+      warning.hidden = true;
+      form.hidden = true;
+      if(input) input.value = "";
+      return;
+    }
+
+    if(data.open_network){
+      dot.className = "dot ok";
+      label.textContent = `Offenes WLAN „${data.active_ssid || "--"}“`;
+      detail.textContent = "Für dieses aktive WLAN wird keine Passphrase zur Geräte-Provisionierung benötigt.";
+      warning.hidden = true;
+      form.hidden = true;
+      if(input) input.value = "";
+      return;
+    }
+
+    if(data.stored_for_active){
+      dot.className = "dot ok";
+      label.textContent = `Provisionierungs-Secret für „${data.active_ssid || "--"}“ vorhanden`;
+      detail.textContent = "Neue WLAN-Geräte können dieses Secret serverseitig verwenden. Die Passphrase wird hier nicht angezeigt.";
+      warning.hidden = true;
+      form.hidden = true;
+      if(input) input.value = "";
+      return;
+    }
+
+    dot.className = "dot warn";
+    label.textContent = `Provisionierungs-Secret für „${data.active_ssid || "--"}“ fehlt`;
+      detail.textContent = "Die einmalige Eingabe wird zuerst gegen das aktive NetworkManager-Profil geprüft und erst danach lokal gespeichert.";
+    warning.hidden = false;
+    warning.textContent = "Ohne passendes Secret bleibt die WLAN-Erstinbetriebnahme neuer Geräte gesperrt.";
+    form.hidden = false;
+  }
+
+  async function saveProvisioningSecret(){
+    const input = el("provision-secret-password");
+    const button = el("save-provision-secret-btn");
+    const status = el("provision-secret-save-status");
+    const password = input.value;
+
+    if(!password){
+      status.innerHTML = '<span class="error">Bitte die WLAN-Passphrase eingeben.</span>';
+      return;
+    }
+
+    button.disabled = true;
+    status.textContent = "Passphrase wird gegen das aktive Raspberry-WLAN geprüft …";
+
+    try{
+      const response = await fetch("/system/network/provisioning-secret", {
+        method:"POST",
+        headers:{
+          "Accept":"application/json",
+          "Content-Type":"application/json",
+          "X-CSRF-Token":csrfToken,
+        },
+        cache:"no-store",
+        body:JSON.stringify({password:password}),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      input.value = "";
+
+      if(!response.ok || !data.success){
+        throw new Error(data.error || `HTTP ${response.status}`);
+      }
+
+      renderProvisioningSecret(data);
+      status.innerHTML = '<span class="success">✅ Passphrase verifiziert und lokal für Geräte-Provisionierung gespeichert.</span>';
+
+    }catch(error){
+      input.value = "";
+      status.innerHTML = `<span class="error">${esc(error.message || "Passphrase konnte nicht gespeichert werden.")}</span>`;
+    }finally{
+      button.disabled = false;
+    }
   }
 
   function renderStatus(data){
@@ -607,15 +727,17 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
     if(forceWifiScan) btn.textContent = "⌛ Scan läuft …";
 
     try{
-      const [status, wifi, capabilities] = await Promise.all([
+      const [status, wifi, capabilities, provisioningSecret] = await Promise.all([
         readJson("/api/config/network/status"),
         readJson(forceWifiScan ? "/api/config/network/wifi?refresh=1" : "/api/config/network/wifi"),
         readJson("/api/config/network/capabilities"),
+        readJson("/api/config/network/provisioning-secret"),
       ]);
 
       renderStatus(status);
       renderWifi(wifi);
       renderCapabilities(capabilities);
+      renderProvisioningSecret(provisioningSecret);
 
     }catch(error){
       el("status-dot").className = "dot bad";
@@ -654,6 +776,7 @@ button.primary{background:rgba(34,197,94,.13);border-color:rgba(34,197,94,.35);c
 
   el("cancel-connect-btn").addEventListener("click", closeDialog);
   el("confirm-connect-btn").addEventListener("click", connectSelected);
+  el("save-provision-secret-btn").addEventListener("click", saveProvisioningSecret);
   el("refresh-btn").addEventListener("click", () => refresh(true));
 
   el("wifi-dialog-backdrop").addEventListener("click", event => {
