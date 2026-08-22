@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar 3.10.5 / Phase 4W.5 Regression.
+"""Growstar 3.10.6 / Phase 4W.6 Shelly-WLAN-Regression.
 
 Keine echte BLE- oder WLAN-Mutation.
 """
@@ -508,32 +508,14 @@ def load_service_with_stubs():
         FakeNetworkError
     )
 
-    fake_network_module._active_wifi_snapshot = (
+    fake_network_module.current_wifi_provisioning_credentials = (
         lambda: {
-            "ssid": "Growstar-Test"
-        }
-    )
-
-    fake_network_module.get_current_wifi_password = (
-        lambda _ssid: {
             "success": True,
             "ssid": "Growstar-Test",
             "credential_type": "passphrase",
-            "revealable": True,
+            "credential_source": "growstar_secret_store",
+            "password_required": False,
             "password": "test-passphrase",
-        }
-    )
-
-    fake_network_module.wifi_scan = (
-        lambda force=False: {
-            "success": True,
-            "networks": [
-                {
-                    "ssid": "Growstar-Test",
-                    "security": "WPA2",
-                    "hidden": False,
-                }
-            ],
         }
     )
 
@@ -543,28 +525,13 @@ def load_service_with_stubs():
 
     return load(
         "services/shelly_provisioning.py",
-        "growstar_shelly_service_4w5_test",
+        "growstar_shelly_service_4w6_test",
     )
 
 
 def test_state_and_credentials():
 
     service = load_service_with_stubs()
-
-    wifi = (
-        service.current_wifi_credentials()
-    )
-
-    require(
-        wifi.get("ssid")
-        == "Growstar-Test"
-        and wifi.get("password")
-        == "test-passphrase"
-        and not wifi.get(
-            "password_required"
-        ),
-        "Aktuelles Growstar-WLAN wird serverseitig inklusive rücklesbarer Passphrase aufgelöst",
-    )
 
     with tempfile.TemporaryDirectory() as temp:
 
@@ -668,6 +635,34 @@ def main():
     )
 
     require(
+        "current_wifi_provisioning_credentials"
+        in service_source
+        and "password_override"
+        not in service_source
+        and "_active_wifi_snapshot"
+        not in service_source,
+        "Shelly-Workflow bezieht WLAN-Credentials ausschließlich aus der zentralen Netzwerkquelle",
+    )
+
+    require(
+        "network_secret_required"
+        in service_source
+        and 'data.get("password")'
+        not in routes,
+        "Hardware-API akzeptiert kein separates Shelly-WLAN-Passwort mehr",
+    )
+
+    require(
+        "provisioning-wifi-password"
+        not in template
+        and "System → Netzwerk öffnen"
+        in template
+        and "zentrale"
+        in template.lower(),
+        "Hardware-UI verweist bei fehlendem Secret auf die zentrale Netzwerkverwaltung",
+    )
+
+    require(
         "Switch.Set"
         not in helper_source
         and "Shelly.FactoryReset"
@@ -728,32 +723,32 @@ def main():
         in template
         and "/api/hardware/provisioning/verify"
         in template,
-        "Hardware-UI besitzt den kontrollierten Phase-4W.5-Setupfluss",
+        "Hardware-UI besitzt den kontrollierten Phase-4W.6-Setupfluss",
     )
 
     release = load(
         "core/release.py",
-        "growstar_release_4w5_test",
+        "growstar_release_4w6_test",
     )
 
     require(
         release.GROWSTAR_VERSION
-        == "3.10.5"
+        == "3.10.6"
         and release.GROWSTAR_INTERNAL_PHASE
-        == "4W.5",
-        "Growstar meldet Version 3.10.5 / Phase 4W.5",
+        == "4W.6",
+        "Growstar meldet Version 3.10.6 / Phase 4W.6",
     )
 
     require(
         release.RELEASES[
             1
         ]["version"]
-        == "3.10.4"
+        == "3.10.5"
         and release.RELEASES[
             1
         ]["phase"]
-        == "4W.4",
-        "Phase 4W.4 bleibt direkt in der Patch-Historie erhalten",
+        == "4W.5",
+        "Phase 4W.5 bleibt direkt in der Patch-Historie erhalten",
     )
 
     asyncio.run(
@@ -763,7 +758,7 @@ def main():
     test_state_and_credentials()
 
     print(
-        "✅ Phase 4W.5 sichere Shelly-WLAN-Erstinbetriebnahme vollständig"
+        "✅ Phase 4W.6 zentrale Shelly-WLAN-Erstinbetriebnahme vollständig"
     )
 
 
