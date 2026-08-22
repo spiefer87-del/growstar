@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar 3.10.7 / Phase 4W.7 Shelly-WLAN-Regression.
+"""Growstar 3.10.8 / Phase 4W.8 Shelly-WLAN-Regression.
 
 Keine echte BLE- oder WLAN-Mutation.
 """
@@ -114,12 +114,14 @@ class FakeRpcClient:
         *,
         mac="A1B2C3D4E5F6",
         provision="pending",
+        include_provision=True,
         delayed_rx=False,
         unrelated_frame_once=False,
         mtu_size=23,
     ):
         self.mac = mac
         self.provision = provision
+        self.include_provision = include_provision
         self.rx_zero_once = delayed_rx
         self.unrelated_frame_once = unrelated_frame_once
         self.mtu_size = mtu_size
@@ -194,8 +196,13 @@ class FakeRpcClient:
                     "id": "shelly-test-a1b2c3d4e5f6",
                     "mac": self.mac,
                     "model": "S4PL-00416EU",
-                    "provision": self.provision,
+                    "ver": "1.6.99-test",
                 }
+
+                if self.include_provision:
+                    result["provision"] = (
+                        self.provision
+                    )
 
             elif (
                 request["method"]
@@ -462,6 +469,40 @@ async def test_ble_helper():
             "Shelly.GetDeviceInfo"
         ],
         "Secure-Provisioning locked blockiert Wifi.SetConfig",
+    )
+
+    no_provision_field = FakeRpcClient(
+        include_provision=False
+    )
+
+    no_provision_result = (
+        await helper._provision_with_client(
+            no_provision_field,
+            dict(request),
+        )
+    )
+
+    require(
+        no_provision_result.get("success")
+        is True
+        and no_provision_result.get(
+            "provision_before"
+        )
+        == helper.PROVISIONING_STATE_NOT_REPORTED,
+        "Fehlendes provision-Feld wird als nicht gemeldet behandelt statt fälschlich blockiert",
+    )
+
+    require(
+        [
+            item["method"]
+            for item
+            in no_provision_field.requests
+        ]
+        == [
+            "Shelly.GetDeviceInfo",
+            "Wifi.SetConfig",
+        ],
+        "Fehlendes provision-Feld lässt den bestehenden Wifi.SetConfig-Pfad zu",
     )
 
 
@@ -786,22 +827,22 @@ def main():
 
     require(
         release.GROWSTAR_VERSION
-        == "3.10.7"
+        == "3.10.8"
         and release.GROWSTAR_INTERNAL_PHASE
-        == "4W.7",
-        "Growstar meldet Version 3.10.7 / Phase 4W.7",
+        == "4W.8",
+        "Growstar meldet Version 3.10.8 / Phase 4W.8",
     )
 
     require(
         release.RELEASES[
             1
         ]["version"]
-        == "3.10.6"
+        == "3.10.7"
         and release.RELEASES[
             1
         ]["phase"]
-        == "4W.6",
-        "Phase 4W.6 bleibt direkt in der Patch-Historie erhalten",
+        == "4W.7",
+        "Phase 4W.7 bleibt direkt in der Patch-Historie erhalten",
     )
 
     asyncio.run(
@@ -811,7 +852,7 @@ def main():
     test_state_and_credentials()
 
     print(
-        "✅ Phase 4W.7 robuster Shelly-BLE-RPC-Provisionierungspfad vollständig"
+        "✅ Phase 4W.8 Shelly-Provisionierungsstate-Kompatibilität vollständig"
     )
 
 
