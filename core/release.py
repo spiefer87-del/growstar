@@ -15,6 +15,38 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.11.2",
+        "date": "2026-08-22",
+        "phase": "SF.2A",
+        "title": "Spider-Farmer-GGS als native Growstar-Sensorquelle",
+        "summary": (
+            "Der in SF.2 normalisierte Spider-Farmer-GGS-Zustand wird jetzt "
+            "read-only in Growstars bestehende controller-weite Sensorquellen-"
+            "Architektur übernommen. Temperatur und Luftfeuchte des GGS können "
+            "dadurch über den bereits vorhandenen SENSOR_ASSIGNMENTS-Pfad wie "
+            "Pico-, MQTT- oder Shelly-BLU-Sensoren einer Grow-Station zugeordnet "
+            "werden, ohne einen parallelen Regelkreis oder einen neuen MQTT-"
+            "Commandpfad einzuführen."
+        ),
+        "changes": (
+            "services/spiderfarmer.py liest ausschließlich instance/spiderfarmer/spiderfarmer_state.json aus der bestehenden SF.2-Bridge und erzeugt daraus eine stabile Quelle spiderfarmer:<controller-id>:environment.",
+            "Der Adapter übernimmt GGS-Temperatur und Luftfeuchte in core.sensor_sources; VPD und Tag-/Nacht-Metadaten bleiben als normalisierte Zusatzdaten erhalten.",
+            "Ein unveränderter Bridge-last_seen-Zeitstempel wird nicht erneut veröffentlicht, damit ein ausgefallener GGS niemals durch lokales Polling künstlich frisch gehalten wird.",
+            "Beschädigte, fehlende oder unvollständige Spider-Farmer-State-Dateien fallen fail-closed auf einen leeren read-only Zustand zurück und können den bestehenden Hardware-Thread nicht beenden.",
+            "threads/hardware.py verwendet den bestehenden 30-Sekunden-Hardware-Poll zusätzlich für den read-only Spider-Farmer-Sensor-Sync; Shelly-, Pico-, MQTT-, Actuator-Health- und Inventory-Pfade bleiben unverändert.",
+            "Der Spider-Farmer-Adapter enthält keinen Socket-, MQTT-Encoder-, setConfigField- oder anderen Command-Sendepfad; SF.2A bleibt vollständig read-only.",
+            "Die vorhandene Sensorquellen-/Stationszuordnung muss nicht erweitert werden: sobald der GGS mindestens einen echten Sensorstand geliefert hat, erscheint die Quelle über die bestehende Sensorquellen-API und kann pro Zelt ausgewählt werden.",
+        ),
+        "tests": (
+            "check_spiderfarmer_growstar_adapter.py simuliert einen echten SF.2-GGS-State mit Temperatur, Luftfeuchte, VPD, Licht, Fan und Blower.",
+            "Die Regression verlangt eine stabile spiderfarmer:<id>:environment-Quellen-ID sowie unveränderte Temperatur-/Feuchtewerte.",
+            "Ein identischer last_seen-Wert darf update_sensor_source kein zweites Mal aufrufen; erst ein neuer echter Bridge-Zeitstempel darf die Quelle erneut frisch markieren.",
+            "Beschädigte JSON-State-Dateien müssen sicher als leerer read-only Zustand behandelt werden.",
+            "Statische Guards verbieten Netzwerk-/Commandpfade im SF.2A-Adapter und bestätigen den unveränderten 30-Sekunden-Hardware-Poll.",
+            "Die bestehenden SF.1-/SF.2-Regressionen bleiben zusätzlich auszuführen.",
+        ),
+    },
+    {
         "version": "3.11.1",
         "date": "2026-08-22",
         "phase": "SF.1N",
