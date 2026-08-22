@@ -645,7 +645,12 @@ def _current_wifi_security(ssid):
 
 
 def _security_is_open(security):
-    return str(security or "").strip().upper() in {
+    # ``None`` bedeutet: Security konnte gerade nicht ermittelt werden.
+    # Unbekannt darf niemals als offenes WLAN interpretiert werden.
+    if security is None:
+        return False
+
+    return str(security).strip().upper() in {
         "",
         "--",
         "NONE",
@@ -834,7 +839,6 @@ def get_current_wifi_password(ssid):
         response["password"] = password
 
     return response
-
 def verify_current_wifi_password(ssid, password):
     """Prüft eine Passphrase im privilegierten Helper, ohne Secrets zu lesen."""
 
@@ -884,55 +888,215 @@ def verify_current_wifi_password(ssid, password):
     }
 
 
-def network_provisioning_secret_status():
-    """Öffentlicher Status ohne Passphrase für das aktive Raspberry-WLAN."""
+def _provisioning_target_or_migrate(snapshot=None):
+    """Liefert das feste Geräte-WLAN oder migriert den sicheren Altzustand.
 
-    snapshot = _active_wifi_snapshot()
+    Die automatische Migration ist absichtlich eng: Bei geschützten WLANs wird
+    nur dann ein Ziel festgeschrieben, wenn für genau die aktive SSID bereits
+    ein verifiziertes Growstar-Secret existiert. Dadurch kann ein späterer
+    Spider-Farmer-AP nicht versehentlich zum Shelly-Provisionierungsziel werden.
+    """
+
+    target = network_secret_store.provisioning_target()
+
+    if target:
+        return target
+
+    if snapshot is None:
+        snapshot = _active_wifi_snapshot()
 
     if not snapshot or not snapshot.get("ssid"):
+        return None
+
+    ssid = _validate_ssid(snapshot.get("ssid"))
+    security = _current_wifi_security(ssid)
+    open_network = _security_is_open(security)
+
+    if not open_network and not network_secret_store.get(ssid):
+        return None
+
+    return network_secret_store.ensure_provisioning_target(
+        ssid,
+        security=security,
+        open_network=open_network,
+        source="legacy_active_wifi_migration",
+    )
+
+
+def network_provisioning_secret_status():
+    """Öffentlicher Status des festen Geräte-Provisionierungs-WLANs.
+
+    ``active_ssid`` und ``stored_for_active`` bleiben als Kompatibilitätsfelder
+    erhalten und beziehen sich nach gesetztem Ziel auf das Geräte-WLAN. Der
+    tatsächliche aktuelle Raspberry-WLAN-Uplink wird zusätzlich separat
+    ausgewiesen.
+    """
+
+    snapshot = _active_wifi_snapshot()
+    raspberry_ssid = None
+
+    if snapshot and snapshot.get("ssid"):
+        raspberry_ssid = _validate_ssid(
+            snapshot.get("ssid")
+        )
+
+    target = _provisioning_target_or_migrate(
+        snapshot
+    )
+
+    if target:
+        target_ssid = _validate_ssid(
+            target.get("ssid")
+        )
+        stored = network_secret_store.status(
+            target_ssid
+        )
+        open_network = bool(
+            target.get("open_network")
+        )
+        stored_for_target = (
+            True
+            if open_network
+            else bool(
+                stored.get(
+                    "stored_for_active"
+                )
+            )
+        )
+
+        return {
+            "success": True,
+            # Kompatibilitätsalias für die bestehende Netzwerk-UI.
+            "active_ssid": target_ssid,
+            "wifi_connected": True,
+            "security": (
+                target.get("security")
+                or "--"
+            ),
+            "open_network": open_network,
+            "secret_required": (
+                not open_network
+            ),
+            "stored_for_active": stored_for_target,
+            "stored_count": stored.get(
+                "stored_count",
+                0,
+            ),
+            "source": (
+                stored.get("source")
+                or target.get("source")
+            ),
+            "updated_at": (
+                stored.get("updated_at")
+                or target.get("updated_at")
+            ),
+            "secret_path": stored.get(
+                "secret_path"
+            ),
+            "provisioning_target_set": True,
+            "provisioning_ssid": target_ssid,
+            "provisioning_security": (
+                target.get("security")
+                or "--"
+            ),
+            "provisioning_open_network": open_network,
+            "provisioning_source": target.get(
+                "source"
+            ),
+            "provisioning_updated_at": target.get(
+                "updated_at"
+            ),
+            "stored_for_provisioning": stored_for_target,
+            "raspberry_wifi_connected": bool(
+                raspberry_ssid
+            ),
+            "raspberry_active_ssid": raspberry_ssid,
+            "target_connected": (
+                raspberry_ssid
+                == target_ssid
+            ),
+        }
+
+    if not raspberry_ssid:
         stored = network_secret_store.status()
+
         return {
             "success": True,
             "active_ssid": None,
             "wifi_connected": False,
             "secret_required": False,
             "stored_for_active": False,
-            "stored_count": stored.get("stored_count", 0),
+            "stored_count": stored.get(
+                "stored_count",
+                0,
+            ),
             "source": None,
             "updated_at": None,
-            "secret_path": stored.get("secret_path"),
+            "secret_path": stored.get(
+                "secret_path"
+            ),
+            "provisioning_target_set": False,
+            "provisioning_ssid": None,
+            "stored_for_provisioning": False,
+            "raspberry_wifi_connected": False,
+            "raspberry_active_ssid": None,
+            "target_connected": False,
         }
 
-    ssid = _validate_ssid(snapshot.get("ssid"))
-    security = _current_wifi_security(ssid)
-    open_network = _security_is_open(security)
-    stored = network_secret_store.status(ssid)
+    security = _current_wifi_security(
+        raspberry_ssid
+    )
+    open_network = _security_is_open(
+        security
+    )
+    stored = network_secret_store.status(
+        raspberry_ssid
+    )
 
     return {
         "success": True,
-        "active_ssid": ssid,
+        "active_ssid": raspberry_ssid,
         "wifi_connected": True,
         "security": security,
         "open_network": open_network,
-        "secret_required": not open_network,
+        "secret_required": (
+            not open_network
+        ),
         "stored_for_active": (
             True
             if open_network
-            else bool(stored.get("stored_for_active"))
+            else bool(
+                stored.get(
+                    "stored_for_active"
+                )
+            )
         ),
-        "stored_count": stored.get("stored_count", 0),
+        "stored_count": stored.get(
+            "stored_count",
+            0,
+        ),
         "source": stored.get("source"),
-        "updated_at": stored.get("updated_at"),
-        "secret_path": stored.get("secret_path"),
+        "updated_at": stored.get(
+            "updated_at"
+        ),
+        "secret_path": stored.get(
+            "secret_path"
+        ),
+        "provisioning_target_set": False,
+        "provisioning_ssid": None,
+        "stored_for_provisioning": False,
+        "raspberry_wifi_connected": True,
+        "raspberry_active_ssid": raspberry_ssid,
+        "target_connected": False,
     }
 
 
 def save_current_wifi_provisioning_secret(password):
-    """Verifiziert und speichert die Passphrase des AKTIVEN WLANs.
+    """Verifiziert das AKTIVE WLAN und legt es als Geräte-WLAN fest.
 
-    Die SSID kommt absichtlich nicht aus dem Browser. Der privilegierte Helper
-    vergleicht die eingegebene Passphrase mit NetworkManagers aktivem Profil.
-    Erst bei gültigem Treffer wird lokal gespeichert.
+    Die SSID kommt weiterhin nicht aus dem Browser. Nach erfolgreicher
+    Verifikation wird sie zusätzlich explizit als dauerhaftes
+    Provisionierungsziel gespeichert.
     """
 
     snapshot = _active_wifi_snapshot()
@@ -942,11 +1106,26 @@ def save_current_wifi_provisioning_secret(password):
             "Growstar ist aktuell mit keinem verwalteten WLAN verbunden"
         )
 
-    ssid = _validate_ssid(snapshot.get("ssid"))
-    security = _current_wifi_security(ssid)
+    ssid = _validate_ssid(
+        snapshot.get("ssid")
+    )
+    security = _current_wifi_security(
+        ssid
+    )
+    open_network = _security_is_open(
+        security
+    )
 
-    if _security_is_open(security):
-        network_secret_store.remove(ssid)
+    if open_network:
+        network_secret_store.remove(
+            ssid
+        )
+        network_secret_store.set_provisioning_target(
+            ssid,
+            security=security,
+            open_network=True,
+            source="manual_verified_open",
+        )
         return network_provisioning_secret_status()
 
     verification = verify_current_wifi_password(
@@ -959,12 +1138,22 @@ def save_current_wifi_provisioning_secret(password):
             "Die eingegebene Passphrase stimmt nicht mit dem aktuell verbundenen WLAN überein"
         )
 
-    secret = "" if password is None else str(password)
+    secret = (
+        ""
+        if password is None
+        else str(password)
+    )
 
     try:
         network_secret_store.save(
             ssid,
             secret,
+            source="manual_verified",
+        )
+        network_secret_store.set_provisioning_target(
+            ssid,
+            security=security,
+            open_network=False,
             source="manual_verified",
         )
     finally:
@@ -974,19 +1163,144 @@ def save_current_wifi_provisioning_secret(password):
 
 
 def current_wifi_provisioning_credentials():
-    """Zentrale serverseitige Quelle für spätere Geräte-Provisionierung."""
+    """Zentrale serverseitige Quelle für spätere Geräte-Provisionierung.
 
+    Ein festes Provisionierungsziel hat Vorrang vor dem aktuell verwendeten
+    Raspberry-WLAN. Damit kann ``wlan0`` später den Spider-Farmer-AP tragen,
+    während neue Shellys weiterhin das verifizierte Heim-WLAN erhalten.
+    """
+
+    target = network_secret_store.provisioning_target()
+
+    if target:
+        ssid = _validate_ssid(
+            target.get("ssid")
+        )
+
+        if bool(
+            target.get("open_network")
+        ):
+            return {
+                "success": True,
+                "ssid": ssid,
+                "password": "",
+                "password_required": False,
+                "credential_type": "open",
+                "credential_source": "provisioning_target_open",
+                "provisioning_target": True,
+            }
+
+        secret = network_secret_store.get(
+            ssid
+        )
+
+        if secret:
+            return {
+                "success": True,
+                "ssid": ssid,
+                "password": secret,
+                "password_required": False,
+                "credential_type": "passphrase",
+                "credential_source": "growstar_secret_store",
+                "provisioning_target": True,
+            }
+
+        # Nur wenn genau das Ziel-WLAN aktuell verbunden ist, darf der
+        # bestehende privilegierte NetworkManager-Import noch helfen.
+        snapshot = _active_wifi_snapshot()
+        active_ssid = (
+            _validate_ssid(
+                snapshot.get("ssid")
+            )
+            if snapshot
+            and snapshot.get("ssid")
+            else None
+        )
+
+        if active_ssid == ssid:
+            stored = get_current_wifi_password(
+                ssid
+            )
+
+            if stored.get("revealable"):
+                secret = stored.get(
+                    "password"
+                )
+
+                if (
+                    not isinstance(
+                        secret,
+                        str,
+                    )
+                    or not secret
+                ):
+                    raise NetworkChangeError(
+                        "NetworkManager meldet eine Passphrase, liefert sie aber nicht"
+                    )
+
+                network_secret_store.save(
+                    ssid,
+                    secret,
+                    source="networkmanager_import",
+                )
+
+                return {
+                    "success": True,
+                    "ssid": ssid,
+                    "password": secret,
+                    "password_required": False,
+                    "credential_type": "passphrase",
+                    "credential_source": "networkmanager_import",
+                    "provisioning_target": True,
+                }
+
+            credential_type = (
+                stored.get(
+                    "credential_type"
+                )
+                or "unknown"
+            )
+        else:
+            credential_type = (
+                "missing_provisioning_secret"
+            )
+
+        return {
+            "success": True,
+            "ssid": ssid,
+            "password": None,
+            "password_required": True,
+            "credential_type": credential_type,
+            "credential_source": None,
+            "provisioning_target": True,
+        }
+
+    # Rückwärtskompatible einmalige Migration aus Growstar <= 3.10.8.
     snapshot = _active_wifi_snapshot()
 
     if not snapshot or not snapshot.get("ssid"):
         raise NetworkChangeError(
-            "Growstar ist aktuell mit keinem verwalteten WLAN verbunden"
+            "Kein Geräte-Provisionierungs-WLAN festgelegt und Growstar ist aktuell mit keinem verwalteten WLAN verbunden"
         )
 
-    ssid = _validate_ssid(snapshot.get("ssid"))
-    security = _current_wifi_security(ssid)
+    ssid = _validate_ssid(
+        snapshot.get("ssid")
+    )
+    security = _current_wifi_security(
+        ssid
+    )
+    open_network = _security_is_open(
+        security
+    )
 
-    if _security_is_open(security):
+    if open_network:
+        network_secret_store.ensure_provisioning_target(
+            ssid,
+            security=security,
+            open_network=True,
+            source="legacy_active_wifi_migration",
+        )
+
         return {
             "success": True,
             "ssid": ssid,
@@ -994,11 +1308,21 @@ def current_wifi_provisioning_credentials():
             "password_required": False,
             "credential_type": "open",
             "credential_source": "open_network",
+            "provisioning_target": True,
         }
 
-    secret = network_secret_store.get(ssid)
+    secret = network_secret_store.get(
+        ssid
+    )
 
     if secret:
+        network_secret_store.ensure_provisioning_target(
+            ssid,
+            security=security,
+            open_network=False,
+            source="legacy_active_wifi_migration",
+        )
+
         return {
             "success": True,
             "ssid": ssid,
@@ -1006,14 +1330,20 @@ def current_wifi_provisioning_credentials():
             "password_required": False,
             "credential_type": "passphrase",
             "credential_source": "growstar_secret_store",
+            "provisioning_target": True,
         }
 
-    stored = get_current_wifi_password(ssid)
+    stored = get_current_wifi_password(
+        ssid
+    )
 
     if stored.get("revealable"):
         secret = stored.get("password")
 
-        if not isinstance(secret, str) or not secret:
+        if (
+            not isinstance(secret, str)
+            or not secret
+        ):
             raise NetworkChangeError(
                 "NetworkManager meldet eine Passphrase, liefert sie aber nicht"
             )
@@ -1021,6 +1351,12 @@ def current_wifi_provisioning_credentials():
         network_secret_store.save(
             ssid,
             secret,
+            source="networkmanager_import",
+        )
+        network_secret_store.ensure_provisioning_target(
+            ssid,
+            security=security,
+            open_network=False,
             source="networkmanager_import",
         )
 
@@ -1031,6 +1367,7 @@ def current_wifi_provisioning_credentials():
             "password_required": False,
             "credential_type": "passphrase",
             "credential_source": "networkmanager_import",
+            "provisioning_target": True,
         }
 
     return {
@@ -1038,7 +1375,10 @@ def current_wifi_provisioning_credentials():
         "ssid": ssid,
         "password": None,
         "password_required": True,
-        "credential_type": stored.get("credential_type") or "unknown",
+        "credential_type": (
+            stored.get("credential_type")
+            or "unknown"
+        ),
         "credential_source": None,
+        "provisioning_target": False,
     }
-
