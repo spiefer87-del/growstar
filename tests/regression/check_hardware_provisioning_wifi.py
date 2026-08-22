@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar 3.10.6 / Phase 4W.6 Shelly-WLAN-Regression.
+"""Growstar 3.10.7 / Phase 4W.7 Shelly-WLAN-Regression.
 
 Keine echte BLE- oder WLAN-Mutation.
 """
@@ -86,12 +86,20 @@ class DummyBleakClient:
     pass
 
 
+class DummyBleakScanner:
+    pass
+
+
 fake_bleak = types.ModuleType(
     "bleak"
 )
 
 fake_bleak.BleakClient = (
     DummyBleakClient
+)
+
+fake_bleak.BleakScanner = (
+    DummyBleakScanner
 )
 
 sys.modules[
@@ -107,16 +115,19 @@ class FakeRpcClient:
         mac="A1B2C3D4E5F6",
         provision="pending",
         delayed_rx=False,
+        unrelated_frame_once=False,
         mtu_size=23,
     ):
         self.mac = mac
         self.provision = provision
         self.rx_zero_once = delayed_rx
+        self.unrelated_frame_once = unrelated_frame_once
         self.mtu_size = mtu_size
 
         self.expected_len = None
         self.request_bytes = b""
         self.response_bytes = b""
+        self.response_queue = []
 
         self.requests = []
         self.data_write_chunks = []
@@ -211,6 +222,27 @@ class FakeRpcClient:
                 "utf-8"
             )
 
+            if self.unrelated_frame_once:
+                self.unrelated_frame_once = False
+
+                self.response_queue.append(
+                    self.response_bytes
+                )
+
+                self.response_bytes = json.dumps(
+                    {
+                        "src": "shelly-test",
+                        "dst": "growstar",
+                        "method": "NotifyEvent",
+                        "params": {
+                            "events": []
+                        },
+                    },
+                    separators=(",", ":"),
+                ).encode(
+                    "utf-8"
+                )
+
             return
 
         raise AssertionError(
@@ -235,6 +267,14 @@ class FakeRpcClient:
                 return struct.pack(
                     ">I",
                     0,
+                )
+
+            if (
+                not self.response_bytes
+                and self.response_queue
+            ):
+                self.response_bytes = (
+                    self.response_queue.pop(0)
                 )
 
             return struct.pack(
@@ -284,6 +324,7 @@ async def test_ble_helper():
 
     client = FakeRpcClient(
         delayed_rx=True,
+        unrelated_frame_once=True,
         mtu_size=23,
     )
 
@@ -361,6 +402,10 @@ async def test_ble_helper():
 
     ok(
         "RX-Control 0 wird abgewartet statt als leere Antwort gewertet"
+    )
+
+    ok(
+        "Asynchrones NotifyEvent wird ignoriert und die passende RPC-ID weiter abgewartet"
     )
 
     mismatch = FakeRpcClient(
@@ -663,6 +708,14 @@ def main():
     )
 
     require(
+        "find_device_by_address"
+        in helper_source
+        and "elif result is None:\n                    raise"
+        not in helper_source,
+        "BLE-Helper löst das Gerät frisch auf und lässt Disconnect-EOFError den RPC-Fehler nicht maskieren",
+    )
+
+    require(
         "Switch.Set"
         not in helper_source
         and "Shelly.FactoryReset"
@@ -733,22 +786,22 @@ def main():
 
     require(
         release.GROWSTAR_VERSION
-        == "3.10.6"
+        == "3.10.7"
         and release.GROWSTAR_INTERNAL_PHASE
-        == "4W.6",
-        "Growstar meldet Version 3.10.6 / Phase 4W.6",
+        == "4W.7",
+        "Growstar meldet Version 3.10.7 / Phase 4W.7",
     )
 
     require(
         release.RELEASES[
             1
         ]["version"]
-        == "3.10.5"
+        == "3.10.6"
         and release.RELEASES[
             1
         ]["phase"]
-        == "4W.5",
-        "Phase 4W.5 bleibt direkt in der Patch-Historie erhalten",
+        == "4W.6",
+        "Phase 4W.6 bleibt direkt in der Patch-Historie erhalten",
     )
 
     asyncio.run(
@@ -758,7 +811,7 @@ def main():
     test_state_and_credentials()
 
     print(
-        "✅ Phase 4W.6 zentrale Shelly-WLAN-Erstinbetriebnahme vollständig"
+        "✅ Phase 4W.7 robuster Shelly-BLE-RPC-Provisionierungspfad vollständig"
     )
 
 
