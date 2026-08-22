@@ -47,7 +47,7 @@ def build_parser():
     parser.add_argument(
         "--listen-port",
         type=int,
-        default=_env_int("GROWSTAR_SF_LISTEN_PORT", 8000),
+        default=_env_int("GROWSTAR_SF_LISTEN_PORT", 18883),
     )
     parser.add_argument(
         "--upstream-host",
