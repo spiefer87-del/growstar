@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar 3.11.0 / Phase SF.1 Shelly-WLAN-Kompatibilitätsregression.
+"""Growstar 3.11.1 / Phase SF.1N Shelly-WLAN-Kompatibilitätsregression.
 
 Keine echte BLE- oder WLAN-Mutation.
 """
@@ -827,22 +827,22 @@ def main():
 
     require(
         release.GROWSTAR_VERSION
-        == "3.11.0"
+        == "3.11.1"
         and release.GROWSTAR_INTERNAL_PHASE
-        == "SF.1",
-        "Growstar meldet Version 3.11.0 / Phase SF.1",
+        == "SF.1N",
+        "Growstar meldet Version 3.11.1 / Phase SF.1N",
     )
 
     require(
         release.RELEASES[
             1
         ]["version"]
-        == "3.10.8"
+        == "3.11.0"
         and release.RELEASES[
             1
         ]["phase"]
-        == "4W.8",
-        "Phase 4W.8 bleibt direkt in der Patch-Historie erhalten",
+        == "SF.1",
+        "Phase SF.1 bleibt direkt in der Patch-Historie erhalten",
     )
 
     asyncio.run(
@@ -852,7 +852,7 @@ def main():
     test_state_and_credentials()
 
     print(
-        "✅ Growstar 3.11.0 / SF.1 Shelly-Provisionierungs-Kompatibilität vollständig"
+        "✅ Growstar 3.11.1 / SF.1N Shelly-Provisionierungs-Kompatibilität vollständig"
     )
 
 
