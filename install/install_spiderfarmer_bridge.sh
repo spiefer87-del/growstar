@@ -131,7 +131,7 @@ cat <<EOF2
 Dienst:       ${SERVICE_NAME}
 Benutzer:     ${SERVICE_USER}
 State:        ${STATE_DIR}
-Listener:     TCP/TLS 8000
+Listener:     TCP/TLS 18883
 Upstream:     sf.mqtt.spider-farmer.com:8883
 Modus:        READ-ONLY
 
