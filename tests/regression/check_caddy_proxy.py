@@ -55,9 +55,14 @@ def main():
         "Caddy-Konfiguration enthält keine fest verdrahtete LAN- oder SF-IP",
     )
     require(
-        "caddy\" validate --config" not in installer
-        and "validate --config" in installer,
-        "Installer validiert die neue Caddy-Konfiguration vor dem Austausch",
+        "validate" in installer
+        and "--adapter caddyfile" in installer
+        and '--config "${TMP_NEW}"' in installer,
+        "Installer validiert temporäre Caddyfile explizit mit dem Caddyfile-Adapter",
+    )
+    require(
+        "invalid character ':'" in installer,
+        "Regression dokumentiert den real beobachteten JSON-Adapter-Fehler",
     )
     require(
         "pre-growstar-anyhost-backup" in installer,
@@ -89,7 +94,7 @@ def main():
         "Growstar-Webport 80 bleibt vom isolierten Growstar-SF-WLAN gesperrt",
     )
 
-    print("✅ Growstar 3.11.1 Caddy-Ethernet-Hotfix vollständig geprüft")
+    print("✅ Growstar 3.11.1 Caddy-Validator-Hotfix vollständig geprüft")
 
 
 if __name__ == "__main__":
