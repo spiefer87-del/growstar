@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -48,6 +49,11 @@ class BridgeDiagnostics:
 
     spiderfarmer_state.json:
         normalized, read-only operational state for Growstar
+
+    Restart semantics:
+        Live state is never trusted across a bridge restart. Previously
+        observed normalized configuration is restored because Spider Farmer
+        does not necessarily resend setConfigField after every reconnect.
     """
 
     def __init__(
@@ -88,15 +94,65 @@ class BridgeDiagnostics:
             "last_error": None,
         }
 
-        # SF.2 state is intentionally rebuilt from observed traffic after every
-        # bridge restart. No stale command/config cache is silently trusted.
-        self.growstar_state = new_state()
+        # SF.3B.1 restart rule:
+        # - LIVE values are rebuilt exclusively from newly observed getDevSta.
+        # - CONFIG values may be restored from the already-normalized local
+        #   state because setConfigField is event-driven and may not be sent
+        #   again after a bridge restart.
+        # - last_seen is deliberately cleared so restored config can never
+        #   make an old controller appear freshly observed.
+        self.growstar_state = self._load_persisted_config_state()
 
         self._last_flush_monotonic = 0.0
         self._last_growstar_flush_monotonic = 0.0
 
         self.flush(force=True)
         self.flush_growstar_state(force=True)
+
+    def _load_persisted_config_state(self):
+        restored = new_state()
+
+        try:
+            payload = json.loads(
+                self.growstar_state_path.read_text(encoding="utf-8")
+            )
+        except (FileNotFoundError, OSError, ValueError, TypeError):
+            return restored
+
+        if not isinstance(payload, dict):
+            return restored
+
+        # Only trust Growstar's normalized read-only state format.
+        if payload.get("read_only") is not True:
+            return restored
+
+        controllers = payload.get("controllers")
+        if not isinstance(controllers, dict):
+            return restored
+
+        for raw_session_id, previous in controllers.items():
+            if not isinstance(previous, dict):
+                continue
+
+            config = previous.get("config")
+            if not isinstance(config, dict) or not config:
+                continue
+
+            session_id = (
+                str(raw_session_id or "unknown").strip().lower()
+                or "unknown"
+            )
+
+            restored["controllers"][session_id] = {
+                "id": session_id,
+                "pid": deepcopy(previous.get("pid")),
+                "prefix": deepcopy(previous.get("prefix")),
+                "last_seen": None,
+                "live": {},
+                "config": deepcopy(config),
+            }
+
+        return restored
 
     def configure(self, *, listen_host, listen_port, upstream_host, upstream_port):
         self.state["listener"] = {
