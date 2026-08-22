@@ -15,6 +15,36 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.8",
+        "date": "2026-08-22",
+        "phase": "4W.8",
+        "title": "Fehlendes Shelly-Provisioning-Feld blockiert Gen4-WLAN-Setup nicht mehr",
+        "summary": (
+            "Growstar interpretiert ein von Shelly.GetDeviceInfo nicht geliefertes "
+            "provision-Feld nicht mehr als unbekannten Sperrzustand. Explizite "
+            "Secure-Provisioning-Sperren bleiben weiterhin blockiert; ältere oder "
+            "noch nicht aktualisierte Firmware kann den bestehenden BLE-RPC-"
+            "Wifi.SetConfig-Pfad dagegen wieder verwenden."
+        ),
+        "changes": (
+            "core/hardware/shelly/ble_rpc_helper.py unterscheidet jetzt zwischen einem tatsächlich fehlenden provision-Feld und einem explizit gemeldeten Secure-Provisioning-Zustand.",
+            "pending und confirmed bleiben die ausdrücklich erlaubten Secure-Provisioning-Zustände.",
+            "Explizite Zustände wie locked, complete oder andere unbekannte nicht-leere Werte bleiben fail-closed und blockieren Wifi.SetConfig vor jedem Schreibzugriff.",
+            "Fehlt das provision-Feld vollständig, wird intern not-reported verwendet und der bereits vorhandene Wifi.SetConfig-Pfad fortgesetzt.",
+            "Diese Kompatibilität ist erforderlich, weil Shelly das provision-Feld erst mit Secure Provisioning ab Firmware 1.7.5 eingeführt hat.",
+            "Der bestehende Geräte-MAC-Abgleich vor Wifi.SetConfig bleibt unverändert zwingend.",
+            "BLE-Gerätelookup, Request-ID-Filterung, Secret-Transport über stdin, Idempotenzstatus und LAN-MAC-Verifikation aus 3.10.7 bleiben unverändert erhalten.",
+            "Es wird keine zusätzliche RPC-Methode und kein zweiter BLE-Client eingeführt.",
+        ),
+        "tests": (
+            "Die Regression simuliert erstmals Shelly.GetDeviceInfo ohne provision-Feld und verlangt anschließend den bestehenden Wifi.SetConfig-Aufruf.",
+            "Der fehlende Zustand wird im Helper-Ergebnis als not-reported dokumentiert.",
+            "Der bestehende locked-Test bestätigt weiterhin, dass ein expliziter Sperrzustand Wifi.SetConfig vollständig blockiert.",
+            "MAC-Mismatch, RPC-Framing, asynchrone Notifications, BLE-Lookup und WLAN-Secret-Transport bleiben zusätzlich geschützt.",
+            "Ausgangsbasis ist GitHub main b40d7e583210b757e50225eef7caa2c0a43fdf2f mit Growstar 3.10.7 / Phase 4W.7.",
+        ),
+    },
+    {
         "version": "3.10.7",
         "date": "2026-08-22",
         "phase": "4W.7",
