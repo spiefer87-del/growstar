@@ -15,6 +15,37 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.10.7",
+        "date": "2026-08-22",
+        "phase": "4W.7",
+        "title": "Robuster BLE-RPC-Transport für Shelly-Gen4-Provisionierung",
+        "summary": (
+            "Der bestehende Shelly-WLAN-Provisionierungspfad bleibt erhalten, "
+            "wird aber an einem auf echter Gen4-Hardware beobachteten BlueZ- und "
+            "einem protokollbedingten RPC-Sonderfall gehärtet: Growstar löst das "
+            "BLE-Gerät unmittelbar vor "
+            "dem Connect frisch auf und ignoriert asynchrone Shelly-RPC-"
+            "Notifications, bis die Antwort mit der eigenen Request-ID eintrifft."
+        ),
+        "changes": (
+            "core/hardware/shelly/ble_rpc_helper.py verwendet vor BleakClient einen frischen BleakScanner.find_device_by_address-Aufruf und übergibt das aufgelöste BLEDevice statt nur der Adresse.",
+            "Der bestehende RPC-Framing-, Chunking- und Wifi.SetConfig-Pfad bleibt unverändert; es wird kein zweiter RPC-Client und kein generischer RPC-Endpunkt eingeführt.",
+            "Asynchrone NotifyEvent-/NotifyStatus-Frames oder verspätete Frames anderer Request-IDs werden auf dem symmetrischen Shelly-RPC-Kanal verworfen, bis die passende Antwort-ID vorliegt.",
+            "RPC-Fehler behalten zusätzlich ihren numerischen Fehlercode in der sicheren Fehlermeldung; WLAN-SSID und insbesondere das Secret werden dadurch nicht protokolliert.",
+            "Der auf dem Raspberry beobachtete dbus-fast EOFError beim Disconnect ist nur noch ein Cleanup-Hinweis und kann einen davor entstandenen BLE-RPC-Fehler nicht mehr maskieren.",
+            "services/shelly_provisioning.py erhält ausschließlich einen angepassten Helper-Timeout für den zusätzlichen frischen BLE-Lookup; Credential-Auflösung, Secret-Store, Idempotenz und LAN-MAC-Verifikation bleiben unverändert.",
+            "Wifi.SetConfig überträgt weiterhin exakt die serverseitig aufgelöste SSID und das zugehörige WLAN-Secret im offiziellen sta.pass-Feld; es wird kein Shelly-spezifisches Passwortfeld im Browser eingeführt.",
+            "Switch.Set, FactoryReset, BLE.StartPairing sowie die vorhandenen Gateway-RPC-Funktionen bleiben vollständig außerhalb dieses Provisionierungshelpers.",
+        ),
+        "tests": (
+            "Die Shelly-WLAN-Regression simuliert jetzt ein asynchrones NotifyEvent vor der eigentlichen RPC-Antwort und verlangt trotzdem einen erfolgreichen GetDeviceInfo-/Wifi.SetConfig-Ablauf.",
+            "Die bestehende Regression bestätigt weiterhin, dass Wifi.SetConfig SSID, WLAN-Secret, enable=true und DHCP korrekt erhält.",
+            "Statische Vertragsprüfungen verlangen den frischen Bleak-Gerätelookup und verhindern, dass ein Disconnect-Fehler wieder einen primären RPC-Fehler überschreibt.",
+            "Die bisherigen MAC-, Secure-Provisioning-, No-Secret-State-, stdin-Secret-Transport- und LAN-Verifikationsprüfungen bleiben erhalten.",
+            "Ausgangsbasis ist GitHub main 3c83419a90aa43d8be8862c59d13279a129306df mit Growstar 3.10.6 / Phase 4W.6.",
+        ),
+    },
+    {
         "version": "3.10.6",
         "date": "2026-08-21",
         "phase": "4W.6",
@@ -1096,6 +1127,7 @@ RELEASES = (
             "Ventilator besitzt einen Endpoint, Entfeuchter fordert ihn an: Entfeuchter muss als Anforderer erscheinen.",
             "Identische unveränderte Zuordnung desselben Aktors bleibt konfliktfrei.",
             "Eine echte Doppelbelegung bleibt weiterhin atomar gesperrt.",
+            "Fehlermeldung muss bestehenden Besitzer und kollidierenden Aktor nennen.",
             "/api/system/version meldet Version 3.6.6 und Build-Kennung 4R.2.",
         ),
     },
