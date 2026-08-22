@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar Phase 4W.5 – begrenzter Shelly-WLAN-Provisionierungshelper.
+"""Growstar Phase 4W.7 – robuster Shelly-WLAN-Provisionierungshelper.
 
 Dieser Prozess kann ausschließlich:
 1. Shelly.GetDeviceInfo lesen,
@@ -20,9 +20,10 @@ import sys
 import time
 
 try:
-    from bleak import BleakClient
+    from bleak import BleakClient, BleakScanner
 except ImportError:
     BleakClient = None
+    BleakScanner = None
 
 
 RPC_DATA_UUID = "5f6d4f53-5f52-5043-5f64-6174615f5f5f"
@@ -34,6 +35,7 @@ MAX_INPUT_BYTES = 16 * 1024
 MAX_RPC_FRAME_BYTES = 64 * 1024
 RPC_TIMEOUT_SECONDS = 12.0
 CONNECT_TIMEOUT_SECONDS = 15.0
+DEVICE_SCAN_TIMEOUT_SECONDS = 5.0
 TX_CTL_SETTLE_SECONDS = 0.25
 PROVISIONING_STATES_ALLOWED = {"pending", "confirmed"}
 
@@ -219,108 +221,132 @@ async def _rpc_call(
         + RPC_TIMEOUT_SECONDS
     )
 
-    frame_len = 0
-
+    # Auf demselben RPC-Kanal dürfen asynchrone NotifyStatus-/NotifyEvent-
+    # Frames auftauchen. Sie besitzen nicht unsere Request-ID und müssen
+    # verworfen werden, statt den eigentlichen RPC-Aufruf abzubrechen.
     while time.monotonic() < deadline:
 
-        raw = bytes(
-            await client.read_gatt_char(
-                RPC_RX_CTL_UUID
+        frame_len = 0
+
+        while time.monotonic() < deadline:
+
+            raw = bytes(
+                await client.read_gatt_char(
+                    RPC_RX_CTL_UUID
+                )
             )
-        )
 
-        if len(raw) >= 4:
-            frame_len = struct.unpack(
-                ">I",
-                raw[:4],
-            )[0]
+            if len(raw) >= 4:
+                frame_len = struct.unpack(
+                    ">I",
+                    raw[:4],
+                )[0]
 
-        # 0 bedeutet: Antwort noch nicht bereit.
-        if frame_len:
+            # 0 bedeutet: aktuell noch kein Frame abholbereit.
+            if frame_len:
+                break
+
+            await asyncio.sleep(
+                0.1
+            )
+
+        if not frame_len:
             break
 
-        await asyncio.sleep(
-            0.1
-        )
-
-    if not frame_len:
-        raise ProvisioningError(
-            f"Keine BLE-RPC-Antwort auf {method} innerhalb des Zeitlimits"
-        )
-
-    if frame_len > MAX_RPC_FRAME_BYTES:
-        raise ProvisioningError(
-            "BLE-RPC-Antwort ist unerwartet groß"
-        )
-
-    frame = bytearray()
-
-    while (
-        len(frame) < frame_len
-        and time.monotonic() < deadline
-    ):
-
-        chunk = bytes(
-            await client.read_gatt_char(
-                RPC_DATA_UUID
-            )
-        )
-
-        if chunk:
-            frame.extend(
-                chunk
-            )
-        else:
-            await asyncio.sleep(
-                0.05
+        if frame_len > MAX_RPC_FRAME_BYTES:
+            raise ProvisioningError(
+                "BLE-RPC-Antwort ist unerwartet groß"
             )
 
-    if len(frame) < frame_len:
-        raise ProvisioningError(
-            f"Unvollständige BLE-RPC-Antwort auf {method}"
-        )
+        frame = bytearray()
 
-    try:
-        response = json.loads(
-            bytes(
-                frame[:frame_len]
-            ).decode("utf-8")
-        )
-    except (
-        UnicodeDecodeError,
-        json.JSONDecodeError,
-    ) as exc:
-        raise ProvisioningError(
-            "Ungültige BLE-RPC-JSON-Antwort"
-        ) from exc
+        while (
+            len(frame) < frame_len
+            and time.monotonic() < deadline
+        ):
 
-    if response.get("id") != request["id"]:
-        raise ProvisioningError(
-            "BLE-RPC-Antwort besitzt eine falsche Request-ID"
-        )
+            chunk = bytes(
+                await client.read_gatt_char(
+                    RPC_DATA_UUID
+                )
+            )
 
-    if "error" in response:
+            if chunk:
+                frame.extend(
+                    chunk
+                )
+            else:
+                await asyncio.sleep(
+                    0.05
+                )
 
-        error = response.get(
-            "error"
-        ) or {}
+        if len(frame) < frame_len:
+            raise ProvisioningError(
+                f"Unvollständige BLE-RPC-Antwort auf {method}"
+            )
 
-        raise ProvisioningError(
-            str(
+        try:
+            response = json.loads(
+                bytes(
+                    frame[:frame_len]
+                ).decode("utf-8")
+            )
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise ProvisioningError(
+                "Ungültige BLE-RPC-JSON-Antwort"
+            ) from exc
+
+        # Notifications und verspätete Antworten anderer Requests sind auf
+        # dem symmetrischen Shelly-RPC-Kanal zulässig. Nur die eigene ID ist
+        # die Antwort auf diesen Aufruf.
+        if response.get("id") != request["id"]:
+            continue
+
+        if "error" in response:
+
+            error = response.get(
+                "error"
+            ) or {}
+
+            code = (
+                error.get("code")
+                if isinstance(error, dict)
+                else None
+            )
+
+            message = str(
                 error.get("message")
                 if isinstance(error, dict)
                 else error
+            ).strip()
+
+            suffix = (
+                f" (RPC {code})"
+                if code is not None
+                else ""
             )
-            or f"{method} fehlgeschlagen"
-        )
 
-    if "result" not in response:
-        raise ProvisioningError(
-            "BLE-RPC-Antwort enthält kein result-Feld"
-        )
+            raise ProvisioningError(
+                (
+                    message
+                    or f"{method} fehlgeschlagen"
+                )
+                + suffix
+            )
 
-    return response["result"]
+        if "result" not in response:
+            raise ProvisioningError(
+                "BLE-RPC-Antwort enthält kein result-Feld"
+            )
 
+        return response["result"]
+
+    raise ProvisioningError(
+        f"Keine passende BLE-RPC-Antwort auf {method} innerhalb des Zeitlimits"
+    )
 
 async def _provision_with_client(
     client,
@@ -429,7 +455,10 @@ async def _provision_with_client(
 
 
 async def _run(payload):
-    if BleakClient is None:
+    if (
+        BleakClient is None
+        or BleakScanner is None
+    ):
         raise ProvisioningError(
             "python3-bleak ist nicht installiert"
         )
@@ -438,8 +467,21 @@ async def _run(payload):
         payload
     )
 
-    client = BleakClient(
+    # Bleak empfiehlt unter BlueZ ein bereits aufgelöstes BLEDevice an den
+    # Client zu übergeben. Das vermeidet einen zweiten impliziten Lookup beim
+    # Connect und entspricht dem auf dem echten Growstar-Pi verifizierten Pfad.
+    device = await BleakScanner.find_device_by_address(
         request["address"],
+        timeout=DEVICE_SCAN_TIMEOUT_SECONDS,
+    )
+
+    if device is None:
+        raise ProvisioningError(
+            "Shelly ist beim unmittelbaren BLE-Verbindungsaufbau nicht mehr sichtbar"
+        )
+
+    client = BleakClient(
+        device,
         timeout=CONNECT_TIMEOUT_SECONDS,
     )
 
@@ -462,19 +504,21 @@ async def _run(payload):
             try:
                 await client.disconnect()
             except Exception as exc:
-                # Ein Disconnect-Fehler darf einen bereits begonnenen
-                # Wifi.SetConfig nicht in "nicht begonnen" zurückverwandeln.
+                # BlueZ/dbus-fast kann nach einem ansonsten erfolgreichen
+                # GATT-Lauf beim Disconnect einen EOFError liefern. Ein
+                # Cleanup-Fehler darf weder einen erfolgreichen Write noch
+                # den davor entstandenen eigentlichen RPC-Fehler maskieren.
                 if (
                     isinstance(result, dict)
-                    and result.get(
-                        "write_started"
-                    )
                 ):
+                    detail = str(exc).strip()
                     result[
                         "disconnect_error"
-                    ] = str(exc)
-                elif result is None:
-                    raise
+                    ] = (
+                        f"{type(exc).__name__}: {detail}"
+                        if detail
+                        else type(exc).__name__
+                    )
 
     return result
 
