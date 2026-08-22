@@ -9,7 +9,7 @@ Der Test ist read-only:
 
 from pathlib import Path
 import ast
-import importlib.util
+import importlib
 import re
 import subprocess
 import sys
@@ -54,14 +54,16 @@ def tracked_paths():
 
 
 def load_release():
-    spec = importlib.util.spec_from_file_location(
-        "growstar_baseline_release",
-        ROOT / "core/release.py",
-    )
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+
+    for name in tuple(sys.modules):
+        if name == "core.release" or name == "core.releases" or name.startswith(
+            "core.releases."
+        ):
+            sys.modules.pop(name, None)
+
+    return importlib.import_module("core.release")
 
 
 def check_python_syntax(tracked):
@@ -199,12 +201,29 @@ def main():
         "docs/REPOSITORY_BASELINE.md",
         "tests/README.md",
         "tests/regression/check_repository_baseline.py",
+        "core/releases/loader.py",
+        "core/releases/current.py",
+        "core/releases/legacy.py",
     }
     missing_required = sorted(required - tracked)
     require(
         not missing_required,
         "Aktive Laufzeit-, Installations- und Baseline-Dateien bleiben erhalten"
         + ("" if not missing_required else ": " + ", ".join(missing_required)),
+    )
+
+    release_nodes = sorted(
+        path
+        for path in tracked
+        if re.fullmatch(
+            r"core/releases/r_\d+_\d+_\d+_.+\.py",
+            path,
+        )
+    )
+
+    require(
+        bool(release_nodes),
+        "Repository enthält einzelne getrackte Release-Node-Dateien",
     )
 
     ignore = read(".gitignore")
@@ -276,7 +295,10 @@ def main():
     check_template_references(tracked)
     check_python_syntax(tracked)
 
-    print(f"✅ Growstar Repository-Baseline vollständig · {release.GROWSTAR_VERSION} / Phase {release.GROWSTAR_INTERNAL_PHASE}")
+    print(
+        f"✅ Growstar Repository-Baseline vollständig · "
+        f"{release.GROWSTAR_VERSION} / Phase {release.GROWSTAR_INTERNAL_PHASE}"
+    )
 
 
 if __name__ == "__main__":

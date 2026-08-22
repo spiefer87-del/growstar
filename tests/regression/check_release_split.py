@@ -1,17 +1,11 @@
 #!/usr/bin/env python3
-"""Regression for Growstar release-history split.
-
-This test is intentionally version-agnostic for the current release. It verifies
-that core.release derives its public version/phase/date/title from the first
-entry of the split release history, while preserving the historical chain.
-
-That makes the regression survive future releases such as SF.3, SF.4, etc.
-without hard-coding the then-current version into this infrastructure test.
-"""
+"""Regression for Growstar's file-per-release architecture."""
 
 from __future__ import annotations
 
+import datetime
 from pathlib import Path
+import re
 import sys
 
 
@@ -34,27 +28,44 @@ from core.release import (
 from core.releases import (
     CURRENT_RELEASES,
     LEGACY_RELEASES,
+    PATCH_RELEASES,
+    RELEASE_MODULES,
 )
 
 
 def require(condition, message):
-
     if not condition:
         raise AssertionError(message)
 
     print("✅", message)
 
 
-def main():
+def version_key(value):
+    return tuple(
+        int(part)
+        for part in str(value).split(".")
+    )
 
+
+def main():
     require(
         len(RELEASES) >= 2,
         "Release-Historie enthält aktuellen Release und Vorgänger",
     )
 
     require(
-        len(CURRENT_RELEASES) >= 1,
-        "Aktuelles Release-Modul enthält mindestens einen Release",
+        len(PATCH_RELEASES) >= 1,
+        "Automatischer Patch-Loader findet mindestens einen Release",
+    )
+
+    require(
+        CURRENT_RELEASES == PATCH_RELEASES,
+        "CURRENT_RELEASES bleibt als kompatibler Alias erhalten",
+    )
+
+    require(
+        len(RELEASE_MODULES) == len(PATCH_RELEASES),
+        "Jeder Patch-Release besitzt genau ein entdecktes Release-Modul",
     )
 
     newest = RELEASES[0]
@@ -75,13 +86,13 @@ def main():
     )
 
     require(
-        RELEASES == tuple(CURRENT_RELEASES) + tuple(LEGACY_RELEASES),
-        "RELEASES setzt aktuelle und historische Module exakt zusammen",
+        RELEASES == tuple(PATCH_RELEASES) + tuple(LEGACY_RELEASES),
+        "RELEASES setzt Einzeldatei-Patches und Legacy-Historie exakt zusammen",
     )
 
     require(
-        RELEASES[len(CURRENT_RELEASES)] == LEGACY_RELEASES[0],
-        "Übergang von aktueller zu historischer Release-Datei bleibt lückenlos",
+        RELEASES[len(PATCH_RELEASES)] == LEGACY_RELEASES[0],
+        "Übergang von Einzeldatei-Patches zur Legacy-Historie bleibt lückenlos",
     )
 
     require(
@@ -94,6 +105,20 @@ def main():
         RELEASES[-1]["version"] == LEGACY_RELEASES[-1]["version"]
         and RELEASES[-1]["phase"] == LEGACY_RELEASES[-1]["phase"],
         "Historisches Ende der Release-Historie bleibt erhalten",
+    )
+
+    patch_versions = [
+        item["version"]
+        for item in PATCH_RELEASES
+    ]
+
+    require(
+        patch_versions == sorted(
+            patch_versions,
+            key=version_key,
+            reverse=True,
+        ),
+        "Patch-Releases sind numerisch nach Version absteigend sortiert",
     )
 
     identities = [
@@ -109,6 +134,11 @@ def main():
         "Release-Historie enthält keine Versions-/Phasen-Duplikate",
     )
 
+    require(
+        len(patch_versions) == len(set(patch_versions)),
+        "Jede neue Growstar-Version besitzt genau einen Patch-Release",
+    )
+
     current = current_release()
 
     require(
@@ -117,9 +147,16 @@ def main():
         "current_release liefert den aktuell obersten Release",
     )
 
+    expected_date_label = datetime.date.fromisoformat(
+        newest["date"]
+    ).strftime("%d.%m.%Y")
+
     require(
-        current["date_label"] == "22.08.2026",
-        "current_release liefert weiterhin das deutsche Datumslabel",
+        current["date_label"] == expected_date_label,
+        (
+            "current_release erzeugt das deutsche Datumslabel dynamisch "
+            f"({expected_date_label})"
+        ),
     )
 
     current["changes"].append("MUTATION")
@@ -155,9 +192,11 @@ def main():
         "release_summary wird dynamisch aus dem aktuellen Release erzeugt",
     )
 
+    releases_dir = ROOT / "core" / "releases"
     wrapper = ROOT / "core" / "release.py"
-    legacy = ROOT / "core" / "releases" / "legacy.py"
-    current_file = ROOT / "core" / "releases" / "current.py"
+    legacy = releases_dir / "legacy.py"
+    loader = releases_dir / "loader.py"
+    current_file = releases_dir / "current.py"
 
     require(
         wrapper.is_file(),
@@ -170,13 +209,18 @@ def main():
     )
 
     require(
+        loader.is_file(),
+        "core/releases/loader.py übernimmt die automatische Release-Discovery",
+    )
+
+    require(
         current_file.is_file(),
-        "core/releases/current.py enthält die neuen Release-Nodes",
+        "core/releases/current.py bleibt als kleiner Kompatibilitäts-Wrapper erhalten",
     )
 
     require(
         wrapper.stat().st_size < 5000,
-        "core/release.py bleibt nach dem Split klein",
+        "core/release.py bleibt klein",
     )
 
     require(
@@ -185,12 +229,73 @@ def main():
     )
 
     require(
-        current_file.stat().st_size < 30000,
-        "Aktuelle Release-Datei bleibt klein und wartbar",
+        loader.stat().st_size < 8000,
+        "Automatischer Release-Loader bleibt klein und wartbar",
+    )
+
+    require(
+        current_file.stat().st_size < 1500,
+        "current.py wächst nicht mehr und enthält nur noch den Kompatibilitäts-Wrapper",
+    )
+
+    current_text = current_file.read_text(
+        encoding="utf-8"
+    )
+
+    require(
+        "RELEASE = {" not in current_text
+        and '"version"' not in current_text
+        and "'version'" not in current_text,
+        "current.py enthält keine Release-Nodes mehr",
+    )
+
+    node_files = sorted(
+        releases_dir.glob("r_*.py")
+    )
+
+    require(
+        len(node_files) == len(PATCH_RELEASES),
+        "Auf der Platte existiert genau eine Datei pro Patch-Release",
+    )
+
+    require(
+        {
+            path.stem
+            for path in node_files
+        }
+        == set(RELEASE_MODULES),
+        "Loader-Discovery und vorhandene Release-Dateien stimmen exakt überein",
+    )
+
+    for path in node_files:
+        require(
+            path.stat().st_size < 12000,
+            f"{path.name} bleibt eine kleine einzelne Release-Datei",
+        )
+
+        text = path.read_text(
+            encoding="utf-8"
+        )
+
+        require(
+            len(
+                re.findall(
+                    r"(?m)^RELEASE\s*=",
+                    text,
+                )
+            )
+            == 1,
+            f"{path.name} exportiert genau einen RELEASE-Node",
+        )
+
+    require(
+        newest["version"] == "3.11.8"
+        and newest["phase"] == "CORE.R3",
+        "CORE.R3-Migration meldet 3.11.8 / CORE.R3 als aktuellen Release",
     )
 
     print(
-        "✅ Growstar Release-Split Regression vollständig erfolgreich "
+        "✅ Growstar Einzeldatei-Release-Regression vollständig erfolgreich "
         f"({GROWSTAR_VERSION} / {GROWSTAR_INTERNAL_PHASE})"
     )
 
