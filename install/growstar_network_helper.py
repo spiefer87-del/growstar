@@ -8,6 +8,8 @@ freigegebene Aktionen und verweigert Aufrufe außerhalb von growstar.service.
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -678,6 +680,85 @@ def _get_password(payload):
         "password": stored_secret,
     }
 
+def _verify_password(payload):
+    """Prüft eine Passphrase gegen das AKTIVE NM-Profil ohne Secret-Ausgabe."""
+
+    requested_ssid = str(payload.get("ssid") or "").strip()
+    password = "" if payload.get("password") is None else str(payload.get("password"))
+
+    if not requested_ssid:
+        raise HelperError("WLAN-Name fehlt")
+    if any(char in requested_ssid for char in ("\x00", "\n", "\r")):
+        raise HelperError("Ungültiger WLAN-Name")
+    if not password:
+        raise HelperError("Bitte die WLAN-Passphrase eingeben")
+    if any(char in password for char in ("\x00", "\n", "\r")):
+        raise HelperError("WLAN-Passwort enthält ungültige Steuerzeichen")
+    if len(password) > 128:
+        raise HelperError("WLAN-Passwort ist zu lang")
+
+    device = _wifi_device()
+    current = _device_snapshot(device)
+
+    if not current or current.get("ssid") != requested_ssid:
+        raise HelperError(
+            "Die Passphrase kann nur für das aktuell verbundene WLAN geprüft werden"
+        )
+
+    connection_name = current.get("connection")
+    if not connection_name:
+        raise HelperError(
+            "Die aktive NetworkManager-Verbindung konnte nicht ermittelt werden"
+        )
+
+    key_mgmt = _connection_key_mgmt(connection_name)
+    if not _personal_wifi_security(key_mgmt):
+        raise HelperError(
+            "Passphrase-Verifikation wird nur für WPA/WPA2/WPA3-Personal unterstützt"
+        )
+
+    stored_secret = _connection_psk(connection_name)
+    if not stored_secret:
+        raise HelperError(
+            "NetworkManager liefert für diese Verbindung kein gespeichertes Secret"
+        )
+
+    credential_type = _credential_type(stored_secret)
+
+    try:
+        if credential_type == "derived_psk":
+            candidate = hashlib.pbkdf2_hmac(
+                "sha1",
+                password.encode("utf-8"),
+                requested_ssid.encode("utf-8"),
+                4096,
+                dklen=32,
+            ).hex()
+
+            valid = hmac.compare_digest(
+                candidate.lower(),
+                stored_secret.lower(),
+            )
+
+            candidate = ""
+        else:
+            valid = hmac.compare_digest(
+                password,
+                stored_secret,
+            )
+
+        return {
+            "success": True,
+            "ssid": requested_ssid,
+            "valid": bool(valid),
+            "credential_type": credential_type,
+        }
+
+    finally:
+        password = ""
+        stored_secret = ""
+
+
 def main():
     try:
         _guard()
@@ -710,6 +791,9 @@ def main():
 
         if action == "get_password":
             _json_out(_get_password(payload))
+
+        if action == "verify_password":
+            _json_out(_verify_password(payload))
 
         raise HelperError("Nicht unterstützte Netzwerk-Aktion")
 
