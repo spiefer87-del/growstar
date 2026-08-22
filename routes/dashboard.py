@@ -1,8 +1,9 @@
-from flask import abort, redirect, render_template, url_for
+from flask import abort, jsonify, redirect, render_template, url_for
 
 from core.devices import get_device_default_label, get_device_icon, get_device_label
 from core.runtime import get_runtime
 from core.tents import manager as tent_manager, validate_tent_id
+from services.spiderfarmer import list_controllers as list_spiderfarmer_controllers
 
 
 _DEVICE_META = {
@@ -51,6 +52,25 @@ def _default_tent_url(endpoint, **values):
         tent_id=tent_manager.default_tent_id(),
         **values,
     )
+
+
+def _spiderfarmer_controllers_payload():
+    """Return only the normalized, existing read model for the UI.
+
+    SF.3C deliberately does not create a command abstraction. It exposes the
+    already-normalized SF.3A/SF.3B controller/device projection through one GET
+    endpoint so the browser can display real controller state.
+    """
+
+    controllers = list_spiderfarmer_controllers()
+
+    return {
+        "success": True,
+        "phase": "SF.3C",
+        "read_only": True,
+        "controller_count": len(controllers),
+        "controllers": controllers,
+    }
 
 
 def register(app):
@@ -163,6 +183,18 @@ def register(app):
             device_icon=get_device_icon(device),
             **context,
         )
+
+    # ================================================================
+    # Spider Farmer · SF.3C native read-only UI
+    # ================================================================
+
+    @app.get("/system/spiderfarmer")
+    def spiderfarmer_system_page():
+        return render_template("spiderfarmer.html")
+
+    @app.get("/api/spiderfarmer/controllers")
+    def api_spiderfarmer_controllers():
+        return jsonify(_spiderfarmer_controllers_payload())
 
     # ================================================================
     # Legacy URLs -> Default-Station
