@@ -3,6 +3,7 @@ import time
 from core.hardware.manager import manager
 from services.actuator_health import poll_assigned_actuators
 from services.hardware import hardware
+from services.spiderfarmer import sync_sensor_sources
 
 
 HARDWARE_REFRESH_INTERVAL = 30
@@ -14,6 +15,22 @@ def hardware_loop():
     while True:
         try:
             hardware.refresh()
+
+            # Phase SF.2A:
+            # Der bereits von der separaten read-only Spider-Farmer-Bridge
+            # normalisierte GGS-Umweltsensor wird als controller-weite
+            # Growstar-Sensorquelle veröffentlicht. Die Funktion sendet keine
+            # Netzwerk-/MQTT-Befehle und aktualisiert eine Quelle nur, wenn der
+            # Bridge-Zeitstempel tatsächlich fortgeschritten ist.
+            try:
+                sf_result = sync_sensor_sources()
+                if sf_result.get("published"):
+                    print(
+                        "🌿 Spider Farmer Sensorquelle aktualisiert: "
+                        f"{len(sf_result.get('published') or [])}"
+                    )
+            except Exception as exc:
+                print("⚠️ Spider-Farmer-State-Sync Fehler:", exc)
 
             # Phase 4G: Ein zentraler read-only Poll prüft alle tatsächlich
             # zugeordneten Shelly-Aktor-Endpunkte über alle lokalen Stationen.
