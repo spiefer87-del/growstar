@@ -15,6 +15,37 @@ import datetime
 
 RELEASES = (
     {
+        "version": "3.11.1",
+        "date": "2026-08-22",
+        "phase": "SF.1N",
+        "title": "Isoliertes Spider-Farmer-GGS-Netz mit Ethernet-Uplink",
+        "summary": (
+            "Growstar kann den Raspberry jetzt kontrolliert aufteilen: eth0 bleibt "
+            "der einzige Heimnetz-/Internet-Uplink, während wlan0 als eigener "
+            "2,4-GHz-WPA2-Access-Point Growstar-SF für den Spider-Farmer-GGS-"
+            "Controller betrieben werden kann. Der GGS-MQTT-Verkehr auf TCP/8883 "
+            "wird ausschließlich vom isolierten WLAN zur lokalen read-only Bridge "
+            "auf Port 18883 umgeleitet; die bestehende Shelly-Provisionierung bleibt "
+            "auf dem separat gespeicherten Heimnetz-Ziel."
+        ),
+        "changes": (
+            "install/growstar_spiderfarmer_network.py ergänzt eine root-eigene, eng begrenzte Netzwerkgrenze mit Preflight, Start, Stop, Status und Rollback; sie wird nicht aus Gunicorn heraus ausgeführt.",
+            "Der Preflight verlangt einen verbundenen IPv4-Ethernet-Uplink auf eth0, Default- und Spider-Farmer-Cloud-Route über eth0, AP-Fähigkeit von wlan0 sowie ein gesetztes und gespeichertes Growstar-Geräte-Provisionierungsziel, das nicht Growstar-SF heißen darf.",
+            "Der Access Point verwendet ein eigenes NetworkManager-Profil Growstar-SF mit 2,4 GHz, WPA2/RSN-CCMP, festem 10.42.77.1/24 und ipv4.method shared; bestehende Heim-WLAN-Profile werden weder gelöscht noch editiert.",
+            "Das zufällig erzeugte Spider-Farmer-WLAN-Passwort wird root-only unter instance/spiderfarmer_network/config.json gespeichert und beim NetworkManager-Editor ausschließlich über stdin gesetzt, nicht als Prozessargument.",
+            "Eine eigene nftables-NAT-Regel leitet nur TCP/8883 von wlan0 auf den lokalen Bridge-Port 18883 um; der lokale Bridge-Upstream über eth0 bleibt davon unberührt.",
+            "Eine zusätzliche nftables-Grenze blockiert Zugriffe des Spider-Farmer-WLANs auf private IPv4-Netze und lässt am Raspberry nur DHCP, DNS, Ping und die TLS-Bridge zu; SSH und Growstar-Weboberfläche werden nicht über Growstar-SF freigegeben.",
+            "Bei einem Startfehler entfernt Growstar die eigenen nftables-Tabellen, fährt das AP-Profil herunter und versucht die zuvor aktive wlan0-Verbindung wiederherzustellen.",
+            "growstar-spiderfarmer.service verlangt die Netzwerkgrenze als systemd-Abhängigkeit; beide Dienste bleiben nach Installation zunächst deaktiviert und werden erst nach bewusstem Teststart aktiviert.",
+            "Die in 3.11.0 getrennte Shelly-Geräte-Provisionierung wird nicht verändert: neue Shellys erhalten weiterhin die gespeicherte FRITZ!Box-SSID und deren Growstar-Secret, unabhängig vom späteren AP-Betrieb auf wlan0.",
+        ),
+        "tests": (
+            "check_spiderfarmer_network.py prüft offline den Ethernet-/AP-/Provisionierungs-Preflight, die NetworkManager-Shared-Konfiguration, secret-freien Prozessaufruf, den eng begrenzten nftables-Redirect, LAN-Isolation und Rollback-Vertrag.",
+            "Die bestehende SF.1-Bridge-Regression bleibt read-only und der Shelly-WLAN-Regressionstest wird auf Growstar 3.11.1 / SF.1N sowie die direkte Historie 3.11.0 / SF.1 aktualisiert.",
+            "Ausgangsbasis ist GitHub main 7150b290b39ffb76b227a17c82c8acacf014d396 mit Growstar 3.11.0 / Phase SF.1 und vollständig grünem Shelly-/Provisionierungsbestand.",
+        ),
+    },
+    {
         "version": "3.11.0",
         "date": "2026-08-22",
         "phase": "SF.1",
