@@ -4,30 +4,64 @@
 
 {% block head %}
 <style>
-:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--purple:#a78bfa;--amber:#f59e0b}
-*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.45;cursor:not-allowed}.gateway-pick{margin:12px 0 4px;padding:11px;border:1px solid rgba(56,189,248,.16);border-radius:10px;background:rgba(14,116,144,.07)}.gateway-pick-title{margin-bottom:7px;color:#bae6fd;font-size:.75rem;font-weight:800}.gateway-pick-actions{display:grid;grid-template-columns:1fr auto;gap:8px}.gateway-pick select{width:100%;min-width:0;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.gateway-copy{border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:8px 10px;background:rgba(56,189,248,.12);color:#bae6fd;font-weight:800;cursor:pointer;white-space:nowrap}.gateway-copy:disabled,.gateway-pick select:disabled{opacity:.45;cursor:not-allowed}.gateway-hint{margin-top:7px;color:var(--muted);font-size:.7rem;line-height:1.4}.mode-note{margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(148,163,184,.08);color:var(--muted);font-size:.75rem;line-height:1.4}.mode-note.locked{background:rgba(245,158,11,.12);color:#fde68a}.actions{margin-top:18px;display:flex;gap:10px;align-items:center}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.card.conflict{border-color:rgba(239,68,68,.72);box-shadow:0 0 0 2px rgba(239,68,68,.12),0 10px 30px rgba(0,0,0,.22)}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}}
+:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--red:#ef4444;--purple:#a78bfa;--amber:#f59e0b;--blue:#38bdf8}
+*{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.wrap{max-width:1120px;margin:auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.head{display:flex;align-items:center;gap:12px}.back{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:11px;background:var(--card);color:var(--text);text-decoration:none}h1{margin:0;font-size:1.65rem}.sub{margin-top:4px;color:var(--muted);font-size:.85rem}.station-select{min-width:190px;padding:9px 34px 9px 10px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text)}.banner{margin:0 0 18px;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(30,41,59,.6);color:var(--muted);font-size:.86rem;line-height:1.45}.banner.live{border-color:rgba(245,158,11,.3);background:rgba(120,53,15,.16);color:#fde68a}.banner.shadow{border-color:rgba(167,139,250,.3);background:rgba(76,29,149,.16);color:#ddd6fe}.section-title{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin:24px 0 12px}.section-title h2{margin:0;font-size:1.05rem}.section-title p{margin:4px 0 0;color:var(--muted);font-size:.78rem;line-height:1.4}.section-badge{flex:0 0 auto;padding:5px 9px;border-radius:999px;font-size:.67rem;font-weight:800;background:rgba(56,189,248,.11);color:#7dd3fc;border:1px solid rgba(56,189,248,.22)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:var(--card);border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:18px}.card-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:14px}.card h2,.card h3{margin:0;font-size:.95rem}.status{padding:4px 8px;border-radius:999px;font-size:.69rem;font-weight:800}.ok{background:rgba(34,197,94,.14);color:#86efac}.none{background:rgba(148,163,184,.12);color:var(--muted)}.row{display:grid;grid-template-columns:75px 1fr;gap:9px;align-items:center;margin:9px 0}.row label{color:var(--muted);font-size:.82rem}.row input,.row select{width:100%;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.row input:disabled,.row select:disabled{opacity:.45;cursor:not-allowed}.gateway-pick{margin:12px 0 4px;padding:11px;border:1px solid rgba(56,189,248,.16);border-radius:10px;background:rgba(14,116,144,.07)}.gateway-pick-title{margin-bottom:7px;color:#bae6fd;font-size:.75rem;font-weight:800}.gateway-pick-actions{display:grid;grid-template-columns:1fr auto;gap:8px}.gateway-pick select{width:100%;min-width:0;padding:8px 9px;border:1px solid #334155;border-radius:8px;background:#020617;color:var(--text);font:inherit}.gateway-copy{border:1px solid rgba(56,189,248,.28);border-radius:8px;padding:8px 10px;background:rgba(56,189,248,.12);color:#bae6fd;font-weight:800;cursor:pointer;white-space:nowrap}.gateway-copy:disabled,.gateway-pick select:disabled{opacity:.45;cursor:not-allowed}.gateway-hint{margin-top:7px;color:var(--muted);font-size:.7rem;line-height:1.4}.mode-note{margin-top:10px;padding:8px 10px;border-radius:9px;background:rgba(148,163,184,.08);color:var(--muted);font-size:.75rem;line-height:1.4}.mode-note.locked{background:rgba(245,158,11,.12);color:#fde68a}.actions{margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.save{border:0;border-radius:10px;padding:10px 14px;background:var(--green);color:#052e16;font-weight:800;cursor:pointer}.save.secondary{background:rgba(56,189,248,.16);color:#bae6fd;border:1px solid rgba(56,189,248,.30)}.save:disabled{opacity:.45;cursor:not-allowed}.feedback{font-size:.84rem;color:var(--muted)}.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.card.conflict{border-color:rgba(239,68,68,.72);box-shadow:0 0 0 2px rgba(239,68,68,.12),0 10px 30px rgba(0,0,0,.22)}.legend{margin-top:14px;color:var(--muted);font-size:.78rem;line-height:1.5}.controller-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.controller-card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.98));border:1px solid rgba(56,189,248,.15);border-radius:16px;padding:18px}.controller-card.conflict{border-color:rgba(239,68,68,.72);box-shadow:0 0 0 2px rgba(239,68,68,.12)}.controller-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:12px}.controller-meta{color:var(--muted);font-size:.72rem;margin-top:4px}.cap-row{margin-top:11px}.cap-label{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px;color:#cbd5e1;font-size:.76rem;font-weight:750}.cap-label small{color:var(--muted);font-weight:500}.cap-select{width:100%;padding:9px;border:1px solid #334155;border-radius:9px;background:#020617;color:var(--text);font:inherit}.cap-select:disabled{opacity:.45;cursor:not-allowed}.target-offline{color:#fca5a5}.controller-note{margin-top:12px;padding:9px 10px;border-radius:9px;background:rgba(56,189,248,.07);color:var(--muted);font-size:.72rem;line-height:1.45}.controller-empty{padding:18px;border:1px dashed rgba(148,163,184,.22);border-radius:14px;color:var(--muted);font-size:.82rem}.controller-legend{margin-top:12px;color:var(--muted);font-size:.76rem;line-height:1.5}@media(max-width:650px){body{padding:13px}.topbar{align-items:flex-start;flex-direction:column}.station-select{width:100%}.section-title{align-items:flex-start;flex-direction:column}}
 </style>
 {% endblock %}
 
 {% block page %}
 <div class="wrap">
     <header class="topbar">
-        <div class="head"><a class="back" href="{{ url_for('grow_control_dashboard') }}">←</a><div><h1>🔗 Verbindungen</h1><div class="sub">Aktoren einer Grow-Station manuell IP und Relay zuweisen</div></div></div>
+        <div class="head"><a class="back" href="{{ url_for('grow_control_dashboard') }}">←</a><div><h1>🔗 Verbindungen</h1><div class="sub">Strom-Aktoren und zusätzliche Controller-Funktionen einer Grow-Station zuweisen</div></div></div>
         <select id="station-select" class="station-select" aria-label="Grow-Station"></select>
     </header>
 
     <div id="banner" class="banner">Station wird geladen …</div>
+
+    <div class="section-title">
+        <div>
+            <h2>🔌 Stromversorgung</h2>
+            <p>Bestehende Shelly-Zuordnung für Ein/Aus. Dieser Pfad bleibt unverändert.</p>
+        </div>
+        <span class="section-badge">POWER</span>
+    </div>
+
     <div id="device-grid" class="grid"></div>
 
     <div class="actions">
-        {% if has_permission('hardware.configure') %}<button id="save-button" class="save" type="button">💾 Zuordnungen speichern</button>{% endif %}
+        {% if has_permission('hardware.configure') %}<button id="save-button" class="save" type="button">💾 Strom-Zuordnungen speichern</button>{% endif %}
         <span id="feedback" class="feedback"></span>
     </div>
+
     <div class="legend">
         Nicht verwendete Aktoren können ohne IP/Hostname bleiben. Aktive Betriebsarten sind aber nur mit vollständiger Hardware-Zuordnung erlaubt.
         Eine bestehende Zuordnung kann nur im Modus <strong>Deaktiviert / OFF</strong> geändert werden; bei einer LIVE-Station muss der alte Ausgang zusätzlich als <strong>ONLINE · AUS</strong> bestätigt sein.
         Bei gesetzter IP und leerem Relay wird Relay 0 verwendet. Doppelbelegungen derselben Kombination <strong>IP/Hostname + Relay</strong> bleiben gesperrt.<br>
         Erkannte Shelly-Gateways können als Eingabehilfe gewählt werden; <strong>IP übernehmen</strong> kopiert ausschließlich die IP und speichert nichts automatisch.
+    </div>
+
+    <div class="section-title">
+        <div>
+            <h2>🎛️ Controller-Funktionen</h2>
+            <p>Level/Dimmen und Oszillation getrennt vom Strom-Aktor zuweisen.</p>
+        </div>
+        <span class="section-badge">SF.4B · MAPPING</span>
+    </div>
+
+    <div id="controller-grid" class="controller-grid">
+        <div class="controller-empty">Controller-Zuordnungen werden geladen …</div>
+    </div>
+
+    <div class="actions">
+        {% if has_permission('hardware.configure') %}<button id="controller-save-button" class="save secondary" type="button">💾 Controller-Zuordnungen speichern</button>{% endif %}
+        <span id="controller-feedback" class="feedback"></span>
+    </div>
+
+    <div class="controller-legend">
+        <strong>Power bleibt beim Shelly.</strong> Die Controller-Zuordnung ergänzt ausschließlich Fähigkeiten wie
+        <strong>Level/Dimmen</strong> und <strong>Oszillation</strong>. SF.4B speichert nur das Mapping;
+        es werden weiterhin keine Spider-Farmer-Befehle gesendet. Ein physisches Target kann pro Capability
+        nur einem logischen Growstar-Gerät gehören.
     </div>
 </div>
 
@@ -36,21 +70,33 @@
     const CAN_CONFIGURE = {{ has_permission('hardware.configure')|tojson }};
     const select = document.getElementById("station-select");
     const grid = document.getElementById("device-grid");
+    const controllerGrid = document.getElementById("controller-grid");
     const banner = document.getElementById("banner");
     const saveButton = document.getElementById("save-button");
+    const controllerSaveButton = document.getElementById("controller-save-button");
     const feedback = document.getElementById("feedback");
+    const controllerFeedback = document.getElementById("controller-feedback");
+
     let current = null;
     let gateways = [];
+    let capabilitySnapshot = null;
 
     const q = new URLSearchParams(location.search);
     const preferred = q.get("tent");
     const hwUrl = id => `/api/tents/${encodeURIComponent(id)}/hardware`;
+    const routingUrl = id => `/api/tents/${encodeURIComponent(id)}/capability-routing`;
+
     const MODE_LABELS = {
         OFF: "Deaktiviert",
         ON: "Dauerbetrieb",
         TIME: "Zeitgesteuert",
         INTERVAL: "Intervall",
         ENV: "Umgebung"
+    };
+
+    const CAPABILITY_LABELS = {
+        level: "Level / Dimmen",
+        oscillation: "Oszillation"
     };
 
     function relayOptions(selected){
@@ -159,6 +205,26 @@
         card?.scrollIntoView({behavior:"smooth", block:"center"});
     }
 
+    function clearControllerConflicts(){
+        controllerGrid.querySelectorAll(".controller-card.conflict")
+            .forEach(card => card.classList.remove("conflict"));
+    }
+
+    function highlightControllerConflict(contender){
+        if(
+            !contender ||
+            String(contender.tent_id || select.value || "") !== String(select.value || "")
+        ){
+            return;
+        }
+
+        const card = [...controllerGrid.querySelectorAll(".controller-card[data-device]")]
+            .find(item => String(item.dataset.device || "") === String(contender.device || ""));
+
+        card?.classList.add("conflict");
+        card?.scrollIntoView({behavior:"smooth", block:"center"});
+    }
+
     async function loadGatewayCatalog(){
         try{
             const res = await fetch("/api/hardware", {cache:"no-store"});
@@ -206,6 +272,113 @@
         }).join("");
 
         if(saveButton) saveButton.disabled = !editable;
+        renderCapabilityRouting();
+    }
+
+    function targetOptions(capability, selectedTarget){
+        const targets = (capabilitySnapshot?.targets || [])
+            .filter(target =>
+                target.assignment_enabled &&
+                (target.capabilities || []).includes(capability)
+            );
+
+        let html = `<option value="" ${selectedTarget ? '' : 'selected'}>– Kein Controller –</option>`;
+
+        for(const target of targets){
+            const selected = String(target.id || "") === String(selectedTarget || "");
+            const state = target.online ? "ONLINE" : "OFFLINE";
+            html += `<option value="${escapeHtml(target.id)}" ${selected ? 'selected' : ''}>${escapeHtml(target.label || target.id)} · ${state}</option>`;
+        }
+
+        return html;
+    }
+
+    function renderCapabilityRouting(){
+        if(!capabilitySnapshot){
+            controllerGrid.innerHTML = `<div class="controller-empty">Controller-Zuordnungen werden geladen …</div>`;
+            if(controllerSaveButton) controllerSaveButton.disabled = true;
+            return;
+        }
+
+        const devices = Object.values(capabilitySnapshot.devices || {})
+            .filter(device =>
+                Object.keys(device.routes || {}).some(cap => cap !== "power")
+            );
+
+        if(!devices.length){
+            controllerGrid.innerHTML = `<div class="controller-empty">Für diese Station sind keine zusätzlichen Controller-Funktionen vorhanden.</div>`;
+            if(controllerSaveButton) controllerSaveButton.disabled = true;
+            return;
+        }
+
+        controllerGrid.innerHTML = devices.map(device => {
+            const hwAssignment = current?.assignments?.[device.device] || {};
+            const mode = String(hwAssignment.mode || "OFF").toUpperCase();
+            const modeLocked = mode !== "OFF";
+            const editable = CAN_CONFIGURE && !modeLocked;
+
+            const rows = Object.entries(device.routes || {})
+                .filter(([capability, route]) =>
+                    capability !== "power" && route?.editable_here
+                )
+                .map(([capability, route]) => `
+                    <div class="cap-row">
+                        <div class="cap-label">
+                            <span>${escapeHtml(CAPABILITY_LABELS[capability] || capability)}</span>
+                            <small>${route.configured ? escapeHtml(route.provider || "zugeordnet") : "optional"}</small>
+                        </div>
+                        <select
+                            class="cap-select js-capability"
+                            data-capability="${escapeHtml(capability)}"
+                            data-original="${escapeHtml(route.target_id || '')}"
+                            ${editable ? '' : 'disabled'}
+                        >
+                            ${targetOptions(capability, route.target_id)}
+                        </select>
+                    </div>
+                `).join("");
+
+            return `
+                <article class="controller-card" data-device="${escapeHtml(device.device)}">
+                    <div class="controller-head">
+                        <div>
+                            <h3>${device.icon || '🎛️'} ${escapeHtml(device.label || device.device)}</h3>
+                            <div class="controller-meta">Power: Shelly · Zusatzfunktionen: frei zuweisbar</div>
+                        </div>
+                        <span class="status ${rows.includes('data-original=""') ? 'none' : 'ok'}">CONTROLLER</span>
+                    </div>
+                    ${rows}
+                    <div class="controller-note ${modeLocked ? 'locked' : ''}">
+                        Modus: ${escapeHtml(MODE_LABELS[mode] || mode)}
+                        ${modeLocked ? " · Controller-Zuordnung zur Sicherheit erst im Modus OFF ändern." : " · Mapping änderbar."}
+                    </div>
+                </article>
+            `;
+        }).join("");
+
+        if(controllerSaveButton) controllerSaveButton.disabled = !CAN_CONFIGURE;
+    }
+
+    async function loadCapabilityRouting(id){
+        controllerFeedback.className = "feedback";
+        controllerFeedback.textContent = "";
+
+        try{
+            const res = await fetch(routingUrl(id), {cache:"no-store"});
+            const data = await res.json().catch(()=>({}));
+
+            if(!res.ok){
+                throw new Error(data.message || data.error || `HTTP ${res.status}`);
+            }
+
+            capabilitySnapshot = data;
+            renderCapabilityRouting();
+        }catch(err){
+            console.error("Controller-Zuordnungen konnten nicht geladen werden:", err);
+            capabilitySnapshot = null;
+            controllerGrid.innerHTML = `<div class="controller-empty">Controller-Zuordnungen konnten nicht geladen werden: ${escapeHtml(err.message || err)}</div>`;
+            if(controllerSaveButton) controllerSaveButton.disabled = true;
+        }
     }
 
     async function loadHardware(id){
@@ -217,6 +390,18 @@
         const u=new URL(location.href);u.searchParams.set("tent",id);history.replaceState(null,"",u);
     }
 
+    async function loadStation(id){
+        capabilitySnapshot = null;
+        controllerGrid.innerHTML = `<div class="controller-empty">Controller-Zuordnungen werden geladen …</div>`;
+
+        await Promise.all([
+            loadHardware(id),
+            loadCapabilityRouting(id)
+        ]);
+
+        renderCapabilityRouting();
+    }
+
     async function loadStations(){
         const res = await fetch("/api/tents");
         const data = await res.json();
@@ -224,7 +409,7 @@
         select.innerHTML = tents.map(t => `<option value="${t.id}">${t.name || t.id}${t.control_enabled ? ' · LIVE' : t.shadow_enabled ? ' · SHADOW' : ''}</option>`).join("");
         const wanted = tents.some(t=>t.id===preferred) ? preferred : data.default_tent_id;
         select.value = wanted || tents[0]?.id || "";
-        if(select.value) loadHardware(select.value);
+        if(select.value) loadStation(select.value);
     }
 
     grid.addEventListener("click", event => {
@@ -242,9 +427,6 @@
 
         clearConflictHighlights();
 
-        // Absichtlich NUR die IP kopieren. Relay, Modus und sämtliche
-        // Regel-/Safety-Strukturen bleiben unberührt. Gespeichert wird erst
-        // über den bereits bestehenden Zuordnungen-speichern-Button.
         ipInput.value = String(gateway.ip || "").trim();
         feedback.className = "feedback";
         feedback.textContent = `${card.querySelector("h2")?.textContent || "Aktor"}: Gateway-IP übernommen. Noch nicht gespeichert.`;
@@ -269,16 +451,23 @@
         }
     });
 
-    select.addEventListener("change",()=>loadHardware(select.value));
+    controllerGrid.addEventListener("change", event => {
+        if(event.target.matches(".js-capability")){
+            event.target.closest(".controller-card")?.classList.remove("conflict");
+            if(controllerFeedback.classList.contains("err")){
+                controllerFeedback.className = "feedback";
+                controllerFeedback.textContent = "";
+            }
+        }
+    });
+
+    select.addEventListener("change",()=>loadStation(select.value));
 
     saveButton?.addEventListener("click", async () => {
         if(!current || !CAN_CONFIGURE) return;
 
         clearConflictHighlights();
 
-        // Nur tatsächlich geänderte Aktoren senden. Dadurch werden
-        // unberührte offene Alt-Zuordnungen nicht nebenbei normalisiert
-        // (z.B. leeres Relay -> Relay 0).
         const assignments={};
 
         grid.querySelectorAll(".card[data-device]").forEach(card => {
@@ -357,8 +546,78 @@
         }
 
         feedback.className="feedback ok";
-        feedback.textContent="Zuordnungen gespeichert";
+        feedback.textContent="Strom-Zuordnungen gespeichert";
         render(data);
+    });
+
+    controllerSaveButton?.addEventListener("click", async () => {
+        if(!capabilitySnapshot || !CAN_CONFIGURE) return;
+
+        clearControllerConflicts();
+
+        const routes = {};
+
+        controllerGrid.querySelectorAll(".controller-card[data-device]").forEach(card => {
+            const device = card.dataset.device;
+
+            card.querySelectorAll(".js-capability").forEach(field => {
+                if(field.disabled) return;
+
+                const capability = field.dataset.capability;
+                const original = String(field.dataset.original || "");
+                const requested = String(field.value || "");
+
+                if(original === requested) return;
+
+                if(!routes[device]) routes[device] = {};
+
+                routes[device][capability] = requested
+                    ? {target_id: requested}
+                    : null;
+            });
+        });
+
+        if(Object.keys(routes).length === 0){
+            controllerFeedback.className = "feedback";
+            controllerFeedback.textContent = "Keine Controller-Änderungen zu speichern.";
+            return;
+        }
+
+        controllerFeedback.className = "feedback";
+        controllerFeedback.textContent = "Speichere Controller-Zuordnungen …";
+
+        const res = await fetch(
+            routingUrl(select.value),
+            {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({routes})
+            }
+        );
+
+        const data = await res.json().catch(()=>({}));
+
+        if(!res.ok){
+            controllerFeedback.className = "feedback err";
+
+            if(data.error === "capability_route_conflict"){
+                const owner = data.owner || {};
+                const contender = data.contender || {};
+                controllerFeedback.textContent =
+                    `Doppelbelegung: ${CAPABILITY_LABELS[data.capability] || data.capability} ` +
+                    `des Targets ist bereits ${owner.tent_id || ""} / ${owner.device || ""} zugeordnet.`;
+                highlightControllerConflict(contender);
+            } else {
+                controllerFeedback.textContent =
+                    data.message || data.error || "Controller-Zuordnung konnte nicht gespeichert werden.";
+            }
+            return;
+        }
+
+        capabilitySnapshot = data;
+        controllerFeedback.className = "feedback ok";
+        controllerFeedback.textContent = "Controller-Zuordnungen gespeichert";
+        renderCapabilityRouting();
     });
 
     async function init(){
