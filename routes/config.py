@@ -8,7 +8,9 @@ from services.network import (
     connect_wifi,
     get_current_wifi_password,
     network_permissions,
+    network_provisioning_secret_status,
     network_status,
+    save_current_wifi_provisioning_secret,
     update_current_wifi_password,
     wifi_scan,
 )
@@ -38,6 +40,45 @@ def register(app):
     @permission_required("settings.view")
     def api_network_capabilities():
         return jsonify(network_permissions())
+
+    @app.route("/api/config/network/provisioning-secret")
+    @permission_required("settings.view")
+    def api_network_provisioning_secret():
+        response = jsonify(
+            network_provisioning_secret_status()
+        )
+        response.headers["Cache-Control"] = "no-store, private, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
+    @app.route("/system/network/provisioning-secret", methods=["POST"])
+    @permission_required("settings.manage")
+    def system_network_provisioning_secret():
+        data = request.get_json(silent=True) or {}
+
+        try:
+            result = save_current_wifi_provisioning_secret(
+                data.get("password")
+            )
+        except ValueError as exc:
+            return jsonify(
+                success=False,
+                error=str(exc),
+            ), 400
+        except NetworkChangeError as exc:
+            return jsonify(exc.as_dict()), 409
+        except RuntimeError as exc:
+            return jsonify(
+                success=False,
+                error=str(exc),
+            ), 503
+
+        response = jsonify(result)
+        response.headers["Cache-Control"] = "no-store, private, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     # Absichtlich unter /system: Die bestehende zentrale Auth-Policy verlangt
     # für schreibende /system-Unterpfade bereits settings.manage.

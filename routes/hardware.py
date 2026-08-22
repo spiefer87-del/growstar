@@ -248,7 +248,6 @@ def register(app):
         try:
             result = shelly_wifi_provisioning.start(
                 data.get("address"),
-                password_override=data.get("password"),
             )
         except (
             ShellyProvisioningError,
@@ -267,7 +266,7 @@ def register(app):
                 ),
             }), 503
 
-        if result.get("password_required"):
+        if result.get("network_secret_required"):
             return jsonify(result), 409
 
         if result.get("adopted"):
