@@ -7,9 +7,11 @@ Commands arrive exclusively over a private UNIX socket inside the protected
 Spider Farmer state directory. No HTTP listener and no second MQTT connection
 is created.
 
-SF.4D.4 adds one private diagnostic action, test_controller_minimal, used only
-by tools/test_spiderfarmer_minimal_setpoint.py. The normal UI/device path still
-uses set_controller unchanged.
+SF.4D.4 adds the private diagnostic action test_controller_minimal.
+
+SF.4D.5 adds a second private fan-only diagnostic action,
+test_controller_minimal_powered, which sends mOnOff=1 plus exactly one requested
+fan setpoint. The normal UI/device path still uses set_controller unchanged.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from .command_model import (
     SpiderFarmerCommandError,
     compile_controller_command,
     compile_minimal_controller_command,
+    compile_powered_minimal_fan_command,
 )
 from .mqtt_command import build_publish
 from .proxy import ReadOnlySpiderFarmerProxy, _close_writer
@@ -281,6 +284,7 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         if action not in {
             "set_controller",
             "test_controller_minimal",
+            "test_controller_minimal_powered",
         }:
             raise SpiderFarmerCommandError(
                 "Unsupported command action"
@@ -305,7 +309,18 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
                 "Spider-Farmer-Controller ist nicht aktiv mit der Bridge verbunden"
             )
 
-        if action == "test_controller_minimal":
+        if action == "test_controller_minimal_powered":
+            if module != "fan":
+                raise SpiderFarmerCommandError(
+                    "SF.4D.5 Powered-Minimaltest ist ausschließlich für fan erlaubt"
+                )
+
+            compiled = compile_powered_minimal_fan_command(
+                self.capture_path,
+                pid=pid,
+                setpoints=setpoints,
+            )
+        elif action == "test_controller_minimal":
             compiled = compile_minimal_controller_command(
                 self.capture_path,
                 pid=pid,
@@ -342,7 +357,16 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         writer.write(packet)
         await writer.drain()
 
-        if action == "test_controller_minimal":
+        if action == "test_controller_minimal_powered":
+            _LOG.warning(
+                "SF.4D.5 POWERED MINIMAL TEST sent controller=%s module=%s fields=%s template=%s payload=%s",
+                controller_id,
+                module,
+                sorted(compiled["changed_fields"]),
+                compiled.get("observed_at"),
+                compiled["payload"],
+            )
+        elif action == "test_controller_minimal":
             _LOG.warning(
                 "SF.4D.4 MINIMAL TEST sent controller=%s module=%s fields=%s template=%s payload=%s",
                 controller_id,
