@@ -26,7 +26,7 @@ def require(condition, message):
     print("✅", message)
 
 
-def _record(*, ts, max_speed, shake_level=4):
+def _record(*, ts, m_level, shake_level=4):
     return {
         "ts": ts,
         "direction": "down",
@@ -41,7 +41,8 @@ def _record(*, ts, max_speed, shake_level=4):
                 "fan": {
                     "modeType": 2,
                     "minSpeed": 3,
-                    "maxSpeed": max_speed,
+                    "maxSpeed": 8,
+                    "mLevel": m_level,
                     "shakeLevel": shake_level,
                     "natural": 1,
                     "cycleTime": {
@@ -86,8 +87,7 @@ def _level_record(*, ts, module, raw_field, value):
 def main():
     with tempfile.TemporaryDirectory() as td:
         capture = Path(td) / "raw_frames.jsonl"
-        initial = _record(ts="2026-08-23T09:00:00Z", max_speed=7)
-        original_fan = initial["payload"]["params"]["fan"]
+        initial = _record(ts="2026-08-23T09:00:00Z", m_level=7)
 
         capture.write_text(json.dumps(initial) + "\n", encoding="utf-8")
 
@@ -101,20 +101,37 @@ def main():
         fan = compiled["payload"]["params"]["fan"]
 
         require(
-            fan["maxSpeed"] == 8,
-            "Ventilatorstufe wird ausschließlich auf beobachtetes maxSpeed gemappt",
+            fan == {
+                "modeType": 0,
+                "mOnOff": 1,
+                "mLevel": 8,
+                "shakeLevel": 5,
+            },
+            "Produktionspfad sendet manuellen Fan exakt als modeType=0, mOnOff=1, mLevel und shakeLevel",
         )
+
+        for forbidden in (
+            "minSpeed",
+            "maxSpeed",
+            "natural",
+            "cycleTime",
+            "timePeriod",
+        ):
+            require(
+                forbidden not in fan,
+                f"Produktionspfad sendet fremde Fan-Konfiguration {forbidden} nicht zurück",
+            )
+
         require(
-            fan["shakeLevel"] == 5,
-            "Oszillation wird ausschließlich auf beobachtetes shakeLevel gemappt",
+            compiled["changed_fields"] == {
+                "modeType": 0,
+                "mOnOff": 1,
+                "mLevel": 8,
+                "shakeLevel": 5,
+            },
+            "Command-Ergebnis benennt den vollständigen tatsächlich gesendeten manuellen Fan-Block",
         )
-        require(
-            fan["minSpeed"] == 3
-            and fan["natural"] == 1
-            and fan["cycleTime"] == original_fan["cycleTime"]
-            and fan["timePeriod"] == original_fan["timePeriod"],
-            "Unbekannte bzw. nicht bearbeitete Controller-Konfiguration bleibt exakt erhalten",
-        )
+
         require(
             compiled["payload"]["params"]["keyPath"] == ["device", "fan"],
             "Echt beobachteter keyPath wird unverändert wiederverwendet",
@@ -145,7 +162,7 @@ def main():
                     f"Bridge akzeptierte ungültigen Fan-Sollwert: {bad}"
                 )
 
-        print("✅ SF.4D.3 Bridge blockiert Fan-Level/Oszillation außerhalb L1 bis L10")
+        print("✅ SF.4D.6 Bridge blockiert Fan-Level/Oszillation außerhalb L1 bis L10")
 
         message = json.dumps(
             compiled["payload"],
@@ -167,7 +184,7 @@ def main():
 
         rotated = Path(str(capture) + ".1")
         rotated.write_text(
-            json.dumps(_record(ts="2026-08-23T08:30:00Z", max_speed=5)) + "\n",
+            json.dumps(_record(ts="2026-08-23T08:30:00Z", m_level=5)) + "\n",
             encoding="utf-8",
         )
         capture.write_text(
@@ -190,19 +207,22 @@ def main():
         rotated_fan = rotated_compiled["payload"]["params"]["fan"]
 
         require(
-            rotated_fan["maxSpeed"] == 6
-            and rotated_fan["shakeLevel"] == 4
+            rotated_fan == {
+                "modeType": 0,
+                "mOnOff": 1,
+                "mLevel": 6,
+            }
             and rotated_compiled["observed_at"] == "2026-08-23T08:30:00Z",
-            "SF.4D.2 findet ein echtes Fan-Template auch nach Capture-Rotation in raw_frames.jsonl.1",
+            "Capture-Rotation liefert weiterhin das echte Envelope, ohne alte Fan-Konfiguration zurückzusenden",
         )
 
-        # A newer but unsafe historical template (e.g. our L60 discovery test)
-        # must never be replayed. The compiler falls back to the older valid one.
+        # A newer but unsafe historical manual level must never be reused.
+        # The compiler falls back to the older valid one.
         capture.write_text(
             json.dumps(
                 _record(
                     ts="2026-08-23T10:05:00Z",
-                    max_speed=60,
+                    m_level=60,
                     shake_level=4,
                 )
             ) + "\n",
@@ -218,17 +238,20 @@ def main():
         safe_fan = safe_fallback["payload"]["params"]["fan"]
 
         require(
-            safe_fan["maxSpeed"] == 5
-            and safe_fan["shakeLevel"] == 5
+            safe_fan == {
+                "modeType": 0,
+                "mOnOff": 1,
+                "shakeLevel": 5,
+            }
             and safe_fallback["observed_at"] == "2026-08-23T08:30:00Z",
-            "Ungültiges beobachtetes Fan-Template wird übersprungen statt erneut gesendet",
+            "Ungültiges beobachtetes mLevel wird übersprungen und nicht in den neuen Fan-Block kopiert",
         )
 
         capture.write_text(
             json.dumps(
                 _record(
                     ts="2026-08-23T10:10:00Z",
-                    max_speed=9,
+                    m_level=9,
                     shake_level=6,
                 )
             ) + "\n",
@@ -244,10 +267,13 @@ def main():
         current_fan = current_compiled["payload"]["params"]["fan"]
 
         require(
-            current_fan["maxSpeed"] == 10
-            and current_fan["shakeLevel"] == 6
+            current_fan == {
+                "modeType": 0,
+                "mOnOff": 1,
+                "mLevel": 10,
+            }
             and current_compiled["observed_at"] == "2026-08-23T10:10:00Z",
-            "Aktuelle gültige Capture-Datei hat Vorrang vor dem älteren rotierten Template",
+            "Aktuelles gültiges Capture hat Vorrang, Fan-Schreibblock bleibt trotzdem minimal manuell",
         )
 
         # The 1..10 rule is fan-specific. Light/blower keep their 0..100 scale.
@@ -318,7 +344,7 @@ def main():
         "Bestehender Geräte-Speicherpfad dispatcht gespeicherte Controller-Sollwerte über den Provider-Adapter",
     )
 
-    print("✅ Spider Farmer SF.4D.3 Command-Path Regression vollständig erfolgreich")
+    print("✅ Spider Farmer SF.4D.6 manueller Command-Path vollständig erfolgreich")
 
 
 if __name__ == "__main__":

@@ -111,18 +111,18 @@ def main():
         require(
             payload["params"]["fan"] == {
                 "mOnOff": 1,
-                "maxSpeed": 7,
+                "mLevel": 7,
             },
-            "SF.4D.5 sendet exakt mOnOff=1 plus maxSpeed=7",
+            "SF.4D.5-Diagnose folgt der korrigierten Zuordnung mOnOff=1 plus mLevel=7",
         )
 
         for forbidden in (
             "modeType",
             "minSpeed",
+            "maxSpeed",
             "shakeLevel",
             "natural",
             "timePeriod",
-            "mLevel",
             "cycleTime",
         ):
             require(
@@ -133,9 +133,9 @@ def main():
         require(
             compiled["changed_fields"] == {
                 "mOnOff": 1,
-                "maxSpeed": 7,
+                "mLevel": 7,
             },
-            "Diagnose-Rückgabe benennt nur die tatsächlich gesendeten Fan-Felder",
+            "Diagnose-Rückgabe benennt die korrigierten tatsächlich gesendeten Fan-Felder",
         )
 
         for invalid in (
