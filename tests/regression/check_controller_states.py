@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Regression for CTRL.1 controller-aware operating states."""
+"""Regression for CTRL.1 controller-aware operating states.
+
+CTRL.3.2 adds a read-only Shelly health fallback to the controller power gate.
+This test keeps using an isolated dummy runtime and therefore mocks the new
+health lookup explicitly. Productive hardware assignment data is not required
+for this regression.
+"""
 
 from pathlib import Path
 import sys
@@ -110,6 +116,8 @@ def main():
         patch("core.controller_states.resolve_runtime", return_value=rt),
         patch("core.controller_states.set_device", side_effect=fake_set_device),
         patch("core.controller_states._apply_controller") as controller,
+        patch("core.controller_states.get_endpoint_health") as health,
+        patch("core.controller_states.device_assignment") as assignment,
     ):
         result = apply_device_state(
             "vent",
@@ -126,6 +134,8 @@ def main():
         )
         require(
             controller.call_count == 0
+            and health.call_count == 0
+            and assignment.call_count == 0
             and result["controller"]["status"] == "skipped_power_off",
             "AUS sendet niemals einen Controller-Level-Befehl",
         )
@@ -141,6 +151,11 @@ def main():
         patch("core.controller_states.resolve_runtime", return_value=rt),
         patch("core.controller_states.set_device", side_effect=blocked_power),
         patch("core.controller_states._apply_controller") as controller,
+        patch(
+            "core.controller_states.device_assignment",
+            return_value={"configured": False},
+        ),
+        patch("core.controller_states.get_endpoint_health") as health,
     ):
         result = apply_device_state(
             "vent",
@@ -153,6 +168,7 @@ def main():
 
         require(
             controller.call_count == 0
+            and health.call_count == 0
             and result["controller"]["status"] == "blocked_by_power_path",
             "Controller kann eine blockierte Shelly-/Safety-Powerfreigabe nicht umgehen",
         )
