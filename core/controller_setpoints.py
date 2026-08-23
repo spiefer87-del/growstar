@@ -1,6 +1,6 @@
-"""Generic controller setpoints for Growstar SF.4C.
+"""Generic controller setpoints for Growstar.
 
-This module validates and stores desired controller values only.
+This module is the single source of truth for editable controller values.
 It deliberately contains no hardware transport.
 
 Persisted shape inside DEVICE_PARAMS[device]:
@@ -56,21 +56,37 @@ SCHEMAS = {
 }
 
 
-def controller_schema(target):
-    """Return the editable setpoint schema for one assigned controller target."""
+def controller_schema_for_family(family, capabilities=None):
+    """Return one family schema, optionally restricted to capabilities."""
 
-    if not isinstance(target, dict):
-        return {}
-
-    family = str(target.get("family") or "").strip()
-    allowed = set(target.get("capabilities") or [])
+    family = str(family or "").strip()
     family_schema = SCHEMAS.get(family) or {}
+
+    if capabilities is None:
+        allowed = set(family_schema)
+    else:
+        allowed = {
+            str(item)
+            for item in (capabilities or [])
+        }
 
     return {
         name: deepcopy(spec)
         for name, spec in family_schema.items()
         if name in allowed
     }
+
+
+def controller_schema(target):
+    """Return the editable setpoint schema for one assigned controller target."""
+
+    if not isinstance(target, dict):
+        return {}
+
+    return controller_schema_for_family(
+        target.get("family"),
+        target.get("capabilities") or [],
+    )
 
 
 def normalize_controller_setpoints(raw, schema):
