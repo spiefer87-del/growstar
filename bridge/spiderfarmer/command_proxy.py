@@ -391,7 +391,7 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
             )
         elif action == "test_controller_manual_blower":
             _LOG.warning(
-                "SF.4D.9 MANUAL BLOWER TEST sent controller=%s module=%s fields=%s payload=%s",
+                "SF.4D.11 MANUAL BLOWER TEST sent controller=%s module=%s fields=%s payload=%s",
                 controller_id,
                 module,
                 sorted(compiled["changed_fields"]),

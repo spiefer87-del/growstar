@@ -29,7 +29,7 @@ _FIELD_MAP = {
         "oscillation": "shakeLevel",
     },
     "blower": {
-        "level": "maxSpeed",
+        "level": "mLevel",
     },
     "light": {
         "level": "mLevel",
@@ -315,14 +315,57 @@ def compile_manual_fan_command(*, pid, setpoints):
     )
 
 
-def compile_manual_blower_command(*, pid, setpoints):
-    """Build the isolated SF.4D.10 manual blower hardware-test command.
+def _confirmed_manual_blower_payload(pid, normalized_setpoints, *, diagnostic=None):
+    """Build the controller-confirmed manual blower command without capture data.
 
-    SF.4D.9 proved that modeType=0 switches the real GGS blower into manual
-    mode, but maxSpeed did not alter the actual speed.  The controller read
-    model reports the live/manual value as mLevel, so this next isolated test
-    sends modeType=0, mOnOff=1 and mLevel only.  It remains diagnostic until
-    the real controller confirms that mLevel controls the blower output.
+    Real-controller tests in SF.4D.10 confirmed that the GGS blower accepts the
+    stable DOWN topic/keyPath together with modeType=0, mOnOff=1 and mLevel
+    25..100.  This is now the production-safe manual blower envelope.
+    """
+
+    pid = str(pid or "").strip().upper()
+    if not pid:
+        raise SpiderFarmerCommandError("Controller-PID fehlt")
+
+    blower_block = {
+        "modeType": 0,
+        "mOnOff": 1,
+    }
+    changed_fields = {
+        "modeType": 0,
+        "mOnOff": 1,
+    }
+
+    for name, value in normalized_setpoints.items():
+        raw_field = _FIELD_MAP["blower"][name]
+        blower_block[raw_field] = value
+        changed_fields[raw_field] = value
+
+    result = {
+        "topic": f"SF/GGS/CB/API/DOWN/{pid}",
+        "payload": {
+            "method": "setConfigField",
+            "params": {
+                "keyPath": ["device", "blower"],
+                "blower": blower_block,
+            },
+        },
+        "observed_at": None,
+        "session_id": None,
+        "module": "blower",
+        "changed_fields": changed_fields,
+    }
+    if diagnostic:
+        result["diagnostic"] = diagnostic
+    return result
+
+
+def compile_manual_blower_command(*, pid, setpoints):
+    """Compatibility diagnostic for the confirmed manual blower write.
+
+    SF.4D.10 confirmed on real hardware that modeType=0, mOnOff=1 and mLevel
+    25..100 directly control the blower.  Keep the private action available for
+    diagnostics while using the same confirmed envelope as production.
     """
 
     if not isinstance(setpoints, dict):
@@ -336,47 +379,22 @@ def compile_manual_blower_command(*, pid, setpoints):
         raise SpiderFarmerCommandError(
             "Manueller Blower-Test erwartet modeType=0"
         )
-    if (
-        isinstance(level, bool)
-        or not isinstance(level, int)
-        or not 25 <= level <= 100
-    ):
-        raise SpiderFarmerCommandError(
-            "Manueller Blower-Test erwartet mLevel zwischen 25 und 100"
-        )
     if on_off != 1:
         raise SpiderFarmerCommandError(
             "Manueller Blower-Test erwartet mOnOff=1"
         )
 
-    # SF.4D.10 intentionally validates the observed 25..100 blower range
-    # directly here.  Production field mapping remains untouched until this
-    # hardware test has been confirmed on the real controller.
-    pid = str(pid or "").strip().upper()
-    if not pid:
-        raise SpiderFarmerCommandError("Controller-PID fehlt")
+    normalized = _normalize_command_setpoints(
+        "blower",
+        {"level": level},
+    )
 
-    blower_block = {
-        "modeType": 0,
-        "mOnOff": 1,
-        "mLevel": level,
-    }
+    return _confirmed_manual_blower_payload(
+        pid,
+        normalized,
+        diagnostic="confirmed_manual_blower",
+    )
 
-    return {
-        "topic": f"SF/GGS/CB/API/DOWN/{pid}",
-        "payload": {
-            "method": "setConfigField",
-            "params": {
-                "keyPath": ["device", "blower"],
-                "blower": blower_block,
-            },
-        },
-        "observed_at": None,
-        "session_id": None,
-        "module": "blower",
-        "changed_fields": dict(blower_block),
-        "diagnostic": "candidate_manual_blower_mlevel",
-    }
 
 def compile_controller_command(
     capture_path,
@@ -407,15 +425,21 @@ def compile_controller_command(
             module=module,
         )
     except SpiderFarmerCommandError:
-        # Fan is the one controller family for which the complete manual
-        # envelope was confirmed on real hardware.  If no safe observed
-        # template exists yet (for example after capture rotation/restart),
-        # use that confirmed envelope instead of blocking Growstar control.
+        # Fan and blower now both have controller-confirmed manual envelopes.
+        # If no safe observed template exists yet (for example after capture
+        # rotation/restart), use those confirmed envelopes instead of blocking
+        # Growstar control.
         if module == "fan":
             return _confirmed_manual_fan_payload(
                 pid,
                 normalized_setpoints,
                 diagnostic="confirmed_manual_fan_fallback",
+            )
+        if module == "blower":
+            return _confirmed_manual_blower_payload(
+                pid,
+                normalized_setpoints,
+                diagnostic="confirmed_manual_blower_fallback",
             )
         raise
 
@@ -429,7 +453,7 @@ def compile_controller_command(
 
     changed_fields = {}
 
-    if module == "fan":
+    if module in ("fan", "blower"):
         key_path = params.get("keyPath")
         if not isinstance(key_path, list) or not key_path:
             raise SpiderFarmerCommandError(
@@ -438,12 +462,13 @@ def compile_controller_command(
 
         # Am realen GGS-Controller bestätigt:
         #   modeType=0 -> Manueller Modus
-        #   mOnOff=1   -> controller-interner Fan EIN
-        #   mLevel=N   -> manuelle Ventilatorstufe L1..L10
+        #   mOnOff=1   -> controller-interner Ausgang EIN
+        #   fan.mLevel -> Ventilatorstufe L1..L10
+        #   blower.mLevel -> Gebläseleistung 25..100 %
         #
-        # Spider-Farmer-Zeitfenster, Zyklus, Standby und Natural Wind werden
-        # bewusst nicht aus einem alten Template zurückgesendet.
-        fan_block = {
+        # Zeitfenster, Zyklus, Standby und sonstige Spider-Farmer-Automatik
+        # werden bewusst nicht aus einem alten Template zurückgesendet.
+        manual_block = {
             "modeType": 0,
             "mOnOff": 1,
         }
@@ -454,12 +479,12 @@ def compile_controller_command(
 
         for name, value in normalized_setpoints.items():
             raw_field = field_map[name]
-            fan_block[raw_field] = value
+            manual_block[raw_field] = value
             changed_fields[raw_field] = value
 
         payload["params"] = {
             "keyPath": deepcopy(key_path),
-            "fan": fan_block,
+            module: manual_block,
         }
 
     else:
