@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 from bridge.spiderfarmer.command_model import (
     SpiderFarmerCommandError,
     compile_controller_command,
+    compile_manual_fan_command,
 )
 from bridge.spiderfarmer.mqtt_command import build_publish
 from bridge.spiderfarmer.mqtt_codec import parse_packets
@@ -136,6 +137,54 @@ def main():
             compiled["payload"]["params"]["keyPath"] == ["device", "fan"],
             "Echt beobachteter keyPath wird unverändert wiederverwendet",
         )
+
+        direct_manual = compile_manual_fan_command(
+            pid="744DBD59D734",
+            setpoints={"modeType": 0, "mLevel": 4},
+        )
+        require(
+            direct_manual["topic"] == "SF/GGS/CB/API/DOWN/744DBD59D734"
+            and direct_manual["payload"] == {
+                "method": "setConfigField",
+                "params": {
+                    "keyPath": ["device", "fan"],
+                    "fan": {
+                        "modeType": 0,
+                        "mOnOff": 1,
+                        "mLevel": 4,
+                    },
+                },
+            },
+            "Bestätigter direkter Fan-Test stellt modeType=0, mOnOff=1 und mLevel ohne Capture-Template wieder her",
+        )
+
+        capture.write_text(
+            json.dumps({
+                "ts": "2026-08-23T11:00:00Z",
+                "direction": "up",
+                "session_id": "744dbd59d734",
+                "topic": "SF/GGS/CB/API/UP/744DBD59D734",
+                "payload": {"method": "getDevSta"},
+            }) + "\n",
+            encoding="utf-8",
+        )
+        fallback = compile_controller_command(
+            capture,
+            pid="744DBD59D734",
+            module="fan",
+            setpoints={"level": 7},
+        )
+        require(
+            fallback["payload"]["params"]["fan"] == {
+                "modeType": 0,
+                "mOnOff": 1,
+                "mLevel": 7,
+            }
+            and fallback.get("diagnostic") == "confirmed_manual_fan_fallback",
+            "Produktionspfad kann Fan auch ohne beobachtetes setConfigField-Template mit bestätigtem manuellen Envelope schreiben",
+        )
+
+        capture.write_text(json.dumps(initial) + "\n", encoding="utf-8")
         require(
             compiled["topic"] == "SF/GGS/CB/API/DOWN/744DBD59D734",
             "Echt beobachtetes DOWN-Topic wird unverändert wiederverwendet",
@@ -326,6 +375,11 @@ def main():
         and "asyncio.open_connection" in command_proxy,
         "SF.4D erweitert nur die bestehende Bridge-Sitzung und eröffnet keinen zweiten Controller-MQTT-Client",
     )
+    require(
+        '"test_controller_manual_fan"' in command_proxy
+        and "compile_manual_fan_command" in command_proxy,
+        "SF.4D.8 stellt den früher bestätigten privaten Manual-Fan-Test wieder bereit",
+    )
 
     service = (
         ROOT / "install/growstar-spiderfarmer.service.in"
@@ -344,7 +398,7 @@ def main():
         "Bestehender Geräte-Speicherpfad dispatcht gespeicherte Controller-Sollwerte über den Provider-Adapter",
     )
 
-    print("✅ Spider Farmer SF.4D.6 manueller Command-Path vollständig erfolgreich")
+    print("✅ Spider Farmer SF.4D.8 manueller Command-Path vollständig erfolgreich")
 
 
 if __name__ == "__main__":
