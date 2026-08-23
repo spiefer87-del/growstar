@@ -24,6 +24,7 @@ from core.hardware_assignments import device_assignment
 from core.runtime import get_default_runtime, get_runtime
 from core.safety import get_runtime_safety_snapshot
 from core.tents import manager as tent_manager, validate_tent_id
+from services.spiderfarmer_commands import send_controller_setpoints
 
 
 def _validate_device(device):
@@ -217,13 +218,68 @@ def _save_device(runtime, device, data):
         device,
         data,
     )
+
+    requested_setpoints = (
+        deepcopy(data.get("controller_setpoints"))
+        if isinstance(data, dict)
+        and isinstance(data.get("controller_setpoints"), dict)
+        else None
+    )
+
     changed = update_device_config(
         device,
         normalized,
         runtime=runtime,
     )
+
     payload = _device_payload(runtime, device)
     payload["changed"] = changed
+
+    if requested_setpoints is not None:
+        context = payload.get("controller") or {}
+
+        if not context.get("assigned"):
+            payload["controller_apply"] = {
+                "success": False,
+                "status": "not_assigned",
+                "message": "Kein Controller-Gerät zugeordnet.",
+            }
+        elif context.get("provider") != "spiderfarmer":
+            payload["controller_apply"] = {
+                "success": False,
+                "status": "unsupported_provider",
+                "message": (
+                    "Der zugeordnete Controller-Provider besitzt noch keinen "
+                    "Growstar-Schreibadapter."
+                ),
+            }
+        else:
+            target_id = str(context.get("target_id") or "")
+            parts = target_id.split(":", 2)
+            controller_id = parts[1] if len(parts) >= 3 else ""
+            module = parts[2] if len(parts) >= 3 else ""
+            pid = ""
+
+            for target in spiderfarmer_control_targets():
+                if str(target.get("id") or "") == target_id:
+                    pid = str(target.get("controller_pid") or "")
+                    module = str(target.get("device_id") or module)
+                    break
+
+            try:
+                payload["controller_apply"] = send_controller_setpoints(
+                    controller_id=controller_id,
+                    pid=pid,
+                    module=module,
+                    setpoints=requested_setpoints,
+                )
+            except Exception as exc:
+                payload["controller_apply"] = {
+                    "success": False,
+                    "status": "bridge_error",
+                    "message": str(exc),
+                }
+
     return payload
 
 
