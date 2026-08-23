@@ -12,7 +12,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from bridge.spiderfarmer.command_model import compile_controller_command
+from bridge.spiderfarmer.command_model import (
+    SpiderFarmerCommandError,
+    compile_controller_command,
+)
 from bridge.spiderfarmer.mqtt_command import build_publish
 from bridge.spiderfarmer.mqtt_codec import parse_packets
 
@@ -60,6 +63,26 @@ def _record(*, ts, max_speed, shake_level=4):
     }
 
 
+def _level_record(*, ts, module, raw_field, value):
+    return {
+        "ts": ts,
+        "direction": "down",
+        "session_id": "744dbd59d734",
+        "topic": "SF/GGS/CB/API/DOWN/744DBD59D734",
+        "qos": 0,
+        "retain": False,
+        "payload": {
+            "method": "setConfigField",
+            "params": {
+                "keyPath": ["device", module],
+                module: {
+                    raw_field: value,
+                },
+            },
+        },
+    }
+
+
 def main():
     with tempfile.TemporaryDirectory() as td:
         capture = Path(td) / "raw_frames.jsonl"
@@ -100,6 +123,29 @@ def main():
             compiled["topic"] == "SF/GGS/CB/API/DOWN/744DBD59D734",
             "Echt beobachtetes DOWN-Topic wird unverändert wiederverwendet",
         )
+
+        for bad in (
+            {"level": 0},
+            {"level": 11},
+            {"level": 60},
+            {"oscillation": 0},
+            {"oscillation": 99},
+        ):
+            try:
+                compile_controller_command(
+                    capture,
+                    pid="744DBD59D734",
+                    module="fan",
+                    setpoints=bad,
+                )
+            except SpiderFarmerCommandError:
+                pass
+            else:
+                raise AssertionError(
+                    f"Bridge akzeptierte ungültigen Fan-Sollwert: {bad}"
+                )
+
+        print("✅ SF.4D.3 Bridge blockiert Fan-Level/Oszillation außerhalb L1 bis L10")
 
         message = json.dumps(
             compiled["payload"],
@@ -150,10 +196,38 @@ def main():
             "SF.4D.2 findet ein echtes Fan-Template auch nach Capture-Rotation in raw_frames.jsonl.1",
         )
 
+        # A newer but unsafe historical template (e.g. our L60 discovery test)
+        # must never be replayed. The compiler falls back to the older valid one.
         capture.write_text(
             json.dumps(
                 _record(
                     ts="2026-08-23T10:05:00Z",
+                    max_speed=60,
+                    shake_level=4,
+                )
+            ) + "\n",
+            encoding="utf-8",
+        )
+
+        safe_fallback = compile_controller_command(
+            capture,
+            pid="744DBD59D734",
+            module="fan",
+            setpoints={"oscillation": 5},
+        )
+        safe_fan = safe_fallback["payload"]["params"]["fan"]
+
+        require(
+            safe_fan["maxSpeed"] == 5
+            and safe_fan["shakeLevel"] == 5
+            and safe_fallback["observed_at"] == "2026-08-23T08:30:00Z",
+            "Ungültiges beobachtetes Fan-Template wird übersprungen statt erneut gesendet",
+        )
+
+        capture.write_text(
+            json.dumps(
+                _record(
+                    ts="2026-08-23T10:10:00Z",
                     max_speed=9,
                     shake_level=6,
                 )
@@ -172,9 +246,35 @@ def main():
         require(
             current_fan["maxSpeed"] == 10
             and current_fan["shakeLevel"] == 6
-            and current_compiled["observed_at"] == "2026-08-23T10:05:00Z",
-            "Aktuelle Capture-Datei hat Vorrang vor dem älteren rotierten Template",
+            and current_compiled["observed_at"] == "2026-08-23T10:10:00Z",
+            "Aktuelle gültige Capture-Datei hat Vorrang vor dem älteren rotierten Template",
         )
+
+        # The 1..10 rule is fan-specific. Light/blower keep their 0..100 scale.
+        for module, raw_field in (("light", "mLevel"), ("blower", "maxSpeed")):
+            capture.write_text(
+                json.dumps(
+                    _level_record(
+                        ts="2026-08-23T10:20:00Z",
+                        module=module,
+                        raw_field=raw_field,
+                        value=50,
+                    )
+                ) + "\n",
+                encoding="utf-8",
+            )
+
+            level_compiled = compile_controller_command(
+                capture,
+                pid="744DBD59D734",
+                module=module,
+                setpoints={"level": 60},
+            )
+
+            require(
+                level_compiled["payload"]["params"][module][raw_field] == 60,
+                f"{module} behält die eigene 0-bis-100-Skala",
+            )
 
     command_proxy = (
         ROOT / "bridge/spiderfarmer/command_proxy.py"
@@ -218,7 +318,7 @@ def main():
         "Bestehender Geräte-Speicherpfad dispatcht gespeicherte Controller-Sollwerte über den Provider-Adapter",
     )
 
-    print("✅ Spider Farmer SF.4D.2 Command-Path Regression vollständig erfolgreich")
+    print("✅ Spider Farmer SF.4D.3 Command-Path Regression vollständig erfolgreich")
 
 
 if __name__ == "__main__":

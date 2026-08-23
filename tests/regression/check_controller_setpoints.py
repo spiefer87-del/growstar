@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression for SF.4C controller setpoints in existing device detail UI."""
+"""Regression for controller setpoints in the existing device detail UI."""
 
 from pathlib import Path
 import sys
@@ -10,6 +10,7 @@ if str(ROOT) not in sys.path:
 
 from core.controller_setpoints import (
     controller_schema,
+    controller_schema_for_family,
     normalize_controller_setpoints,
 )
 
@@ -39,6 +40,11 @@ def main():
         "Ventilator-Sollwerte verwenden die beobachtete GGS-L1-bis-L10-Skala",
     )
 
+    require(
+        controller_schema_for_family("fan") == schema,
+        "UI/API und Bridge können dieselbe zentrale Fan-Schemaquelle verwenden",
+    )
+
     normalized = normalize_controller_setpoints(
         {"level": 7, "oscillation": 4},
         schema,
@@ -51,6 +57,7 @@ def main():
     for bad in (
         {"level": 0, "oscillation": 4},
         {"level": 11, "oscillation": 4},
+        {"level": 60, "oscillation": 4},
         {"level": 7, "oscillation": 99},
         {"level": 7, "unknown": 1},
     ):
@@ -60,7 +67,7 @@ def main():
             pass
         else:
             raise AssertionError(f"Ungültiger Sollwert akzeptiert: {bad}")
-    print("✅ Bereichs- und Capability-Validierung blockiert ungültige Sollwerte")
+    print("✅ Bereichs- und Capability-Validierung blockiert ungültige Fan-Sollwerte einschließlich L60")
 
     light_schema = controller_schema({
         "family": "light",
@@ -74,12 +81,17 @@ def main():
     require(
         light_schema["level"]["min"] == 0
         and light_schema["level"]["max"] == 100,
-        "Lichtstärke wird auf 0 bis 100 Prozent modelliert",
+        "Lichtstärke bleibt auf 0 bis 100 Prozent modelliert",
     )
     require(
         blower_schema["level"]["min"] == 0
         and blower_schema["level"]["max"] == 100,
-        "Gebläsestärke wird auf 0 bis 100 Prozent modelliert",
+        "Gebläsestärke bleibt auf 0 bis 100 Prozent modelliert",
+    )
+    require(
+        normalize_controller_setpoints({"level": 60}, light_schema) == {"level": 60}
+        and normalize_controller_setpoints({"level": 60}, blower_schema) == {"level": 60},
+        "60 bleibt für Licht und Gebläse gültig und wird nicht global auf Fan-Skala begrenzt",
     )
 
     route_text = (ROOT / "routes/device.py").read_text(encoding="utf-8")
@@ -148,7 +160,7 @@ def main():
                 f"{path.name} besitzt keinen Spider-Farmer-Command-/Transportpfad: {token}",
             )
 
-    print("✅ Spider Farmer SF.4C Controller-Sollwerte Regression vollständig erfolgreich")
+    print("✅ Spider Farmer SF.4D.3 Controller-Sollwerte Regression vollständig erfolgreich")
 
 
 if __name__ == "__main__":
