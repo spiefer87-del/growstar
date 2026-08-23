@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send one controlled SF.4D.9 manual blower diagnostic command."""
+"""Send one controlled SF.4D.10 manual blower mLevel diagnostic command."""
 
 import argparse
 import json
@@ -12,14 +12,14 @@ DEFAULT_PID = "744DBD59D734"
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max-speed", type=int, required=True)
+    parser.add_argument("--level", type=int, required=True)
     parser.add_argument("--controller-id", default=DEFAULT_CONTROLLER)
     parser.add_argument("--pid", default=DEFAULT_PID)
     parser.add_argument("--socket", default=DEFAULT_SOCKET)
     args = parser.parse_args()
 
-    if not 0 <= args.max_speed <= 100:
-        parser.error("--max-speed muss zwischen 0 und 100 liegen")
+    if not 25 <= args.level <= 100:
+        parser.error("--level muss zwischen 25 und 100 liegen")
 
     request = {
         "action": "test_controller_manual_blower",
@@ -29,7 +29,7 @@ def main():
         "setpoints": {
             "modeType": 0,
             "mOnOff": 1,
-            "maxSpeed": args.max_speed,
+            "mLevel": args.level,
         },
     }
 
