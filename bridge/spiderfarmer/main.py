@@ -1,4 +1,4 @@
-"""Command-line entry point for Growstar Spider Farmer phase SF.1."""
+"""Command-line entry point for Growstar Spider Farmer bridge."""
 
 from __future__ import annotations
 
@@ -35,8 +35,8 @@ def _env_int(name, default):
 def build_parser():
     parser = argparse.ArgumentParser(
         description=(
-            "Growstar Spider Farmer SF.1 read-only TLS/MQTT relay. "
-            "Keine Growstar-Steuerbefehle werden injiziert."
+            "Growstar Spider Farmer TLS/MQTT relay. "
+            "Command injection is opt-in through GROWSTAR_SF_COMMANDS=1."
         )
     )
     parser.add_argument("--check", action="store_true")
@@ -102,6 +102,15 @@ def build_parser():
         action="store_true",
         default=not _env_bool("GROWSTAR_SF_CAPTURE_PAYLOADS", True),
     )
+    parser.add_argument(
+        "--enable-commands",
+        action="store_true",
+        default=_env_bool("GROWSTAR_SF_COMMANDS", False),
+    )
+    parser.add_argument(
+        "--command-socket",
+        default=os.getenv("GROWSTAR_SF_COMMAND_SOCKET", ""),
+    )
     return parser
 
 
@@ -117,6 +126,11 @@ def validate_configuration(args):
     key_file = Path(args.key_file).expanduser().resolve()
     upstream_ca_file = Path(args.upstream_ca_file).expanduser().resolve()
     state_dir = Path(args.state_dir).expanduser().resolve()
+    command_socket = (
+        Path(args.command_socket).expanduser().resolve()
+        if str(args.command_socket or "").strip()
+        else state_dir / "command.sock"
+    )
 
     for path, label in (
         (cert_file, "Server-Zertifikat"),
@@ -141,10 +155,12 @@ def validate_configuration(args):
     upstream_context.verify_mode = ssl.CERT_REQUIRED
     upstream_context.load_verify_locations(cafile=str(upstream_ca_file))
 
+    commands_enabled = bool(args.enable_commands)
+
     return {
         "success": True,
-        "phase": "SF.1",
-        "read_only": True,
+        "phase": "SF.4D" if commands_enabled else "SF.1",
+        "read_only": not commands_enabled,
         "listen": {
             "host": str(args.listen_host),
             "port": int(args.listen_port),
@@ -156,7 +172,8 @@ def validate_configuration(args):
         },
         "state_dir": str(state_dir),
         "capture_payloads": not bool(args.no_payload_capture),
-        "command_injection": False,
+        "command_injection": commands_enabled,
+        "command_socket": str(command_socket) if commands_enabled else None,
         "network_changes": False,
     }
 
@@ -170,7 +187,7 @@ async def _run(args):
         max_capture_bytes=args.max_capture_bytes,
     )
 
-    proxy = ReadOnlySpiderFarmerProxy(
+    common = dict(
         listen_host=configuration["listen"]["host"],
         listen_port=configuration["listen"]["port"],
         upstream_host=configuration["upstream"]["host"],
@@ -180,6 +197,17 @@ async def _run(args):
         upstream_ca_file=args.upstream_ca_file,
         diagnostics=diagnostics,
     )
+
+    if configuration["command_injection"]:
+        from .command_proxy import CommandSpiderFarmerProxy
+
+        proxy = CommandSpiderFarmerProxy(
+            state_dir=configuration["state_dir"],
+            command_socket=configuration["command_socket"],
+            **common,
+        )
+    else:
+        proxy = ReadOnlySpiderFarmerProxy(**common)
 
     await proxy.serve_forever()
 
