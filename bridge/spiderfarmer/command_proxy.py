@@ -24,6 +24,7 @@ from pathlib import Path
 from .command_model import (
     SpiderFarmerCommandError,
     compile_controller_command,
+    compile_manual_fan_command,
     compile_minimal_controller_command,
     compile_powered_minimal_fan_command,
 )
@@ -283,6 +284,7 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         action = str(request.get("action") or "").strip()
         if action not in {
             "set_controller",
+            "test_controller_manual_fan",
             "test_controller_minimal",
             "test_controller_minimal_powered",
         }:
@@ -309,7 +311,17 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
                 "Spider-Farmer-Controller ist nicht aktiv mit der Bridge verbunden"
             )
 
-        if action == "test_controller_minimal_powered":
+        if action == "test_controller_manual_fan":
+            if module != "fan":
+                raise SpiderFarmerCommandError(
+                    "Manueller Fan-Test ist ausschließlich für fan erlaubt"
+                )
+
+            compiled = compile_manual_fan_command(
+                pid=pid,
+                setpoints=setpoints,
+            )
+        elif action == "test_controller_minimal_powered":
             if module != "fan":
                 raise SpiderFarmerCommandError(
                     "SF.4D.5 Powered-Minimaltest ist ausschließlich für fan erlaubt"
@@ -357,7 +369,15 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         writer.write(packet)
         await writer.drain()
 
-        if action == "test_controller_minimal_powered":
+        if action == "test_controller_manual_fan":
+            _LOG.warning(
+                "SF.4D.8 MANUAL FAN TEST sent controller=%s module=%s fields=%s payload=%s",
+                controller_id,
+                module,
+                sorted(compiled["changed_fields"]),
+                compiled["payload"],
+            )
+        elif action == "test_controller_minimal_powered":
             _LOG.warning(
                 "SF.4D.5 POWERED MINIMAL TEST sent controller=%s module=%s fields=%s template=%s payload=%s",
                 controller_id,

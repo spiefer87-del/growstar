@@ -219,6 +219,101 @@ def find_latest_template(capture_path, *, pid, module):
     )
 
 
+
+def _confirmed_manual_fan_payload(pid, normalized_setpoints, *, diagnostic=None):
+    """Build the controller-confirmed manual fan command without capture data.
+
+    Real-controller tests confirmed that the GGS controller accepts the stable
+    DOWN topic/keyPath together with modeType=0, mOnOff=1 and mLevel L1..L10.
+    This helper is intentionally fan-only; other modules still require a real
+    observed template.
+    """
+
+    pid = str(pid or "").strip().upper()
+    if not pid:
+        raise SpiderFarmerCommandError("Controller-PID fehlt")
+
+    fan_block = {
+        "modeType": 0,
+        "mOnOff": 1,
+    }
+    changed_fields = {
+        "modeType": 0,
+        "mOnOff": 1,
+    }
+
+    for name, value in normalized_setpoints.items():
+        raw_field = _FIELD_MAP["fan"][name]
+        fan_block[raw_field] = value
+        changed_fields[raw_field] = value
+
+    result = {
+        "topic": f"SF/GGS/CB/API/DOWN/{pid}",
+        "payload": {
+            "method": "setConfigField",
+            "params": {
+                "keyPath": ["device", "fan"],
+                "fan": fan_block,
+            },
+        },
+        "observed_at": None,
+        "session_id": None,
+        "module": "fan",
+        "changed_fields": changed_fields,
+    }
+    if diagnostic:
+        result["diagnostic"] = diagnostic
+    return result
+
+
+def compile_manual_fan_command(*, pid, setpoints):
+    """Compatibility diagnostic for the controller-confirmed manual fan write.
+
+    The historical chat/hardware test used raw Spider-Farmer names:
+    modeType=0 plus mLevel=N.  Restore that exact private diagnostic action so
+    it can be repeated without first generating an app-side template.
+    """
+
+    if not isinstance(setpoints, dict):
+        raise SpiderFarmerCommandError("Manueller Fan-Test erwartet setpoints")
+
+    mode_type = setpoints.get("modeType")
+    level = setpoints.get("mLevel")
+    on_off = setpoints.get("mOnOff", 1)
+
+    if mode_type != 0:
+        raise SpiderFarmerCommandError(
+            "Manueller Fan-Test erwartet modeType=0"
+        )
+    if isinstance(level, bool) or not isinstance(level, int) or not 1 <= level <= 10:
+        raise SpiderFarmerCommandError(
+            "Manueller Fan-Test erwartet mLevel zwischen 1 und 10"
+        )
+    if on_off != 1:
+        raise SpiderFarmerCommandError(
+            "Manueller Fan-Test erwartet mOnOff=1"
+        )
+
+    normalized = {"level": level}
+
+    if "shakeLevel" in setpoints:
+        shake = setpoints["shakeLevel"]
+        try:
+            normalized.update(
+                _normalize_command_setpoints(
+                    "fan",
+                    {"oscillation": shake},
+                )
+            )
+        except SpiderFarmerCommandError:
+            raise
+
+    return _confirmed_manual_fan_payload(
+        pid,
+        normalized,
+        diagnostic="confirmed_manual_fan",
+    )
+
 def compile_controller_command(
     capture_path,
     *,
@@ -241,11 +336,24 @@ def compile_controller_command(
         setpoints,
     )
 
-    template = find_latest_template(
-        capture_path,
-        pid=pid,
-        module=module,
-    )
+    try:
+        template = find_latest_template(
+            capture_path,
+            pid=pid,
+            module=module,
+        )
+    except SpiderFarmerCommandError:
+        # Fan is the one controller family for which the complete manual
+        # envelope was confirmed on real hardware.  If no safe observed
+        # template exists yet (for example after capture rotation/restart),
+        # use that confirmed envelope instead of blocking Growstar control.
+        if module == "fan":
+            return _confirmed_manual_fan_payload(
+                pid,
+                normalized_setpoints,
+                diagnostic="confirmed_manual_fan_fallback",
+            )
+        raise
 
     payload = deepcopy(template["payload"])
     params = payload.get("params")
