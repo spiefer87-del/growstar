@@ -22,7 +22,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .status{padding:12px 14px;border-radius:12px;background:#111827;color:var(--muted);margin-bottom:14px}.status.shadow{background:rgba(124,58,237,.16);color:#ddd6fe}.status.live{background:rgba(34,197,94,.14);color:#bbf7d0}
 .state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}.editing-hint{display:none;margin-top:10px;color:#fcd34d;text-align:center;font-size:.76rem}.editing-hint.visible{display:block}.assignment-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(120,53,15,.18);color:#fde68a;font-size:.84rem;line-height:1.5}.assignment-warning.visible{display:block}.safety-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(239,68,68,.42);background:rgba(127,29,29,.22);color:#fecaca;font-size:.84rem;line-height:1.5}.safety-warning.visible{display:block}.hardware-line{margin-top:7px;color:var(--muted);font-size:.78rem}
 .controller-card{display:none;border:1px solid rgba(56,189,248,.22);background:linear-gradient(145deg,rgba(30,41,59,1),rgba(15,23,42,.98))}.controller-card.visible{display:block}.controller-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.controller-title{font-size:1rem;font-weight:800}.controller-meta{margin-top:5px;color:var(--muted);font-size:.78rem;line-height:1.4}.controller-badge{padding:5px 9px;border-radius:999px;font-size:.66rem;font-weight:800;background:rgba(56,189,248,.14);color:#7dd3fc}.controller-badge.offline{background:rgba(239,68,68,.14);color:#fca5a5}.setpoint{margin:14px 0;padding:13px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(2,6,23,.34)}.setpoint-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:9px}.setpoint-head label{margin:0;color:var(--text);font-weight:750}.setpoint-value{color:#bae6fd;font-size:.8rem;font-weight:800}.setpoint-row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center}.setpoint-row input[type="range"]{padding:0}.controller-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.77rem;line-height:1.45}
-.interval-phase{margin-top:14px;padding:15px;border:1px solid rgba(56,189,248,.18);border-radius:13px;background:rgba(2,6,23,.28)}.interval-phase-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}.interval-phase-title{font-weight:800}.interval-phase-badge{font-size:.7rem;color:#7dd3fc;font-weight:800}.interval-controller{margin-top:10px}.interval-controller.power-off{display:none}.shelly-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.78rem;line-height:1.45}
+.interval-phase{margin-top:14px;padding:15px;border:1px solid rgba(56,189,248,.18);border-radius:13px;background:rgba(2,6,23,.28)}.interval-phase-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}.interval-phase-title{font-weight:800}.interval-phase-badge{font-size:.7rem;color:#7dd3fc;font-weight:800}.mode-controller,.interval-controller{margin-top:10px}.interval-controller.power-off{display:none}.shelly-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.78rem;line-height:1.45}
 @media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}.setpoint-row{grid-template-columns:1fr 78px}}
 </style>
 {% endblock %}
@@ -52,19 +52,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div id="controller-card" class="card controller-card">
         <div class="controller-head">
             <div>
-                <div class="controller-title">🎛️ Controller · Dauerbetrieb / Standard</div>
+                <div class="controller-title">🎛️ Controller</div>
                 <div id="controller-meta" class="controller-meta">Controller wird geladen …</div>
             </div>
             <span id="controller-badge" class="controller-badge">--</span>
         </div>
 
-        <div id="controller-setpoints"></div>
-        <div id="controller-apply-feedback" class="saved"></div>
-
         <div class="controller-note">
-            Diese Werte gelten für Dauerbetrieb und als Standard für regelbare Zustände.
-            <strong>Power / Ein-Aus bleibt immer beim Shelly.</strong>
-            Controller-Werte dürfen den Shelly-Powerzustand niemals überstimmen.
+            Der Controller ist diesem Growstar-Gerät zugeordnet.
+            <strong>Die Leistungswerte werden jetzt getrennt im jeweiligen Modus eingestellt.</strong>
+            Power / Ein-Aus bleibt immer beim Shelly.
         </div>
     </div>
 
@@ -80,12 +77,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
             </select>
         </div>
 
+        <div id="on-section" class="section">
+            <h3>Dauerbetrieb</h3>
+            <div class="hint">Controller-Werte für den dauerhaften EIN-Zustand.</div>
+            <div id="on-controller" class="mode-controller"></div>
+        </div>
+
         <div id="time-section" class="section">
             <h3>Zeitfenster</h3>
             <div class="grid2">
                 <div class="row"><label for="start">Start</label><input id="start" type="time"></div>
                 <div class="row"><label for="end">Ende</label><input id="end" type="time"></div>
             </div>
+            <div class="hint">Controller-Werte innerhalb des aktiven Zeitfensters.</div>
+            <div id="time-controller" class="mode-controller"></div>
         </div>
 
         <div id="interval-section" class="section">
@@ -163,6 +168,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
                     </div>
                 </div>
             </div>
+            <div class="hint" style="margin-top:14px">
+                Controller-Werte, solange der ENV-Zustand aktiv ist. Eine spätere
+                proportionale Klima-Regelung kann diesen Sollwert dynamisch verändern.
+            </div>
+            <div id="env-controller" class="mode-controller"></div>
         </div>
 
         <button id="save-button" onclick="saveDevice()">💾 Für {{ tent_name }} speichern</button>
@@ -187,8 +197,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
     const controllerCard = document.getElementById("controller-card");
     const controllerMeta = document.getElementById("controller-meta");
     const controllerBadge = document.getElementById("controller-badge");
-    const controllerSetpoints = document.getElementById("controller-setpoints");
-    const controllerApplyFeedback = document.getElementById("controller-apply-feedback");
+    const onController = document.getElementById("on-controller");
+    const timeController = document.getElementById("time-controller");
+    const envController = document.getElementById("env-controller");
     const intervalAController = document.getElementById("interval-a-controller");
     const intervalBController = document.getElementById("interval-b-controller");
 
@@ -293,6 +304,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
     function updateSections() {
         const current = mode.value;
+        document.getElementById("on-section").classList.toggle("visible", current === "ON");
         document.getElementById("time-section").classList.toggle("visible", current === "TIME");
         document.getElementById("interval-section").classList.toggle("visible", current === "INTERVAL");
         document.getElementById("env-section").classList.toggle("visible", current === "ENV");
@@ -401,32 +413,52 @@ button:disabled{opacity:.45;cursor:not-allowed}
         `;
     }
 
-    function renderIntervalControllerStates(params, defaultSetpoints){
+    function renderModeControllerStates(params, defaultSetpoints){
         const states = params?.control_states || {};
-        const a = states.interval_a || {};
-        const b = states.interval_b || {};
         const entries = Object.entries(controllerSchema);
 
+        function valuesFor(stateName){
+            return states[stateName]?.controller || defaultSetpoints || {};
+        }
+
+        function renderInto(container, stateName, title){
+            if(!entries.length){
+                container.innerHTML = "";
+                return;
+            }
+            const values = valuesFor(stateName);
+            container.innerHTML =
+                `<div class="hint">${escapeHtml(title)}</div>` +
+                entries.map(([name, spec]) =>
+                    stateSetpointField(stateName, name, spec, values[name])
+                ).join("");
+        }
+
+        renderInto(onController, "on", "Controller-Werte Dauerbetrieb");
+        renderInto(timeController, "time", "Controller-Werte Zeitsteuerung");
+        renderInto(envController, "env", "Controller-Werte ENV");
+
+        const a = states.interval_a || {};
+        const b = states.interval_b || {};
         const aValues = a.controller || defaultSetpoints || {};
         const bValues = b.controller || defaultSetpoints || {};
 
         if(!entries.length){
             intervalAController.innerHTML = "";
             intervalBController.innerHTML = "";
-            return;
+        } else {
+            intervalAController.innerHTML =
+                `<div class="hint">Controller-Werte Phase A</div>` +
+                entries.map(([name, spec]) =>
+                    stateSetpointField("interval_a", name, spec, aValues[name])
+                ).join("");
+
+            intervalBController.innerHTML =
+                `<div class="hint">Controller-Werte Phase B</div>` +
+                entries.map(([name, spec]) =>
+                    stateSetpointField("interval_b", name, spec, bValues[name])
+                ).join("");
         }
-
-        intervalAController.innerHTML =
-            `<div class="hint">Controller-Werte Phase A</div>` +
-            entries.map(([name, spec]) =>
-                stateSetpointField("interval_a", name, spec, aValues[name])
-            ).join("");
-
-        intervalBController.innerHTML =
-            `<div class="hint">Controller-Werte Phase B</div>` +
-            entries.map(([name, spec]) =>
-                stateSetpointField("interval_b", name, spec, bValues[name])
-            ).join("");
 
         updateIntervalPowerVisibility();
     }
@@ -435,6 +467,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
         if(!controller?.assigned){
             controllerCard.classList.remove("visible");
             controllerSchema = {};
+            onController.innerHTML = "";
+            timeController.innerHTML = "";
+            envController.innerHTML = "";
             intervalAController.innerHTML = "";
             intervalBController.innerHTML = "";
             return;
@@ -450,33 +485,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
         controllerBadge.textContent = controller.online ? "ONLINE" : "OFFLINE";
         controllerBadge.classList.toggle("offline", !controller.online);
 
-        if(!syncValues && controllerSetpoints.children.length){
+        if(!syncValues && onController.children.length){
             return;
         }
 
-        const setpoints = controller.setpoints || {};
-        const entries = Object.entries(controllerSchema);
-
-        if(!entries.length){
-            controllerSetpoints.innerHTML =
-                `<div class="hint">Für diesen Controller sind aktuell keine einstellbaren Growstar-Sollwerte verfügbar.</div>`;
-            renderIntervalControllerStates(params, setpoints);
-            return;
-        }
-
-        controllerSetpoints.innerHTML = entries
-            .map(([name, spec]) => setpointField(name, spec, setpoints[name]))
-            .join("");
-
-        renderIntervalControllerStates(params, setpoints);
-    }
-
-    function syncControllerDisplay(name, value){
-        const spec = controllerSchema[name] || {};
-        const display = document.getElementById(`controller-${name}-display`);
-        if(display){
-            display.textContent = `${spec.unit || ""} ${value}`.trim();
-        }
+        renderModeControllerStates(
+            params,
+            controller.setpoints || {}
+        );
     }
 
     function syncStateDisplay(stateName, name, value){
@@ -649,6 +665,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
                     900
                 ),
                 control_states: {
+                    on: {
+                        power: true,
+                        controller: readStateController(onController)
+                    },
+                    time: {
+                        power: true,
+                        controller: readStateController(timeController)
+                    },
                     interval_a: {
                         power: aPower,
                         controller: intervalAControllerValues
@@ -656,6 +680,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
                     interval_b: {
                         power: bPower,
                         controller: intervalBControllerValues
+                    },
+                    env: {
+                        power: true,
+                        controller: readStateController(envController)
                     }
                 }
             },
@@ -666,10 +694,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
                 direction: document.getElementById("direction").value
             }
         };
-
-        if(controllerCard.classList.contains("visible")){
-            payload.controller_setpoints = readControllerSetpoints();
-        }
 
         saveInProgress = true;
         refreshEpoch += 1;
@@ -696,23 +720,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
             renderRuntime(data);
             applyDeviceForm(data);
 
-            const apply = data.controller_apply;
-            if(apply){
-                controllerApplyFeedback.classList.add("visible");
-                if(apply.success){
-                    controllerApplyFeedback.style.color = "#86efac";
-                    controllerApplyFeedback.textContent =
-                        apply.verified
-                            ? "✓ Controller bestätigt"
-                            : "✓ Controller-Werte an Spider Farmer gesendet";
-                } else {
-                    controllerApplyFeedback.style.color = "#fca5a5";
-                    controllerApplyFeedback.textContent =
-                        "⚠ Controller lokal gespeichert, aber nicht gesendet: " +
-                        (apply.message || apply.status || "unbekannter Fehler");
-                }
-            }
-
             const saved = document.getElementById("saved");
             saved.classList.add("visible");
             setTimeout(() => saved.classList.remove("visible"), 1200);
@@ -738,34 +745,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
                 updateIntervalPowerVisibility();
             }
         });
-    });
-
-    controllerSetpoints.addEventListener("input", event => {
-        const range = event.target.closest(".js-controller-range");
-        const number = event.target.closest(".js-controller-number");
-
-        if(range){
-            const name = range.dataset.name;
-            const partner = document.getElementById(`controller-${name}`);
-            if(partner) partner.value = range.value;
-            syncControllerDisplay(name, range.value);
-            markFormDirty();
-            return;
-        }
-
-        if(number){
-            const name = number.dataset.name;
-            const spec = controllerSchema[name] || {};
-            let value = Number(number.value);
-
-            if(Number.isFinite(Number(spec.min))) value = Math.max(Number(spec.min), value);
-            if(Number.isFinite(Number(spec.max))) value = Math.min(Number(spec.max), value);
-
-            const partner = document.getElementById(`controller-${name}-range`);
-            if(partner) partner.value = value;
-            syncControllerDisplay(name, value);
-            markFormDirty();
-        }
     });
 
     function handleStateControllerInput(event){
@@ -798,6 +777,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
         }
     }
 
+    onController.addEventListener("input", handleStateControllerInput);
+    timeController.addEventListener("input", handleStateControllerInput);
+    envController.addEventListener("input", handleStateControllerInput);
     intervalAController.addEventListener("input", handleStateControllerInput);
     intervalBController.addEventListener("input", handleStateControllerInput);
 
