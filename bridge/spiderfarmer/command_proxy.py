@@ -6,6 +6,10 @@ only when GROWSTAR_SF_COMMANDS=1 (the SF.4D service template enables it).
 Commands arrive exclusively over a private UNIX socket inside the protected
 Spider Farmer state directory. No HTTP listener and no second MQTT connection
 is created.
+
+SF.4D.4 adds one private diagnostic action, test_controller_minimal, used only
+by tools/test_spiderfarmer_minimal_setpoint.py. The normal UI/device path still
+uses set_controller unchanged.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from pathlib import Path
 from .command_model import (
     SpiderFarmerCommandError,
     compile_controller_command,
+    compile_minimal_controller_command,
 )
 from .mqtt_command import build_publish
 from .proxy import ReadOnlySpiderFarmerProxy, _close_writer
@@ -164,8 +169,6 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         peer,
         controller_writer,
     ):
-        # Reuse the exact parser/inspection logic from the base class by
-        # duplicating only the small state-binding step needed for injection.
         from .mqtt_codec import (
             MQTT_CONNECT,
             MQTT_SUBSCRIBE,
@@ -274,7 +277,11 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
                 "Command request must be an object"
             )
 
-        if request.get("action") != "set_controller":
+        action = str(request.get("action") or "").strip()
+        if action not in {
+            "set_controller",
+            "test_controller_minimal",
+        }:
             raise SpiderFarmerCommandError(
                 "Unsupported command action"
             )
@@ -298,12 +305,20 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
                 "Spider-Farmer-Controller ist nicht aktiv mit der Bridge verbunden"
             )
 
-        compiled = compile_controller_command(
-            self.capture_path,
-            pid=pid,
-            module=module,
-            setpoints=setpoints,
-        )
+        if action == "test_controller_minimal":
+            compiled = compile_minimal_controller_command(
+                self.capture_path,
+                pid=pid,
+                module=module,
+                setpoints=setpoints,
+            )
+        else:
+            compiled = compile_controller_command(
+                self.capture_path,
+                pid=pid,
+                module=module,
+                setpoints=setpoints,
+            )
 
         topic = compiled["topic"]
         subscriptions = self._controller_subscriptions.get(
@@ -327,13 +342,23 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         writer.write(packet)
         await writer.drain()
 
-        _LOG.warning(
-            "SF.4D COMMAND sent controller=%s module=%s fields=%s template=%s",
-            controller_id,
-            module,
-            sorted(compiled["changed_fields"]),
-            compiled.get("observed_at"),
-        )
+        if action == "test_controller_minimal":
+            _LOG.warning(
+                "SF.4D.4 MINIMAL TEST sent controller=%s module=%s fields=%s template=%s payload=%s",
+                controller_id,
+                module,
+                sorted(compiled["changed_fields"]),
+                compiled.get("observed_at"),
+                compiled["payload"],
+            )
+        else:
+            _LOG.warning(
+                "SF.4D COMMAND sent controller=%s module=%s fields=%s template=%s",
+                controller_id,
+                module,
+                sorted(compiled["changed_fields"]),
+                compiled.get("observed_at"),
+            )
 
         return {
             "status": "sent",
@@ -343,5 +368,6 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
             "topic": topic,
             "changed_fields": compiled["changed_fields"],
             "template_observed_at": compiled.get("observed_at"),
+            "diagnostic": compiled.get("diagnostic"),
             "verified": False,
         }

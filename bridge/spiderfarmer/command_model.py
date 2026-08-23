@@ -1,12 +1,12 @@
 """Observed-template Spider Farmer command compiler for SF.4D.
 
-The command compiler intentionally does not invent undocumented GGS payloads.
-It reuses the latest real DOWN/setConfigField payload previously captured from
-the Spider Farmer app/cloud and changes only the small set of fields that
-Growstar owns.
+The normal compiler reuses a full real DOWN/setConfigField payload and changes
+only Growstar-owned fields.
 
-This preserves firmware-specific fields, schedules and flags that Growstar does
-not understand yet.
+SF.4D.4 additionally exposes one deliberately separate diagnostic compiler for
+the minimal-write experiment. It preserves the observed command envelope and
+observed keyPath but sends only the requested module fields. The diagnostic
+compiler is not used by the normal Growstar device/UI path.
 """
 
 from __future__ import annotations
@@ -163,7 +163,6 @@ def find_latest_template(capture_path, *, pid, module):
     readable_capture_seen = False
     last_read_error = None
 
-    # Newest capture generation first; only then the older rotated generation.
     for candidate in _capture_candidates(capture_path):
         try:
             lines = candidate.read_text(encoding="utf-8").splitlines()
@@ -193,8 +192,6 @@ def find_latest_template(capture_path, *, pid, module):
             if not _payload_matches_module(payload, module):
                 continue
 
-            # Never reuse an observed template that already contains an invalid
-            # Growstar-owned value (for example the historical L60 fan test).
             if not _template_owned_values_valid(payload, module):
                 continue
 
@@ -238,8 +235,6 @@ def compile_controller_command(
             f"Modul {module!r} wird noch nicht geschrieben"
         )
 
-    # Final safety boundary: even a direct command.sock request must obey the
-    # same family schema that the Growstar device UI/API already exposes.
     normalized_setpoints = _normalize_command_setpoints(
         module,
         setpoints,
@@ -274,4 +269,86 @@ def compile_controller_command(
         "session_id": template.get("session_id"),
         "module": module,
         "changed_fields": changed_fields,
+    }
+
+
+def compile_minimal_controller_command(
+    capture_path,
+    *,
+    pid,
+    module,
+    setpoints,
+):
+    """Compile the SF.4D.4 one-off minimal-write diagnostic payload.
+
+    This is intentionally separate from compile_controller_command().
+
+    It preserves:
+      - the real observed DOWN topic,
+      - the real observed command envelope,
+      - the real observed params.keyPath.
+
+    It removes every unrelated field from params[module] and keeps only the
+    explicitly requested Growstar-owned raw field(s).
+
+    The result is meant only for the controlled minimal-write experiment.
+    """
+
+    if not isinstance(setpoints, dict) or not setpoints:
+        raise SpiderFarmerCommandError("Keine Controller-Sollwerte angegeben")
+
+    field_map = _FIELD_MAP.get(str(module))
+    if not field_map:
+        raise SpiderFarmerCommandError(
+            f"Modul {module!r} wird noch nicht geschrieben"
+        )
+
+    normalized_setpoints = _normalize_command_setpoints(
+        module,
+        setpoints,
+    )
+
+    template = find_latest_template(
+        capture_path,
+        pid=pid,
+        module=module,
+    )
+
+    observed_payload = template["payload"]
+    observed_params = observed_payload.get("params")
+
+    if not isinstance(observed_params, dict):
+        raise SpiderFarmerCommandError(
+            "Beobachtetes Template enthält keinen params-Block"
+        )
+
+    key_path = observed_params.get("keyPath")
+    if not isinstance(key_path, list) or not key_path:
+        raise SpiderFarmerCommandError(
+            "Beobachtetes Template enthält keinen gültigen keyPath"
+        )
+
+    payload = deepcopy(observed_payload)
+
+    minimal_block = {}
+    changed_fields = {}
+
+    for name, value in normalized_setpoints.items():
+        raw_field = field_map[name]
+        minimal_block[raw_field] = value
+        changed_fields[raw_field] = value
+
+    payload["params"] = {
+        "keyPath": deepcopy(key_path),
+        str(module): minimal_block,
+    }
+
+    return {
+        "topic": template["topic"],
+        "payload": payload,
+        "observed_at": template.get("observed_at"),
+        "session_id": template.get("session_id"),
+        "module": str(module),
+        "changed_fields": changed_fields,
+        "diagnostic": "minimal_write",
     }
