@@ -21,6 +21,14 @@ Optional future shape:
             "power": True,
             "controller": {"level": 7},
         },
+        "time": {
+            "power": True,
+            "controller": {"level": 6},
+        },
+        "env": {
+            "power": True,
+            "controller": {"level": 5},
+        },
         "interval_a": {
             "power": True,
             "controller": {"level": 7},
@@ -84,7 +92,7 @@ def resolve_control_state(params, name):
             "controller": {},
         }
 
-    if name == "on":
+    if name in ("on", "time", "env"):
         return {
             "power": bool(raw.get("power", True)),
             "controller": _mapping(raw.get("controller")) or base,

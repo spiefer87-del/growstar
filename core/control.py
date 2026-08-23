@@ -154,7 +154,7 @@ def control_device(device, runtime=None):
         end = int(params.get("end_min", 0))
         should_run = in_time_window(now_min, start, end)
 
-        state_name = "on" if should_run else "off"
+        state_name = "time" if should_run else "off"
         apply_device_state(
             device,
             resolve_control_state(params, state_name),
@@ -199,7 +199,12 @@ def control_device(device, runtime=None):
             return
 
         should_run = evaluate_env_conditions(device, runtime=rt)
-        set_device(device, should_run, runtime=rt)
+        state_name = "env" if should_run else "off"
+        apply_device_state(
+            device,
+            resolve_control_state(params, state_name),
+            runtime=rt,
+        )
         return
 
 
@@ -212,7 +217,13 @@ def control_light_profile(runtime=None):
     night_start = int(cfg.get("NIGHT_START_MIN", 1320))
 
     light_on = in_time_window(now_min, day_start, night_start)
-    set_device("light", light_on, runtime=rt)
+    params = get_device_params("light", runtime=rt)
+    state_name = "env" if light_on else "off"
+    apply_device_state(
+        "light",
+        resolve_control_state(params, state_name),
+        runtime=rt,
+    )
 
 
 def control_heating_env(runtime=None):
