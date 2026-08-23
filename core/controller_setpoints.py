@@ -31,7 +31,7 @@ SCHEMAS = {
     "blower": {
         "level": {
             "label": "Gebläsestärke",
-            "min": 0,
+            "min": 25,
             "max": 100,
             "step": 1,
             "unit": "%",
