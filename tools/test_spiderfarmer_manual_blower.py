@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send one controlled SF.4D.10 manual blower mLevel diagnostic command."""
+"""Send one controlled SF.4D.11 confirmed manual blower mLevel command."""
 
 import argparse
 import json
