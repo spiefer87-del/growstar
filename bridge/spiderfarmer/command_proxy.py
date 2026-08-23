@@ -25,6 +25,7 @@ from .command_model import (
     SpiderFarmerCommandError,
     compile_controller_command,
     compile_manual_fan_command,
+    compile_manual_blower_command,
     compile_minimal_controller_command,
     compile_powered_minimal_fan_command,
 )
@@ -285,6 +286,7 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         if action not in {
             "set_controller",
             "test_controller_manual_fan",
+            "test_controller_manual_blower",
             "test_controller_minimal",
             "test_controller_minimal_powered",
         }:
@@ -318,6 +320,16 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
                 )
 
             compiled = compile_manual_fan_command(
+                pid=pid,
+                setpoints=setpoints,
+            )
+        elif action == "test_controller_manual_blower":
+            if module != "blower":
+                raise SpiderFarmerCommandError(
+                    "Manueller Blower-Test ist ausschließlich für blower erlaubt"
+                )
+
+            compiled = compile_manual_blower_command(
                 pid=pid,
                 setpoints=setpoints,
             )
@@ -372,6 +384,14 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         if action == "test_controller_manual_fan":
             _LOG.warning(
                 "SF.4D.8 MANUAL FAN TEST sent controller=%s module=%s fields=%s payload=%s",
+                controller_id,
+                module,
+                sorted(compiled["changed_fields"]),
+                compiled["payload"],
+            )
+        elif action == "test_controller_manual_blower":
+            _LOG.warning(
+                "SF.4D.9 MANUAL BLOWER TEST sent controller=%s module=%s fields=%s payload=%s",
                 controller_id,
                 module,
                 sorted(compiled["changed_fields"]),

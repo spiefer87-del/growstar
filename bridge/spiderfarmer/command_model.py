@@ -314,6 +314,71 @@ def compile_manual_fan_command(*, pid, setpoints):
         diagnostic="confirmed_manual_fan",
     )
 
+
+def compile_manual_blower_command(*, pid, setpoints):
+    """Build the isolated manual blower hardware-test command.
+
+    The Growstar blower schema is 0..100 percent and maps level to maxSpeed.
+    This diagnostic deliberately mirrors the confirmed manual fan envelope,
+    but remains a private test path until the real controller confirms it.
+    """
+
+    if not isinstance(setpoints, dict):
+        raise SpiderFarmerCommandError("Manueller Blower-Test erwartet setpoints")
+
+    mode_type = setpoints.get("modeType", 0)
+    max_speed = setpoints.get("maxSpeed")
+    on_off = setpoints.get("mOnOff", 1)
+
+    if mode_type != 0:
+        raise SpiderFarmerCommandError(
+            "Manueller Blower-Test erwartet modeType=0"
+        )
+    if (
+        isinstance(max_speed, bool)
+        or not isinstance(max_speed, int)
+        or not 0 <= max_speed <= 100
+    ):
+        raise SpiderFarmerCommandError(
+            "Manueller Blower-Test erwartet maxSpeed zwischen 0 und 100"
+        )
+    if on_off != 1:
+        raise SpiderFarmerCommandError(
+            "Manueller Blower-Test erwartet mOnOff=1"
+        )
+
+    # Validate through Growstar's central blower schema as well.
+    normalized = _normalize_command_setpoints(
+        "blower",
+        {"level": max_speed},
+    )
+
+    pid = str(pid or "").strip().upper()
+    if not pid:
+        raise SpiderFarmerCommandError("Controller-PID fehlt")
+
+    blower_block = {
+        "modeType": 0,
+        "mOnOff": 1,
+        "maxSpeed": normalized["level"],
+    }
+
+    return {
+        "topic": f"SF/GGS/CB/API/DOWN/{pid}",
+        "payload": {
+            "method": "setConfigField",
+            "params": {
+                "keyPath": ["device", "blower"],
+                "blower": blower_block,
+            },
+        },
+        "observed_at": None,
+        "session_id": None,
+        "module": "blower",
+        "changed_fields": dict(blower_block),
+        "diagnostic": "candidate_manual_blower",
+    }
+
 def compile_controller_command(
     capture_path,
     *,
