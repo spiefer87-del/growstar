@@ -58,10 +58,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
         </div>
 
         <div id="controller-setpoints"></div>
+        <div id="controller-apply-feedback" class="saved"></div>
 
         <div class="controller-note">
             Diese Werte sind die Growstar-Sollwerte für den zugeordneten Controller.
-            <strong>SF.4C speichert sie bereits sauber am Gerät, sendet sie aber noch nicht an Spider Farmer.</strong>
+            <strong>SF.4D speichert diese Werte und sendet sie über die lokale Growstar-Bridge an den zugeordneten Spider-Farmer-Controller.</strong>
             Power / Ein-Aus bleibt weiterhin beim Shelly.
         </div>
     </div>
@@ -138,6 +139,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     const controllerMeta = document.getElementById("controller-meta");
     const controllerBadge = document.getElementById("controller-badge");
     const controllerSetpoints = document.getElementById("controller-setpoints");
+    const controllerApplyFeedback = document.getElementById("controller-apply-feedback");
 
     const FORM_CONTROL_IDS = [
         "mode",
@@ -483,6 +485,23 @@ button:disabled{opacity:.45;cursor:not-allowed}
             const data = await response.json();
             renderRuntime(data);
             applyDeviceForm(data);
+
+            const apply = data.controller_apply;
+            if(apply){
+                controllerApplyFeedback.classList.add("visible");
+                if(apply.success){
+                    controllerApplyFeedback.style.color = "#86efac";
+                    controllerApplyFeedback.textContent =
+                        apply.verified
+                            ? "✓ Controller bestätigt"
+                            : "✓ Controller-Werte an Spider Farmer gesendet";
+                } else {
+                    controllerApplyFeedback.style.color = "#fca5a5";
+                    controllerApplyFeedback.textContent =
+                        "⚠ Controller lokal gespeichert, aber nicht gesendet: " +
+                        (apply.message || apply.status || "unbekannter Fehler");
+                }
+            }
 
             const saved = document.getElementById("saved");
             saved.classList.add("visible");
