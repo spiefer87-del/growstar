@@ -12,6 +12,10 @@ from core.actuators import (
     set_fan,
     set_vent,
 )
+from core.controller_states import (
+    apply_device_state,
+    resolve_control_state,
+)
 from core.devices import (
     get_device_mode,
     get_device_params,
@@ -130,18 +134,32 @@ def control_device(device, runtime=None):
     now_min = minutes_now()
 
     if mode == "OFF":
-        set_device(device, False, runtime=rt)
+        apply_device_state(
+            device,
+            resolve_control_state(params, "off"),
+            runtime=rt,
+        )
         return
 
     if mode == "ON":
-        set_device(device, True, runtime=rt)
+        apply_device_state(
+            device,
+            resolve_control_state(params, "on"),
+            runtime=rt,
+        )
         return
 
     if mode == "TIME":
         start = int(params.get("start_min", 0))
         end = int(params.get("end_min", 0))
         should_run = in_time_window(now_min, start, end)
-        set_device(device, should_run, runtime=rt)
+
+        state_name = "on" if should_run else "off"
+        apply_device_state(
+            device,
+            resolve_control_state(params, state_name),
+            runtime=rt,
+        )
         return
 
     if mode == "INTERVAL":
@@ -150,11 +168,25 @@ def control_device(device, runtime=None):
 
         cycle = on_t + off_t
         if cycle <= 0:
-            set_device(device, False, runtime=rt)
+            apply_device_state(
+                device,
+                resolve_control_state(params, "off"),
+                runtime=rt,
+            )
             return
 
         phase = int(time.time()) % cycle
-        set_device(device, phase < on_t, runtime=rt)
+        state_name = (
+            "interval_a"
+            if phase < on_t
+            else "interval_b"
+        )
+
+        apply_device_state(
+            device,
+            resolve_control_state(params, state_name),
+            runtime=rt,
+        )
         return
 
     if mode == "ENV":
