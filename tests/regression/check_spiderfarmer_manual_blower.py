@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline regression for SF.4D.9 manual blower hardware-test path."""
+"""Offline regression for SF.4D.10 manual blower mLevel hardware-test path."""
 
 from pathlib import Path
 import sys
@@ -23,7 +23,7 @@ def require(condition, message):
 def main():
     compiled = compile_manual_blower_command(
         pid="744DBD59D734",
-        setpoints={"modeType": 0, "mOnOff": 1, "maxSpeed": 40},
+        setpoints={"modeType": 0, "mOnOff": 1, "mLevel": 40},
     )
 
     require(
@@ -38,29 +38,29 @@ def main():
                 "blower": {
                     "modeType": 0,
                     "mOnOff": 1,
-                    "maxSpeed": 40,
+                    "mLevel": 40,
                 },
             },
         },
-        "Blower-Test sendet nur manuellen Modus, EIN und maxSpeed",
+        "Blower-Test sendet nur manuellen Modus, EIN und mLevel",
     )
     require(
-        compiled["diagnostic"] == "candidate_manual_blower",
-        "Blower-Pfad bleibt bis zum Hardwaretest ausdrücklich diagnostisch",
+        compiled["diagnostic"] == "candidate_manual_blower_mlevel",
+        "Blower-mLevel-Pfad bleibt bis zum Hardwaretest ausdrücklich diagnostisch",
     )
 
-    for bad in (-1, 101, 40.5, True):
+    for bad in (24, 101, 40.5, True):
         try:
             compile_manual_blower_command(
                 pid="744DBD59D734",
-                setpoints={"modeType": 0, "maxSpeed": bad},
+                setpoints={"modeType": 0, "mLevel": bad},
             )
         except SpiderFarmerCommandError:
             pass
         else:
-            raise AssertionError(f"Ungültiges maxSpeed akzeptiert: {bad!r}")
+            raise AssertionError(f"Ungültiges mLevel akzeptiert: {bad!r}")
 
-    print("✅ Blower begrenzt maxSpeed auf ganzzahlige 0..100")
+    print("✅ Blower begrenzt mLevel auf ganzzahlige 25..100")
 
     proxy = (ROOT / "bridge/spiderfarmer/command_proxy.py").read_text(encoding="utf-8")
     require(
@@ -69,7 +69,13 @@ def main():
         "Privater Command-Socket stellt den isolierten Blower-Hardwaretest bereit",
     )
 
-    print("✅ Spider Farmer SF.4D.9 Blower-Diagnosepfad vollständig erfolgreich")
+    command_model = (ROOT / "bridge/spiderfarmer/command_model.py").read_text(encoding="utf-8")
+    require(
+        '"blower": {\n        "level": "maxSpeed"' in command_model,
+        "Produktionsmapping bleibt bis zur Hardwarebestätigung unverändert",
+    )
+
+    print("✅ Spider Farmer SF.4D.10 Blower-mLevel-Diagnosepfad vollständig erfolgreich")
 
 
 if __name__ == "__main__":
