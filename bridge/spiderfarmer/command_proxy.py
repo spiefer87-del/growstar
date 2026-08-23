@@ -26,6 +26,7 @@ from .command_model import (
     compile_controller_command,
     compile_manual_fan_command,
     compile_manual_blower_command,
+    compile_manual_light_command,
     compile_minimal_controller_command,
     compile_powered_minimal_fan_command,
 )
@@ -287,6 +288,7 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
             "set_controller",
             "test_controller_manual_fan",
             "test_controller_manual_blower",
+            "test_controller_manual_light",
             "test_controller_minimal",
             "test_controller_minimal_powered",
         }:
@@ -330,6 +332,16 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
                 )
 
             compiled = compile_manual_blower_command(
+                pid=pid,
+                setpoints=setpoints,
+            )
+        elif action == "test_controller_manual_light":
+            if module != "light":
+                raise SpiderFarmerCommandError(
+                    "Manueller Licht-Test ist ausschließlich für light erlaubt"
+                )
+
+            compiled = compile_manual_light_command(
                 pid=pid,
                 setpoints=setpoints,
             )
@@ -392,6 +404,14 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         elif action == "test_controller_manual_blower":
             _LOG.warning(
                 "SF.4D.11 MANUAL BLOWER TEST sent controller=%s module=%s fields=%s payload=%s",
+                controller_id,
+                module,
+                sorted(compiled["changed_fields"]),
+                compiled["payload"],
+            )
+        elif action == "test_controller_manual_light":
+            _LOG.warning(
+                "SF.4D.12 MANUAL LIGHT TEST sent controller=%s module=%s fields=%s payload=%s",
                 controller_id,
                 module,
                 sorted(compiled["changed_fields"]),

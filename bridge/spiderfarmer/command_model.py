@@ -219,7 +219,6 @@ def find_latest_template(capture_path, *, pid, module):
     )
 
 
-
 def _confirmed_manual_fan_payload(pid, normalized_setpoints, *, diagnostic=None):
     """Build the controller-confirmed manual fan command without capture data.
 
@@ -394,6 +393,67 @@ def compile_manual_blower_command(*, pid, setpoints):
         normalized,
         diagnostic="confirmed_manual_blower",
     )
+
+
+def compile_manual_light_command(*, pid, setpoints):
+    """Controlled manual light mLevel diagnostic for SF.4D.12.
+
+    This intentionally does not make light a confirmed production fallback.
+    The hardware hypothesis under test is modeType=0, mOnOff=1, mLevel=0..100.
+    """
+
+    if not isinstance(setpoints, dict):
+        raise SpiderFarmerCommandError(
+            "Manueller Licht-Test erwartet setpoints"
+        )
+
+    mode_type = setpoints.get("modeType", 0)
+    level = setpoints.get("mLevel")
+    on_off = setpoints.get("mOnOff", 1)
+
+    if mode_type != 0:
+        raise SpiderFarmerCommandError(
+            "Manueller Licht-Test erwartet modeType=0"
+        )
+    if on_off != 1:
+        raise SpiderFarmerCommandError(
+            "Manueller Licht-Test erwartet mOnOff=1"
+        )
+
+    normalized = _normalize_command_setpoints(
+        "light",
+        {"level": level},
+    )
+
+    pid = str(pid or "").strip().upper()
+    if not pid:
+        raise SpiderFarmerCommandError("Controller-PID fehlt")
+
+    light_block = {
+        "modeType": 0,
+        "mOnOff": 1,
+        "mLevel": normalized["level"],
+    }
+
+    return {
+        "topic": f"SF/GGS/CB/API/DOWN/{pid}",
+        "payload": {
+            "method": "setConfigField",
+            "params": {
+                "keyPath": ["device", "light"],
+                "light": light_block,
+            },
+        },
+        "observed_at": None,
+        "session_id": None,
+        "module": "light",
+        "changed_fields": {
+            "modeType": 0,
+            "mOnOff": 1,
+            "mLevel": normalized["level"],
+        },
+        "diagnostic": "manual_light_mlevel_test",
+    }
 
 
 def compile_controller_command(
