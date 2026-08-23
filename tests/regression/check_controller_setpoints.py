@@ -109,8 +109,20 @@ def main():
         "Geräte-Speichern nimmt Controller-Sollwerte im selben Formular mit",
     )
     require(
-        "sendet sie aber noch nicht an Spider Farmer" in ui_text,
-        "UI kennzeichnet SF.4C ausdrücklich als Sollwert-Persistenz ohne Hardware-Schreibpfad",
+        "SF.4D speichert diese Werte und sendet sie über die lokale Growstar-Bridge" in ui_text,
+        "UI kennzeichnet den aktiven SF.4D-Schreibpfad ausdrücklich",
+    )
+
+    require(
+        'id="controller-apply-feedback"' in ui_text
+        and "controller_apply" in ui_text,
+        "UI besitzt einen getrennten Rückkanal für lokalen Speicher- und Controller-Sendestatus",
+    )
+
+    require(
+        "Controller-Werte an Spider Farmer gesendet" in ui_text
+        and "Controller lokal gespeichert, aber nicht gesendet" in ui_text,
+        "UI unterscheidet erfolgreichen Hardware-Sendestatus von lokaler Persistenz bei Bridge-Fehlern",
     )
 
     forbidden = (
