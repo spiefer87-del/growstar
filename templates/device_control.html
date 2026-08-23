@@ -5,7 +5,7 @@
 {% block head %}
 <style>
 *,*::before,*::after{box-sizing:border-box}
-:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--accent:#22c55e;--purple:#a78bfa;--border:#334155}
+:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--accent:#22c55e;--purple:#a78bfa;--border:#334155;--blue:#38bdf8;--amber:#f59e0b}
 body{margin:0;padding:20px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif}
 .wrap{max-width:720px;margin:auto}
 .top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
@@ -21,7 +21,8 @@ button{width:100%;border:none;border-radius:10px;padding:11px;background:var(--a
 button:disabled{opacity:.45;cursor:not-allowed}
 .status{padding:12px 14px;border-radius:12px;background:#111827;color:var(--muted);margin-bottom:14px}.status.shadow{background:rgba(124,58,237,.16);color:#ddd6fe}.status.live{background:rgba(34,197,94,.14);color:#bbf7d0}
 .state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}.editing-hint{display:none;margin-top:10px;color:#fcd34d;text-align:center;font-size:.76rem}.editing-hint.visible{display:block}.assignment-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(120,53,15,.18);color:#fde68a;font-size:.84rem;line-height:1.5}.assignment-warning.visible{display:block}.safety-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(239,68,68,.42);background:rgba(127,29,29,.22);color:#fecaca;font-size:.84rem;line-height:1.5}.safety-warning.visible{display:block}.hardware-line{margin-top:7px;color:var(--muted);font-size:.78rem}
-@media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}}
+.controller-card{display:none;border:1px solid rgba(56,189,248,.22);background:linear-gradient(145deg,rgba(30,41,59,1),rgba(15,23,42,.98))}.controller-card.visible{display:block}.controller-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.controller-title{font-size:1rem;font-weight:800}.controller-meta{margin-top:5px;color:var(--muted);font-size:.78rem;line-height:1.4}.controller-badge{padding:5px 9px;border-radius:999px;font-size:.66rem;font-weight:800;background:rgba(56,189,248,.14);color:#7dd3fc}.controller-badge.offline{background:rgba(239,68,68,.14);color:#fca5a5}.setpoint{margin:14px 0;padding:13px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(2,6,23,.34)}.setpoint-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:9px}.setpoint-head label{margin:0;color:var(--text);font-weight:750}.setpoint-value{color:#bae6fd;font-size:.8rem;font-weight:800}.setpoint-row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center}.setpoint-row input[type="range"]{padding:0}.controller-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.77rem;line-height:1.45}
+@media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}.setpoint-row{grid-template-columns:1fr 78px}}
 </style>
 {% endblock %}
 
@@ -45,6 +46,24 @@ button:disabled{opacity:.45;cursor:not-allowed}
             <span id="output-state" class="state-value">--</span>
         </div>
         <div id="hardware-state" class="hardware-line">Hardware: wird geladen …</div>
+    </div>
+
+    <div id="controller-card" class="card controller-card">
+        <div class="controller-head">
+            <div>
+                <div class="controller-title">🎛️ Controller</div>
+                <div id="controller-meta" class="controller-meta">Controller wird geladen …</div>
+            </div>
+            <span id="controller-badge" class="controller-badge">--</span>
+        </div>
+
+        <div id="controller-setpoints"></div>
+
+        <div class="controller-note">
+            Diese Werte sind die Growstar-Sollwerte für den zugeordneten Controller.
+            <strong>SF.4C speichert sie bereits sauber am Gerät, sendet sie aber noch nicht an Spider Farmer.</strong>
+            Power / Ein-Aus bleibt weiterhin beim Shelly.
+        </div>
     </div>
 
     <div class="card">
@@ -115,6 +134,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
     const safetyWarning = document.getElementById("safety-warning");
     const hardwareState = document.getElementById("hardware-state");
     const editingHint = document.getElementById("editing-hint");
+    const controllerCard = document.getElementById("controller-card");
+    const controllerMeta = document.getElementById("controller-meta");
+    const controllerBadge = document.getElementById("controller-badge");
+    const controllerSetpoints = document.getElementById("controller-setpoints");
 
     const FORM_CONTROL_IDS = [
         "mode",
@@ -134,8 +157,18 @@ button:disabled{opacity:.45;cursor:not-allowed}
     let refreshInFlight = false;
     let saveInProgress = false;
     let refreshEpoch = 0;
+    let controllerSchema = {};
 
     saveButton.disabled = !CAN_CONFIGURE;
+
+    function escapeHtml(value){
+        return String(value ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
 
     function markFormDirty() {
         if (!CAN_CONFIGURE) return;
@@ -158,7 +191,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         if (!hardwareConfigured) {
             assignmentWarning.classList.add("visible");
             assignmentWarning.textContent =
-                "⚠️ Dieses Gerät ist keiner Hardware zugeordnet. " +
+                "⚠️ Dieses Gerät ist keiner Power-Hardware zugeordnet. " +
                 "Dauerbetrieb, Zeitsteuerung, Intervall und Umgebung sind gesperrt. " +
                 "Bitte zuerst unter Grow Control → Verbindungen IP/Hostname + Relay zuweisen.";
         } else {
@@ -201,6 +234,106 @@ button:disabled{opacity:.45;cursor:not-allowed}
         }
     }
 
+    function setpointDefault(spec){
+        const minimum = Number(spec.min);
+        const maximum = Number(spec.max);
+        if (minimum <= 1 && maximum >= 1) return Math.max(minimum, 1);
+        return minimum;
+    }
+
+    function setpointField(name, spec, value){
+        const initial = Number.isFinite(Number(value))
+            ? Number(value)
+            : setpointDefault(spec);
+
+        return `
+            <div class="setpoint" data-setpoint="${escapeHtml(name)}">
+                <div class="setpoint-head">
+                    <label for="controller-${escapeHtml(name)}-range">${escapeHtml(spec.label || name)}</label>
+                    <span class="setpoint-value" id="controller-${escapeHtml(name)}-display">${escapeHtml(spec.unit || "")} ${escapeHtml(initial)}</span>
+                </div>
+                <div class="setpoint-row">
+                    <input
+                        id="controller-${escapeHtml(name)}-range"
+                        class="js-controller-range"
+                        data-name="${escapeHtml(name)}"
+                        type="range"
+                        min="${escapeHtml(spec.min)}"
+                        max="${escapeHtml(spec.max)}"
+                        step="${escapeHtml(spec.step || 1)}"
+                        value="${escapeHtml(initial)}"
+                        ${CAN_CONFIGURE ? "" : "disabled"}
+                    >
+                    <input
+                        id="controller-${escapeHtml(name)}"
+                        class="js-controller-number"
+                        data-name="${escapeHtml(name)}"
+                        type="number"
+                        min="${escapeHtml(spec.min)}"
+                        max="${escapeHtml(spec.max)}"
+                        step="${escapeHtml(spec.step || 1)}"
+                        value="${escapeHtml(initial)}"
+                        ${CAN_CONFIGURE ? "" : "disabled"}
+                    >
+                </div>
+            </div>
+        `;
+    }
+
+    function renderController(controller, {syncValues = false} = {}){
+        if(!controller?.assigned){
+            controllerCard.classList.remove("visible");
+            controllerSchema = {};
+            return;
+        }
+
+        controllerCard.classList.add("visible");
+        controllerSchema = controller.schema || {};
+
+        controllerMeta.textContent =
+            `${controller.label || controller.target_id} · ` +
+            `${(controller.capabilities || []).join(" + ") || "keine steuerbaren Werte"}`;
+
+        controllerBadge.textContent = controller.online ? "ONLINE" : "OFFLINE";
+        controllerBadge.classList.toggle("offline", !controller.online);
+
+        if(!syncValues && controllerSetpoints.children.length){
+            return;
+        }
+
+        const setpoints = controller.setpoints || {};
+        const entries = Object.entries(controllerSchema);
+
+        if(!entries.length){
+            controllerSetpoints.innerHTML =
+                `<div class="hint">Für diesen Controller sind aktuell keine einstellbaren Growstar-Sollwerte verfügbar.</div>`;
+            return;
+        }
+
+        controllerSetpoints.innerHTML = entries
+            .map(([name, spec]) => setpointField(name, spec, setpoints[name]))
+            .join("");
+    }
+
+    function syncControllerDisplay(name, value){
+        const spec = controllerSchema[name] || {};
+        const display = document.getElementById(`controller-${name}-display`);
+        if(display){
+            display.textContent = `${spec.unit || ""} ${value}`.trim();
+        }
+    }
+
+    function readControllerSetpoints(){
+        const result = {};
+
+        controllerSetpoints.querySelectorAll(".js-controller-number")
+            .forEach(input => {
+                result[input.dataset.name] = Number(input.value);
+            });
+
+        return result;
+    }
+
     function applyDeviceForm(data) {
         const params = data.params || {};
         const env = data.env_config || {};
@@ -215,6 +348,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
         document.getElementById("logic").value = env.logic || "OR";
         document.getElementById("direction").value = env.direction || "HIGH";
 
+        renderController(data.controller || {}, {syncValues: true});
+
         formInitialized = true;
         markFormClean();
         updateSections();
@@ -227,19 +362,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
         const safety = data.safety || {};
 
         setModeAvailability(data.hardware_configured);
+        renderController(data.controller || {}, {syncValues: false});
 
         if (!data.hardware_configured) {
             output.textContent = "NICHT ZUGEORDNET";
-            hardwareState.textContent = "Hardware: keine IP/Relay-Zuordnung";
+            hardwareState.textContent = "Power: keine IP/Relay-Zuordnung";
         } else if (data.physical_known) {
             output.textContent = data.physical_on ? "EIN" : "AUS";
             hardwareState.textContent =
-                `Hardware: ONLINE · ${data.physical_on ? "EIN" : "AUS"}` +
+                `Power: ONLINE · ${data.physical_on ? "EIN" : "AUS"}` +
                 (health.check_age == null ? "" : ` · Prüfung vor ${Math.round(health.check_age)}s`);
         } else {
             output.textContent = "STATUS UNBEKANNT";
             const state = health.state ? String(health.state).toUpperCase() : "NOCH KEIN POLL";
-            hardwareState.textContent = `Hardware: ${state}`;
+            hardwareState.textContent = `Power: ${state}`;
         }
 
         if (safety.active || safety.stale) {
@@ -280,16 +416,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
             if (!response.ok) return;
 
             const data = await response.json();
-
-            // Ein Refresh, der vor einem Speichervorgang gestartet wurde,
-            // darf danach keinen älteren Runtime-Zustand mehr rendern.
             if (requestEpoch !== refreshEpoch) return;
 
             renderRuntime(data);
 
-            // Auto-Refresh darf niemals Benutzereingaben überschreiben.
-            // Formularwerte werden nur beim Erstladen oder bewusst nach
-            // erfolgreichem Speichern synchronisiert.
             if (syncForm && !formDirty) {
                 applyDeviceForm(data);
             }
@@ -303,7 +433,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
         if (mode.value !== "OFF" && !hardwareConfigured) {
             alert(
-                "Dieses Gerät ist keiner Hardware zugeordnet. " +
+                "Dieses Gerät ist keiner Power-Hardware zugeordnet. " +
                 "Bitte zuerst unter Grow Control → Verbindungen IP/Hostname + Relay zuweisen."
             );
             return;
@@ -325,6 +455,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
             }
         };
 
+        if(controllerCard.classList.contains("visible")){
+            payload.controller_setpoints = readControllerSetpoints();
+        }
+
         saveInProgress = true;
         refreshEpoch += 1;
         saveButton.disabled = true;
@@ -343,8 +477,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
                 } else {
                     alert(error.message || error.error || "Speichern fehlgeschlagen");
                 }
-                // Eingaben bewusst stehen lassen. Der Benutzer kann korrigieren
-                // und erneut speichern; der nächste Poll aktualisiert nur Status.
                 return;
             }
 
@@ -376,10 +508,36 @@ button:disabled{opacity:.45;cursor:not-allowed}
         });
     });
 
-    // Erstes Laden darf die gespeicherten Werte in das Formular übernehmen.
+    controllerSetpoints.addEventListener("input", event => {
+        const range = event.target.closest(".js-controller-range");
+        const number = event.target.closest(".js-controller-number");
+
+        if(range){
+            const name = range.dataset.name;
+            const partner = document.getElementById(`controller-${name}`);
+            if(partner) partner.value = range.value;
+            syncControllerDisplay(name, range.value);
+            markFormDirty();
+            return;
+        }
+
+        if(number){
+            const name = number.dataset.name;
+            const spec = controllerSchema[name] || {};
+            let value = Number(number.value);
+
+            if(Number.isFinite(Number(spec.min))) value = Math.max(Number(spec.min), value);
+            if(Number.isFinite(Number(spec.max))) value = Math.min(Number(spec.max), value);
+
+            const partner = document.getElementById(`controller-${name}-range`);
+            if(partner) partner.value = value;
+            syncControllerDisplay(name, value);
+            markFormDirty();
+        }
+    });
+
     loadDevice({syncForm: true});
 
-    // Danach werden ausschließlich Live-/Hardware-/Safety-Daten aktualisiert.
     setInterval(
         () => loadDevice({syncForm: false}),
         3000
