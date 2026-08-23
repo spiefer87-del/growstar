@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send one controlled SF.4D.12 manual light mLevel command."""
+"""Send one controlled SF.4D.13 confirmed manual light mLevel command."""
 
 import argparse
 import json
@@ -18,8 +18,8 @@ def main():
     parser.add_argument("--socket", default=DEFAULT_SOCKET)
     args = parser.parse_args()
 
-    if not 0 <= args.level <= 100:
-        parser.error("--level muss zwischen 0 und 100 liegen")
+    if not 11 <= args.level <= 100:
+        parser.error("--level muss zwischen 11 und 100 liegen")
 
     request = {
         "action": "test_controller_manual_light",
