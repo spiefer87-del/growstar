@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression for SF.4B integration into the existing Connections UI."""
+"""Regression for the corrected SF.4B.1 Connections UI."""
 
 from pathlib import Path
 import sys
@@ -18,63 +18,55 @@ def require(condition, message):
 def main():
     path = ROOT / "templates/connections.html"
     require(path.is_file(), "Bestehende Verbindungen-Seite vorhanden")
-
     text = path.read_text(encoding="utf-8")
 
     require(
         'id="device-grid"' in text
-        and 'id="save-button"' in text
-        and "/api/hardware" in text,
-        "Bestehende Shelly-/Power-Zuordnung bleibt auf derselben Seite erhalten",
+        and "Strom-Zuordnungen speichern" in text,
+        "Bestehender Shelly-/Power-Bereich bleibt unverändert vorhanden",
     )
 
     require(
-        "Stromversorgung" in text
-        and "Power bleibt beim Shelly" in text,
-        "UI trennt Power-Aktor sichtbar von Controller-Funktionen",
-    )
-
-    require(
-        'id="controller-grid"' in text
-        and 'id="controller-save-button"' in text,
-        "Controller-Mapping wird in die bestehende Verbindungen-Seite integriert",
-    )
-
-    require(
-        "/capability-routing" in text,
-        "UI verwendet ausschließlich die bestehende SF.4A Capability-Routing-API",
+        'class="cap-select js-controller"' in text,
+        "Pro Growstar-Gerät existiert genau eine Controller-Auswahl",
     )
 
     require(
         "Level / Dimmen" in text
         and "Oszillation" in text,
-        "UI stellt die benötigten Zusatzfähigkeiten Level und Oszillation bereit",
+        "Controller-Funktionsumfang wird sichtbar beschrieben",
     )
 
     require(
-        "target.assignment_enabled" in text,
-        "UI bietet nur vom Backend freigegebene Controller-Targets zur Auswahl an",
+        "Funktionen des gewählten Controllers werden immer gemeinsam diesem Gerät zugeordnet." in text,
+        "UI erklärt die unteilbare Geräte-Zuordnung ausdrücklich",
     )
 
     require(
-        "target.capabilities" in text,
-        "Controller-Auswahl wird pro Capability gefiltert",
+        "controller.family" in text
+        and "required_capabilities" in text,
+        "UI filtert Controller nach Gerätefamilie und vollständigem Funktionssatz",
+    )
+
+    require(
+        'BELEGT:' in text
+        and 'disabled data-occupied="1"' in text,
+        "Bereits einem anderen Gerät zugeordneter Controller ist sichtbar aber gesperrt",
+    )
+
+    require(
+        'JSON.stringify({controllers})' in text,
+        "UI speichert ein gerätegebundenes Controller-Mapping",
+    )
+
+    require(
+        "js-capability" not in text,
+        "Alte getrennte Capability-Dropdowns wurden vollständig entfernt",
     )
 
     require(
         'const modeLocked = mode !== "OFF"' in text,
-        "Controller-Zuordnungen folgen der bestehenden OFF-Sicherheitslogik der Verbindungen-Seite",
-    )
-
-    require(
-        "capability_route_conflict" in text,
-        "Globale Target/Capability-Doppelbelegung wird in der bestehenden UI verständlich behandelt",
-    )
-
-    require(
-        'method:"POST"' in text
-        and "JSON.stringify({routes})" in text,
-        "Controller-Speichern persistiert ausschließlich Routing-Metadaten",
+        "Bestehende OFF-Sicherheitslogik bleibt für Controller-Wechsel erhalten",
     )
 
     forbidden = (
@@ -90,16 +82,10 @@ def main():
     for token in forbidden:
         require(
             token not in text,
-            f"SF.4B UI besitzt keinen Spider-Farmer-Command-/Transportpfad: {token}",
+            f"SF.4B.1 UI besitzt weiterhin keinen Command-Transport: {token}",
         )
 
-    require(
-        "Strom-Zuordnungen speichern" in text
-        and "Controller-Zuordnungen speichern" in text,
-        "Power- und Controller-Persistenz bleiben bewusst getrennt und ohne Teiltransaktions-Risiko vermischt",
-    )
-
-    print("✅ Spider Farmer SF.4B Verbindungen-UI Regression vollständig erfolgreich")
+    print("✅ Spider Farmer SF.4B.1 Geräte-Zuordnungs-UI Regression vollständig erfolgreich")
 
 
 if __name__ == "__main__":
