@@ -25,7 +25,7 @@ from .state_model import parse_topic
 
 _FIELD_MAP = {
     "fan": {
-        "level": "maxSpeed",
+        "level": "mLevel",
         "oscillation": "shakeLevel",
     },
     "blower": {
@@ -229,7 +229,8 @@ def compile_controller_command(
     if not isinstance(setpoints, dict) or not setpoints:
         raise SpiderFarmerCommandError("Keine Controller-Sollwerte angegeben")
 
-    field_map = _FIELD_MAP.get(str(module))
+    module = str(module)
+    field_map = _FIELD_MAP.get(module)
     if not field_map:
         raise SpiderFarmerCommandError(
             f"Modul {module!r} wird noch nicht geschrieben"
@@ -247,20 +248,60 @@ def compile_controller_command(
     )
 
     payload = deepcopy(template["payload"])
-    params = payload["params"]
-    block = params.get(module)
+    params = payload.get("params")
 
-    if not isinstance(block, dict):
+    if not isinstance(params, dict):
         raise SpiderFarmerCommandError(
-            f"Beobachtetes Template enthält keinen {module}-Block"
+            "Beobachtetes Template enthält keinen params-Block"
         )
 
     changed_fields = {}
 
-    for name, value in normalized_setpoints.items():
-        raw_field = field_map[name]
-        block[raw_field] = value
-        changed_fields[raw_field] = value
+    if module == "fan":
+        key_path = params.get("keyPath")
+        if not isinstance(key_path, list) or not key_path:
+            raise SpiderFarmerCommandError(
+                "Beobachtetes Template enthält keinen gültigen keyPath"
+            )
+
+        # Am realen GGS-Controller bestätigt:
+        #   modeType=0 -> Manueller Modus
+        #   mOnOff=1   -> controller-interner Fan EIN
+        #   mLevel=N   -> manuelle Ventilatorstufe L1..L10
+        #
+        # Spider-Farmer-Zeitfenster, Zyklus, Standby und Natural Wind werden
+        # bewusst nicht aus einem alten Template zurückgesendet.
+        fan_block = {
+            "modeType": 0,
+            "mOnOff": 1,
+        }
+        changed_fields.update({
+            "modeType": 0,
+            "mOnOff": 1,
+        })
+
+        for name, value in normalized_setpoints.items():
+            raw_field = field_map[name]
+            fan_block[raw_field] = value
+            changed_fields[raw_field] = value
+
+        payload["params"] = {
+            "keyPath": deepcopy(key_path),
+            "fan": fan_block,
+        }
+
+    else:
+        block = params.get(module)
+
+        if not isinstance(block, dict):
+            raise SpiderFarmerCommandError(
+                f"Beobachtetes Template enthält keinen {module}-Block"
+            )
+
+        for name, value in normalized_setpoints.items():
+            raw_field = field_map[name]
+            block[raw_field] = value
+            changed_fields[raw_field] = value
 
     return {
         "topic": template["topic"],
@@ -353,6 +394,7 @@ def compile_minimal_controller_command(
         "diagnostic": "minimal_write",
     }
 
+
 def compile_powered_minimal_fan_command(
     capture_path,
     *,
@@ -363,15 +405,15 @@ def compile_powered_minimal_fan_command(
 
     This is intentionally NOT the production controller compiler.
 
-    The first SF.4D.4 minimal experiment proved that a fan block containing only
-    maxSpeed can make the Spider Farmer controller switch the fan internally off.
-    SF.4D.5 therefore tests the next-smallest payload:
+    The historical SF.4D.4/SF.4D.5 experiments isolated the smallest fan
+    blocks. The corrected fan field map now resolves Growstar fan level to
+    mLevel. This diagnostic therefore sends:
 
         fan:
             mOnOff: 1
             <exactly one requested Growstar-owned fan field>
 
-    No interval, standby, natural-wind, timing or unrelated fan fields are sent.
+    The production compiler additionally owns the confirmed modeType=0 envelope.
     """
 
     if not isinstance(setpoints, dict) or len(setpoints) != 1:
@@ -433,4 +475,3 @@ def compile_powered_minimal_fan_command(
         "changed_fields": changed_fields,
         "diagnostic": "powered_minimal_fan_write",
     }
-
