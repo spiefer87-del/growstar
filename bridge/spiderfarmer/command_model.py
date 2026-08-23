@@ -61,6 +61,19 @@ def _payload_matches_module(payload, module):
     )
 
 
+def _capture_candidates(capture_path):
+    """Return capture files from newest generation to oldest generation."""
+
+    capture_path = Path(capture_path)
+    candidates = [capture_path]
+
+    rotated = Path(str(capture_path) + ".1")
+    if rotated.exists():
+        candidates.append(rotated)
+
+    return candidates
+
+
 def find_latest_template(capture_path, *, pid, module):
     """Return latest observed real setConfigField command for module/PID."""
 
@@ -75,38 +88,55 @@ def find_latest_template(capture_path, *, pid, module):
             f"Modul {module!r} wird noch nicht geschrieben"
         )
 
-    try:
-        lines = capture_path.read_text(encoding="utf-8").splitlines()
-    except OSError as exc:
-        raise SpiderFarmerCommandError(
-            f"Spider-Farmer-Rohcapture nicht lesbar: {exc}"
-        ) from exc
+    readable_capture_seen = False
+    last_read_error = None
 
-    for line in reversed(lines):
+    # Newest capture generation first; only then the older rotated generation.
+    for candidate in _capture_candidates(capture_path):
         try:
-            row = json.loads(line)
-        except (TypeError, ValueError):
+            lines = candidate.read_text(encoding="utf-8").splitlines()
+            readable_capture_seen = True
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            last_read_error = exc
             continue
 
-        if not isinstance(row, dict) or row.get("direction") != "down":
-            continue
+        for line in reversed(lines):
+            try:
+                row = json.loads(line)
+            except (TypeError, ValueError):
+                continue
 
-        topic = str(row.get("topic") or "")
-        topic_info = parse_topic(topic)
+            if not isinstance(row, dict) or row.get("direction") != "down":
+                continue
 
-        if not topic_info or topic_info.get("pid") != pid:
-            continue
+            topic = str(row.get("topic") or "")
+            topic_info = parse_topic(topic)
 
-        payload = row.get("payload")
-        if not _payload_matches_module(payload, module):
-            continue
+            if not topic_info or topic_info.get("pid") != pid:
+                continue
 
-        return {
-            "topic": topic,
-            "payload": deepcopy(payload),
-            "observed_at": row.get("ts"),
-            "session_id": row.get("session_id"),
-        }
+            payload = row.get("payload")
+            if not _payload_matches_module(payload, module):
+                continue
+
+            return {
+                "topic": topic,
+                "payload": deepcopy(payload),
+                "observed_at": row.get("ts"),
+                "session_id": row.get("session_id"),
+            }
+
+    if not readable_capture_seen and last_read_error is not None:
+        raise SpiderFarmerCommandError(
+            f"Spider-Farmer-Rohcapture nicht lesbar: {last_read_error}"
+        ) from last_read_error
+
+    if not readable_capture_seen:
+        raise SpiderFarmerCommandError(
+            f"Spider-Farmer-Rohcapture nicht gefunden: {capture_path}"
+        )
 
     raise SpiderFarmerCommandError(
         f"Noch kein echtes setConfigField-Template für {module} / {pid} "
