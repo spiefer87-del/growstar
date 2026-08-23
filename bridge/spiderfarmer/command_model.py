@@ -15,6 +15,11 @@ from copy import deepcopy
 import json
 from pathlib import Path
 
+from core.controller_setpoints import (
+    controller_schema_for_family,
+    normalize_controller_setpoints,
+)
+
 from .state_model import parse_topic
 
 
@@ -34,9 +39,46 @@ _FIELD_MAP = {
     },
 }
 
+_MODULE_FAMILY = {
+    "fan": "fan",
+    "blower": "blower",
+    "light": "light",
+    "light2": "light",
+}
+
 
 class SpiderFarmerCommandError(RuntimeError):
     pass
+
+
+def _command_schema(module):
+    family = _MODULE_FAMILY.get(str(module))
+    field_map = _FIELD_MAP.get(str(module)) or {}
+
+    if not family or not field_map:
+        return {}
+
+    return controller_schema_for_family(
+        family,
+        field_map.keys(),
+    )
+
+
+def _normalize_command_setpoints(module, setpoints):
+    schema = _command_schema(module)
+
+    if not schema:
+        raise SpiderFarmerCommandError(
+            f"Modul {module!r} wird noch nicht geschrieben"
+        )
+
+    try:
+        return normalize_controller_setpoints(
+            setpoints,
+            schema,
+        )
+    except (TypeError, ValueError) as exc:
+        raise SpiderFarmerCommandError(str(exc)) from exc
 
 
 def _payload_matches_module(payload, module):
@@ -61,6 +103,36 @@ def _payload_matches_module(payload, module):
     )
 
 
+def _template_owned_values_valid(payload, module):
+    """Reject observed templates carrying invalid Growstar-owned values."""
+
+    if not _payload_matches_module(payload, module):
+        return False
+
+    params = payload.get("params") or {}
+    block = params.get(module) or {}
+    field_map = _FIELD_MAP.get(str(module)) or {}
+
+    observed = {
+        name: block[raw_field]
+        for name, raw_field in field_map.items()
+        if raw_field in block
+    }
+
+    if not observed:
+        return True
+
+    try:
+        _normalize_command_setpoints(
+            module,
+            observed,
+        )
+    except SpiderFarmerCommandError:
+        return False
+
+    return True
+
+
 def _capture_candidates(capture_path):
     """Return capture files from newest generation to oldest generation."""
 
@@ -75,7 +147,7 @@ def _capture_candidates(capture_path):
 
 
 def find_latest_template(capture_path, *, pid, module):
-    """Return latest observed real setConfigField command for module/PID."""
+    """Return latest safe observed real setConfigField command for module/PID."""
 
     capture_path = Path(capture_path)
     pid = str(pid or "").strip().upper()
@@ -121,6 +193,11 @@ def find_latest_template(capture_path, *, pid, module):
             if not _payload_matches_module(payload, module):
                 continue
 
+            # Never reuse an observed template that already contains an invalid
+            # Growstar-owned value (for example the historical L60 fan test).
+            if not _template_owned_values_valid(payload, module):
+                continue
+
             return {
                 "topic": topic,
                 "payload": deepcopy(payload),
@@ -139,9 +216,9 @@ def find_latest_template(capture_path, *, pid, module):
         )
 
     raise SpiderFarmerCommandError(
-        f"Noch kein echtes setConfigField-Template für {module} / {pid} "
-        "beobachtet. Einmal in der Spider-Farmer-App einen Wert dieses Geräts "
-        "ändern und danach erneut versuchen."
+        f"Noch kein gültiges echtes setConfigField-Template für {module} / {pid} "
+        "beobachtet. Einmal in der Spider-Farmer-App einen gültigen Wert dieses "
+        "Geräts ändern und danach erneut versuchen."
     )
 
 
@@ -161,11 +238,12 @@ def compile_controller_command(
             f"Modul {module!r} wird noch nicht geschrieben"
         )
 
-    unknown = sorted(set(setpoints) - set(field_map))
-    if unknown:
-        raise SpiderFarmerCommandError(
-            "Nicht unterstützte Sollwerte: " + ", ".join(unknown)
-        )
+    # Final safety boundary: even a direct command.sock request must obey the
+    # same family schema that the Growstar device UI/API already exposes.
+    normalized_setpoints = _normalize_command_setpoints(
+        module,
+        setpoints,
+    )
 
     template = find_latest_template(
         capture_path,
@@ -184,7 +262,7 @@ def compile_controller_command(
 
     changed_fields = {}
 
-    for name, value in setpoints.items():
+    for name, value in normalized_setpoints.items():
         raw_field = field_map[name]
         block[raw_field] = value
         changed_fields[raw_field] = value
