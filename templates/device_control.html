@@ -22,6 +22,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .status{padding:12px 14px;border-radius:12px;background:#111827;color:var(--muted);margin-bottom:14px}.status.shadow{background:rgba(124,58,237,.16);color:#ddd6fe}.status.live{background:rgba(34,197,94,.14);color:#bbf7d0}
 .state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}.editing-hint{display:none;margin-top:10px;color:#fcd34d;text-align:center;font-size:.76rem}.editing-hint.visible{display:block}.assignment-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(120,53,15,.18);color:#fde68a;font-size:.84rem;line-height:1.5}.assignment-warning.visible{display:block}.safety-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(239,68,68,.42);background:rgba(127,29,29,.22);color:#fecaca;font-size:.84rem;line-height:1.5}.safety-warning.visible{display:block}.hardware-line{margin-top:7px;color:var(--muted);font-size:.78rem}
 .controller-card{display:none;border:1px solid rgba(56,189,248,.22);background:linear-gradient(145deg,rgba(30,41,59,1),rgba(15,23,42,.98))}.controller-card.visible{display:block}.controller-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.controller-title{font-size:1rem;font-weight:800}.controller-meta{margin-top:5px;color:var(--muted);font-size:.78rem;line-height:1.4}.controller-badge{padding:5px 9px;border-radius:999px;font-size:.66rem;font-weight:800;background:rgba(56,189,248,.14);color:#7dd3fc}.controller-badge.offline{background:rgba(239,68,68,.14);color:#fca5a5}.setpoint{margin:14px 0;padding:13px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(2,6,23,.34)}.setpoint-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:9px}.setpoint-head label{margin:0;color:var(--text);font-weight:750}.setpoint-value{color:#bae6fd;font-size:.8rem;font-weight:800}.setpoint-row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center}.setpoint-row input[type="range"]{padding:0}.controller-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.77rem;line-height:1.45}
+.interval-phase{margin-top:14px;padding:15px;border:1px solid rgba(56,189,248,.18);border-radius:13px;background:rgba(2,6,23,.28)}.interval-phase-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}.interval-phase-title{font-weight:800}.interval-phase-badge{font-size:.7rem;color:#7dd3fc;font-weight:800}.interval-controller{margin-top:10px}.interval-controller.power-off{display:none}.shelly-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.78rem;line-height:1.45}
 @media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}.setpoint-row{grid-template-columns:1fr 78px}}
 </style>
 {% endblock %}
@@ -51,7 +52,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div id="controller-card" class="card controller-card">
         <div class="controller-head">
             <div>
-                <div class="controller-title">🎛️ Controller</div>
+                <div class="controller-title">🎛️ Controller · Dauerbetrieb / Standard</div>
                 <div id="controller-meta" class="controller-meta">Controller wird geladen …</div>
             </div>
             <span id="controller-badge" class="controller-badge">--</span>
@@ -61,9 +62,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div id="controller-apply-feedback" class="saved"></div>
 
         <div class="controller-note">
-            Diese Werte sind die Growstar-Sollwerte für den zugeordneten Controller.
-            <strong>SF.4D speichert diese Werte und sendet sie über die lokale Growstar-Bridge an den zugeordneten Spider-Farmer-Controller.</strong>
-            Power / Ein-Aus bleibt weiterhin beim Shelly.
+            Diese Werte gelten für Dauerbetrieb und als Standard für regelbare Zustände.
+            <strong>Power / Ein-Aus bleibt immer beim Shelly.</strong>
+            Controller-Werte dürfen den Shelly-Powerzustand niemals überstimmen.
         </div>
     </div>
 
@@ -88,10 +89,58 @@ button:disabled{opacity:.45;cursor:not-allowed}
         </div>
 
         <div id="interval-section" class="section">
-            <h3>Intervall</h3>
-            <div class="grid2">
-                <div class="row"><label for="interval-on">EIN (Sekunden)</label><input id="interval-on" type="number" min="1" step="1"></div>
-                <div class="row"><label for="interval-off">AUS (Sekunden)</label><input id="interval-off" type="number" min="1" step="1"></div>
+            <h3>Intervall · zwei getrennte Zustände</h3>
+            <div class="hint">
+                Phase A und Phase B wechseln fortlaufend. Jede Phase besitzt eine eigene Dauer,
+                Shelly-Power und – bei zugeordnetem Controller – eigene Leistungswerte.
+            </div>
+
+            <div class="interval-phase">
+                <div class="interval-phase-head">
+                    <span class="interval-phase-title">Phase A</span>
+                    <span class="interval-phase-badge">ZUSTAND A</span>
+                </div>
+                <div class="grid2">
+                    <div class="row">
+                        <label for="interval-a-minutes">Dauer (Minuten)</label>
+                        <input id="interval-a-minutes" type="number" min="0.1" step="0.1">
+                    </div>
+                    <div class="row">
+                        <label for="interval-a-power">Shelly-Power</label>
+                        <select id="interval-a-power">
+                            <option value="on">EIN</option>
+                            <option value="off">AUS</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="interval-a-controller" class="interval-controller"></div>
+            </div>
+
+            <div class="interval-phase">
+                <div class="interval-phase-head">
+                    <span class="interval-phase-title">Phase B</span>
+                    <span class="interval-phase-badge">ZUSTAND B</span>
+                </div>
+                <div class="grid2">
+                    <div class="row">
+                        <label for="interval-b-minutes">Dauer (Minuten)</label>
+                        <input id="interval-b-minutes" type="number" min="0.1" step="0.1">
+                    </div>
+                    <div class="row">
+                        <label for="interval-b-power">Shelly-Power</label>
+                        <select id="interval-b-power">
+                            <option value="off">AUS</option>
+                            <option value="on">EIN</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="interval-b-controller" class="interval-controller"></div>
+            </div>
+
+            <div class="shelly-note">
+                <strong>Sicherheitsregel:</strong> Steht eine Phase auf Shelly-Power AUS,
+                wird in dieser Phase kein Controller-Level gesendet. Shelly besitzt immer
+                die Oberhand über das physische Ausschalten.
             </div>
         </div>
 
@@ -140,13 +189,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
     const controllerBadge = document.getElementById("controller-badge");
     const controllerSetpoints = document.getElementById("controller-setpoints");
     const controllerApplyFeedback = document.getElementById("controller-apply-feedback");
+    const intervalAController = document.getElementById("interval-a-controller");
+    const intervalBController = document.getElementById("interval-b-controller");
 
     const FORM_CONTROL_IDS = [
         "mode",
         "start",
         "end",
-        "interval-on",
-        "interval-off",
+        "interval-a-minutes",
+        "interval-b-minutes",
+        "interval-a-power",
+        "interval-b-power",
         "use-temp",
         "use-hum",
         "logic",
@@ -216,6 +269,28 @@ button:disabled{opacity:.45;cursor:not-allowed}
         return h * 60 + m;
     }
 
+    function secondsToMinutes(value, fallbackSeconds) {
+        const seconds = Number(value);
+        const valid = Number.isFinite(seconds) && seconds > 0
+            ? seconds
+            : fallbackSeconds;
+        return Math.round((valid / 60) * 10) / 10;
+    }
+
+    function minutesToSeconds(value, fallbackSeconds) {
+        const minutes = Number(value);
+        if (!Number.isFinite(minutes) || minutes <= 0) return fallbackSeconds;
+        return Math.max(1, Math.round(minutes * 60));
+    }
+
+    function updateIntervalPowerVisibility() {
+        const aOn = document.getElementById("interval-a-power").value === "on";
+        const bOn = document.getElementById("interval-b-power").value === "on";
+
+        intervalAController.classList.toggle("power-off", !aOn);
+        intervalBController.classList.toggle("power-off", !bOn);
+    }
+
     function updateSections() {
         const current = mode.value;
         document.getElementById("time-section").classList.toggle("visible", current === "TIME");
@@ -234,6 +309,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
             special.textContent = "";
             generic.style.display = "block";
         }
+
+        updateIntervalPowerVisibility();
     }
 
     function setpointDefault(spec){
@@ -282,10 +359,84 @@ button:disabled{opacity:.45;cursor:not-allowed}
         `;
     }
 
-    function renderController(controller, {syncValues = false} = {}){
+    function stateSetpointField(stateName, name, spec, value){
+        const initial = Number.isFinite(Number(value))
+            ? Number(value)
+            : setpointDefault(spec);
+        const prefix = `state-${stateName}-${name}`;
+
+        return `
+            <div class="setpoint" data-state="${escapeHtml(stateName)}" data-setpoint="${escapeHtml(name)}">
+                <div class="setpoint-head">
+                    <label for="${prefix}-range">${escapeHtml(spec.label || name)}</label>
+                    <span class="setpoint-value" id="${prefix}-display">${escapeHtml(spec.unit || "")} ${escapeHtml(initial)}</span>
+                </div>
+                <div class="setpoint-row">
+                    <input
+                        id="${prefix}-range"
+                        class="js-state-range"
+                        data-state="${escapeHtml(stateName)}"
+                        data-name="${escapeHtml(name)}"
+                        type="range"
+                        min="${escapeHtml(spec.min)}"
+                        max="${escapeHtml(spec.max)}"
+                        step="${escapeHtml(spec.step || 1)}"
+                        value="${escapeHtml(initial)}"
+                        ${CAN_CONFIGURE ? "" : "disabled"}
+                    >
+                    <input
+                        id="${prefix}"
+                        class="js-state-number"
+                        data-state="${escapeHtml(stateName)}"
+                        data-name="${escapeHtml(name)}"
+                        type="number"
+                        min="${escapeHtml(spec.min)}"
+                        max="${escapeHtml(spec.max)}"
+                        step="${escapeHtml(spec.step || 1)}"
+                        value="${escapeHtml(initial)}"
+                        ${CAN_CONFIGURE ? "" : "disabled"}
+                    >
+                </div>
+            </div>
+        `;
+    }
+
+    function renderIntervalControllerStates(params, defaultSetpoints){
+        const states = params?.control_states || {};
+        const a = states.interval_a || {};
+        const b = states.interval_b || {};
+        const entries = Object.entries(controllerSchema);
+
+        const aValues = a.controller || defaultSetpoints || {};
+        const bValues = b.controller || defaultSetpoints || {};
+
+        if(!entries.length){
+            intervalAController.innerHTML = "";
+            intervalBController.innerHTML = "";
+            return;
+        }
+
+        intervalAController.innerHTML =
+            `<div class="hint">Controller-Werte Phase A</div>` +
+            entries.map(([name, spec]) =>
+                stateSetpointField("interval_a", name, spec, aValues[name])
+            ).join("");
+
+        intervalBController.innerHTML =
+            `<div class="hint">Controller-Werte Phase B</div>` +
+            entries.map(([name, spec]) =>
+                stateSetpointField("interval_b", name, spec, bValues[name])
+            ).join("");
+
+        updateIntervalPowerVisibility();
+    }
+
+    function renderController(controller, {syncValues = false, params = {}} = {}){
         if(!controller?.assigned){
             controllerCard.classList.remove("visible");
             controllerSchema = {};
+            intervalAController.innerHTML = "";
+            intervalBController.innerHTML = "";
             return;
         }
 
@@ -309,17 +460,28 @@ button:disabled{opacity:.45;cursor:not-allowed}
         if(!entries.length){
             controllerSetpoints.innerHTML =
                 `<div class="hint">Für diesen Controller sind aktuell keine einstellbaren Growstar-Sollwerte verfügbar.</div>`;
+            renderIntervalControllerStates(params, setpoints);
             return;
         }
 
         controllerSetpoints.innerHTML = entries
             .map(([name, spec]) => setpointField(name, spec, setpoints[name]))
             .join("");
+
+        renderIntervalControllerStates(params, setpoints);
     }
 
     function syncControllerDisplay(name, value){
         const spec = controllerSchema[name] || {};
         const display = document.getElementById(`controller-${name}-display`);
+        if(display){
+            display.textContent = `${spec.unit || ""} ${value}`.trim();
+        }
+    }
+
+    function syncStateDisplay(stateName, name, value){
+        const spec = controllerSchema[name] || {};
+        const display = document.getElementById(`state-${stateName}-${name}-display`);
         if(display){
             display.textContent = `${spec.unit || ""} ${value}`.trim();
         }
@@ -336,21 +498,37 @@ button:disabled{opacity:.45;cursor:not-allowed}
         return result;
     }
 
+    function readStateController(container){
+        const result = {};
+        container.querySelectorAll(".js-state-number").forEach(input => {
+            result[input.dataset.name] = Number(input.value);
+        });
+        return result;
+    }
+
     function applyDeviceForm(data) {
         const params = data.params || {};
         const env = data.env_config || {};
+        const states = params.control_states || {};
+        const a = states.interval_a || {};
+        const b = states.interval_b || {};
 
         mode.value = data.mode || "OFF";
         document.getElementById("start").value = timeFromMinutes(params.start_min);
         document.getElementById("end").value = timeFromMinutes(params.end_min);
-        document.getElementById("interval-on").value = params.interval_on ?? 300;
-        document.getElementById("interval-off").value = params.interval_off ?? 900;
+        document.getElementById("interval-a-minutes").value = secondsToMinutes(params.interval_on, 300);
+        document.getElementById("interval-b-minutes").value = secondsToMinutes(params.interval_off, 900);
+        document.getElementById("interval-a-power").value = a.power === false ? "off" : "on";
+        document.getElementById("interval-b-power").value = b.power === true ? "on" : "off";
         document.getElementById("use-temp").checked = Boolean(env.use_temp);
         document.getElementById("use-hum").checked = Boolean(env.use_hum);
         document.getElementById("logic").value = env.logic || "OR";
         document.getElementById("direction").value = env.direction || "HIGH";
 
-        renderController(data.controller || {}, {syncValues: true});
+        renderController(data.controller || {}, {
+            syncValues: true,
+            params,
+        });
 
         formInitialized = true;
         markFormClean();
@@ -364,7 +542,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
         const safety = data.safety || {};
 
         setModeAvailability(data.hardware_configured);
-        renderController(data.controller || {}, {syncValues: false});
+        renderController(data.controller || {}, {
+            syncValues: false,
+            params: data.params || {},
+        });
 
         if (!data.hardware_configured) {
             output.textContent = "NICHT ZUGEORDNET";
@@ -441,13 +622,42 @@ button:disabled{opacity:.45;cursor:not-allowed}
             return;
         }
 
+        const aPower = document.getElementById("interval-a-power").value === "on";
+        const bPower = document.getElementById("interval-b-power").value === "on";
+
+        const intervalAControllerValues =
+            controllerCard.classList.contains("visible") && aPower
+                ? readStateController(intervalAController)
+                : {};
+
+        const intervalBControllerValues =
+            controllerCard.classList.contains("visible") && bPower
+                ? readStateController(intervalBController)
+                : {};
+
         const payload = {
             mode: mode.value,
             params: {
                 start_min: minutesFromTime(document.getElementById("start").value),
                 end_min: minutesFromTime(document.getElementById("end").value),
-                interval_on: Number(document.getElementById("interval-on").value || 300),
-                interval_off: Number(document.getElementById("interval-off").value || 900)
+                interval_on: minutesToSeconds(
+                    document.getElementById("interval-a-minutes").value,
+                    300
+                ),
+                interval_off: minutesToSeconds(
+                    document.getElementById("interval-b-minutes").value,
+                    900
+                ),
+                control_states: {
+                    interval_a: {
+                        power: aPower,
+                        controller: intervalAControllerValues
+                    },
+                    interval_b: {
+                        power: bPower,
+                        controller: intervalBControllerValues
+                    }
+                }
             },
             env_config: {
                 use_temp: document.getElementById("use-temp").checked,
@@ -524,6 +734,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
         element.addEventListener(eventName, () => {
             markFormDirty();
             if (id === "mode") updateSections();
+            if (id === "interval-a-power" || id === "interval-b-power") {
+                updateIntervalPowerVisibility();
+            }
         });
     });
 
@@ -554,6 +767,39 @@ button:disabled{opacity:.45;cursor:not-allowed}
             markFormDirty();
         }
     });
+
+    function handleStateControllerInput(event){
+        const range = event.target.closest(".js-state-range");
+        const number = event.target.closest(".js-state-number");
+
+        if(range){
+            const stateName = range.dataset.state;
+            const name = range.dataset.name;
+            const partner = document.getElementById(`state-${stateName}-${name}`);
+            if(partner) partner.value = range.value;
+            syncStateDisplay(stateName, name, range.value);
+            markFormDirty();
+            return;
+        }
+
+        if(number){
+            const stateName = number.dataset.state;
+            const name = number.dataset.name;
+            const spec = controllerSchema[name] || {};
+            let value = Number(number.value);
+
+            if(Number.isFinite(Number(spec.min))) value = Math.max(Number(spec.min), value);
+            if(Number.isFinite(Number(spec.max))) value = Math.min(Number(spec.max), value);
+
+            const partner = document.getElementById(`state-${stateName}-${name}-range`);
+            if(partner) partner.value = value;
+            syncStateDisplay(stateName, name, value);
+            markFormDirty();
+        }
+    }
+
+    intervalAController.addEventListener("input", handleStateControllerInput);
+    intervalBController.addEventListener("input", handleStateControllerInput);
 
     loadDevice({syncForm: true});
 
