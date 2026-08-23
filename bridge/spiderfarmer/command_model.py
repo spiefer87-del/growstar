@@ -316,18 +316,20 @@ def compile_manual_fan_command(*, pid, setpoints):
 
 
 def compile_manual_blower_command(*, pid, setpoints):
-    """Build the isolated manual blower hardware-test command.
+    """Build the isolated SF.4D.10 manual blower hardware-test command.
 
-    The Growstar blower schema is 0..100 percent and maps level to maxSpeed.
-    This diagnostic deliberately mirrors the confirmed manual fan envelope,
-    but remains a private test path until the real controller confirms it.
+    SF.4D.9 proved that modeType=0 switches the real GGS blower into manual
+    mode, but maxSpeed did not alter the actual speed.  The controller read
+    model reports the live/manual value as mLevel, so this next isolated test
+    sends modeType=0, mOnOff=1 and mLevel only.  It remains diagnostic until
+    the real controller confirms that mLevel controls the blower output.
     """
 
     if not isinstance(setpoints, dict):
         raise SpiderFarmerCommandError("Manueller Blower-Test erwartet setpoints")
 
     mode_type = setpoints.get("modeType", 0)
-    max_speed = setpoints.get("maxSpeed")
+    level = setpoints.get("mLevel")
     on_off = setpoints.get("mOnOff", 1)
 
     if mode_type != 0:
@@ -335,24 +337,21 @@ def compile_manual_blower_command(*, pid, setpoints):
             "Manueller Blower-Test erwartet modeType=0"
         )
     if (
-        isinstance(max_speed, bool)
-        or not isinstance(max_speed, int)
-        or not 0 <= max_speed <= 100
+        isinstance(level, bool)
+        or not isinstance(level, int)
+        or not 25 <= level <= 100
     ):
         raise SpiderFarmerCommandError(
-            "Manueller Blower-Test erwartet maxSpeed zwischen 0 und 100"
+            "Manueller Blower-Test erwartet mLevel zwischen 25 und 100"
         )
     if on_off != 1:
         raise SpiderFarmerCommandError(
             "Manueller Blower-Test erwartet mOnOff=1"
         )
 
-    # Validate through Growstar's central blower schema as well.
-    normalized = _normalize_command_setpoints(
-        "blower",
-        {"level": max_speed},
-    )
-
+    # SF.4D.10 intentionally validates the observed 25..100 blower range
+    # directly here.  Production field mapping remains untouched until this
+    # hardware test has been confirmed on the real controller.
     pid = str(pid or "").strip().upper()
     if not pid:
         raise SpiderFarmerCommandError("Controller-PID fehlt")
@@ -360,7 +359,7 @@ def compile_manual_blower_command(*, pid, setpoints):
     blower_block = {
         "modeType": 0,
         "mOnOff": 1,
-        "maxSpeed": normalized["level"],
+        "mLevel": level,
     }
 
     return {
@@ -376,7 +375,7 @@ def compile_manual_blower_command(*, pid, setpoints):
         "session_id": None,
         "module": "blower",
         "changed_fields": dict(blower_block),
-        "diagnostic": "candidate_manual_blower",
+        "diagnostic": "candidate_manual_blower_mlevel",
     }
 
 def compile_controller_command(
