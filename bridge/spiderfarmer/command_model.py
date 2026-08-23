@@ -395,12 +395,54 @@ def compile_manual_blower_command(*, pid, setpoints):
     )
 
 
-def compile_manual_light_command(*, pid, setpoints):
-    """Controlled manual light mLevel diagnostic for SF.4D.12.
+def _confirmed_manual_light_payload(pid, normalized_setpoints, *, diagnostic=None):
+    """Build the controller-confirmed manual light command without capture data.
 
-    This intentionally does not make light a confirmed production fallback.
-    The hardware hypothesis under test is modeType=0, mOnOff=1, mLevel=0..100.
+    Real-controller tests in SF.4D.12 confirmed that light accepts the stable
+    DOWN topic/keyPath together with modeType=0, mOnOff=1 and mLevel 11..100.
+    Values 9 and 10 were observed by the Spider-Farmer app as 11 %, therefore
+    Growstar deliberately exposes 11 % as the minimum controllable level.
     """
+
+    pid = str(pid or "").strip().upper()
+    if not pid:
+        raise SpiderFarmerCommandError("Controller-PID fehlt")
+
+    light_block = {
+        "modeType": 0,
+        "mOnOff": 1,
+    }
+    changed_fields = {
+        "modeType": 0,
+        "mOnOff": 1,
+    }
+
+    for name, value in normalized_setpoints.items():
+        raw_field = _FIELD_MAP["light"][name]
+        light_block[raw_field] = value
+        changed_fields[raw_field] = value
+
+    result = {
+        "topic": f"SF/GGS/CB/API/DOWN/{pid}",
+        "payload": {
+            "method": "setConfigField",
+            "params": {
+                "keyPath": ["device", "light"],
+                "light": light_block,
+            },
+        },
+        "observed_at": None,
+        "session_id": None,
+        "module": "light",
+        "changed_fields": changed_fields,
+    }
+    if diagnostic:
+        result["diagnostic"] = diagnostic
+    return result
+
+
+def compile_manual_light_command(*, pid, setpoints):
+    """Compatibility diagnostic for the confirmed manual light mLevel write."""
 
     if not isinstance(setpoints, dict):
         raise SpiderFarmerCommandError(
@@ -425,35 +467,11 @@ def compile_manual_light_command(*, pid, setpoints):
         {"level": level},
     )
 
-    pid = str(pid or "").strip().upper()
-    if not pid:
-        raise SpiderFarmerCommandError("Controller-PID fehlt")
-
-    light_block = {
-        "modeType": 0,
-        "mOnOff": 1,
-        "mLevel": normalized["level"],
-    }
-
-    return {
-        "topic": f"SF/GGS/CB/API/DOWN/{pid}",
-        "payload": {
-            "method": "setConfigField",
-            "params": {
-                "keyPath": ["device", "light"],
-                "light": light_block,
-            },
-        },
-        "observed_at": None,
-        "session_id": None,
-        "module": "light",
-        "changed_fields": {
-            "modeType": 0,
-            "mOnOff": 1,
-            "mLevel": normalized["level"],
-        },
-        "diagnostic": "manual_light_mlevel_test",
-    }
+    return _confirmed_manual_light_payload(
+        pid,
+        normalized,
+        diagnostic="confirmed_manual_light",
+    )
 
 
 def compile_controller_command(
@@ -485,10 +503,10 @@ def compile_controller_command(
             module=module,
         )
     except SpiderFarmerCommandError:
-        # Fan and blower now both have controller-confirmed manual envelopes.
+        # Fan, blower and light have controller-confirmed manual envelopes.
         # If no safe observed template exists yet (for example after capture
         # rotation/restart), use those confirmed envelopes instead of blocking
-        # Growstar control.
+        # Growstar control. light2 remains template-only until separately tested.
         if module == "fan":
             return _confirmed_manual_fan_payload(
                 pid,
@@ -500,6 +518,12 @@ def compile_controller_command(
                 pid,
                 normalized_setpoints,
                 diagnostic="confirmed_manual_blower_fallback",
+            )
+        if module == "light":
+            return _confirmed_manual_light_payload(
+                pid,
+                normalized_setpoints,
+                diagnostic="confirmed_manual_light_fallback",
             )
         raise
 
@@ -513,7 +537,7 @@ def compile_controller_command(
 
     changed_fields = {}
 
-    if module in ("fan", "blower"):
+    if module in ("fan", "blower", "light"):
         key_path = params.get("keyPath")
         if not isinstance(key_path, list) or not key_path:
             raise SpiderFarmerCommandError(
@@ -525,6 +549,7 @@ def compile_controller_command(
         #   mOnOff=1   -> controller-interner Ausgang EIN
         #   fan.mLevel -> Ventilatorstufe L1..L10
         #   blower.mLevel -> Gebläseleistung 25..100 %
+        #   light.mLevel -> Lichtleistung 11..100 %
         #
         # Zeitfenster, Zyklus, Standby und sonstige Spider-Farmer-Automatik
         # werden bewusst nicht aus einem alten Template zurückgesendet.
