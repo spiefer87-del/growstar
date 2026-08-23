@@ -22,7 +22,7 @@ SCHEMAS = {
     "light": {
         "level": {
             "label": "Lichtstärke",
-            "min": 0,
+            "min": 11,
             "max": 100,
             "step": 1,
             "unit": "%",
