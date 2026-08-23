@@ -1,5 +1,5 @@
 [Unit]
-Description=Growstar Spider Farmer Read-Only Bridge (SF.1)
+Description=Growstar Spider Farmer Bridge (SF.4D)
 After=network-online.target growstar-spiderfarmer-network.service
 Wants=network-online.target
 Requires=growstar-spiderfarmer-network.service
@@ -21,6 +21,8 @@ Environment="GROWSTAR_SF_CERT_FILE=__SF_CERT_DIR__/server.pem"
 Environment="GROWSTAR_SF_KEY_FILE=__SF_CERT_DIR__/server_key.pem"
 Environment="GROWSTAR_SF_UPSTREAM_CA_FILE=__SF_CERT_DIR__/upstream_ca.pem"
 Environment="GROWSTAR_SF_CAPTURE_PAYLOADS=1"
+Environment="GROWSTAR_SF_COMMANDS=1"
+Environment="GROWSTAR_SF_COMMAND_SOCKET=__SF_STATE_DIR__/command.sock"
 
 ExecStart=/usr/bin/python3 -m bridge.spiderfarmer.main
 

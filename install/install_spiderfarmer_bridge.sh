@@ -105,7 +105,7 @@ if command -v systemd-analyze >/dev/null; then
     systemd-analyze verify "${SERVICE_DEST}" >/dev/null
 fi
 
-echo "🔎 Prüfe SF.1-Konfiguration ..."
+echo "🔎 Prüfe SF.4D-Konfiguration ..."
 
 sudo -u "${SERVICE_USER}" \
     env \
@@ -113,6 +113,8 @@ sudo -u "${SERVICE_USER}" \
     GROWSTAR_SF_CERT_FILE="${CERT_DIR}/server.pem" \
     GROWSTAR_SF_KEY_FILE="${CERT_DIR}/server_key.pem" \
     GROWSTAR_SF_UPSTREAM_CA_FILE="${CERT_DIR}/upstream_ca.pem" \
+    GROWSTAR_SF_COMMANDS=1 \
+    GROWSTAR_SF_COMMAND_SOCKET="${STATE_DIR}/command.sock" \
     /usr/bin/python3 -m bridge.spiderfarmer.main --check
 
 if [[ "${START_NOW}" -eq 1 ]]; then
@@ -126,30 +128,20 @@ fi
 
 cat <<EOF2
 
-✅ Growstar Spider Farmer SF.1 installiert
+✅ Growstar Spider Farmer SF.4D installiert
 
-Dienst:       ${SERVICE_NAME}
-Benutzer:     ${SERVICE_USER}
-State:        ${STATE_DIR}
-Listener:     TCP/TLS 18883
-Upstream:     sf.mqtt.spider-farmer.com:8883
-Modus:        READ-ONLY
+Dienst:          ${SERVICE_NAME}
+Benutzer:        ${SERVICE_USER}
+State:           ${STATE_DIR}
+Listener:        TCP/TLS 18883
+Command-Socket:  ${STATE_DIR}/command.sock
+Upstream:        sf.mqtt.spider-farmer.com:8883
+Modus:           CONTROLLED COMMAND INJECTION
 
 Wichtig:
-- Dieses Installationsskript selbst ändert KEIN NetworkManager-Profil.
-- Es ändert KEIN DNS und KEIN Mosquitto.
-- Die Netzwerkgrenze wird separat durch growstar-spiderfarmer-network.service verwaltet.
-- Der Bridge-Dienst verlangt diese Netzwerkgrenze als systemd-Abhängigkeit.
+- Kein zweiter MQTT-Client wird aufgebaut.
+- Growstar nutzt ausschließlich die bestehende lokale Controller-Verbindung.
+- Ein Schreibbefehl wird nur aus einem zuvor real beobachteten
+  DOWN/setConfigField-Template erzeugt.
+- Netzwerk-, DNS- und Mosquitto-Konfiguration bleiben unverändert.
 EOF2
-
-if [[ "${START_NOW}" -eq 0 ]]; then
-    cat <<EOF2
-
-Der Dienst wurde absichtlich NICHT aktiviert oder gestartet.
-Zuerst die Netzwerkgrenze installieren und prüfen:
-  sudo bash install/install_spiderfarmer_network.sh
-
-Erst nach erfolgreichem AP-Test die Bridge starten:
-  sudo systemctl start growstar-spiderfarmer.service
-EOF2
-fi
