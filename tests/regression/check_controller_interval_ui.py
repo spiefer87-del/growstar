@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Static regression for CTRL.2 interval-state UI."""
+"""Static regression for CTRL.2/CTRL.3 interval-state UI."""
 
 from pathlib import Path
 
@@ -48,7 +48,7 @@ def main():
         "Bestehende Intervalle bleiben standardmäßig in Phase B AUS",
     )
     require(
-        "Controller-Werte dürfen den Shelly-Powerzustand niemals überstimmen" in text
+        "Power / Ein-Aus bleibt immer beim Shelly" in text
         and "Shelly besitzt immer" in text,
         "Shelly-Priorität ist in der Bedienoberfläche eindeutig dokumentiert",
     )
@@ -57,7 +57,7 @@ def main():
         "Phase B speichert Controllerwerte nur bei Shelly-Power EIN",
     )
 
-    print("✅ CTRL.2 Intervall-UI vollständig erfolgreich")
+    print("✅ CTRL.2/CTRL.3 Intervall-UI vollständig erfolgreich")
 
 
 if __name__ == "__main__":
