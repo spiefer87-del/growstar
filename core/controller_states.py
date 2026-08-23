@@ -53,6 +53,8 @@ from core.controller_setpoints import (
     controller_schema,
     normalize_controller_setpoints,
 )
+from core.hardware.actuator_health import get_endpoint_health
+from core.hardware_assignments import device_assignment
 from core.runtime import resolve_runtime
 from services.spiderfarmer_commands import send_controller_setpoints
 
@@ -211,6 +213,45 @@ def _apply_controller(runtime, device, setpoints):
     return response
 
 
+def _shelly_power_confirmed(runtime, device):
+    """Return True only when Growstar can confirm Shelly power is ON.
+
+    The live runtime bit is the fast path. After process restarts that bit can
+    temporarily be False even though the physical Shelly relay is already ON.
+    In that case use the existing read-only actuator-health cache as a second
+    source of truth.
+
+    No network request is performed here and OFF can never be converted to ON.
+    """
+
+    if bool(getattr(runtime.state, f"{device}_on", False)):
+        return True
+
+    assignment = device_assignment(
+        runtime.tent_id,
+        device,
+    )
+    if not isinstance(assignment, dict) or not assignment.get("configured"):
+        return False
+
+    host = assignment.get("ip")
+    relay = assignment.get("relay")
+    if not host or relay is None:
+        return False
+
+    health = get_endpoint_health(
+        host,
+        relay,
+    )
+    if not isinstance(health, dict):
+        return False
+
+    return bool(
+        health.get("state") == "ok"
+        and health.get("actual_state") is True
+    )
+
+
 def apply_device_state(
     device,
     state,
@@ -263,9 +304,12 @@ def apply_device_state(
         reason=reason,
     )
 
-    # Never allow a controller command to bypass Shadow/Safety or a failed
-    # Shelly ON. The existing runtime state is the gate.
-    if not bool(getattr(rt.state, f"{device}_on", False)):
+    # Never allow a controller command to bypass Shelly/Safety/Shadow.
+    # The runtime bit is normally enough. After a Growstar restart, however,
+    # the physical relay can already be ON while the in-memory bit still says
+    # False. In that case only a fresh, verified read-only Shelly-health entry
+    # may release the controller write.
+    if not _shelly_power_confirmed(rt, device):
         return {
             "power": False,
             "controller": {
