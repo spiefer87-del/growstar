@@ -43,9 +43,9 @@
     <div class="section-title">
         <div>
             <h2>🎛️ Controller-Funktionen</h2>
-            <p>Level/Dimmen und Oszillation getrennt vom Strom-Aktor zuweisen.</p>
+            <p>Einen physischen Controller als vollständiges Gerät zuweisen. Seine Funktionen bleiben zusammen.</p>
         </div>
-        <span class="section-badge">SF.4B · MAPPING</span>
+        <span class="section-badge">SF.4B.1 · DEVICE MAPPING</span>
     </div>
 
     <div id="controller-grid" class="controller-grid">
@@ -58,10 +58,7 @@
     </div>
 
     <div class="controller-legend">
-        <strong>Power bleibt beim Shelly.</strong> Die Controller-Zuordnung ergänzt ausschließlich Fähigkeiten wie
-        <strong>Level/Dimmen</strong> und <strong>Oszillation</strong>. SF.4B speichert nur das Mapping;
-        es werden weiterhin keine Spider-Farmer-Befehle gesendet. Ein physisches Target kann pro Capability
-        nur einem logischen Growstar-Gerät gehören.
+        <strong>Power bleibt beim Shelly.</strong> Ein physisches Controller-Gerät wird immer vollständig einem logischen Growstar-Gerät zugeordnet. Die Fähigkeiten des Controllers – z. B. Level und Oszillation – können nicht auf mehrere Geräte verteilt werden. SF.4B.1 speichert weiterhin nur das Mapping; es werden keine Spider-Farmer-Befehle gesendet.
     </div>
 </div>
 
@@ -275,19 +272,67 @@
         renderCapabilityRouting();
     }
 
-    function targetOptions(capability, selectedTarget){
-        const targets = (capabilitySnapshot?.targets || [])
-            .filter(target =>
-                target.assignment_enabled &&
-                (target.capabilities || []).includes(capability)
-            );
+    function ownerIsCurrent(owner, device){
+        return Boolean(
+            owner &&
+            String(owner.tent_id || "") === String(select.value || "") &&
+            String(owner.device || "") === String(device || "")
+        );
+    }
 
+    function ownerLabel(owner){
+        if(!owner) return "";
+        return `${owner.tent_name || owner.tent_id || "Station"} · ${owner.device_label || owner.device || "Gerät"}`;
+    }
+
+    function capabilityText(values){
+        const labels = {
+            level: "Level / Dimmen",
+            oscillation: "Oszillation"
+        };
+        return (values || [])
+            .map(value => labels[value] || value)
+            .join(" + ");
+    }
+
+    function compatibleTargets(device){
+        const controller = device.controller || {};
+        const requiredFamily = controller.family;
+        const requiredCapabilities = new Set(controller.required_capabilities || []);
+
+        return (capabilitySnapshot?.targets || [])
+            .filter(target => {
+                if(!target.assignment_enabled) return false;
+                if(target.role !== "device_controller") return false;
+                if(target.family !== requiredFamily) return false;
+
+                const available = new Set(target.capabilities || []);
+                return [...requiredCapabilities].every(capability => available.has(capability));
+            });
+    }
+
+    function controllerOptions(device){
+        const selectedTarget = String(device.controller?.target_id || "");
         let html = `<option value="" ${selectedTarget ? '' : 'selected'}>– Kein Controller –</option>`;
 
-        for(const target of targets){
-            const selected = String(target.id || "") === String(selectedTarget || "");
+        for(const target of compatibleTargets(device)){
+            const selected = String(target.id || "") === selectedTarget;
+            const ownAssignment = ownerIsCurrent(target.owner, device.device);
+            const occupied = Boolean(target.owner && !ownAssignment);
             const state = target.online ? "ONLINE" : "OFFLINE";
-            html += `<option value="${escapeHtml(target.id)}" ${selected ? 'selected' : ''}>${escapeHtml(target.label || target.id)} · ${state}</option>`;
+            const functions = capabilityText(target.capabilities);
+
+            let label = `${target.label || target.id} · ${state}`;
+            if(functions) label += ` · ${functions}`;
+            if(occupied) label += ` · BELEGT: ${ownerLabel(target.owner)}`;
+            else if(ownAssignment || selected) label += " · ZUGEORDNET";
+
+            html += (
+                `<option value="${escapeHtml(target.id)}" ` +
+                `${selected ? 'selected' : ''} ` +
+                `${occupied ? 'disabled data-occupied="1"' : ''}>` +
+                `${escapeHtml(label)}</option>`
+            );
         }
 
         return html;
@@ -301,12 +346,10 @@
         }
 
         const devices = Object.values(capabilitySnapshot.devices || {})
-            .filter(device =>
-                Object.keys(device.routes || {}).some(cap => cap !== "power")
-            );
+            .filter(device => device.controller?.supported);
 
         if(!devices.length){
-            controllerGrid.innerHTML = `<div class="controller-empty">Für diese Station sind keine zusätzlichen Controller-Funktionen vorhanden.</div>`;
+            controllerGrid.innerHTML = `<div class="controller-empty">Für diese Station sind keine zusätzlichen Controller-Geräte vorgesehen.</div>`;
             if(controllerSaveButton) controllerSaveButton.disabled = true;
             return;
         }
@@ -316,41 +359,38 @@
             const mode = String(hwAssignment.mode || "OFF").toUpperCase();
             const modeLocked = mode !== "OFF";
             const editable = CAN_CONFIGURE && !modeLocked;
-
-            const rows = Object.entries(device.routes || {})
-                .filter(([capability, route]) =>
-                    capability !== "power" && route?.editable_here
-                )
-                .map(([capability, route]) => `
-                    <div class="cap-row">
-                        <div class="cap-label">
-                            <span>${escapeHtml(CAPABILITY_LABELS[capability] || capability)}</span>
-                            <small>${route.configured ? escapeHtml(route.provider || "zugeordnet") : "optional"}</small>
-                        </div>
-                        <select
-                            class="cap-select js-capability"
-                            data-capability="${escapeHtml(capability)}"
-                            data-original="${escapeHtml(route.target_id || '')}"
-                            ${editable ? '' : 'disabled'}
-                        >
-                            ${targetOptions(capability, route.target_id)}
-                        </select>
-                    </div>
-                `).join("");
+            const controller = device.controller || {};
+            const statusText = controller.configured ? "ZUGEORDNET" : "OFFEN";
+            const statusClass = controller.configured ? "ok" : "none";
+            const required = capabilityText(controller.required_capabilities);
 
             return `
                 <article class="controller-card" data-device="${escapeHtml(device.device)}">
                     <div class="controller-head">
                         <div>
                             <h3>${device.icon || '🎛️'} ${escapeHtml(device.label || device.device)}</h3>
-                            <div class="controller-meta">Power: Shelly · Zusatzfunktionen: frei zuweisbar</div>
+                            <div class="controller-meta">Power: Shelly · Controller-Funktionen: ${escapeHtml(required || "keine")}</div>
                         </div>
-                        <span class="status ${rows.includes('data-original=""') ? 'none' : 'ok'}">CONTROLLER</span>
+                        <span class="status ${statusClass}">${statusText}</span>
                     </div>
-                    ${rows}
+
+                    <div class="cap-row">
+                        <div class="cap-label">
+                            <span>Controller-Gerät</span>
+                            <small>${controller.configured ? escapeHtml(controller.provider || "zugeordnet") : "optional"}</small>
+                        </div>
+                        <select
+                            class="cap-select js-controller"
+                            data-original="${escapeHtml(controller.target_id || '')}"
+                            ${editable ? '' : 'disabled'}
+                        >
+                            ${controllerOptions(device)}
+                        </select>
+                    </div>
+
                     <div class="controller-note ${modeLocked ? 'locked' : ''}">
-                        Modus: ${escapeHtml(MODE_LABELS[mode] || mode)}
-                        ${modeLocked ? " · Controller-Zuordnung zur Sicherheit erst im Modus OFF ändern." : " · Mapping änderbar."}
+                        Funktionen des gewählten Controllers werden immer gemeinsam diesem Gerät zugeordnet.
+                        ${modeLocked ? " Controller-Zuordnung zur Sicherheit erst im Modus OFF ändern." : " Mapping änderbar."}
                     </div>
                 </article>
             `;
@@ -452,7 +492,7 @@
     });
 
     controllerGrid.addEventListener("change", event => {
-        if(event.target.matches(".js-capability")){
+        if(event.target.matches(".js-controller")){
             event.target.closest(".controller-card")?.classList.remove("conflict");
             if(controllerFeedback.classList.contains("err")){
                 controllerFeedback.className = "feedback";
@@ -555,29 +595,25 @@
 
         clearControllerConflicts();
 
-        const routes = {};
+        const controllers = {};
 
         controllerGrid.querySelectorAll(".controller-card[data-device]").forEach(card => {
             const device = card.dataset.device;
+            const field = card.querySelector(".js-controller");
 
-            card.querySelectorAll(".js-capability").forEach(field => {
-                if(field.disabled) return;
+            if(!field || field.disabled) return;
 
-                const capability = field.dataset.capability;
-                const original = String(field.dataset.original || "");
-                const requested = String(field.value || "");
+            const original = String(field.dataset.original || "");
+            const requested = String(field.value || "");
 
-                if(original === requested) return;
+            if(original === requested) return;
 
-                if(!routes[device]) routes[device] = {};
-
-                routes[device][capability] = requested
-                    ? {target_id: requested}
-                    : null;
-            });
+            controllers[device] = requested
+                ? {target_id: requested}
+                : null;
         });
 
-        if(Object.keys(routes).length === 0){
+        if(Object.keys(controllers).length === 0){
             controllerFeedback.className = "feedback";
             controllerFeedback.textContent = "Keine Controller-Änderungen zu speichern.";
             return;
@@ -591,7 +627,7 @@
             {
                 method:"POST",
                 headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({routes})
+                body:JSON.stringify({controllers})
             }
         );
 
@@ -604,8 +640,7 @@
                 const owner = data.owner || {};
                 const contender = data.contender || {};
                 controllerFeedback.textContent =
-                    `Doppelbelegung: ${CAPABILITY_LABELS[data.capability] || data.capability} ` +
-                    `des Targets ist bereits ${owner.tent_id || ""} / ${owner.device || ""} zugeordnet.`;
+                    `Controller bereits belegt: ${owner.tent_id || ""} / ${owner.device || ""}.`;
                 highlightControllerConflict(contender);
             } else {
                 controllerFeedback.textContent =
