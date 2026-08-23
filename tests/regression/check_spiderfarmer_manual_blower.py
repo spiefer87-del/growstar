@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline regression for SF.4D.10 manual blower mLevel hardware-test path."""
+"""Offline regression for SF.4D.11 confirmed manual blower production path."""
 
 from pathlib import Path
 import sys
@@ -45,8 +45,8 @@ def main():
         "Blower-Test sendet nur manuellen Modus, EIN und mLevel",
     )
     require(
-        compiled["diagnostic"] == "candidate_manual_blower_mlevel",
-        "Blower-mLevel-Pfad bleibt bis zum Hardwaretest ausdrücklich diagnostisch",
+        compiled["diagnostic"] == "confirmed_manual_blower",
+        "Blower-mLevel-Pfad ist nach Hardwarebestätigung als bestätigt markiert",
     )
 
     for bad in (24, 101, 40.5, True):
@@ -71,11 +71,31 @@ def main():
 
     command_model = (ROOT / "bridge/spiderfarmer/command_model.py").read_text(encoding="utf-8")
     require(
-        '"blower": {\n        "level": "maxSpeed"' in command_model,
-        "Produktionsmapping bleibt bis zur Hardwarebestätigung unverändert",
+        '"blower": {\n        "level": "mLevel"' in command_model,
+        "Produktionsmapping verwendet blower.level -> mLevel",
     )
 
-    print("✅ Spider Farmer SF.4D.10 Blower-mLevel-Diagnosepfad vollständig erfolgreich")
+    from tempfile import TemporaryDirectory
+    from bridge.spiderfarmer.command_model import compile_controller_command
+    with TemporaryDirectory() as tmp:
+        missing_capture = Path(tmp) / "missing.jsonl"
+        production = compile_controller_command(
+            missing_capture,
+            pid="744DBD59D734",
+            module="blower",
+            setpoints={"level": 70},
+        )
+    require(
+        production["payload"]["params"]["blower"] == {
+            "modeType": 0,
+            "mOnOff": 1,
+            "mLevel": 70,
+        }
+        and production.get("diagnostic") == "confirmed_manual_blower_fallback",
+        "Produktionspfad kann den bestätigten Blower auch ohne Capture-Template schreiben",
+    )
+
+    print("✅ Spider Farmer SF.4D.11 Blower-Produktionspfad vollständig erfolgreich")
 
 
 if __name__ == "__main__":

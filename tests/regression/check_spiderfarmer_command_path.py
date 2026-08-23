@@ -325,8 +325,8 @@ def main():
             "Aktuelles gültiges Capture hat Vorrang, Fan-Schreibblock bleibt trotzdem minimal manuell",
         )
 
-        # The 1..10 rule is fan-specific. Light/blower keep their 0..100 scale.
-        for module, raw_field in (("light", "mLevel"), ("blower", "maxSpeed")):
+        # Fan uses L1..L10. Light keeps 0..100; confirmed blower uses 25..100 via mLevel.
+        for module, raw_field in (("light", "mLevel"), ("blower", "mLevel")):
             capture.write_text(
                 json.dumps(
                     _level_record(
@@ -348,7 +348,7 @@ def main():
 
             require(
                 level_compiled["payload"]["params"][module][raw_field] == 60,
-                f"{module} behält die eigene 0-bis-100-Skala",
+                f"{module} verwendet sein bestätigtes eigenes Level-Feld",
             )
 
     command_proxy = (
