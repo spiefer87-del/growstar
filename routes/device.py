@@ -2,6 +2,15 @@ from copy import deepcopy
 
 from flask import jsonify, request
 
+from core.capability_routing import (
+    controller_assignment_for_config,
+    spiderfarmer_control_targets,
+)
+from core.controller_setpoints import (
+    controller_schema,
+    normalize_controller_setpoints,
+    stored_controller_setpoints,
+)
 from core.devices import (
     DeviceHardwareRequiredError,
     get_device_env_config,
@@ -35,6 +44,73 @@ def _find_runtime(tent_id):
         return get_runtime(tent_id), None
     except KeyError:
         return None, (jsonify(success=False, error="tent_runtime_not_loaded"), 409)
+
+
+def _controller_context(runtime, device):
+    assignment = controller_assignment_for_config(
+        runtime.config,
+        device,
+    )
+
+    if not isinstance(assignment, dict) or not assignment.get("target_id"):
+        return {
+            "assigned": False,
+            "target_id": None,
+            "provider": None,
+            "label": None,
+            "online": None,
+            "family": None,
+            "capabilities": [],
+            "schema": {},
+            "setpoints": stored_controller_setpoints(
+                get_device_params(device, runtime=runtime)
+            ),
+            "command_transport_enabled": False,
+        }
+
+    target_id = str(assignment.get("target_id") or "")
+    target = next(
+        (
+            item
+            for item in spiderfarmer_control_targets()
+            if str(item.get("id") or "") == target_id
+        ),
+        None,
+    )
+
+    if not isinstance(target, dict):
+        return {
+            "assigned": True,
+            "target_id": target_id,
+            "provider": assignment.get("provider"),
+            "label": target_id,
+            "online": False,
+            "family": None,
+            "capabilities": [],
+            "schema": {},
+            "setpoints": stored_controller_setpoints(
+                get_device_params(device, runtime=runtime)
+            ),
+            "command_transport_enabled": False,
+            "missing_target": True,
+        }
+
+    schema = controller_schema(target)
+
+    return {
+        "assigned": True,
+        "target_id": target_id,
+        "provider": target.get("provider"),
+        "label": target.get("label") or target_id,
+        "online": bool(target.get("online")),
+        "family": target.get("family"),
+        "capabilities": list(target.get("capabilities") or []),
+        "schema": schema,
+        "setpoints": stored_controller_setpoints(
+            get_device_params(device, runtime=runtime)
+        ),
+        "command_transport_enabled": False,
+    }
 
 
 def _device_payload(runtime, device):
@@ -85,6 +161,10 @@ def _device_payload(runtime, device):
         "physical_known": physical_known,
         "physical_on": physical_on,
 
+        # SF.4C: generische Controller-Zuordnung + lokale Sollwerte.
+        # command_transport_enabled bleibt absichtlich False.
+        "controller": _controller_context(runtime, device),
+
         "shadow_desired": shadow_desired,
         "control_enabled": runtime.control_enabled,
         "shadow_enabled": runtime.shadow_enabled,
@@ -101,8 +181,47 @@ def _device_payload(runtime, device):
     }
 
 
+def _normalize_device_update(runtime, device, data):
+    if not isinstance(data, dict):
+        raise TypeError("Geräte-Update muss ein JSON-Objekt sein")
+
+    working = deepcopy(data)
+
+    if "controller_setpoints" not in working:
+        return working
+
+    context = _controller_context(runtime, device)
+    normalized = normalize_controller_setpoints(
+        working.pop("controller_setpoints"),
+        context.get("schema") or {},
+    )
+
+    params = working.get("params")
+    if params is None:
+        params = {}
+    if not isinstance(params, dict):
+        raise TypeError("params muss ein JSON-Objekt sein")
+
+    params = deepcopy(params)
+
+    # Preserve only normalized, controller-generic desired values.
+    params["controller"] = normalized
+    working["params"] = params
+
+    return working
+
+
 def _save_device(runtime, device, data):
-    changed = update_device_config(device, data, runtime=runtime)
+    normalized = _normalize_device_update(
+        runtime,
+        device,
+        data,
+    )
+    changed = update_device_config(
+        device,
+        normalized,
+        runtime=runtime,
+    )
     payload = _device_payload(runtime, device)
     payload["changed"] = changed
     return payload
