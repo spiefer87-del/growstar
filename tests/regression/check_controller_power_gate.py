@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression for CTRL.3.3 runtime-config Shelly power gate."""
+"""Regression for CTRL.3.3.1 runtime-config Shelly power gate."""
 
 from pathlib import Path
 import sys
@@ -24,6 +24,7 @@ class DummyState:
 class DummyLock:
     def __enter__(self):
         return self
+
     def __exit__(self, *args):
         return False
 
@@ -47,14 +48,15 @@ def require(condition, message):
     print("✅", message)
 
 
-
 def main():
     rt = DummyRuntime()
     rt.state.vent_on = True
 
     with patch(
-        "core.controller_states.device_assignment",
-        side_effect=AssertionError("Health-Fallback darf bei Runtime-EIN nicht nötig sein"),
+        "core.controller_states.get_endpoint_health",
+        side_effect=AssertionError(
+            "Health-Fallback darf bei Runtime-EIN nicht nötig sein"
+        ),
     ):
         require(
             _shelly_power_confirmed(rt, "vent") is True,
@@ -62,15 +64,13 @@ def main():
         )
 
     rt = DummyRuntime()
-    with (
-        patch(
-            "core.controller_states.get_endpoint_health",
-            return_value={
-                "state": "ok",
-                "actual_state": True,
-                "stale": False,
-            },
-        ),
+    with patch(
+        "core.controller_states.get_endpoint_health",
+        return_value={
+            "state": "ok",
+            "actual_state": True,
+            "stale": False,
+        },
     ):
         require(
             _shelly_power_confirmed(rt, "vent") is True,
@@ -84,11 +84,9 @@ def main():
         None,
     ):
         rt = DummyRuntime()
-        with (
-            patch(
-                "core.controller_states.get_endpoint_health",
-                return_value=health,
-            ),
+        with patch(
+            "core.controller_states.get_endpoint_health",
+            return_value=health,
         ):
             require(
                 _shelly_power_confirmed(rt, "vent") is False,
@@ -107,9 +105,6 @@ def main():
         )
         health.assert_called_once_with("192.0.2.10", 0)
 
-    # End-to-end through apply_device_state:
-    # set_device(True) leaves the cold runtime bit untouched, but the verified
-    # physical relay state is ON, so the controller may be written.
     rt = DummyRuntime()
     applied = []
 
@@ -144,8 +139,6 @@ def main():
         "Physisch bestätigtes Shelly-EIN gibt den Modus-Level trotz kaltem Runtime-Bit frei",
     )
 
-    # Hard invariant: power=False skips all controller logic, even if hardware
-    # health would report ON.
     rt = DummyRuntime()
     with (
         patch("core.controller_states.resolve_runtime", return_value=rt),
@@ -170,7 +163,7 @@ def main():
         "Power AUS bleibt hart Shelly-autoritativ und prüft/sendet keinen Controller",
     )
 
-    print("✅ CTRL.3.3 Runtime-Power-Gate vollständig erfolgreich")
+    print("✅ CTRL.3.3.1 Runtime-Power-Gate vollständig erfolgreich")
 
 
 if __name__ == "__main__":
