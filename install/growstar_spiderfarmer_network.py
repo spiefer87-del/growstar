@@ -464,7 +464,7 @@ def _ensure_profile(config):
         "modify",
         name,
         "connection.autoconnect",
-        "no",
+        "yes",
         "connection.interface-name",
         wifi,
         "802-11-wireless.mode",
