@@ -37,7 +37,7 @@ class DummyLock:
 class DummyRuntime:
     def __init__(self):
         self.tent_id = "default"
-        self.config = {}
+        self.config = {"IP_VENT": "", "RELAY_VENT": None}
         self.state = DummyState()
         self.state_lock = DummyLock()
         self.control_enabled = True
@@ -117,7 +117,6 @@ def main():
         patch("core.controller_states.set_device", side_effect=fake_set_device),
         patch("core.controller_states._apply_controller") as controller,
         patch("core.controller_states.get_endpoint_health") as health,
-        patch("core.controller_states.device_assignment") as assignment,
     ):
         result = apply_device_state(
             "vent",
@@ -135,7 +134,6 @@ def main():
         require(
             controller.call_count == 0
             and health.call_count == 0
-            and assignment.call_count == 0
             and result["controller"]["status"] == "skipped_power_off",
             "AUS sendet niemals einen Controller-Level-Befehl",
         )
@@ -151,10 +149,6 @@ def main():
         patch("core.controller_states.resolve_runtime", return_value=rt),
         patch("core.controller_states.set_device", side_effect=blocked_power),
         patch("core.controller_states._apply_controller") as controller,
-        patch(
-            "core.controller_states.device_assignment",
-            return_value={"configured": False},
-        ),
         patch("core.controller_states.get_endpoint_health") as health,
     ):
         result = apply_device_state(

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression for CTRL.3.2 Shelly-confirmed controller power gate."""
+"""Regression for CTRL.3.3 runtime-config Shelly power gate."""
 
 from pathlib import Path
 import sys
@@ -31,7 +31,10 @@ class DummyLock:
 class DummyRuntime:
     def __init__(self):
         self.tent_id = "tent_1"
-        self.config = {}
+        self.config = {
+            "IP_VENT": "192.0.2.10",
+            "RELAY_VENT": 0,
+        }
         self.state = DummyState()
         self.state_lock = DummyLock()
         self.control_enabled = True
@@ -43,13 +46,6 @@ def require(condition, message):
         raise AssertionError(message)
     print("✅", message)
 
-
-def configured_assignment():
-    return {
-        "configured": True,
-        "ip": "192.0.2.10",
-        "relay": 0,
-    }
 
 
 def main():
@@ -68,10 +64,6 @@ def main():
     rt = DummyRuntime()
     with (
         patch(
-            "core.controller_states.device_assignment",
-            return_value=configured_assignment(),
-        ),
-        patch(
             "core.controller_states.get_endpoint_health",
             return_value={
                 "state": "ok",
@@ -82,7 +74,7 @@ def main():
     ):
         require(
             _shelly_power_confirmed(rt, "vent") is True,
-            "Verifiziertes physisches Shelly-EIN überbrückt ein kaltes Runtime-Bit nach Neustart",
+            "Runtime-config + verifiziertes physisches Shelly-EIN geben Controllerwrite frei",
         )
 
     for health in (
@@ -94,10 +86,6 @@ def main():
         rt = DummyRuntime()
         with (
             patch(
-                "core.controller_states.device_assignment",
-                return_value=configured_assignment(),
-            ),
-            patch(
                 "core.controller_states.get_endpoint_health",
                 return_value=health,
             ),
@@ -106,6 +94,18 @@ def main():
                 _shelly_power_confirmed(rt, "vent") is False,
                 f"Unsicherer/AUS Shelly-Health blockiert Controllerwrite: {health!r}",
             )
+
+    rt = DummyRuntime()
+    rt.config["RELAY_VENT"] = "0"
+    with patch(
+        "core.controller_states.get_endpoint_health",
+        return_value={"state": "ok", "actual_state": True},
+    ) as health:
+        require(
+            _shelly_power_confirmed(rt, "vent") is True,
+            "String-Relay aus runtime.config wird sicher normalisiert",
+        )
+        health.assert_called_once_with("192.0.2.10", 0)
 
     # End-to-end through apply_device_state:
     # set_device(True) leaves the cold runtime bit untouched, but the verified
@@ -116,10 +116,6 @@ def main():
     with (
         patch("core.controller_states.resolve_runtime", return_value=rt),
         patch("core.controller_states.set_device") as shelly,
-        patch(
-            "core.controller_states.device_assignment",
-            return_value=configured_assignment(),
-        ),
         patch(
             "core.controller_states.get_endpoint_health",
             return_value={"state": "ok", "actual_state": True},
@@ -174,7 +170,7 @@ def main():
         "Power AUS bleibt hart Shelly-autoritativ und prüft/sendet keinen Controller",
     )
 
-    print("✅ CTRL.3.2 Power-Gate vollständig erfolgreich")
+    print("✅ CTRL.3.3 Runtime-Power-Gate vollständig erfolgreich")
 
 
 if __name__ == "__main__":
