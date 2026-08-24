@@ -335,35 +335,16 @@ h3 {
     {% endif %}
 
     <a href="/ph" class="card-link pending-detail-link" id="ph-link">
-        <div class="card env" id="ph-card">
-            <h2>pH-Wert</h2>
-            <div class="value"><span id="ph">--.-</span></div>
-            <div class="sub">Nährlösung</div>
-        </div>
+        <div class="card env" id="ph-card"><h2>pH-Wert</h2><div class="value"><span id="ph">--.-</span></div><div class="sub">Nährlösung</div></div>
     </a>
-
     <a href="/ec" class="card-link pending-detail-link" id="ec-link">
-        <div class="card env" id="ec-card">
-            <h2>EC-Wert</h2>
-            <div class="value"><span id="ec">--.-</span> mS</div>
-            <div class="sub">Nährlösung</div>
-        </div>
+        <div class="card env" id="ec-card"><h2>EC-Wert</h2><div class="value"><span id="ec">--.-</span> mS</div><div class="sub">Nährlösung</div></div>
     </a>
-
     <a href="/water-temp" class="card-link pending-detail-link" id="water-temp-link">
-        <div class="card env" id="water-temp-card">
-            <h2>Wassertemp</h2>
-            <div class="value"><span id="water-temp">--.-</span> °C</div>
-            <div class="sub">Tank</div>
-        </div>
+        <div class="card env" id="water-temp-card"><h2>Wassertemp</h2><div class="value"><span id="water-temp">--.-</span> °C</div><div class="sub">Tank</div></div>
     </a>
-
     <a href="/light-level" class="card-link pending-detail-link" id="light-level-link">
-        <div class="card env" id="light-level-card">
-            <h2>Helligkeit</h2>
-            <div class="value"><span id="light-level">---</span> lx</div>
-            <div class="sub">Sensor</div>
-        </div>
+        <div class="card env" id="light-level-card"><h2>Helligkeit</h2><div class="value"><span id="light-level">---</span> lx</div><div class="sub">Sensor</div></div>
     </a>
 </div>
 
@@ -402,15 +383,9 @@ h3 {
     };
 
     const AUX_DEVICES = ["aux1", "aux2", "aux3", "aux4"];
-    const AUX_DEFAULT_LABELS = {
-        aux1: "Wasserpumpen",
-        aux2: "Zusatzgerät 2",
-        aux3: "Zusatzgerät 3",
-        aux4: "Zusatzgerät 4"
-    };
+    const AUX_DEFAULT_LABELS = {aux1:"Wasserpumpen", aux2:"Zusatzgerät 2", aux3:"Zusatzgerät 3", aux4:"Zusatzgerät 4"};
     const AUX_ICONS = {aux1:"💧", aux2:"🔌", aux3:"🔌", aux4:"🔌"};
     let DEVICE_LABELS = {};
-
     let ENV_CARDS = {};
     let DEV_CARDS = {};
 
@@ -435,6 +410,29 @@ h3 {
         const n = Number(value);
         return Number.isFinite(n) ? n.toFixed(digits) : "--";
     };
+
+    function controllerDetail(device, controller) {
+        if (!controller || controller.provider !== "spiderfarmer") return "";
+
+        const level = Number(controller.level);
+        const oscillation = Number(controller.oscillation_level);
+        const hasLevel = Number.isFinite(level);
+        const hasOscillation = Number.isFinite(oscillation);
+
+        if ((device === "vent" || device === "vent2") && hasLevel && hasOscillation) {
+            return `Stufe ${level} · Osz. ${oscillation}`;
+        }
+        if ((device === "vent" || device === "vent2") && hasLevel) {
+            return `Stufe ${level}`;
+        }
+        if ((device === "light" || device === "light2") && hasLevel) {
+            return `Dimmung ${level}`;
+        }
+        if (device === "fan" && hasLevel) {
+            return `Leistung ${level}`;
+        }
+        return hasLevel ? `Level ${level}` : "";
+    }
 
     const buildTentUrl = (tentId) =>
         TENT_DETAIL_TEMPLATE.replace("__TENT_ID__", encodeURIComponent(tentId));
@@ -475,7 +473,6 @@ h3 {
 
     function lockPendingDetailLinks() {
         if (TENT_ID === DEFAULT_TENT_ID) return;
-
         document.querySelectorAll(".pending-detail-link").forEach(link => {
             link.classList.add("detail-locked");
             link.setAttribute("aria-disabled", "true");
@@ -519,7 +516,6 @@ h3 {
             if (!response.ok) throw new Error(`Config HTTP ${response.status}`);
             const payload = await response.json();
             const cfg = payload.config || payload;
-
             const envGrid = document.getElementById("env-grid");
             const devGrid = document.getElementById("device-grid");
             if (!envGrid || !devGrid) return;
@@ -535,7 +531,6 @@ h3 {
                 .forEach(([_, el]) => envGrid.appendChild(el));
 
             updateAuxTitles(cfg.DEVICE_LABELS || {});
-
             const devVisible = cfg.DASH_DEVICE || {};
             const devOrder = cfg.DASH_DEVICE_ORDER || {};
             Object.entries(DEV_CARDS)
@@ -557,18 +552,15 @@ h3 {
         const badge = document.getElementById("runtime-badge");
         const banner = document.getElementById("safety-banner");
         if (!badge) return;
-
         const safety = state.safety || {};
 
         if (state.control_enabled) {
             badge.textContent = "LIVE";
             badge.className = "runtime-badge live";
-
             if (safety.active || safety.stale) {
                 banner?.classList.add("visible");
                 banner?.classList.toggle("failsafe", Boolean(safety.active));
                 banner?.classList.toggle("warning", Boolean(safety.stale && !safety.active));
-
                 if (banner) {
                     const blocked = (safety.blocked_devices || [])
                         .map(device => deviceDisplayName(device))
@@ -586,10 +578,7 @@ h3 {
             badge.className = "runtime-badge shadow";
             banner?.classList.remove("failsafe", "warning");
             banner?.classList.add("visible");
-            if (banner) {
-                banner.textContent =
-                    "🟣 Shadow/ARMING: Growstar berechnet Sollzustände, reale Hardware-Aktorik bleibt bis zur Freigabe gesperrt.";
-            }
+            if (banner) banner.textContent = "🟣 Shadow/ARMING: Growstar berechnet Sollzustände, reale Hardware-Aktorik bleibt bis zur Freigabe gesperrt.";
         } else {
             badge.textContent = "BEREIT";
             badge.className = "runtime-badge";
@@ -614,19 +603,15 @@ h3 {
         if (mode === "OFF") {
             label.textContent = "DEAKTIVIERT";
             card.className = "card device disabled";
-            if (detail && !device.assigned) {
-                detail.textContent = "Keine Hardware zugeordnet";
-            }
+            if (detail && !device.assigned) detail.textContent = "Keine Hardware zugeordnet";
             return;
         }
-
         if (!device.assigned) {
             label.textContent = "NICHT ZUGEORDNET";
             card.className = "card device unassigned";
             if (detail) detail.textContent = "Aktive Betriebsart gesperrt · zuerst Verbindungen";
             return;
         }
-
         if (isShadow) {
             const desired = device.shadow_desired;
             if (desired === null || desired === undefined) {
@@ -642,22 +627,19 @@ h3 {
             if (detail) detail.textContent = "Keine reale Aktorik";
             return;
         }
-
         if (device.safety_blocked || device.safety_force_off) {
             label.textContent = "SAFE AUS";
             card.className = "card device safety";
             if (detail) detail.textContent = device.safety_reason || "Safety blockiert EIN";
             return;
         }
-
         if (device.physical_known) {
             const on = Boolean(device.physical_on);
             label.textContent = on ? "EIN" : "AUS";
             card.className = on ? "card device on" : "card device off";
-            // Verifizierungsalter gehört in den Watchdog, nicht auf die
-            // normale Grow-Kachel. Die Kachelfarbe folgt trotzdem weiterhin
-            // dem zentral bestätigten physischen Relay-Zustand.
-            if (detail) detail.textContent = "";
+            if (on && detail) {
+                detail.textContent = controllerDetail(name, device.controller_readback);
+            }
             return;
         }
 
@@ -665,9 +647,7 @@ h3 {
         card.className = "card device unknown";
         if (detail) {
             const h = device.hardware_health || {};
-            detail.textContent =
-                h.last_error ||
-                (h.state ? `Hardware ${String(h.state).toUpperCase()}` : "Noch kein Hardware-Poll");
+            detail.textContent = h.last_error || (h.state ? `Hardware ${String(h.state).toUpperCase()}` : "Noch kein Hardware-Poll");
         }
     }
 
