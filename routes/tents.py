@@ -5,6 +5,7 @@ from flask import jsonify, request
 from core.capability_routing import controller_assignment_for_config
 from core.config_update import apply_config_patch, config_snapshot
 from core.controller_setpoints import stored_controller_setpoints
+from core.controller_states import resolve_control_state
 from core.devices import DEVICE_NAMES, get_device_mode
 from core.hardware.actuator_health import get_endpoint_health
 from core.hardware_assignments import (
@@ -147,12 +148,45 @@ def _controller_readback(runtime, device):
     # stattdessen den stationsbezogen persistierten Controller-Setpoint.
     if device_id == "fan":
         params = (runtime.config.get("DEVICE_PARAMS") or {}).get(device) or {}
-        configured = stored_controller_setpoints(params)
-        if "oscillation" in configured:
-            result["oscillation_level"] = configured["oscillation"]
-            result["oscillation_source"] = "configured_setpoint"
+
+        # Prefer the exact controller values that the live runtime has already
+        # applied successfully. This is the closest available truth because
+        # GGS getDevSta does not expose shakeLevel.
+        with runtime.state_lock:
+            applied_map = runtime.state.live_state.get("_controller_applied")
+            applied = (
+                dict(applied_map.get(device) or {})
+                if isinstance(applied_map, dict)
+                else {}
+            )
+
+        if "oscillation" in applied:
+            result["oscillation_level"] = applied["oscillation"]
+            result["oscillation_source"] = "applied_controller_state"
         else:
-            result.pop("oscillation_level", None)
+            # After a process restart the applied cache can be empty before the
+            # first control pass. Fall back to the currently selected Growstar
+            # operating state's own controller values, not to the legacy
+            # params["controller"] default.
+            mode_name = str(get_device_mode(device, runtime=runtime) or "").upper()
+            state_name = {
+                "ON": "on",
+                "TIME": "time",
+                "ENV": "env",
+            }.get(mode_name)
+
+            configured = {}
+            if state_name:
+                configured = (
+                    resolve_control_state(params, state_name).get("controller")
+                    or {}
+                )
+
+            if "oscillation" in configured:
+                result["oscillation_level"] = configured["oscillation"]
+                result["oscillation_source"] = "active_mode_setpoint"
+            else:
+                result.pop("oscillation_level", None)
 
     return result if len(result) > 3 else None
 
