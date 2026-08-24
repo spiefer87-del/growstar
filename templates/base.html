@@ -5,16 +5,340 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Growstar{% endblock %}</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/growstar-app-shell.css') }}?v=3.13.0-shell1"
+    >
+
     <script data-growstar-feedback src="{{ url_for('static', filename='js/growstar-feedback.js') }}"></script>
     <script
         data-growstar-setpoint-stepper
         src="{{ url_for('static', filename='js/device-setpoint-stepper.js') }}?v=3.12.4-ui5"
         defer
     ></script>
+    <script
+        data-growstar-app-shell
+        src="{{ url_for('static', filename='js/growstar-app-shell.js') }}?v=3.13.0-shell1"
+        defer
+    ></script>
+
     {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
-    {% block page %}{% endblock %}
+    {% if current_user %}
+    {% set growstar_endpoint = request.endpoint or '' %}
+
+    <header class="growstar-appbar" data-growstar-appbar>
+        <button
+            class="growstar-menu-toggle"
+            type="button"
+            data-growstar-menu-open
+            aria-label="Growstar Navigation öffnen"
+            aria-controls="growstar-navigation"
+            aria-expanded="false"
+        >
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+            <span aria-hidden="true"></span>
+        </button>
+
+        <a class="growstar-appbar-brand" href="{{ url_for('dashboard') }}">
+            <span class="growstar-appbar-logo" aria-hidden="true">🌱</span>
+            <span class="growstar-appbar-title">Growstar</span>
+        </a>
+
+        <div class="growstar-appbar-context" aria-hidden="true">
+            {% if growstar_endpoint.startswith('grow_control') %}
+                Grow Control
+            {% elif growstar_endpoint.startswith('plant_')
+                or growstar_endpoint.startswith('cultivar_')
+                or growstar_endpoint.startswith('batch_')
+                or growstar_endpoint.startswith('propagation_')
+                or growstar_endpoint.startswith('seed_')
+                or growstar_endpoint.startswith('genetic_') %}
+                Pflanzenmanagement
+            {% elif growstar_endpoint.startswith('admin_') %}
+                Administration
+            {% elif growstar_endpoint in ['devices', 'gateway_page', 'bluetooth_device_page'] %}
+                Hardware
+            {% elif growstar_endpoint == 'spiderfarmer_system_page' %}
+                Spider Farmer
+            {% elif growstar_endpoint in ['energie_page', 'energie_settings_page'] %}
+                Energie
+            {% elif growstar_endpoint == 'diagrams_page' %}
+                Diagramme
+            {% elif growstar_endpoint in ['system_page', 'patch_notes_page'] %}
+                System
+            {% else %}
+                Management
+            {% endif %}
+        </div>
+
+        {% if growstar_release %}
+        <a
+            class="growstar-appbar-version"
+            href="{{ url_for('patch_notes_page') }}"
+            title="Versions- und Patch-Information"
+        >
+            v{{ growstar_release.version }}
+        </a>
+        {% endif %}
+    </header>
+
+    <div
+        id="growstar-navigation-overlay"
+        class="growstar-nav-overlay"
+        data-growstar-menu-overlay
+        hidden
+    ></div>
+
+    <aside
+        id="growstar-navigation"
+        class="growstar-nav-drawer"
+        data-growstar-menu
+        aria-label="Growstar Hauptnavigation"
+        aria-hidden="true"
+    >
+        <div class="growstar-nav-head">
+            <a class="growstar-nav-brand" href="{{ url_for('dashboard') }}">
+                <span class="growstar-nav-logo" aria-hidden="true">🌱</span>
+                <span>
+                    <strong>Growstar</strong>
+                    <small>Operations Console</small>
+                </span>
+            </a>
+
+            <button
+                class="growstar-nav-close"
+                type="button"
+                data-growstar-menu-close
+                aria-label="Navigation schließen"
+            >×</button>
+        </div>
+
+        <nav class="growstar-nav-scroll">
+            <section class="growstar-nav-section">
+                <div class="growstar-nav-section-title">Betrieb</div>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'dashboard' %}active{% endif %}"
+                    href="{{ url_for('dashboard') }}"
+                >
+                    <span class="growstar-nav-icon">▦</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Übersicht</strong>
+                        <small>Management Dashboard</small>
+                    </span>
+                </a>
+
+                {% if has_permission('grow.view') %}
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'grow_control_dashboard' %}active{% endif %}"
+                    href="{{ url_for('grow_control_dashboard') }}"
+                >
+                    <span class="growstar-nav-icon">🎛️</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Grow Control</strong>
+                        <small>Stationen & Regelung</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint.startswith('grow_control_tent') %}active{% endif %}"
+                    href="{{ url_for('grow_control_live') }}"
+                >
+                    <span class="growstar-nav-icon">●</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Live-Steuerung</strong>
+                        <small>Direkt zur Hauptstation</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'grow_control_sensors_dashboard' %}active{% endif %}"
+                    href="{{ url_for('grow_control_sensors_dashboard') }}"
+                >
+                    <span class="growstar-nav-icon">◉</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Sensoren</strong>
+                        <small>Messwerte & Quellen</small>
+                    </span>
+                </a>
+                {% endif %}
+
+                {% if has_permission('plants.view') %}
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint.startswith('plant_')
+                        or growstar_endpoint.startswith('cultivar_')
+                        or growstar_endpoint.startswith('batch_')
+                        or growstar_endpoint.startswith('propagation_')
+                        or growstar_endpoint.startswith('seed_')
+                        or growstar_endpoint.startswith('genetic_') %}active{% endif %}"
+                    href="{{ url_for('plant_management_dashboard') }}"
+                >
+                    <span class="growstar-nav-icon">🌿</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Pflanzenmanagement</strong>
+                        <small>Bestand & Lifecycle</small>
+                    </span>
+                </a>
+                {% endif %}
+            </section>
+
+            {% if has_permission('grow.view') %}
+            <section class="growstar-nav-section">
+                <div class="growstar-nav-section-title">Technik</div>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint in ['devices', 'gateway_page', 'bluetooth_device_page'] %}active{% endif %}"
+                    href="{{ url_for('devices') }}"
+                >
+                    <span class="growstar-nav-icon">▣</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Hardware</strong>
+                        <small>Gateways & Geräte</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'grow_control_connections' %}active{% endif %}"
+                    href="{{ url_for('grow_control_connections') }}"
+                >
+                    <span class="growstar-nav-icon">⇄</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Verbindungen</strong>
+                        <small>Zuordnungen & Routing</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'spiderfarmer_system_page' %}active{% endif %}"
+                    href="{{ url_for('spiderfarmer_system_page') }}"
+                >
+                    <span class="growstar-nav-icon">SF</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Spider Farmer</strong>
+                        <small>Controller-Readout</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint in ['energie_page', 'energie_settings_page'] %}active{% endif %}"
+                    href="{{ url_for('energie_page') }}"
+                >
+                    <span class="growstar-nav-icon">⚡</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Energie</strong>
+                        <small>Verbrauch & Leistung</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'diagrams_page' %}active{% endif %}"
+                    href="{{ url_for('diagrams_page') }}"
+                >
+                    <span class="growstar-nav-icon">⌁</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Diagramme</strong>
+                        <small>Verläufe & Analyse</small>
+                    </span>
+                </a>
+            </section>
+
+            <section class="growstar-nav-section">
+                <div class="growstar-nav-section-title">System</div>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'grow_control_watchdog' %}active{% endif %}"
+                    href="{{ url_for('grow_control_watchdog') }}"
+                >
+                    <span class="growstar-nav-icon">◇</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Watchdog</strong>
+                        <small>Betriebsüberwachung</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'grow_control_setup' %}active{% endif %}"
+                    href="{{ url_for('grow_control_setup') }}"
+                >
+                    <span class="growstar-nav-icon">⚙</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Setup</strong>
+                        <small>Grow-Control-Konfiguration</small>
+                    </span>
+                </a>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint == 'system_page' %}active{% endif %}"
+                    href="{{ url_for('system_page') }}"
+                >
+                    <span class="growstar-nav-icon">⌘</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Systemstatus</strong>
+                        <small>Growstar System</small>
+                    </span>
+                </a>
+            </section>
+            {% endif %}
+
+            {% if has_any_permission('users.view', 'users.manage', 'roles.view', 'roles.manage', 'audit.view') %}
+            <section class="growstar-nav-section">
+                <div class="growstar-nav-section-title">Verwaltung</div>
+
+                <a
+                    class="growstar-nav-item {% if growstar_endpoint.startswith('admin_') %}active{% endif %}"
+                    href="{{ url_for('admin_index') }}"
+                >
+                    <span class="growstar-nav-icon">🛡</span>
+                    <span class="growstar-nav-copy">
+                        <strong>Administration</strong>
+                        <small>Benutzer, Rollen & Audit</small>
+                    </span>
+                </a>
+            </section>
+            {% endif %}
+        </nav>
+
+        <div class="growstar-nav-footer">
+            <a class="growstar-nav-version" href="{{ url_for('patch_notes_page') }}">
+                <span class="growstar-status-dot" aria-hidden="true"></span>
+                <span>
+                    <strong>System online</strong>
+                    <small>
+                        {% if growstar_release %}
+                            Growstar {{ growstar_release.version }}
+                        {% else %}
+                            Versionsinfo
+                        {% endif %}
+                    </small>
+                </span>
+            </a>
+
+            <div class="growstar-nav-user">
+                <div class="growstar-nav-user-copy">
+                    <span>Angemeldet als</span>
+                    <strong>{{ current_user.display_name }}</strong>
+                </div>
+
+                <form method="post" action="{{ url_for('auth_logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" title="Abmelden" aria-label="Abmelden">↪</button>
+                </form>
+            </div>
+        </div>
+    </aside>
+
+    <div class="growstar-app-content" data-growstar-app-content>
+    {% endif %}
+
+        {% block page %}{% endblock %}
+
+    {% if current_user %}
+    </div>
+    {% endif %}
 
     {% block scripts %}{% endblock %}
 </body>
