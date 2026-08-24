@@ -2,6 +2,7 @@ import time
 
 from flask import jsonify, request
 
+from core.capability_routing import controller_assignment_for_config
 from core.config_update import apply_config_patch, config_snapshot
 from core.devices import DEVICE_NAMES, get_device_mode
 from core.hardware.actuator_health import get_endpoint_health
@@ -20,6 +21,7 @@ from core.safety import get_runtime_safety_snapshot
 from core.tent_config import ensure_tent_config
 from core.tents import manager as tent_manager, validate_tent_id
 from services.live_control import LiveTransitionError, request_live, request_shadow
+from services.spiderfarmer import device as spiderfarmer_device
 
 
 _DEVICE_NAMES = DEVICE_NAMES
@@ -96,6 +98,50 @@ def _age(last_seen):
     return max(0, int(time.time() - last_seen))
 
 
+def _controller_readback(runtime, device):
+    """Read-only projection of the assigned Spider Farmer controller values."""
+    assignment = controller_assignment_for_config(runtime.config, device)
+    if not isinstance(assignment, dict):
+        return None
+
+    if str(assignment.get("provider") or "") != "spiderfarmer":
+        return None
+
+    controller_id = str(assignment.get("controller_id") or "").strip().lower()
+    device_id = str(assignment.get("device_id") or "").strip()
+
+    if not controller_id or not device_id:
+        target_id = str(assignment.get("target_id") or "").strip()
+        prefix = "spiderfarmer:"
+        if not target_id.startswith(prefix):
+            return None
+        controller_id, separator, device_id = target_id[len(prefix):].partition(":")
+        controller_id = controller_id.strip().lower()
+        device_id = device_id.strip()
+        if not separator or not controller_id or not device_id:
+            return None
+
+    observed = spiderfarmer_device(controller_id, device_id)
+    if not isinstance(observed, dict):
+        return None
+
+    effective = observed.get("effective")
+    if not isinstance(effective, dict):
+        return None
+
+    result = {
+        "provider": "spiderfarmer",
+        "controller_id": controller_id,
+        "device_id": device_id,
+    }
+
+    for field in ("on", "level", "oscillation_level", "mode_type"):
+        if field in effective:
+            result[field] = effective[field]
+
+    return result if len(result) > 3 else None
+
+
 def _state_snapshot(runtime):
     st = runtime.state
     cfg = runtime.config
@@ -135,6 +181,7 @@ def _state_snapshot(runtime):
             "safety_force_off": bool(safety_override.get("force_off")),
             "safety_block_on": bool(safety_override.get("block_on")),
             "safety_reason": safety_override.get("reason"),
+            "controller_readback": _controller_readback(runtime, device),
         }
 
     return {
