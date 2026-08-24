@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Growstar 3.12.0 / UI.1 regression guard."""
+"""Growstar 3.12.3 / UI.4 regression guard for dashboard controller readback."""
 
 from pathlib import Path
 
@@ -18,11 +18,11 @@ def main():
 
     require(
         "from core.capability_routing import controller_assignment_for_config" in tents,
-        "UI.1 nutzt die bestehende Controller-Zuordnung",
+        "Dashboard nutzt die bestehende Controller-Zuordnung",
     )
     require(
         "from services.spiderfarmer import device as spiderfarmer_device" in tents,
-        "UI.1 nutzt das kanonische Spider-Farmer Read-Model",
+        "Dashboard nutzt das kanonische Spider-Farmer Read-Model",
     )
     require(
         "def _controller_readback(runtime, device):" in tents,
@@ -33,8 +33,21 @@ def main():
         "Stations-State liefert Controller-Readback",
     )
     require(
+        'effective = observed.get("effective")' in tents,
+        "Spider-Farmer effective bleibt die primäre Live-Readback-Quelle",
+    )
+    require(
+        'for field in ("on", "level", "oscillation_level", "mode_type"):' in tents,
+        "kanonische Livefelder werden weiterhin aus effective übernommen",
+    )
+    require(
+        'if device_id == "fan":' in tents
+        and 'runtime.state.live_state.get("_controller_applied")' in tents,
+        "Sendecache-Sonderfall ist auf Ventilator-Oszillation begrenzt",
+    )
+    require(
         "function controllerDetail(device, controller)" in ui,
-        "Dashboard formatiert Controller-Livewerte",
+        "Dashboard formatiert Controllerwerte",
     )
     require(
         'return `Stufe ${level} · Osz. ${oscillation}`;' in ui,
@@ -49,16 +62,11 @@ def main():
         "Abluft/Gebläse zeigt Controller-Leistung",
     )
     require(
-        "if (on && detail)" in ui
-        and "device.controller_readback" in ui,
-        "Livewert erscheint nur bei physisch bestätigtem EIN",
-    )
-    require(
-        "_controller_applied" not in tents,
-        "Dashboard verwendet nicht den Controller-Sendecache",
+        "if (on && detail)" in ui and "device.controller_readback" in ui,
+        "Controllerdetail erscheint nur bei physisch bestätigtem EIN",
     )
 
-    print("✅ Growstar 3.12.0 / UI.1 vollständig geprüft")
+    print("✅ Growstar 3.12.3 / UI.4 Dashboard-Readback vollständig geprüft")
 
 
 if __name__ == "__main__":
