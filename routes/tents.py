@@ -4,6 +4,7 @@ from flask import jsonify, request
 
 from core.capability_routing import controller_assignment_for_config
 from core.config_update import apply_config_patch, config_snapshot
+from core.controller_setpoints import stored_controller_setpoints
 from core.devices import DEVICE_NAMES, get_device_mode
 from core.hardware.actuator_health import get_endpoint_health
 from core.hardware_assignments import (
@@ -138,6 +139,20 @@ def _controller_readback(runtime, device):
     for field in ("on", "level", "oscillation_level", "mode_type"):
         if field in effective:
             result[field] = effective[field]
+
+    # GGS getDevSta liefert für den Ventilator den Live-Level, aber keinen
+    # aktuellen shakeLevel/Oszillations-Istwert. Ein älterer setConfigField-
+    # Block im kanonischen Read-Model darf deshalb nicht als Live-Oszillation
+    # ausgegeben werden. Für die Dashboard-Anzeige verwenden wir bei fan
+    # stattdessen den stationsbezogen persistierten Controller-Setpoint.
+    if device_id == "fan":
+        params = (runtime.config.get("DEVICE_PARAMS") or {}).get(device) or {}
+        configured = stored_controller_setpoints(params)
+        if "oscillation" in configured:
+            result["oscillation_level"] = configured["oscillation"]
+            result["oscillation_source"] = "configured_setpoint"
+        else:
+            result.pop("oscillation_level", None)
 
     return result if len(result) > 3 else None
 
