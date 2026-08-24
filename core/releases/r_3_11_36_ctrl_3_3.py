@@ -19,4 +19,10 @@ RELEASE = {
         "Power AUS bleibt hart Shelly-autoritativ und sendet niemals Controllerwerte.",
         "Keine Änderung an Spider-Farmer-Payloads oder Modus-Sollwerten.",
     ),
+    "tests": (
+        "python3 tests/regression/check_controller_states.py",
+        "python3 tests/regression/check_controller_interval_ui.py",
+        "python3 tests/regression/check_controller_mode_setpoints.py",
+        "python3 tests/regression/check_controller_power_gate.py",
+    ),
 }

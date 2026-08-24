@@ -17,4 +17,10 @@ RELEASE = {
         "Runtime-EIN prüft nun korrekt, dass get_endpoint_health nicht benötigt wird.",
         "Die übrigen Runtime-Config-, Health- und Power-AUS-Regressionen bleiben erhalten.",
     ),
+    "tests": (
+        "python3 tests/regression/check_controller_states.py",
+        "python3 tests/regression/check_controller_interval_ui.py",
+        "python3 tests/regression/check_controller_mode_setpoints.py",
+        "python3 tests/regression/check_controller_power_gate.py",
+    ),
 }
