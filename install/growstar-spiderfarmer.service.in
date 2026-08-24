@@ -3,6 +3,7 @@ Description=Growstar Spider Farmer Bridge (SF.4D)
 After=network-online.target growstar-spiderfarmer-network.service
 Wants=network-online.target
 Requires=growstar-spiderfarmer-network.service
+PartOf=growstar.service
 
 [Service]
 Type=simple
