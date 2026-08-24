@@ -6,6 +6,11 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}Growstar{% endblock %}</title>
     <script data-growstar-feedback src="{{ url_for('static', filename='js/growstar-feedback.js') }}"></script>
+    <script
+        data-growstar-setpoint-stepper
+        src="{{ url_for('static', filename='js/device-setpoint-stepper.js') }}?v=3.12.4-ui5"
+        defer
+    ></script>
     {% block head %}{% endblock %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
