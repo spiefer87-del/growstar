@@ -54,7 +54,7 @@ from core.controller_setpoints import (
     normalize_controller_setpoints,
 )
 from core.hardware.actuator_health import get_endpoint_health
-from core.hardware_assignments import device_assignment
+from core.hardware_assignments import DEVICE_HARDWARE
 from core.runtime import resolve_runtime
 from services.spiderfarmer_commands import send_controller_setpoints
 
@@ -227,16 +227,24 @@ def _shelly_power_confirmed(runtime, device):
     if bool(getattr(runtime.state, f"{device}_on", False)):
         return True
 
-    assignment = device_assignment(
-        runtime.tent_id,
-        device,
-    )
-    if not isinstance(assignment, dict) or not assignment.get("configured"):
+    # The active TentRuntime already owns the authoritative station config.
+    # Do not re-resolve the same tent through hardware_snapshot()/tent_manager:
+    # that global registry path can be unavailable in worker/diagnostic
+    # contexts even though runtime.config is complete.
+    meta = DEVICE_HARDWARE.get(device)
+    if not isinstance(meta, dict):
         return False
 
-    host = assignment.get("ip")
-    relay = assignment.get("relay")
-    if not host or relay is None:
+    cfg = runtime.config if isinstance(runtime.config, dict) else {}
+    host = str(cfg.get(meta.get("ip_key")) or "").strip()
+    relay = cfg.get(meta.get("relay_key"))
+
+    if not host or relay in (None, ""):
+        return False
+
+    try:
+        relay = int(relay)
+    except (TypeError, ValueError):
         return False
 
     health = get_endpoint_health(
