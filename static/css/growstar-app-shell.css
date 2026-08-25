@@ -18,6 +18,12 @@
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+.growstar-appbar,
+.growstar-nav-drawer {
+    font-size: 16px;
+    line-height: 1.25;
+}
+
 .growstar-appbar *,
 .growstar-nav-drawer * {
     box-sizing: border-box;
@@ -44,7 +50,8 @@
 }
 
 .growstar-menu-toggle,
-.growstar-nav-close {
+.growstar-nav-close,
+.growstar-nav-group-toggle {
     appearance: none;
     border: 1px solid rgba(148, 163, 184, .22);
     background: rgba(30, 41, 59, .86);
@@ -76,7 +83,8 @@
 .growstar-menu-toggle:hover,
 .growstar-menu-toggle:focus-visible,
 .growstar-nav-close:hover,
-.growstar-nav-close:focus-visible {
+.growstar-nav-close:focus-visible,
+.growstar-nav-group-toggle:focus-visible {
     border-color: rgba(56, 189, 248, .55);
     outline: none;
 }
@@ -93,11 +101,11 @@
 }
 
 .growstar-appbar-logo {
-    font-size: 1.15rem;
+    font-size: 18.4px;
 }
 
 .growstar-appbar-title {
-    font-size: .98rem;
+    font-size: 15.68px;
 }
 
 .growstar-appbar-context {
@@ -106,7 +114,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--growstar-shell-muted);
-    font-size: .78rem;
+    font-size: 12.48px;
     font-weight: 650;
 }
 
@@ -126,7 +134,7 @@
     background: rgba(34, 197, 94, .07);
     color: #86efac;
     text-decoration: none;
-    font-size: .68rem;
+    font-size: 10.88px;
     font-weight: 750;
 }
 
@@ -170,7 +178,7 @@
     overflow: hidden;
     border-right: 1px solid rgba(56, 189, 248, .16);
     background:
-        radial-gradient(circle at 15% 0%, rgba(34, 197, 94, .075), transparent 17rem),
+        radial-gradient(circle at 15% 0%, rgba(34, 197, 94, .075), transparent 272px),
         linear-gradient(180deg, #0b1220 0%, #0a1120 100%);
     color: var(--growstar-shell-text);
     box-shadow: 22px 0 52px rgba(0, 0, 0, .38);
@@ -203,12 +211,12 @@
 }
 
 .growstar-nav-logo {
-    font-size: 1.45rem;
+    font-size: 23.2px;
 }
 
 .growstar-nav-brand strong {
     display: block;
-    font-size: 1.08rem;
+    font-size: 17.28px;
     letter-spacing: -.02em;
 }
 
@@ -216,7 +224,7 @@
     display: block;
     margin-top: 1px;
     color: var(--growstar-shell-muted);
-    font-size: .64rem;
+    font-size: 10.24px;
     font-weight: 700;
     letter-spacing: .10em;
     text-transform: uppercase;
@@ -226,7 +234,7 @@
     width: 39px;
     height: 39px;
     border-radius: 10px;
-    font-size: 1.55rem;
+    font-size: 24.8px;
     line-height: 1;
 }
 
@@ -247,7 +255,7 @@
 .growstar-nav-section-title {
     padding: 0 11px 7px;
     color: #64748b;
-    font-size: .64rem;
+    font-size: 10.24px;
     font-weight: 800;
     letter-spacing: .12em;
     text-transform: uppercase;
@@ -304,7 +312,7 @@
     border-radius: 8px;
     background: rgba(15, 23, 42, .78);
     color: #bae6fd;
-    font-size: .78rem;
+    font-size: 12.48px;
     font-weight: 850;
 }
 
@@ -321,16 +329,101 @@
 }
 
 .growstar-nav-copy strong {
-    font-size: .84rem;
+    font-size: 13.44px;
     font-weight: 760;
 }
 
 .growstar-nav-copy small {
     margin-top: 2px;
     color: #7f8da2;
-    font-size: .66rem;
+    font-size: 10.56px;
     font-weight: 570;
 }
+
+/* SHELL.2: eigener, einklappbarer Pflanzenbereich. */
+.growstar-nav-group { margin: 2px 0; }
+.growstar-nav-group-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 40px;
+    align-items: stretch;
+    border: 1px solid transparent;
+    border-radius: 11px;
+    overflow: hidden;
+    transition: background .14s ease, border-color .14s ease;
+}
+.growstar-nav-group-row.active {
+    border-color: rgba(34, 197, 94, .22);
+    background: linear-gradient(90deg, rgba(34, 197, 94, .16), rgba(30, 41, 59, .48));
+    color: #f0fdf4;
+}
+.growstar-nav-group-row.active::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--growstar-shell-accent);
+    box-shadow: 0 0 14px rgba(34, 197, 94, .32);
+}
+.growstar-nav-group-main {
+    min-height: 50px;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    padding: 7px 6px 7px 10px;
+    color: #cbd5e1;
+    text-decoration: none;
+}
+.growstar-nav-group-main:hover,
+.growstar-nav-group-main:focus-visible { color: #f8fafc; outline: none; }
+.growstar-nav-group-toggle {
+    appearance: none;
+    width: 36px;
+    min-height: 40px;
+    align-self: center;
+    justify-self: center;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: #94a3b8;
+    cursor: pointer;
+    font: inherit;
+    font-size: 17px;
+    touch-action: manipulation;
+}
+.growstar-nav-group-toggle:hover,
+.growstar-nav-group-toggle:focus-visible { border-color: rgba(56,189,248,.35); outline: none; }
+.growstar-nav-group-toggle span { display: inline-block; transition: transform .16s ease; }
+.growstar-nav-group.is-expanded .growstar-nav-group-toggle span { transform: rotate(180deg); }
+.growstar-nav-submenu {
+    margin: 5px 0 7px 17px;
+    padding: 3px 0 3px 13px;
+    border-left: 1px solid rgba(56, 189, 248, .18);
+}
+.growstar-nav-submenu[hidden] { display: none; }
+.growstar-nav-submenu a {
+    min-height: 34px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    margin: 1px 0;
+    border-radius: 8px;
+    color: #9aa8ba;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 650;
+}
+.growstar-nav-submenu a small { color: #56657a; font-size: 9px; font-weight: 650; }
+.growstar-nav-submenu a:hover,
+.growstar-nav-submenu a:focus-visible { background: rgba(30,41,59,.62); color:#e2e8f0; outline:none; }
+.growstar-nav-submenu a.active { background: rgba(34,197,94,.10); color:#bbf7d0; }
+.growstar-nav-submenu a.active small { color:#6ee7a3; }
 
 .growstar-nav-footer {
     padding: 10px;
@@ -363,13 +456,13 @@
 
 .growstar-nav-version strong {
     color: #bbf7d0;
-    font-size: .72rem;
+    font-size: 11.52px;
 }
 
 .growstar-nav-version small {
     margin-top: 1px;
     color: var(--growstar-shell-muted);
-    font-size: .63rem;
+    font-size: 10.08px;
 }
 
 .growstar-nav-user {
@@ -397,12 +490,12 @@
 
 .growstar-nav-user-copy span {
     color: #64748b;
-    font-size: .61rem;
+    font-size: 9.76px;
 }
 
 .growstar-nav-user-copy strong {
     margin-top: 1px;
-    font-size: .73rem;
+    font-size: 11.68px;
 }
 
 .growstar-nav-user form {
@@ -417,7 +510,7 @@
     background: rgba(15, 23, 42, .88);
     color: #cbd5e1;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 16px;
 }
 
 body.growstar-menu-open {
@@ -441,11 +534,11 @@ body.growstar-menu-open {
 
     .growstar-appbar-context {
         text-align: right;
-        font-size: .70rem;
+        font-size: 11.2px;
     }
 
     .growstar-appbar-title {
-        font-size: .91rem;
+        font-size: 14.56px;
     }
 
     .growstar-nav-drawer {
@@ -466,7 +559,8 @@ body.growstar-menu-open {
 @media (prefers-reduced-motion: reduce) {
     .growstar-nav-drawer,
     .growstar-nav-overlay,
-    .growstar-menu-toggle span {
+    .growstar-menu-toggle span,
+    .growstar-nav-group-toggle span {
         transition: none !important;
     }
 }
