@@ -564,3 +564,30 @@ body.growstar-menu-open {
         transition: none !important;
     }
 }
+
+
+/* Growstar 3.13.2 / SHELL.3 — module hierarchy */
+.growstar-nav-module + .growstar-nav-module {
+    margin-top: 18px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(148, 163, 184, .11);
+}
+
+.growstar-nav-submenu-label {
+    margin: 8px 8px 4px;
+    padding: 8px 1px 4px;
+    border-top: 1px solid rgba(148, 163, 184, .09);
+    color: #607086;
+    font-size: 9px;
+    font-weight: 850;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+}
+
+.growstar-nav-admin .growstar-nav-item {
+    min-height: 46px;
+}
+
+.growstar-nav-admin .growstar-nav-section-title {
+    color: #9aa8ba;
+}
