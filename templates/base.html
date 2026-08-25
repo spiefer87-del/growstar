@@ -8,7 +8,7 @@
 
     <link
         rel="stylesheet"
-        href="{{ url_for('static', filename='css/growstar-app-shell.css') }}?v=3.13.0-shell1"
+        href="{{ url_for('static', filename='css/growstar-app-shell.css') }}?v=3.13.1-shell2"
     >
 
     <script data-growstar-feedback src="{{ url_for('static', filename='js/growstar-feedback.js') }}"></script>
@@ -19,7 +19,7 @@
     ></script>
     <script
         data-growstar-app-shell
-        src="{{ url_for('static', filename='js/growstar-app-shell.js') }}?v=3.13.0-shell1"
+        src="{{ url_for('static', filename='js/growstar-app-shell.js') }}?v=3.13.1-shell2"
         defer
     ></script>
 
@@ -28,6 +28,15 @@
 <body class="{% block body_class %}{% endblock %}">
     {% if current_user %}
     {% set growstar_endpoint = request.endpoint or '' %}
+    {% set growstar_plants_active =
+        growstar_endpoint.startswith('plant_')
+        or growstar_endpoint.startswith('cultivar_')
+        or growstar_endpoint.startswith('batch_')
+        or growstar_endpoint.startswith('propagation_')
+        or growstar_endpoint.startswith('seed_')
+        or growstar_endpoint.startswith('genetic_')
+        or growstar_endpoint in ['genetics_dashboard', 'propagation_dashboard_page']
+    %}
 
     <header class="growstar-appbar" data-growstar-appbar>
         <button
@@ -51,12 +60,7 @@
         <div class="growstar-appbar-context" aria-hidden="true">
             {% if growstar_endpoint.startswith('grow_control') %}
                 Grow Control
-            {% elif growstar_endpoint.startswith('plant_')
-                or growstar_endpoint.startswith('cultivar_')
-                or growstar_endpoint.startswith('batch_')
-                or growstar_endpoint.startswith('propagation_')
-                or growstar_endpoint.startswith('seed_')
-                or growstar_endpoint.startswith('genetic_') %}
+            {% elif growstar_plants_active %}
                 Pflanzenmanagement
             {% elif growstar_endpoint.startswith('admin_') %}
                 Administration
@@ -132,7 +136,51 @@
                     </span>
                 </a>
 
-                {% if has_permission('grow.view') %}
+                {% if has_permission('plants.view') %}
+            <section class="growstar-nav-section growstar-nav-section-plants">
+                <div class="growstar-nav-section-title">Pflanzen</div>
+
+                <div class="growstar-nav-group {% if growstar_plants_active %}is-expanded{% endif %}" data-growstar-nav-group>
+                    <div class="growstar-nav-group-row {% if growstar_plants_active %}active{% endif %}">
+                        <a class="growstar-nav-group-main" href="{{ url_for('plant_management_dashboard') }}">
+                            <span class="growstar-nav-icon">🌿</span>
+                            <span class="growstar-nav-copy">
+                                <strong>Pflanzenmanagement</strong>
+                                <small>Bestand & Lifecycle</small>
+                            </span>
+                        </a>
+                        <button
+                            class="growstar-nav-group-toggle"
+                            type="button"
+                            data-growstar-nav-group-toggle
+                            aria-expanded="{{ 'true' if growstar_plants_active else 'false' }}"
+                            aria-controls="growstar-plants-submenu"
+                            aria-label="Pflanzenmenü ein- oder ausklappen"
+                        ><span aria-hidden="true">⌄</span></button>
+                    </div>
+
+                    <div
+                        id="growstar-plants-submenu"
+                        class="growstar-nav-submenu"
+                        data-growstar-nav-submenu
+                        {% if not growstar_plants_active %}hidden{% endif %}
+                    >
+                        <a class="{% if growstar_endpoint == 'plant_management_dashboard' %}active{% endif %}" href="{{ url_for('plant_management_dashboard') }}"><span>Übersicht</span><small>Board</small></a>
+                        <a class="{% if growstar_endpoint.startswith('plant_') and growstar_endpoint not in ['plant_management_dashboard', 'plant_timeline', 'plant_journal', 'plant_journal_detail'] %}active{% endif %}" href="{{ url_for('plant_list') }}"><span>Pflanzen</span><small>Bestand</small></a>
+                        <a class="{% if growstar_endpoint == 'plant_timeline' %}active{% endif %}" href="{{ url_for('plant_timeline') }}"><span>Timeline</span><small>Lifecycle</small></a>
+                        <a class="{% if growstar_endpoint.startswith('cultivar_') %}active{% endif %}" href="{{ url_for('cultivar_list') }}"><span>Sorten</span><small>Sortenstamm</small></a>
+                        <a class="{% if growstar_endpoint == 'genetics_dashboard' or growstar_endpoint.startswith('genetic_') %}active{% endif %}" href="{{ url_for('genetics_dashboard') }}"><span>Genetik & Mütter</span><small>Linien</small></a>
+                        <a class="{% if growstar_endpoint == 'propagation_dashboard_page' or growstar_endpoint.startswith('propagation_') or growstar_endpoint.startswith('seed_') %}active{% endif %}" href="{{ url_for('propagation_dashboard_page') }}"><span>Vermehrung</span><small>Saatgut & Runs</small></a>
+                        <a class="{% if growstar_endpoint.startswith('batch_') %}active{% endif %}" href="{{ url_for('batch_list') }}"><span>Durchgänge</span><small>Chargen</small></a>
+                        {% if has_permission('diary.view') %}
+                        <a class="{% if growstar_endpoint in ['plant_journal', 'plant_journal_detail'] %}active{% endif %}" href="{{ url_for('plant_journal') }}"><span>Betriebsjournal</span><small>Dokumentation</small></a>
+                        {% endif %}
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+
+            {% if has_permission('grow.view') %}
                 <a
                     class="growstar-nav-item {% if growstar_endpoint == 'grow_control_dashboard' %}active{% endif %}"
                     href="{{ url_for('grow_control_dashboard') }}"
@@ -167,23 +215,7 @@
                 </a>
                 {% endif %}
 
-                {% if has_permission('plants.view') %}
-                <a
-                    class="growstar-nav-item {% if growstar_endpoint.startswith('plant_')
-                        or growstar_endpoint.startswith('cultivar_')
-                        or growstar_endpoint.startswith('batch_')
-                        or growstar_endpoint.startswith('propagation_')
-                        or growstar_endpoint.startswith('seed_')
-                        or growstar_endpoint.startswith('genetic_') %}active{% endif %}"
-                    href="{{ url_for('plant_management_dashboard') }}"
-                >
-                    <span class="growstar-nav-icon">🌿</span>
-                    <span class="growstar-nav-copy">
-                        <strong>Pflanzenmanagement</strong>
-                        <small>Bestand & Lifecycle</small>
-                    </span>
-                </a>
-                {% endif %}
+
             </section>
 
             {% if has_permission('grow.view') %}
