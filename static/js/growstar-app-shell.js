@@ -1,6 +1,8 @@
 (() => {
     "use strict";
 
+    // Growstar 3.13.2 / SHELL.3: multiple independent module groups.
+
     const drawer = document.querySelector("[data-growstar-menu]");
     const overlay = document.querySelector("[data-growstar-menu-overlay]");
     const openButton = document.querySelector("[data-growstar-menu-open]");
