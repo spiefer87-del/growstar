@@ -29,6 +29,28 @@ def _find_outlet(controller, outlet):
     return None
 
 
+def _valid_outlet_channel(channel):
+    name = str((channel or {}).get("channel") or "").strip().upper()
+    return (
+        name.startswith("O")
+        and name[1:].isdigit()
+        and 1 <= int(name[1:]) <= 10
+    )
+
+
+def _is_power_strip(controller):
+    if str((controller or {}).get("prefix") or "").strip().upper() == "PS":
+        return True
+
+    for device in (controller or {}).get("devices") or []:
+        if device.get("kind") != "outlet":
+            continue
+        if any(_valid_outlet_channel(item) for item in device.get("channels") or []):
+            return True
+
+    return False
+
+
 def register(app):
     @app.post(
         "/api/spiderfarmer/controllers/<controller_id>/outlets/<outlet>/power"
@@ -38,7 +60,7 @@ def register(app):
         if not controller:
             return _error("Spider-Farmer-Gerät nicht gefunden", 404)
 
-        if str(controller.get("prefix") or "").strip().upper() != "PS":
+        if not _is_power_strip(controller):
             return _error(
                 "Dieses Spider-Farmer-Gerät ist kein Power Strip",
                 409,
