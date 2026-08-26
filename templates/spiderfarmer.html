@@ -263,13 +263,13 @@ button:disabled{opacity:.5;cursor:wait}
 <header>
   <div>
     <h1>🕷️ Spider Farmer</h1>
-    <div class="subtitle">GGS Controller & Power Strip · nativer Growstar Readout</div>
+    <div class="subtitle">GGS Controller & Power Strip · nativer Growstar Readout · SF.PS1.1</div>
   </div>
   <a class="back" href="/system">← System</a>
 </header>
 
 <div class="notice">
-  <strong>SF.PS1:</strong>
+  <strong>SF.PS1.1:</strong>
   Spider-Farmer-Geräte bleiben von Shelly vollständig getrennt.
   Controllerwerte werden weiterhin aus dem normalisierten Readback dargestellt.
   Bei einem Gerät mit Prefix <strong>PS</strong> können ausschließlich die
@@ -356,8 +356,68 @@ function valuesHtml(values){
   `;
 }
 
+function hasOutletDevice(controller){
+  return Array.isArray(controller?.devices) &&
+    controller.devices.some(device =>
+      device &&
+      device.kind === "outlet" &&
+      Array.isArray(device.channels) &&
+      device.channels.length > 0
+    );
+}
+
+function isPowerStrip(controller){
+  const prefix = String(controller?.prefix || "").trim().toUpperCase();
+
+  // Prefix PS is the canonical identification.
+  // The outlet-device fallback makes the read UI robust against stale/older
+  // browser payloads while the server-side write route still requires PS.
+  return prefix === "PS" || hasOutletDevice(controller);
+}
+
+function normalizedOutletChannels(channels){
+  if(!Array.isArray(channels)){ return []; }
+
+  const unique = new Map();
+
+  for(const channel of channels){
+    if(!channel){ continue; }
+
+    const rawName = String(
+      channel.channel ||
+      channel.label ||
+      channel.id ||
+      ""
+    ).trim().toUpperCase();
+
+    const match = rawName.match(/(?:OUTLET:)?O(\d+)$/);
+    if(!match){ continue; }
+
+    const number = Number(match[1]);
+    if(!Number.isInteger(number) || number < 1 || number > 10){
+      continue;
+    }
+
+    const name = `O${number}`;
+
+    if(!unique.has(name)){
+      unique.set(name, {
+        ...channel,
+        channel:name,
+        label:name
+      });
+    }
+  }
+
+  return Array.from(unique.values()).sort((a,b)=>{
+    const ai = Number(String(a.channel).slice(1));
+    const bi = Number(String(b.channel).slice(1));
+    return ai - bi;
+  });
+}
+
 function outletControlHtml(controller, channel){
-  if(String(controller.prefix || "").toUpperCase() !== "PS"){
+  if(!isPowerStrip(controller)){
     return "";
   }
 
@@ -382,14 +442,19 @@ function outletControlHtml(controller, channel){
   `;
 }
 
-function channelsHtml(controller, channels){
+function channelsHtml(controller, channels, deviceKind){
   if(!Array.isArray(channels) || channels.length === 0){ return ""; }
 
-  return channels.map(channel=>`
+  const visibleChannels =
+    deviceKind === "outlet"
+      ? normalizedOutletChannels(channels)
+      : channels;
+
+  return visibleChannels.map(channel=>`
     <div class="channel">
       <div class="channel-title">
         <span>${esc(channel.label || channel.id || "Kanal")}</span>
-        ${String(controller.prefix || "").toUpperCase() === "PS"
+        ${isPowerStrip(controller) && deviceKind === "outlet"
           ? `<span class="badge controllable">POWER</span>`
           : ""}
       </div>
@@ -401,7 +466,7 @@ function channelsHtml(controller, channels){
 
 function deviceHtml(controller, device){
   const writableOutlet =
-    String(controller.prefix || "").toUpperCase() === "PS" &&
+    isPowerStrip(controller) &&
     device.kind === "outlet";
 
   return `
@@ -419,7 +484,7 @@ function deviceHtml(controller, device){
       </div>
 
       ${valuesHtml(device.effective || {})}
-      ${channelsHtml(controller, device.channels)}
+      ${channelsHtml(controller, device.channels, device.kind)}
     </div>
   `;
 }
@@ -427,7 +492,7 @@ function deviceHtml(controller, device){
 function controllerHtml(controller){
   const id = controller.id || "--";
   const suffix = String(id).slice(-4).toUpperCase();
-  const isPS = String(controller.prefix || "").toUpperCase() === "PS";
+  const isPS = isPowerStrip(controller);
 
   return `
     <section class="controller ${isPS ? "power-strip" : ""}">
@@ -514,7 +579,11 @@ async function loadControllers(){
   try{
     const response = await fetch(endpoint, {
       method:"GET",
-      headers:{"Accept":"application/json"}
+      cache:"no-store",
+      headers:{
+        "Accept":"application/json",
+        "Cache-Control":"no-cache"
+      }
     });
 
     const data = await response.json();
@@ -523,9 +592,7 @@ async function loadControllers(){
     }
 
     const controllers = Array.isArray(data.controllers) ? data.controllers : [];
-    const powerStrips = controllers.filter(
-      item=>String(item.prefix || "").toUpperCase() === "PS"
-    ).length;
+    const powerStrips = controllers.filter(isPowerStrip).length;
 
     status.textContent =
       `${controllers.length} Spider-Farmer-Geräte · ${powerStrips} Power Strip`;
