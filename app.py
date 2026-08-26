@@ -59,6 +59,7 @@ from routes.release import register as register_release_routes
 from routes.restart_policy import register as register_restart_policy_routes
 from routes.notifications import register as register_notification_routes
 from routes.capability_routing import register as register_capability_routing_routes
+from routes.spiderfarmer_powerstrip import register as register_spiderfarmer_powerstrip_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -140,6 +141,7 @@ def create_flask_app():
     register_restart_policy_routes(app)
     register_notification_routes(app)
     register_capability_routing_routes(app)
+    register_spiderfarmer_powerstrip_routes(app)
 
     # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
     install_auth(app)
@@ -228,8 +230,6 @@ def start_backend():
         try:
             _sync_all_relays(runtime=runtime)
 
-            # Phase 4V.5: Der Safety-Heartbeat besitzt bewusst einen eigenen
-            # Thread. Er darf nicht hinter Shelly-/Energy-Netzwerkzyklen warten.
             _start_daemon_thread(
                 "growstar-safety",
                 safety_supervisor_loop,
@@ -272,10 +272,6 @@ def start_backend():
             )
             print("🧠 Main Control Thread gestartet")
 
-            # Phase 4H: jede zusätzliche aktive Station besitzt weiterhin genau
-            # EINEN Regelkreis-Thread. Shadow und ARMING starten hardwaregesperrt;
-            # nach erfolgreichem Preflight kann derselbe Thread dynamisch LIVE
-            # werden. Inaktive Stationen bekommen weiterhin keinen Thread.
             for extra_runtime in list_runtimes():
                 if extra_runtime.tent_id == runtime.tent_id:
                     continue
@@ -309,19 +305,12 @@ def start_backend():
             )
             print("🧠 Hardware Thread gestartet")
 
-            # The arming thread only consumes runtime state + the read-only
-            # actuator-health cache. Starting it after hardware_loop ensures
-            # that persisted LIVE stations cannot open their gate before the
-            # central hardware poll has produced a fresh result.
             _start_daemon_thread(
                 "growstar-live-arming",
                 live_arming_loop,
             )
             print("🟠 LIVE-Arming Thread gestartet")
 
-            # Phase 4F: bekannte Gateways/BLE-Sensoren nach Neustart
-            # automatisch wiederherstellen. Der Recovery-Thread arbeitet
-            # vollständig parallel; er blockiert den Regelungsstart nicht.
             start_hardware_recovery_thread()
             print("♻️ Hardware Auto-Recovery Thread gestartet")
 
@@ -356,8 +345,6 @@ def shutdown_backend():
             if not runtime.control_enabled:
                 continue
 
-            # Controller-/Safety-Threads dürfen während des Shutdowns nicht
-            # gegen die explizite Restart-Policy arbeiten.
             runtime.disarming = True
 
             try:
