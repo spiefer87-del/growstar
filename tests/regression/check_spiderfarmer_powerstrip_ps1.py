@@ -4,6 +4,11 @@
 import json
 from pathlib import Path
 import tempfile
+import sys
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from bridge.spiderfarmer.powerstrip_command import (
     compile_outlet_power_command,
@@ -11,8 +16,6 @@ from bridge.spiderfarmer.powerstrip_command import (
     normalize_power,
 )
 
-
-ROOT = Path(__file__).resolve().parents[2]
 
 
 def require(condition, message):
