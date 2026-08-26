@@ -199,9 +199,9 @@ async def _run(args):
     )
 
     if configuration["command_injection"]:
-        from .command_proxy import CommandSpiderFarmerProxy
+        from .powerstrip_proxy import PowerStripCommandSpiderFarmerProxy
 
-        proxy = CommandSpiderFarmerProxy(
+        proxy = PowerStripCommandSpiderFarmerProxy(
             state_dir=configuration["state_dir"],
             command_socket=configuration["command_socket"],
             **common,
