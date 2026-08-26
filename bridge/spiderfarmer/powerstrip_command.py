@@ -1,15 +1,4 @@
-"""Spider Farmer PS5/PS10 outlet command compiler.
-
-This module is deliberately separate from the existing GGS controller compiler.
-It implements only the reverse-engineered, reference-confirmed Power Strip
-manual outlet toggle:
-
-    keyPath: ["outlet", "O1".."O10"]
-    block:   {"modeType": 0, "mOnOff": 0|1}
-
-The DOWN topic is not guessed. The command-capable proxy supplies the exact
-currently subscribed PS topic for the active controller session.
-"""
+"""Spider Farmer PS5/PS10 outlet command compiler."""
 
 from __future__ import annotations
 
@@ -22,6 +11,13 @@ from .state_model import parse_topic
 
 class SpiderFarmerPowerStripCommandError(RuntimeError):
     pass
+
+
+POWERSTRIP_PREFIXES = frozenset({"PS", "PS5", "PS10"})
+
+
+def is_powerstrip_prefix(value):
+    return str(value or "").strip().upper() in POWERSTRIP_PREFIXES
 
 
 def normalize_outlet(value):
@@ -63,13 +59,6 @@ def _capture_candidates(capture_path):
 
 
 def find_latest_uid(capture_path, *, pid):
-    """Recover the SF account uid from already observed traffic.
-
-    PS outlet commands in the reference bridge carry uid in their normal
-    setConfigField envelope. Growstar never invents an account uid; it reuses
-    the most recently observed uid for exactly the requested PID.
-    """
-
     wanted_pid = str(pid or "").strip().upper()
     if not wanted_pid:
         raise SpiderFarmerPowerStripCommandError("Power-Strip-PID fehlt")
@@ -126,10 +115,10 @@ def compile_outlet_power_command(
         not topic_info
         or topic_info.get("direction") != "down"
         or topic_info.get("pid") != pid
-        or str(topic_info.get("prefix") or "").upper() != "PS"
+        or not is_powerstrip_prefix(topic_info.get("prefix"))
     ):
         raise SpiderFarmerPowerStripCommandError(
-            "Kein gültiges aktives Spider-Farmer-PS-DOWN-Topic"
+            "Kein gültiges Spider-Farmer-Power-Strip-DOWN-Topic"
         )
 
     uid = find_latest_uid(capture_path, pid=pid)
