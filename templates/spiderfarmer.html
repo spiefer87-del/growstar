@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token() }}">
 <title>Spider Farmer</title>
 
 <style>
@@ -41,22 +42,9 @@ header{
   margin-bottom:18px;
 }
 
-h1{
-  margin:0;
-  font-size:1.45rem;
-}
-
-.subtitle{
-  margin-top:5px;
-  color:var(--muted);
-  font-size:.88rem;
-}
-
-.back{
-  color:var(--muted);
-  text-decoration:none;
-  white-space:nowrap;
-}
+h1{margin:0;font-size:1.45rem}
+.subtitle{margin-top:5px;color:var(--muted);font-size:.88rem}
+.back{color:var(--muted);text-decoration:none;white-space:nowrap}
 
 .notice{
   border:1px solid rgba(56,189,248,.22);
@@ -69,6 +57,8 @@ h1{
   margin-bottom:16px;
 }
 
+.notice strong{color:#e0f2fe}
+
 .statusbar{
   display:flex;
   align-items:center;
@@ -77,10 +67,7 @@ h1{
   margin-bottom:14px;
 }
 
-.status-text{
-  color:var(--muted);
-  font-size:.85rem;
-}
+.status-text{color:var(--muted);font-size:.85rem}
 
 button{
   border:0;
@@ -91,6 +78,8 @@ button{
   font-weight:700;
   cursor:pointer;
 }
+
+button:disabled{opacity:.5;cursor:wait}
 
 .controller-grid{
   display:grid;
@@ -106,6 +95,10 @@ button{
   box-shadow:0 10px 28px rgba(0,0,0,.24);
 }
 
+.controller.power-strip{
+  border-color:rgba(245,158,11,.28);
+}
+
 .controller-head{
   display:flex;
   justify-content:space-between;
@@ -115,11 +108,7 @@ button{
   border-bottom:1px solid var(--line);
 }
 
-.controller-name{
-  font-weight:800;
-  font-size:1.08rem;
-  word-break:break-word;
-}
+.controller-name{font-weight:800;font-size:1.08rem;word-break:break-word}
 
 .meta{
   color:var(--muted);
@@ -142,12 +131,9 @@ button{
 .online{background:var(--green-soft);color:#86efac}
 .offline{background:var(--red-soft);color:#fca5a5}
 .readonly{background:var(--blue-soft);color:#7dd3fc}
+.controllable{background:var(--amber-soft);color:#fcd34d}
 
-.devices{
-  display:grid;
-  gap:12px;
-  margin-top:14px;
-}
+.devices{display:grid;gap:12px;margin-top:14px}
 
 .device{
   background:var(--card2);
@@ -164,9 +150,7 @@ button{
   margin-bottom:10px;
 }
 
-.device-title{
-  font-weight:750;
-}
+.device-title{font-weight:750}
 
 .capabilities{
   color:var(--muted);
@@ -213,10 +197,51 @@ button{
   font-weight:750;
   font-size:.83rem;
   margin-bottom:7px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
 }
 
-.empty,
-.error{
+.outlet-control{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-top:9px;
+}
+
+.outlet-control button{
+  min-height:42px;
+  border:1px solid var(--line);
+}
+
+.outlet-control .turn-on{
+  background:rgba(34,197,94,.14);
+  color:#86efac;
+  border-color:rgba(34,197,94,.25);
+}
+
+.outlet-control .turn-off{
+  background:rgba(239,68,68,.11);
+  color:#fca5a5;
+  border-color:rgba(239,68,68,.22);
+}
+
+.outlet-control button.active{
+  box-shadow:inset 0 0 0 1px currentColor;
+}
+
+.command-status{
+  min-height:18px;
+  margin-top:7px;
+  color:var(--muted);
+  font-size:.72rem;
+}
+
+.command-status.ok{color:#86efac}
+.command-status.error{color:#fca5a5}
+
+.empty,.error{
   border-radius:14px;
   padding:18px;
   color:var(--muted);
@@ -224,10 +249,7 @@ button{
   border:1px solid var(--line);
 }
 
-.error{
-  color:#fecaca;
-  background:var(--red-soft);
-}
+.error{color:#fecaca;background:var(--red-soft)}
 
 @media(max-width:600px){
   body{padding:12px}
@@ -241,20 +263,22 @@ button{
 <header>
   <div>
     <h1>🕷️ Spider Farmer</h1>
-    <div class="subtitle">GGS Controller · nativer Growstar Readout</div>
+    <div class="subtitle">GGS Controller & Power Strip · nativer Growstar Readout</div>
   </div>
   <a class="back" href="/system">← System</a>
 </header>
 
 <div class="notice">
-  <strong>SF.3C · READ-ONLY:</strong>
-  Diese Seite zeigt ausschließlich den bereits von Growstar normalisierten
-  Spider-Farmer-State. Es existiert in diesem Patch weiterhin kein
-  Steuer-/MQTT-Publish-Pfad zum GGS.
+  <strong>SF.PS1:</strong>
+  Spider-Farmer-Geräte bleiben von Shelly vollständig getrennt.
+  Controllerwerte werden weiterhin aus dem normalisierten Readback dargestellt.
+  Bei einem Gerät mit Prefix <strong>PS</strong> können ausschließlich die
+  beobachteten Steckdosenkanäle O1…O10 manuell EIN/AUS geschaltet werden.
+  Nach jedem Befehl bleibt der echte getDevSta-Readback die maßgebliche Anzeige.
 </div>
 
 <div class="statusbar">
-  <div id="status" class="status-text">Controller werden geladen …</div>
+  <div id="status" class="status-text">Spider-Farmer-Geräte werden geladen …</div>
   <button type="button" id="refresh">Aktualisieren</button>
 </div>
 
@@ -262,12 +286,11 @@ button{
 
 <script>
 const endpoint = "/api/spiderfarmer/controllers";
+const csrfToken =
+  document.querySelector('meta[name="csrf-token"]')?.getAttribute("content") || "";
 
 function esc(value){
-  if(value === null || value === undefined){
-    return "";
-  }
-
+  if(value === null || value === undefined){ return ""; }
   return String(value)
     .replaceAll("&","&amp;")
     .replaceAll("<","&lt;")
@@ -281,6 +304,11 @@ function displayKey(key){
     temperature_c:"Temperatur",
     humidity_percent:"Luftfeuchte",
     vpd_kpa:"VPD",
+    co2_ppm:"CO₂",
+    ppfd:"PPFD",
+    soil_temperature_c:"Bodentemperatur",
+    soil_moisture_percent:"Bodenfeuchte",
+    soil_ec:"Boden-EC",
     day_environment_target:"Tag-Ziel",
     day_sensor:"Tag-Sensor",
     on:"Ein/Aus",
@@ -298,49 +326,24 @@ function displayKey(key){
     sensor_binding_present:"Sensorbindung",
     watering_automation_present:"Bewässerungsautomatik"
   };
-
   return labels[key] || key.replaceAll("_"," ");
 }
 
 function displayValue(key, value){
-  if(value === null || value === undefined){
-    return "--";
-  }
-
-  if(key === "temperature_c"){
-    return `${value} °C`;
-  }
-
-  if(key === "humidity_percent"){
-    return `${value} %`;
-  }
-
-  if(key === "vpd_kpa"){
-    return `${value} kPa`;
-  }
-
-  if(key === "on"){
-    return Number(value) ? "Ein" : "Aus";
-  }
-
-  if(key === "natural_wind"){
-    return Number(value) ? "Ein" : "Aus";
-  }
-
-  if(typeof value === "object"){
-    return JSON.stringify(value);
-  }
-
+  if(value === null || value === undefined){ return "--"; }
+  if(key === "temperature_c" || key === "soil_temperature_c"){ return `${value} °C`; }
+  if(key === "humidity_percent" || key === "soil_moisture_percent"){ return `${value} %`; }
+  if(key === "vpd_kpa"){ return `${value} kPa`; }
+  if(key === "on" || key === "natural_wind"){ return Number(value) ? "Ein" : "Aus"; }
+  if(typeof value === "object"){ return JSON.stringify(value); }
   return String(value);
 }
 
 function valuesHtml(values){
   const entries = Object.entries(values || {});
-
   if(entries.length === 0){
     return `<div class="meta">Noch keine Werte beobachtet.</div>`;
   }
-
   return `
     <div class="values">
       ${entries.map(([key,value])=>`
@@ -353,22 +356,54 @@ function valuesHtml(values){
   `;
 }
 
-function channelsHtml(channels){
-  if(!Array.isArray(channels) || channels.length === 0){
+function outletControlHtml(controller, channel){
+  if(String(controller.prefix || "").toUpperCase() !== "PS"){
     return "";
   }
+
+  const name = String(channel.channel || "").toUpperCase();
+  const on = Number((channel.effective || {}).on) === 1;
+  const id = `${controller.id}-${name}`.replaceAll(/[^a-zA-Z0-9_-]/g, "-");
+
+  return `
+    <div class="outlet-control" data-outlet-control
+         data-controller="${esc(controller.id)}"
+         data-outlet="${esc(name)}">
+      <button type="button" class="turn-on ${on ? "active" : ""}"
+              onclick="setOutletPower('${esc(controller.id)}','${esc(name)}',true,this)">
+        EIN
+      </button>
+      <button type="button" class="turn-off ${!on ? "active" : ""}"
+              onclick="setOutletPower('${esc(controller.id)}','${esc(name)}',false,this)">
+        AUS
+      </button>
+    </div>
+    <div class="command-status" id="status-${esc(id)}"></div>
+  `;
+}
+
+function channelsHtml(controller, channels){
+  if(!Array.isArray(channels) || channels.length === 0){ return ""; }
 
   return channels.map(channel=>`
     <div class="channel">
       <div class="channel-title">
-        ${esc(channel.label || channel.id || "Kanal")}
+        <span>${esc(channel.label || channel.id || "Kanal")}</span>
+        ${String(controller.prefix || "").toUpperCase() === "PS"
+          ? `<span class="badge controllable">POWER</span>`
+          : ""}
       </div>
       ${valuesHtml(channel.effective || {})}
+      ${outletControlHtml(controller, channel)}
     </div>
   `).join("");
 }
 
-function deviceHtml(device){
+function deviceHtml(controller, device){
+  const writableOutlet =
+    String(controller.prefix || "").toUpperCase() === "PS" &&
+    device.kind === "outlet";
+
   return `
     <div class="device">
       <div class="device-head">
@@ -378,11 +413,13 @@ function deviceHtml(device){
             ${esc((device.capabilities || []).join(" · ") || "keine Capability")}
           </div>
         </div>
-        <span class="badge readonly">READ-ONLY</span>
+        <span class="badge ${writableOutlet ? "controllable" : "readonly"}">
+          ${writableOutlet ? "STEUERBAR" : "READBACK"}
+        </span>
       </div>
 
       ${valuesHtml(device.effective || {})}
-      ${channelsHtml(device.channels)}
+      ${channelsHtml(controller, device.channels)}
     </div>
   `;
 }
@@ -390,12 +427,15 @@ function deviceHtml(device){
 function controllerHtml(controller){
   const id = controller.id || "--";
   const suffix = String(id).slice(-4).toUpperCase();
+  const isPS = String(controller.prefix || "").toUpperCase() === "PS";
 
   return `
-    <section class="controller">
+    <section class="controller ${isPS ? "power-strip" : ""}">
       <div class="controller-head">
         <div>
-          <div class="controller-name">Spider Farmer GGS ${esc(suffix || "GGS")}</div>
+          <div class="controller-name">
+            ${isPS ? "Spider Farmer Power Strip" : "Spider Farmer GGS"} ${esc(suffix || "")}
+          </div>
           <div class="meta">
             ID ${esc(id)}<br>
             PID ${esc(controller.pid || "--")} · Prefix ${esc(controller.prefix || "--")}<br>
@@ -408,43 +448,92 @@ function controllerHtml(controller){
       </div>
 
       <div class="devices">
-        ${(controller.devices || []).map(deviceHtml).join("")}
+        ${(controller.devices || []).map(device=>deviceHtml(controller, device)).join("")}
       </div>
     </section>
   `;
+}
+
+async function setOutletPower(controllerId, outlet, power, button){
+  const control = button.closest("[data-outlet-control]");
+  const buttons = Array.from(control?.querySelectorAll("button") || []);
+  const statusId = `status-${controllerId}-${outlet}`.replaceAll(/[^a-zA-Z0-9_-]/g, "-");
+  const status = document.getElementById(statusId);
+
+  buttons.forEach(item=>item.disabled = true);
+  if(status){
+    status.className = "command-status";
+    status.textContent = `${outlet}: Befehl wird gesendet …`;
+  }
+
+  try{
+    const response = await fetch(
+      `/api/spiderfarmer/controllers/${encodeURIComponent(controllerId)}/outlets/${encodeURIComponent(outlet)}/power`,
+      {
+        method:"POST",
+        headers:{
+          "Accept":"application/json",
+          "Content-Type":"application/json",
+          "X-CSRF-Token":csrfToken
+        },
+        body:JSON.stringify({power})
+      }
+    );
+
+    const data = await response.json();
+    if(!response.ok || !data.success){
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    if(status){
+      status.className = "command-status ok";
+      status.textContent = `${outlet}: gesendet · warte auf echten Readback …`;
+    }
+
+    window.setTimeout(loadControllers, 650);
+    window.setTimeout(loadControllers, 1600);
+  }
+  catch(error){
+    console.error(error);
+    if(status){
+      status.className = "command-status error";
+      status.textContent = `${outlet}: ${error.message || error}`;
+    }
+  }
+  finally{
+    buttons.forEach(item=>item.disabled = false);
+  }
 }
 
 async function loadControllers(){
   const status = document.getElementById("status");
   const root = document.getElementById("controllers");
 
-  status.textContent = "Controller werden geladen …";
+  status.textContent = "Spider-Farmer-Geräte werden geladen …";
 
   try{
     const response = await fetch(endpoint, {
       method:"GET",
-      headers:{
-        "Accept":"application/json"
-      }
+      headers:{"Accept":"application/json"}
     });
 
     const data = await response.json();
-
     if(!response.ok || !data.success){
       throw new Error(data.error || `HTTP ${response.status}`);
     }
 
-    const controllers = Array.isArray(data.controllers)
-      ? data.controllers
-      : [];
+    const controllers = Array.isArray(data.controllers) ? data.controllers : [];
+    const powerStrips = controllers.filter(
+      item=>String(item.prefix || "").toUpperCase() === "PS"
+    ).length;
 
     status.textContent =
-      `${controllers.length} Controller · ${data.read_only ? "READ-ONLY" : "Status unbekannt"}`;
+      `${controllers.length} Spider-Farmer-Geräte · ${powerStrips} Power Strip`;
 
     if(controllers.length === 0){
       root.innerHTML = `
         <div class="empty">
-          Noch kein Spider-Farmer-Controller im normalisierten Growstar-State.
+          Noch kein Spider-Farmer-Gerät im normalisierten Growstar-State.
         </div>
       `;
       return;
