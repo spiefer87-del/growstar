@@ -1,8 +1,14 @@
 """Power-Strip extension for Growstar's command-capable SF bridge.
 
-SF.PS1.3 prefers an actual DOWN subscription. If none exists, it may derive
-the DOWN topic only from an already observed PS/PS5/PS10 UP topic for the
-same PID. CB and ambiguous prefixes remain fail-closed.
+SF.PS1.3:
+- prefers a real PS/PS5/PS10 DOWN subscription;
+- otherwise derives DOWN only from an observed PS-family UP topic of the same PID.
+
+SF.PSC1:
+- keeps outlet switching on the dedicated Power-Strip command path;
+- routes controller modules (light/fan/blower) of a PS-family device over the
+  same validated PS-family DOWN topic;
+- keeps ordinary GGS/CB controllers delegated to CommandSpiderFarmerProxy.
 """
 
 from __future__ import annotations
@@ -11,6 +17,7 @@ import json
 import logging
 from pathlib import Path
 
+from .command_model import SpiderFarmerCommandError, compile_controller_command
 from .command_proxy import CommandSpiderFarmerProxy
 from .mqtt_command import build_publish
 from .powerstrip_command import (
@@ -86,6 +93,9 @@ class PowerStripCommandSpiderFarmerProxy(CommandSpiderFarmerProxy):
 
         return list(dict.fromkeys(matches))
 
+    def _is_observed_powerstrip_pid(self, pid):
+        return bool(self._observed_powerstrip_up_topics(pid))
+
     @staticmethod
     def _down_from_observed_up(topic, pid):
         info = parse_topic(topic)
@@ -105,10 +115,7 @@ class PowerStripCommandSpiderFarmerProxy(CommandSpiderFarmerProxy):
         return f"SF/GGS/{prefix}/API/DOWN/{wanted_pid}"
 
     def _powerstrip_down_topic(self, controller_id, pid):
-        subscribed = self._subscribed_powerstrip_down_topics(
-            controller_id,
-            pid,
-        )
+        subscribed = self._subscribed_powerstrip_down_topics(controller_id, pid)
         if len(subscribed) == 1:
             return subscribed[0]
         if len(subscribed) > 1:
@@ -117,7 +124,6 @@ class PowerStripCommandSpiderFarmerProxy(CommandSpiderFarmerProxy):
             )
 
         observed_up = self._observed_powerstrip_up_topics(pid)
-
         prefixes = []
         for topic in observed_up:
             info = parse_topic(topic)
@@ -151,6 +157,70 @@ class PowerStripCommandSpiderFarmerProxy(CommandSpiderFarmerProxy):
             "Power-Strip-DOWN-Topic konnte nicht bestimmt werden"
         )
 
+    async def _dispatch_powerstrip_controller(self, request):
+        controller_id = str(request.get("controller_id") or "").strip().lower()
+        pid = str(request.get("pid") or "").strip().upper()
+        module = str(request.get("module") or "").strip()
+        setpoints = request.get("setpoints")
+
+        if not controller_id or not pid or not module:
+            raise SpiderFarmerPowerStripCommandError(
+                "controller_id, pid und module sind erforderlich"
+            )
+
+        if module not in {"light", "fan", "blower"}:
+            raise SpiderFarmerPowerStripCommandError(
+                f"Power-Strip-Controller-Modul {module!r} ist nicht freigegeben"
+            )
+
+        writer = self._controller_writers.get(controller_id)
+        if writer is None or writer.is_closing():
+            raise SpiderFarmerPowerStripCommandError(
+                "Spider-Farmer-Power-Strip ist nicht aktiv mit der Bridge verbunden"
+            )
+
+        try:
+            compiled = compile_controller_command(
+                self.capture_path,
+                pid=pid,
+                module=module,
+                setpoints=setpoints,
+            )
+        except SpiderFarmerCommandError as exc:
+            raise SpiderFarmerPowerStripCommandError(str(exc)) from exc
+
+        topic = self._powerstrip_down_topic(controller_id, pid)
+        message = json.dumps(
+            compiled["payload"],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+        writer.write(build_publish(topic, message))
+        await writer.drain()
+
+        _LOG.warning(
+            "PS CONTROLLER COMMAND sent controller=%s pid=%s module=%s fields=%s topic=%s template=%s",
+            controller_id,
+            pid,
+            module,
+            sorted(compiled["changed_fields"]),
+            topic,
+            compiled.get("observed_at"),
+        )
+
+        return {
+            "status": "sent",
+            "controller_id": controller_id,
+            "pid": pid,
+            "module": module,
+            "topic": topic,
+            "changed_fields": compiled["changed_fields"],
+            "template_observed_at": compiled.get("observed_at"),
+            "diagnostic": "ps_controller_transport",
+            "verified": False,
+        }
+
     async def _dispatch_command(self, request):
         if not isinstance(request, dict):
             raise SpiderFarmerPowerStripCommandError(
@@ -158,12 +228,17 @@ class PowerStripCommandSpiderFarmerProxy(CommandSpiderFarmerProxy):
             )
 
         action = str(request.get("action") or "").strip()
+
+        if action == "set_controller":
+            pid = str(request.get("pid") or "").strip().upper()
+            if self._is_observed_powerstrip_pid(pid):
+                return await self._dispatch_powerstrip_controller(request)
+            return await super()._dispatch_command(request)
+
         if action != "set_powerstrip_outlet":
             return await super()._dispatch_command(request)
 
-        controller_id = str(
-            request.get("controller_id") or ""
-        ).strip().lower()
+        controller_id = str(request.get("controller_id") or "").strip().lower()
         pid = str(request.get("pid") or "").strip().upper()
         outlet = request.get("outlet")
         power = request.get("power")
@@ -180,7 +255,6 @@ class PowerStripCommandSpiderFarmerProxy(CommandSpiderFarmerProxy):
             )
 
         topic = self._powerstrip_down_topic(controller_id, pid)
-
         compiled = compile_outlet_power_command(
             self.capture_path,
             pid=pid,
