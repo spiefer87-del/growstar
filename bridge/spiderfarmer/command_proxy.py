@@ -46,6 +46,37 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
         self._controller_writers = {}
         self._controller_subscriptions = {}
 
+    def _release_controller_session(self, session_id, controller_writer):
+        """Remove only the writer owned by the connection that is closing.
+
+        A controller can reconnect before the old TLS/MQTT connection has
+        completely unwound. In that case the new connection has already
+        replaced ``_controller_writers[session_id]``. The old connection must
+        never remove that newer writer during its ``finally`` cleanup.
+        """
+
+        if not session_id:
+            return False
+
+        current_writer = self._controller_writers.get(session_id)
+
+        if current_writer is not controller_writer:
+            _LOG.info(
+                "SF writer cleanup skipped for stale connection "
+                "controller=%s",
+                session_id,
+            )
+            return False
+
+        self._controller_writers.pop(session_id, None)
+        self._controller_subscriptions.pop(session_id, None)
+
+        _LOG.info(
+            "SF writer released controller=%s",
+            session_id,
+        )
+        return True
+
     async def serve_forever(self):
         ssl_context = self.build_server_ssl_context()
 
@@ -157,9 +188,10 @@ class CommandSpiderFarmerProxy(ReadOnlySpiderFarmerProxy):
 
         finally:
             session_id = session.get("id")
-            if session_id:
-                self._controller_writers.pop(session_id, None)
-                self._controller_subscriptions.pop(session_id, None)
+            self._release_controller_session(
+                session_id,
+                client_writer,
+            )
 
             self.diagnostics.disconnected(session_id)
             await _close_writer(upstream_writer)
