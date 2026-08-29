@@ -50,6 +50,12 @@ DEFAULT_CONFIG = {
     "RAMP_DURATION_MIN": 60,
     "RAMP_ENABLED": 0,
 
+    # ================= LICHT · SONNENVERLAUF =================
+    "LIGHT_SUN_ENABLED": 0,
+    "LIGHT_SUNRISE_DURATION_MIN": 30,
+    "LIGHT_SUNSET_DURATION_MIN": 30,
+    "LIGHT_SUN_MIN_LEVEL": 11,
+
     "SENSOR_ASSIGNMENTS": {
 
         "temperature": {

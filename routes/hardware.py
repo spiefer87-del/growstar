@@ -7,6 +7,7 @@ from services.shelly_provisioning import (
 )
 from core.hardware.shelly.provisioning import provisioning_discovery
 from core.mqtt_sensor_devices import list_mqtt_sensor_devices
+from core.sensor_sources import list_sensor_sources
 from core.hardware_assignments import hardware_snapshot
 from core.tents import manager as tent_manager
 
@@ -91,6 +92,43 @@ def _assigned_actuator_views(gateway_rows, *, tents=None, snapshot_loader=None):
                 "gateway": gateway_view,
             })
 
+    return result
+
+
+def _spiderfarmer_sensor_views():
+    """Read-only Spider Farmer environment sources for the hardware overview."""
+
+    result = []
+
+    for source in list_sensor_sources():
+        if str(source.get("type") or "") != "spiderfarmer":
+            continue
+
+        source_id = str(source.get("id") or "")
+        controller_id = ""
+        if source_id.startswith("spiderfarmer:"):
+            controller_id = source_id.split(":", 2)[1] if ":" in source_id else ""
+
+        result.append({
+            "id": source_id,
+            "source_id": source_id,
+            "name": source.get("label") or source_id,
+            "model": "Spider Farmer GGS Sensor",
+            "manufacturer": "Spider Farmer",
+            "controller_id": controller_id,
+            "online": bool(source.get("online", True)),
+            "temperature": source.get("temperature"),
+            "humidity": source.get("humidity"),
+            "ppfd": source.get("ppfd"),
+            "last_seen": source.get("last_seen"),
+            "capabilities": [
+                field
+                for field in ("temperature", "humidity", "ppfd")
+                if source.get(field) is not None
+            ],
+        })
+
+    result.sort(key=lambda item: str(item.get("name") or item.get("id") or ""))
     return result
 
 
@@ -351,6 +389,10 @@ def register(app):
             # Sie gehören bewusst zu keinem Zelt; die Zuordnung erfolgt erst
             # über SENSOR_ASSIGNMENTS.
             "mqtt_devices": list_mqtt_sensor_devices(),
+
+            # Spider-Farmer-Umgebungssensoren erscheinen zusätzlich in der
+            # zentralen Hardwareübersicht. Read-only; keine Herstellerseite nötig.
+            "spiderfarmer_sensors": _spiderfarmer_sensor_views(),
 
         })
 

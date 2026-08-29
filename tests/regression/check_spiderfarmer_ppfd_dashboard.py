@@ -25,7 +25,10 @@ def main():
     require('"light_ppfd": light_ppfd' in tents, "Tent-State liefert PPFD")
     require('"light_ppfd_source": light_ppfd_source' in tents, "Tent-State liefert PPFD-Quelle")
     require("µmol/m²/s" in template, "Dashboard verwendet korrekte PPFD-Einheit")
-    require('safeText("light-level"' in template, "Dashboard aktualisiert vorbereitete Helligkeits-Kachel")
+    require(
+        '"light-level"' in template and "state.light_ppfd" in template,
+        "Dashboard aktualisiert vorbereitete Helligkeits-Kachel",
+    )
     require("> lx</div>" not in template, "Kein falsches Lux-Label auf der PPFD-Kachel")
 
     print("✅ Growstar 3.13.10 / PPFD.1 vollständig geprüft")

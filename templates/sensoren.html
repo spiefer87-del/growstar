@@ -153,6 +153,39 @@
 
     </div>
 
+    <div class="card">
+
+        <h2>Helligkeit / PPFD</h2>
+
+        <div class="value">
+            RAW:
+            <span id="ppfd_raw">--</span>
+            µmol/m²/s
+        </div>
+
+        <div class="sub">
+            Aktuelle Quelle:
+            <strong id="ppfd_source_label">
+                --
+            </strong>
+        </div>
+
+        <label class="form-label">
+            Sensor für Helligkeit / PPFD
+        </label>
+
+        <select
+            id="ppfd-source"
+            class="form-control">
+        </select>
+
+        <div class="sub" style="margin-top:12px;">
+            Die Zuweisung wird bereits stationsbezogen gespeichert.
+            Eine automatische Lichtregelung verwendet diesen Wert noch nicht.
+        </div>
+
+    </div>
+
 </div>
 
 
@@ -213,7 +246,8 @@ const OFFSET_DEBOUNCE_MS = 350;
 
 let sensorOptions = {
     temperature: [],
-    humidity: []
+    humidity: [],
+    ppfd: []
 };
 
 let sensorSources = [];
@@ -330,7 +364,11 @@ function renderSelect(sensorName, selectId){
                 (
                     sensorName === "temperature"
                     ? " °C"
-                    : " %"
+                    : (
+                        sensorName === "humidity"
+                        ? " %"
+                        : " µmol/m²/s"
+                    )
                 ) +
                 ")";
 
@@ -371,6 +409,9 @@ function renderSourceLabels(){
     const hum =
         assignments.humidity || {};
 
+    const ppfd =
+        assignments.ppfd || {};
+
     document.getElementById("temp_source_label").textContent =
         temp.label ||
         temp.source_id ||
@@ -379,6 +420,11 @@ function renderSourceLabels(){
     document.getElementById("hum_source_label").textContent =
         hum.label ||
         hum.source_id ||
+        "--";
+
+    document.getElementById("ppfd_source_label").textContent =
+        ppfd.label ||
+        ppfd.source_id ||
         "--";
 
 }
@@ -426,6 +472,8 @@ function renderSources(){
                     ${source.temperature !== undefined && source.temperature !== null ? source.temperature + " °C" : "--"}
                     · Luftfeuchte:
                     ${source.humidity !== undefined && source.humidity !== null ? source.humidity + " %" : "--"}
+                    · PPFD:
+                    ${source.ppfd !== undefined && source.ppfd !== null ? source.ppfd + " µmol/m²/s" : "--"}
                     · Batterie:
                     ${source.battery !== undefined && source.battery !== null ? source.battery + " %" : "--"}
                     · RSSI:
@@ -468,6 +516,10 @@ async function loadState(){
         document.getElementById("temp_corr").textContent = fmt(s.temp);
         document.getElementById("hum_raw").textContent = fmt(s.hum_raw);
         document.getElementById("hum_corr").textContent = fmt(s.hum);
+        document.getElementById("ppfd_raw").textContent =
+            s.light_ppfd === null || s.light_ppfd === undefined
+                ? "--"
+                : Math.round(Number(s.light_ppfd));
 
     }finally{
 
@@ -497,7 +549,8 @@ function applyAssignmentControls(data){
     sensorOptions =
         data.options || {
             temperature: [],
-            humidity: []
+            humidity: [],
+            ppfd: []
         };
 
     renderSelect(
@@ -508,6 +561,11 @@ function applyAssignmentControls(data){
     renderSelect(
         "humidity",
         "humidity-source"
+    );
+
+    renderSelect(
+        "ppfd",
+        "ppfd-source"
     );
 
     renderSourceLabels();
@@ -807,6 +865,13 @@ async function saveSensorAssignments(){
             ).value
         );
 
+    const ppfdOption =
+        parseOptionValue(
+            document.getElementById(
+                "ppfd-source"
+            ).value
+        );
+
     const tempSelect =
         document.getElementById(
             "temperature-source"
@@ -815,6 +880,11 @@ async function saveSensorAssignments(){
     const humSelect =
         document.getElementById(
             "humidity-source"
+        );
+
+    const ppfdSelect =
+        document.getElementById(
+            "ppfd-source"
         );
 
     tempOption.label =
@@ -826,6 +896,11 @@ async function saveSensorAssignments(){
         humSelect.selectedOptions[0]?.textContent
         ?.replace(/\s\(.+\)$/, "") ||
         humOption.source_id;
+
+    ppfdOption.label =
+        ppfdSelect.selectedOptions[0]?.textContent
+        ?.replace(/\s\(.+\)$/, "") ||
+        ppfdOption.source_id;
 
     const saveButton =
         document.getElementById(
@@ -846,7 +921,8 @@ async function saveSensorAssignments(){
                 },
                 body:JSON.stringify({
                     temperature: tempOption,
-                    humidity: humOption
+                    humidity: humOption,
+                    ppfd: ppfdOption
                 })
             }
         );
@@ -909,6 +985,14 @@ document.getElementById("temperature-source")
 
 
 document.getElementById("humidity-source")
+    .addEventListener(
+        "change",
+        ()=>{
+            assignmentDirty = true;
+        }
+    );
+
+document.getElementById("ppfd-source")
     .addEventListener(
         "change",
         ()=>{

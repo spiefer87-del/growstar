@@ -23,7 +23,7 @@ def main():
     req("ppfd=None" in source, "insert_measurement akzeptiert PPFD")
     req("VALUES (?, ?, ?, ?, ?, ?, ?, ?)" in source, "SQL besitzt exakt 8 Platzhalter")
     req(
-        "            vpd,\\n            ppfd\\n" in source,
+        "            vpd,\n            ppfd\n" in source,
         "Binding-Tupel enthält VPD und PPFD",
     )
 

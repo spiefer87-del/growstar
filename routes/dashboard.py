@@ -121,26 +121,38 @@ def register(app):
             **_tent_page_context(tent_id),
         )
 
+    def _environment_history_page(tent_id, metric):
+        context = _tent_page_context(tent_id)
+        meta = {
+            "temp": ("Temperatur", "🌡️"),
+            "hum": ("Luftfeuchtigkeit", "💧"),
+            "vpd": ("VPD", "🌱"),
+            "ppfd": ("Helligkeit", "☀️"),
+        }
+        title, icon = meta[metric]
+        return render_template(
+            "environment_history.html",
+            initial_metric=metric,
+            metric_title=title,
+            metric_icon=icon,
+            **context,
+        )
+
     @app.route("/grow-control/tents/<tent_id>/temperature")
     def grow_control_tent_temperature(tent_id):
-        return render_template(
-            "temperature.html",
-            **_tent_page_context(tent_id),
-        )
+        return _environment_history_page(tent_id, "temp")
 
     @app.route("/grow-control/tents/<tent_id>/humidity")
     def grow_control_tent_humidity(tent_id):
-        return render_template(
-            "humidity.html",
-            **_tent_page_context(tent_id),
-        )
+        return _environment_history_page(tent_id, "hum")
 
     @app.route("/grow-control/tents/<tent_id>/vpd")
     def grow_control_tent_vpd(tent_id):
-        return render_template(
-            "vpd.html",
-            **_tent_page_context(tent_id),
-        )
+        return _environment_history_page(tent_id, "vpd")
+
+    @app.route("/grow-control/tents/<tent_id>/ppfd")
+    def grow_control_tent_ppfd(tent_id):
+        return _environment_history_page(tent_id, "ppfd")
 
     @app.route("/grow-control/tents/<tent_id>/settings")
     def grow_control_tent_settings(tent_id):
@@ -219,6 +231,10 @@ def register(app):
     @app.route("/vpd")
     def vpd_page():
         return redirect(_default_tent_url("grow_control_tent_vpd"), code=302)
+
+    @app.route("/light-level")
+    def light_level_page():
+        return redirect(_default_tent_url("grow_control_tent_ppfd"), code=302)
 
     @app.route("/heizung")
     def heizung_page():

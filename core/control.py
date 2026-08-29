@@ -5,6 +5,7 @@ import time
 from core.runtime import resolve_runtime
 from core.profile import get_profile
 from core.ramp import get_ramped_target
+from core.light_sun import calculate_light_sun_state
 from core.helpers import minutes_now, in_time_window
 from core.actuators import (
     set_device,
@@ -209,8 +210,11 @@ def control_device(device, runtime=None):
 
 
 def control_light_profile(runtime=None):
+    """Profillicht mit optionalem Sonnenaufgang/Sonnenuntergang."""
+
     rt = resolve_runtime(runtime)
     cfg = rt.config
+    st = rt.state
 
     now_min = minutes_now()
     day_start = int(cfg.get("DAY_START_MIN", 360))
@@ -218,12 +222,92 @@ def control_light_profile(runtime=None):
 
     light_on = in_time_window(now_min, day_start, night_start)
     params = get_device_params("light", runtime=rt)
-    state_name = "env" if light_on else "off"
-    apply_device_state(
+
+    if not light_on:
+        with rt.state_lock:
+            st.live_state["light_sun_active"] = False
+            st.live_state["light_sun_phase"] = "night"
+            st.live_state["light_sun_level"] = None
+            st.live_state["light_sun_progress"] = 0.0
+        apply_device_state(
+            "light",
+            resolve_control_state(params, "off"),
+            runtime=rt,
+        )
+        return
+
+    env_state = resolve_control_state(params, "env")
+
+    from core.capability_routing import controller_assignment_for_config
+    light_controller_assignment = controller_assignment_for_config(
+        cfg,
         "light",
-        resolve_control_state(params, state_name),
-        runtime=rt,
     )
+
+    if (
+        cfg.get("LIGHT_SUN_ENABLED", 0)
+        and not isinstance(light_controller_assignment, dict)
+    ):
+        with rt.state_lock:
+            st.live_state["light_sun_active"] = False
+            st.live_state["light_sun_phase"] = "controller_required"
+            st.live_state["light_sun_level"] = None
+            st.live_state["light_sun_progress"] = 0.0
+
+        apply_device_state("light", env_state, runtime=rt)
+        return
+
+    if not cfg.get("LIGHT_SUN_ENABLED", 0):
+        with rt.state_lock:
+            st.live_state["light_sun_active"] = False
+            st.live_state["light_sun_phase"] = "disabled"
+            st.live_state["light_sun_level"] = None
+            st.live_state["light_sun_progress"] = 0.0
+        apply_device_state("light", env_state, runtime=rt)
+        return
+
+    controller = dict(env_state.get("controller") or {})
+    target_level = controller.get("level")
+
+    # Kein gespeicherter dimmbarer ENV-Level: altes EIN/AUS-Verhalten behalten.
+    if target_level is None:
+        with rt.state_lock:
+            st.live_state["light_sun_active"] = False
+            st.live_state["light_sun_phase"] = "no_level_controller"
+            st.live_state["light_sun_level"] = None
+            st.live_state["light_sun_progress"] = 0.0
+        apply_device_state("light", env_state, runtime=rt)
+        return
+
+    sun = calculate_light_sun_state(
+        now_min=now_min,
+        day_start=day_start,
+        night_start=night_start,
+        sunrise_duration=cfg.get("LIGHT_SUNRISE_DURATION_MIN", 30),
+        sunset_duration=cfg.get("LIGHT_SUNSET_DURATION_MIN", 30),
+        min_level=cfg.get("LIGHT_SUN_MIN_LEVEL", 11),
+        target_level=target_level,
+    )
+
+    if not sun["on"]:
+        apply_device_state(
+            "light",
+            resolve_control_state(params, "off"),
+            runtime=rt,
+        )
+        return
+
+    controller["level"] = int(sun["level"])
+    env_state = dict(env_state)
+    env_state["controller"] = controller
+
+    with rt.state_lock:
+        st.live_state["light_sun_active"] = True
+        st.live_state["light_sun_phase"] = sun["phase"]
+        st.live_state["light_sun_level"] = int(sun["level"])
+        st.live_state["light_sun_progress"] = sun["progress"]
+
+    apply_device_state("light", env_state, runtime=rt)
 
 
 def control_heating_env(runtime=None):

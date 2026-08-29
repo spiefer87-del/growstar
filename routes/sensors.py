@@ -145,6 +145,7 @@ def _sensor_options():
     sources = _source_map()
     temperature = []
     humidity = []
+    ppfd = []
 
     for source in sources.values():
         source_id = source.get("id")
@@ -168,9 +169,19 @@ def _sensor_options():
                 "type": source.get("type"),
             })
 
+        if _supports(source, "ppfd"):
+            ppfd.append({
+                "source_id": source_id,
+                "field": "ppfd",
+                "label": label,
+                "value": source.get("ppfd"),
+                "type": source.get("type"),
+            })
+
     return {
         "temperature": temperature,
         "humidity": humidity,
+        "ppfd": ppfd,
     }
 
 
@@ -182,7 +193,7 @@ def _sources_payload():
         item = dict(source)
         item["fields"] = [
             field
-            for field in ("temperature", "humidity")
+            for field in ("temperature", "humidity", "ppfd")
             if _supports(source, field)
         ]
         result.append(item)
@@ -211,7 +222,14 @@ def _normalize_assignment(sensor_name, data):
         raise ValueError(f"{source_id} ist eine stillgelegte Legacy-Sensorquelle")
 
     if not field:
-        field = "temperature" if sensor_name == "temperature" else "humidity"
+        field = {
+            "temperature": "temperature",
+            "humidity": "humidity",
+            "ppfd": "ppfd",
+        }.get(sensor_name)
+
+    if field not in {"temperature", "humidity", "ppfd"}:
+        raise ValueError(f"Ungültiges Sensorfeld für {sensor_name}: {field}")
 
     return {
         "source_id": str(source_id),
@@ -277,6 +295,12 @@ def _save_assignments(runtime, data):
             data["humidity"],
         )
 
+    if "ppfd" in data:
+        assignments["ppfd"] = _normalize_assignment(
+            "ppfd",
+            data["ppfd"],
+        )
+
     offsets = data.get("offsets", {})
     if offsets is None:
         offsets = {}
@@ -293,7 +317,7 @@ def _save_assignments(runtime, data):
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{key} muss numerisch sein") from exc
 
-    if "temperature" in data or "humidity" in data:
+    if "temperature" in data or "humidity" in data or "ppfd" in data:
         runtime.config["SENSOR_ASSIGNMENTS"] = assignments
 
     for key, value in new_offsets.items():

@@ -20,6 +20,25 @@ h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
 .subtitle{text-align:center;color:var(--muted);font-size:.8rem;margin-bottom:20px}
 .grid{display:grid;gap:16px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+
+.card.feature-unavailable{
+    opacity:.52;
+    filter:grayscale(.28) saturate(.45);
+    border-color:rgba(148,163,184,.12);
+}
+.card.feature-unavailable .info,
+.card.feature-unavailable .preview{
+    opacity:.82;
+}
+.card.feature-unavailable input,
+.card.feature-unavailable button{
+    cursor:not-allowed !important;
+}
+.card.feature-unavailable input:disabled,
+.card.feature-unavailable button:disabled{
+    opacity:.55;
+}
+
 .card h2{margin:0 0 12px;text-align:center;font-size:1rem;color:#cbd5e1;text-transform:uppercase;letter-spacing:.04em}
 .row-inline{display:flex;gap:12px;justify-content:center;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
 .field{display:flex;flex-direction:column;align-items:center;min-width:118px}
@@ -301,6 +320,59 @@ button:hover{background:#475569}
             </div>
         </div>
 
+        <div class="card" id="light-sun-card">
+            <h2>☀️ Sonnenaufgang & Sonnenuntergang</h2>
+
+            <div class="info">
+                Funktion für <strong>Beleuchtung im Modus Umgebung</strong>.
+                Der bereits eingestellte ENV-Lichtlevel bleibt die maximale Tagesleistung.
+                Power / AUS bleibt weiterhin beim Shelly.
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Aktiv</label>
+                    <input type="checkbox" id="LIGHT_SUN_ENABLED">
+                </div>
+
+                <div class="field">
+                    <label>Sonnenaufgang (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('LIGHT_SUNRISE_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="5" id="LIGHT_SUNRISE_DURATION_MIN" class="compact-input">
+                        <button type="button" onclick="step('LIGHT_SUNRISE_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Sonnenuntergang (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('LIGHT_SUNSET_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="5" id="LIGHT_SUNSET_DURATION_MIN" class="compact-input">
+                        <button type="button" onclick="step('LIGHT_SUNSET_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Start-/Endleistung %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('LIGHT_SUN_MIN_LEVEL',-1)">−</button>
+                        <input type="number" step="1" id="LIGHT_SUN_MIN_LEVEL" class="compact-input">
+                        <button type="button" onclick="step('LIGHT_SUN_MIN_LEVEL',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="light-sun-preview" class="preview"></div>
+
+            <div id="light-sun-controller-note" class="info warning" style="display:none;"></div>
+
+            <div class="info warning">
+                Tag Start = Beginn Sonnenaufgang. Nacht Start = Ende Sonnenuntergang / Licht AUS.
+                Bei deaktivierter Funktion arbeitet das Licht exakt wie bisher.
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -309,12 +381,17 @@ const TENT_ID = {{ tent_id|tojson }};
 const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
 const PROFILE_URL = name => `/api/tents/${encodeURIComponent(TENT_ID)}/profile/${encodeURIComponent(name)}`;
 
+let lightSunAvailable = false;
+let lightSunUnavailableReason = "";
+
 const ids = [
     "DAY_TEMP","DAY_TEMP_TOL","NIGHT_TEMP","NIGHT_TEMP_TOL",
     "DAY_HUM","DAY_HUM_TOL","NIGHT_HUM","NIGHT_HUM_TOL",
     "TEMP_ALERT_TOL","HUM_ALERT_TOL",
     "MIN_TEMP","MAX_TEMP","MIN_HUM","MAX_HUM",
-    "RAMP_DURATION_MIN"
+    "RAMP_DURATION_MIN",
+    "LIGHT_SUNRISE_DURATION_MIN","LIGHT_SUNSET_DURATION_MIN",
+    "LIGHT_SUN_MIN_LEVEL"
 ];
 
 function el(id){ return document.getElementById(id); }
@@ -395,6 +472,25 @@ function updatePreview(){
         oder ≥ ${(num("NIGHT_HUM")+num("HUM_ALERT_TOL")).toFixed(1)} %<br>
         Absolute Alarmgrenze: ${num("MIN_HUM").toFixed(1)} bis ${num("MAX_HUM").toFixed(1)} %
     `;
+
+    const sunBox = el("light-sun-preview");
+    if(sunBox){
+        const active = !!el("LIGHT_SUN_ENABLED")?.checked;
+        const dayStart = el("DAY_START_TIME")?.value || "--:--";
+        const nightStart = el("NIGHT_START_TIME")?.value || "--:--";
+        const rise = num("LIGHT_SUNRISE_DURATION_MIN");
+        const sunset = num("LIGHT_SUNSET_DURATION_MIN");
+        const minimum = num("LIGHT_SUN_MIN_LEVEL");
+
+        sunBox.innerHTML = active
+            ? `<strong>Sonnenverlauf aktiv</strong><br>
+               ${dayStart}: EIN bei ${minimum.toFixed(0)} % · Hochdimmen ${rise.toFixed(0)} Min.<br>
+               Tagesleistung: vorhandener ENV-Lichtlevel<br>
+               Herunterdimmen ${sunset.toFixed(0)} Min. vor ${nightStart}<br>
+               ${nightStart}: Licht AUS`
+            : `<strong>Sonnenverlauf deaktiviert</strong><br>
+               Bisherige Profil-EIN/AUS-Steuerung bleibt aktiv.`;
+    }
 }
 
 function applyLimits(c){
@@ -430,7 +526,72 @@ function applyLimits(c){
 
     el("RAMP_DURATION_MIN").min = 5;
     el("RAMP_DURATION_MIN").max = 240;
+
+    el("LIGHT_SUNRISE_DURATION_MIN").min = 0;
+    el("LIGHT_SUNRISE_DURATION_MIN").max = 240;
+    el("LIGHT_SUNSET_DURATION_MIN").min = 0;
+    el("LIGHT_SUNSET_DURATION_MIN").max = 240;
+    el("LIGHT_SUN_MIN_LEVEL").min = 11;
+    el("LIGHT_SUN_MIN_LEVEL").max = 100;
 }
+
+function applyLightSunAvailability(payload){
+    lightSunAvailable = !!payload.light_sun_available;
+
+    lightSunUnavailableReason =
+        payload.light_sun_unavailable_reason ||
+        "Kein Licht-Controller zugewiesen.";
+
+    const card = el("light-sun-card");
+    const note = el("light-sun-controller-note");
+
+    const fieldIds = [
+        "LIGHT_SUN_ENABLED",
+        "LIGHT_SUNRISE_DURATION_MIN",
+        "LIGHT_SUNSET_DURATION_MIN",
+        "LIGHT_SUN_MIN_LEVEL"
+    ];
+
+    if(card){
+        card.classList.toggle(
+            "feature-unavailable",
+            !lightSunAvailable
+        );
+
+        card.querySelectorAll(".num-control button").forEach(button=>{
+            button.disabled = !lightSunAvailable;
+        });
+    }
+
+    fieldIds.forEach(id=>{
+        const input = el(id);
+
+        if(input){
+            input.disabled = !lightSunAvailable;
+        }
+    });
+
+    if(note){
+        if(lightSunAvailable){
+            note.style.display = "none";
+            note.textContent = "";
+        }else{
+            note.style.display = "block";
+            note.innerHTML =
+                "<strong>Nicht verfügbar:</strong> " +
+                lightSunUnavailableReason;
+        }
+    }
+
+    if(!lightSunAvailable){
+        const toggle = el("LIGHT_SUN_ENABLED");
+
+        if(toggle){
+            toggle.checked = false;
+        }
+    }
+}
+
 
 async function load(){
     const response = await fetch(CONFIG_URL,{cache:"no-store"});
@@ -441,6 +602,8 @@ async function load(){
     }
     const c = payload.config || payload;
 
+    applyLightSunAvailability(payload);
+
     for(const id of ids){
         if(el(id) && c[id] !== undefined) el(id).value = c[id];
     }
@@ -448,6 +611,8 @@ async function load(){
     el("DAY_START_TIME").value = minToTime(c.DAY_START_MIN);
     el("NIGHT_START_TIME").value = minToTime(c.NIGHT_START_MIN);
     el("RAMP_ENABLED").checked = !!c.RAMP_ENABLED;
+    el("LIGHT_SUN_ENABLED").checked =
+        lightSunAvailable && !!c.LIGHT_SUN_ENABLED;
     updateLightingDuration();
 
     highlightActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
@@ -478,7 +643,14 @@ async function save(){
         DAY_START_MIN:timeToMin(el("DAY_START_TIME").value),
         NIGHT_START_MIN:timeToMin(el("NIGHT_START_TIME").value),
         RAMP_ENABLED:el("RAMP_ENABLED").checked ? 1 : 0,
-        RAMP_DURATION_MIN:num("RAMP_DURATION_MIN")
+        RAMP_DURATION_MIN:num("RAMP_DURATION_MIN"),
+        LIGHT_SUN_ENABLED:(
+            lightSunAvailable &&
+            el("LIGHT_SUN_ENABLED").checked
+        ) ? 1 : 0,
+        LIGHT_SUNRISE_DURATION_MIN:num("LIGHT_SUNRISE_DURATION_MIN"),
+        LIGHT_SUNSET_DURATION_MIN:num("LIGHT_SUNSET_DURATION_MIN"),
+        LIGHT_SUN_MIN_LEVEL:num("LIGHT_SUN_MIN_LEVEL")
     };
 
     const response = await fetch(CONFIG_URL,{
@@ -494,6 +666,7 @@ async function save(){
     }
 
     const c = payload.config || body;
+    applyLightSunAvailability(payload);
     applyLimits(c);
     updatePreview();
     feedback("Einstellungen gespeichert.","ok");
@@ -530,6 +703,13 @@ function step(id,delta){
     const input = el(id);
     if(!input) return;
 
+    if(
+        !lightSunAvailable &&
+        id.startsWith("LIGHT_SUN")
+    ){
+        return;
+    }
+
     let value = Number(input.value);
     if(!Number.isFinite(value)) value = 0;
 
@@ -551,10 +731,14 @@ function highlightActiveProfile(active){
 document.querySelectorAll("input").forEach(input=>{
     input.addEventListener("change",save);
     if(input.type === "number") input.addEventListener("input",updatePreview);
+    if(input.id === "LIGHT_SUN_ENABLED") input.addEventListener("input",updatePreview);
 });
 
 ["DAY_START_TIME","NIGHT_START_TIME"].forEach(id=>{
-    el(id)?.addEventListener("input",updateLightingDuration);
+    el(id)?.addEventListener("input",()=>{
+        updateLightingDuration();
+        updatePreview();
+    });
 });
 
 load();

@@ -24,6 +24,7 @@ from core.tent_config import ensure_tent_config
 from core.tents import manager as tent_manager, validate_tent_id
 from services.live_control import LiveTransitionError, request_live, request_shadow
 from services.spiderfarmer import device as spiderfarmer_device
+from core.sensor_sources import get_sensor_source
 
 
 _DEVICE_NAMES = DEVICE_NAMES
@@ -98,6 +99,55 @@ def _age(last_seen):
     if not last_seen:
         return None
     return max(0, int(time.time() - last_seen))
+
+
+def _assigned_spiderfarmer_ppfd(runtime):
+    """Return PPFD from this station's assigned Spider Farmer environment source.
+
+    PPFD.1 deliberately reuses the existing temperature/humidity sensor
+    assignment as the station binding. No control logic is changed.
+    """
+
+    assignments = runtime.config.get("SENSOR_ASSIGNMENTS", {})
+    if not isinstance(assignments, dict):
+        return None, None
+
+    source_ids = []
+
+    # PPFD.2: explicit station assignment has priority.
+    ppfd_assignment = assignments.get("ppfd") or {}
+    ppfd_source_id = str(ppfd_assignment.get("source_id") or "").strip()
+    if ppfd_source_id:
+        source_ids.append(ppfd_source_id)
+
+    # Migration fallback for stations configured before PPFD.2.
+    for sensor_name in ("temperature", "humidity"):
+        assignment = assignments.get(sensor_name) or {}
+        source_id = str(assignment.get("source_id") or "").strip()
+        if source_id.startswith("spiderfarmer:") and source_id not in source_ids:
+            source_ids.append(source_id)
+
+    for source_id in source_ids:
+        source = get_sensor_source(source_id)
+        if not isinstance(source, dict):
+            continue
+
+        value = source.get("ppfd")
+        if value is None:
+            continue
+
+        try:
+            ppfd = float(value)
+        except (TypeError, ValueError):
+            continue
+
+        return ppfd, {
+            "source_id": source_id,
+            "label": source.get("label") or source_id,
+            "last_seen": source.get("last_seen"),
+        }
+
+    return None, None
 
 
 def _controller_readback(runtime, device):
@@ -201,6 +251,11 @@ def _state_snapshot(runtime):
 
     safety = get_runtime_safety_snapshot(runtime)
 
+    light_ppfd = live.get("light_ppfd")
+    light_ppfd_source = live.get("light_ppfd_source")
+    if light_ppfd is None:
+        light_ppfd, light_ppfd_source = _assigned_spiderfarmer_ppfd(runtime)
+
     devices = {}
     for device in _DEVICE_NAMES:
         assignment = device_assignment(runtime.tent_id, device)
@@ -252,6 +307,8 @@ def _state_snapshot(runtime):
         "hum_raw": live.get("hum_raw"),
         "hum": live.get("hum"),
         "vpd": live.get("vpd"),
+        "light_ppfd": light_ppfd,
+        "light_ppfd_source": light_ppfd_source,
         "temp_target": live.get("temp_target"),
         "temp_tol": live.get("temp_tol"),
         "hum_target": live.get("hum_target"),
@@ -270,6 +327,13 @@ def _state_snapshot(runtime):
             st.ramp_active and cfg.get("RAMP_ENABLED", 0)
         ),
         "ramp_target": live.get("ramp_target"),
+
+        # Licht · Sonnenverlauf
+        "light_sun_enabled": bool(cfg.get("LIGHT_SUN_ENABLED", 0)),
+        "light_sun_active": bool(live.get("light_sun_active")),
+        "light_sun_phase": live.get("light_sun_phase"),
+        "light_sun_level": live.get("light_sun_level"),
+        "light_sun_progress": live.get("light_sun_progress"),
 
         # Sensorzustand
         "temp_ok": not st.temp_stale,
@@ -296,7 +360,48 @@ def _state_snapshot(runtime):
     }
 
 
+def _light_sun_availability(runtime):
+    assignment = controller_assignment_for_config(runtime.config, "light")
+
+    if not isinstance(assignment, dict):
+        return {
+            "available": False,
+            "reason": (
+                "Sonnenaufgang/Sonnenuntergang benötigt einen zugewiesenen "
+                "Licht-Controller mit Dimmfunktion. Bitte unter Grow Control "
+                "→ Controller-Funktionen zuerst einen Controller für "
+                "Beleuchtung zuweisen."
+            ),
+            "assignment": None,
+        }
+
+    target_id = str(assignment.get("target_id") or "").strip()
+    provider = str(assignment.get("provider") or "").strip()
+
+    if not target_id:
+        return {
+            "available": False,
+            "reason": (
+                "Die Beleuchtung besitzt keine vollständige "
+                "Controller-Zuweisung. Bitte die Controller-Zuordnung "
+                "erneut speichern."
+            ),
+            "assignment": None,
+        }
+
+    return {
+        "available": True,
+        "reason": None,
+        "assignment": {
+            "provider": provider,
+            "target_id": target_id,
+        },
+    }
+
+
 def _config_payload(runtime):
+    sun = _light_sun_availability(runtime)
+
     return {
         "success": True,
         "tent_id": runtime.tent_id,
@@ -308,6 +413,9 @@ def _config_payload(runtime):
         "hardware_actuation_blocked": not runtime.control_enabled,
         "active_profile": get_active_profile(runtime=runtime),
         "profiles": sorted((PROFILES.get("profiles") or {}).keys()),
+        "light_sun_available": bool(sun["available"]),
+        "light_sun_unavailable_reason": sun["reason"],
+        "light_sun_controller_assignment": sun["assignment"],
         "config": config_snapshot(runtime),
     }
 
@@ -496,6 +604,16 @@ def register(app):
             return jsonify(_config_payload(runtime))
 
         data = request.get_json(silent=True) or {}
+
+        if bool(data.get("LIGHT_SUN_ENABLED")):
+            sun = _light_sun_availability(runtime)
+            if not sun["available"]:
+                return jsonify(
+                    success=False,
+                    error="light_sun_controller_required",
+                    message=sun["reason"],
+                ), 409
+
         try:
             _validate_station_config_patch(data)
             result = apply_config_patch(data, runtime=runtime)

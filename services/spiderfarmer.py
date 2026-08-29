@@ -271,9 +271,14 @@ def sync_sensor_sources(path=None, *, now=None):
             "humidity_percent"
         )
 
+        ppfd = sensor.get(
+            "ppfd"
+        )
+
         if (
             temperature is None
             and humidity is None
+            and ppfd is None
         ):
             skipped.append({
                 "id": controller_id,
@@ -319,6 +324,7 @@ def sync_sensor_sources(path=None, *, now=None):
             source_type="spiderfarmer",
             temperature=temperature,
             humidity=humidity,
+            ppfd=ppfd,
             raw=raw,
         )
 
@@ -339,6 +345,11 @@ def sync_sensor_sources(path=None, *, now=None):
                 source.get("humidity")
                 if source
                 else humidity
+            ),
+            "ppfd": (
+                source.get("ppfd")
+                if source
+                else ppfd
             ),
             "bridge_last_seen": last_seen,
             "published_at": current,

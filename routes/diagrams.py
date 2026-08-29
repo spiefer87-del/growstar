@@ -80,6 +80,22 @@ def _history_rows(tent_id, range_key, data_type):
                 if r[1] is not None
             ]
 
+        if data_type == "ppfd":
+            c.execute(
+                """
+                SELECT ts, ppfd
+                FROM temp_history
+                WHERE tent_id = ? AND ts >= ?
+                ORDER BY ts ASC
+                """,
+                (tent_id, since),
+            )
+            return [
+                {"ts": r[0], "ppfd": r[1]}
+                for r in c.fetchall()
+                if r[1] is not None
+            ]
+
         return []
     finally:
         db.close()

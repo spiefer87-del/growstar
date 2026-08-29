@@ -25,6 +25,7 @@ def update_sensor_source(
     source_type=None,
     temperature=None,
     humidity=None,
+    ppfd=None,
     battery=None,
     rssi=None,
     raw=None,
@@ -49,6 +50,9 @@ def update_sensor_source(
 
         if humidity is not None:
             source["humidity"] = float(humidity)
+
+        if ppfd is not None:
+            source["ppfd"] = float(ppfd)
 
         if battery is not None:
             source["battery"] = battery
@@ -120,6 +124,8 @@ def _read_assigned_value(sensor_name, runtime=None):
             field = "temperature"
         elif sensor_name == "humidity":
             field = "humidity"
+        elif sensor_name == "ppfd":
+            field = "ppfd"
 
     source = get_sensor_source(source_id)
 
@@ -176,12 +182,40 @@ def apply_sensor_assignments(runtime=None):
         "humidity",
         runtime=rt,
     )
+    ppfd_raw, ppfd_source, ppfd_assignment = _read_assigned_value(
+        "ppfd",
+        runtime=rt,
+    )
+
+    if ppfd_raw is None:
+        assignments = cfg.get("SENSOR_ASSIGNMENTS", {})
+        for sensor_name in ("temperature", "humidity"):
+            assignment = (assignments or {}).get(sensor_name) or {}
+            source_id = str(assignment.get("source_id") or "").strip()
+            if not source_id.startswith("spiderfarmer:"):
+                continue
+            candidate = get_sensor_source(source_id)
+            if not isinstance(candidate, dict) or candidate.get("ppfd") is None:
+                continue
+            try:
+                ppfd_raw = float(candidate.get("ppfd"))
+            except (TypeError, ValueError):
+                continue
+            ppfd_source = candidate
+            ppfd_assignment = {
+                "source_id": source_id,
+                "field": "ppfd",
+                "label": candidate.get("label") or source_id,
+            }
+            break
 
     now = time.time()
     temp_last_seen = _source_last_seen(temp_source)
     hum_last_seen = _source_last_seen(hum_source)
+    ppfd_last_seen = _source_last_seen(ppfd_source)
     temp_fresh = temp_raw is not None and _source_is_fresh(temp_source, now)
     hum_fresh = hum_raw is not None and _source_is_fresh(hum_source, now)
+    ppfd_fresh = ppfd_raw is not None and _source_is_fresh(ppfd_source, now)
 
     changed = False
 
@@ -233,6 +267,22 @@ def apply_sensor_assignments(runtime=None):
             )
 
             changed = True
+
+        if ppfd_fresh:
+            st.live_state["light_ppfd"] = ppfd_raw
+            st.live_state["light_ppfd_source"] = {
+                "source_id": ppfd_assignment.get("source_id"),
+                "label": (
+                    ppfd_assignment.get("label")
+                    or (ppfd_source or {}).get("label")
+                    or ppfd_assignment.get("source_id")
+                ),
+                "last_seen": ppfd_last_seen,
+            }
+            changed = True
+        else:
+            st.live_state.pop("light_ppfd", None)
+            st.live_state.pop("light_ppfd_source", None)
 
         st.live_state["vpd"] = _calculate_vpd(
             st.live_state.get("temp"),

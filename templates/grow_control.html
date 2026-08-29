@@ -206,6 +206,22 @@ h3 {
 .value { font-size: 1.6rem; font-weight: 600; }
 .sub { margin-top: 6px; font-size: .8rem; color: var(--muted); }
 
+.ppfd-card-shell{
+    color:inherit;
+    text-decoration:none;
+}
+.ppfd-value{
+    line-height:1.02;
+}
+.ppfd-unit{
+    margin-top:4px;
+    font-size:.72rem;
+    font-weight:600;
+    letter-spacing:.01em;
+    color:var(--muted);
+}
+
+
 .badge {
     padding: 6px 14px;
     border-radius: 999px;
@@ -343,8 +359,12 @@ h3 {
     <a href="/water-temp" class="card-link pending-detail-link" id="water-temp-link">
         <div class="card env" id="water-temp-card"><h2>Wassertemp</h2><div class="value"><span id="water-temp">--.-</span> °C</div><div class="sub">Tank</div></div>
     </a>
-    <a href="/light-level" class="card-link pending-detail-link" id="light-level-link">
-        <div class="card env" id="light-level-card"><h2>Helligkeit</h2><div class="value"><span id="light-level">---</span> lx</div><div class="sub">Sensor</div></div>
+    <a href="{{ url_for('grow_control_tent_ppfd', tent_id=tent_id) }}" class="card-link ppfd-card-shell" id="light-level-link">
+        <div class="card env" id="light-level-card">
+            <h2>Helligkeit</h2>
+            <div class="value ppfd-value"><span id="light-level">---</span></div>
+            <div class="sub ppfd-unit">µmol/m²/s</div>
+        </div>
     </a>
 </div>
 
@@ -662,6 +682,12 @@ h3 {
             safeText("hum-ist", formatNumber(state.hum, 1));
             safeText("hum-soll", formatNumber(state.hum_target, 1));
             safeText("vpd", formatNumber(state.vpd, 2));
+            safeText(
+                "light-level",
+                Number.isFinite(Number(state.light_ppfd))
+                    ? String(Math.round(Number(state.light_ppfd)))
+                    : "---"
+            );
 
             const ramp = document.getElementById("temp-ramp");
             if (ramp) ramp.textContent = state.ramp_active ? " ⏱️ Rampe aktiv" : "";
