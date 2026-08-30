@@ -46,10 +46,6 @@ def _restart_ramp(current_temp, target_temp, end_min, runtime=None):
     )
 
 
-# =========================================
-# 🌡️ RAMPE STARTEN
-# =========================================
-
 def start_ramp(start_temp, target_temp, end_min, runtime=None):
     rt = resolve_runtime(runtime)
     st = rt.state
@@ -72,10 +68,6 @@ def start_ramp(start_temp, target_temp, end_min, runtime=None):
         f"{datetime.datetime.fromtimestamp(st.ramp_end_ts).strftime('%H:%M')}"
     )
 
-
-# =========================================
-# 🌡️ AKTUELLEN RAMPENWERT BERECHNEN
-# =========================================
 
 def get_ramped_target(runtime=None):
     rt = resolve_runtime(runtime)
@@ -104,10 +96,6 @@ def get_ramped_target(runtime=None):
     return round(value, 2)
 
 
-# =========================================
-# 🔄 RAMPE AKTUALISIEREN
-# =========================================
-
 def update_ramp(runtime=None):
     rt = resolve_runtime(runtime)
     st = rt.state
@@ -126,10 +114,6 @@ def update_ramp(runtime=None):
     stop_ramp(runtime=rt)
 
 
-# =========================================
-# 🔁 SOLLWERT RESYNC
-# =========================================
-
 def resync_active_ramp(runtime=None):
     rt = resolve_runtime(runtime)
     st = rt.state
@@ -146,22 +130,13 @@ def resync_active_ramp(runtime=None):
 
     if profile == "TAG":
         target = float(cfg["DAY_TEMP"])
-        end_min = int(cfg["DAY_START_MIN"])
+        end_min = get_morning_ramp_end(runtime=rt)
     else:
         target = float(cfg["NIGHT_TEMP"])
         end_min = int(cfg["NIGHT_START_MIN"])
 
-    _restart_ramp(
-        current,
-        target,
-        end_min,
-        runtime=rt,
-    )
+    _restart_ramp(current, target, end_min, runtime=rt)
 
-
-# =========================================
-# ⏱️ DAUER RESYNC
-# =========================================
 
 def update_ramp_duration(runtime=None):
     rt = resolve_runtime(runtime)
@@ -178,7 +153,7 @@ def update_ramp_duration(runtime=None):
     profile = get_profile(runtime=rt)
 
     if profile == "TAG":
-        end_min = int(cfg["DAY_START_MIN"])
+        end_min = get_morning_ramp_end(runtime=rt)
     else:
         end_min = int(cfg["NIGHT_START_MIN"])
 
@@ -189,10 +164,6 @@ def update_ramp_duration(runtime=None):
         runtime=rt,
     )
 
-
-# =========================================
-# 🛑 RAMPE STOPPEN
-# =========================================
 
 def stop_ramp(runtime=None):
     rt = resolve_runtime(runtime)
@@ -211,11 +182,21 @@ def stop_ramp(runtime=None):
 
 
 def get_morning_ramp_start(runtime=None):
+    """Morgenrampe startet exakt mit dem Tages-/Profilbeginn."""
+
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    return int(cfg["DAY_START_MIN"]) % 1440
+
+
+def get_morning_ramp_end(runtime=None):
+    """Morgenrampe endet nach der konfigurierten Rampendauer."""
+
     rt = resolve_runtime(runtime)
     cfg = rt.config
     day_start = int(cfg["DAY_START_MIN"])
-    duration = int(cfg["RAMP_DURATION_MIN"])
-    return (day_start - duration) % 1440
+    duration = max(0, int(cfg["RAMP_DURATION_MIN"]))
+    return (day_start + duration) % 1440
 
 
 def get_evening_ramp_start(runtime=None):
@@ -240,13 +221,12 @@ def check_ramp_schedule(runtime=None):
     now_min = minutes_now()
     today = datetime.date.today().isoformat()
 
-    day_start = int(cfg["DAY_START_MIN"])
     night_start = int(cfg["NIGHT_START_MIN"])
 
     morning_start = get_morning_ramp_start(runtime=rt)
+    morning_end = get_morning_ramp_end(runtime=rt)
     evening_start = get_evening_ramp_start(runtime=rt)
 
-    # 🌅 Morgenrampe
     if (
         now_min == morning_start
         and (
@@ -257,7 +237,7 @@ def check_ramp_schedule(runtime=None):
         start_ramp(
             float(cfg["NIGHT_TEMP"]),
             float(cfg["DAY_TEMP"]),
-            day_start,
+            morning_end,
             runtime=rt,
         )
 
@@ -265,7 +245,6 @@ def check_ramp_schedule(runtime=None):
         st.last_ramp_trigger_type = "morning"
         return
 
-    # 🌙 Abendrampe
     if (
         now_min == evening_start
         and (
