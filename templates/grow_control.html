@@ -406,6 +406,7 @@ h3 {
     const AUX_DEFAULT_LABELS = {aux1:"Wasserpumpen", aux2:"Zusatzgerät 2", aux3:"Zusatzgerät 3", aux4:"Zusatzgerät 4"};
     const AUX_ICONS = {aux1:"💧", aux2:"🔌", aux3:"🔌", aux4:"🔌"};
     let DEVICE_LABELS = {};
+    let STATION_CONFIG = {};
     let ENV_CARDS = {};
     let DEV_CARDS = {};
 
@@ -431,7 +432,7 @@ h3 {
         return Number.isFinite(n) ? n.toFixed(digits) : "--";
     };
 
-    function controllerDetail(device, controller) {
+    function controllerDetail(device, controller, mode = "") {
         if (!controller || controller.provider !== "spiderfarmer") return "";
 
         const level = Number(controller.level);
@@ -449,7 +450,28 @@ h3 {
             return `Dimmung ${level}`;
         }
         if (device === "fan" && hasLevel) {
-            return `Leistung ${level}`;
+            const env =
+                STATION_CONFIG.DEVICE_ENV_CONFIG?.fan || {};
+            const standbyState =
+                STATION_CONFIG.DEVICE_PARAMS?.fan
+                    ?.control_states?.env_standby || {};
+            const standbyLevel =
+                Number(standbyState.controller?.level);
+
+            const isStandby =
+                mode === "ENV" &&
+                env.standby_enabled === true &&
+                standbyState.power === true &&
+                Number.isFinite(standbyLevel) &&
+                standbyLevel === level;
+
+            return isStandby
+                ? `Standby · Leistung ${level}`
+                : (
+                    mode === "ENV"
+                        ? `Regelung · Leistung ${level}`
+                        : `Leistung ${level}`
+                );
         }
         return hasLevel ? `Level ${level}` : "";
     }
@@ -536,6 +558,7 @@ h3 {
             if (!response.ok) throw new Error(`Config HTTP ${response.status}`);
             const payload = await response.json();
             const cfg = payload.config || payload;
+            STATION_CONFIG = cfg;
             const envGrid = document.getElementById("env-grid");
             const devGrid = document.getElementById("device-grid");
             if (!envGrid || !devGrid) return;
@@ -658,7 +681,11 @@ h3 {
             label.textContent = on ? "EIN" : "AUS";
             card.className = on ? "card device on" : "card device off";
             if (on && detail) {
-                detail.textContent = controllerDetail(name, device.controller_readback);
+                detail.textContent = controllerDetail(
+                    name,
+                    device.controller_readback,
+                    mode
+                );
             }
             return;
         }

@@ -23,6 +23,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}.editing-hint{display:none;margin-top:10px;color:#fcd34d;text-align:center;font-size:.76rem}.editing-hint.visible{display:block}.assignment-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(120,53,15,.18);color:#fde68a;font-size:.84rem;line-height:1.5}.assignment-warning.visible{display:block}.safety-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(239,68,68,.42);background:rgba(127,29,29,.22);color:#fecaca;font-size:.84rem;line-height:1.5}.safety-warning.visible{display:block}.hardware-line{margin-top:7px;color:var(--muted);font-size:.78rem}
 .controller-card{display:none;border:1px solid rgba(56,189,248,.22);background:linear-gradient(145deg,rgba(30,41,59,1),rgba(15,23,42,.98))}.controller-card.visible{display:block}.controller-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.controller-title{font-size:1rem;font-weight:800}.controller-meta{margin-top:5px;color:var(--muted);font-size:.78rem;line-height:1.4}.controller-badge{padding:5px 9px;border-radius:999px;font-size:.66rem;font-weight:800;background:rgba(56,189,248,.14);color:#7dd3fc}.controller-badge.offline{background:rgba(239,68,68,.14);color:#fca5a5}.setpoint{margin:14px 0;padding:13px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(2,6,23,.34)}.setpoint-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:9px}.setpoint-head label{margin:0;color:var(--text);font-weight:750}.setpoint-value{color:#bae6fd;font-size:.8rem;font-weight:800}.setpoint-row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center}.setpoint-row input[type="range"]{padding:0}.controller-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.77rem;line-height:1.45}
 .interval-phase{margin-top:14px;padding:15px;border:1px solid rgba(56,189,248,.18);border-radius:13px;background:rgba(2,6,23,.28)}.interval-phase-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}.interval-phase-title{font-weight:800}.interval-phase-badge{font-size:.7rem;color:#7dd3fc;font-weight:800}.mode-controller,.interval-controller{margin-top:10px}.interval-controller.power-off{display:none}.shelly-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.78rem;line-height:1.45}
+.fan-standby{display:none;margin-top:16px;padding:15px;border:1px solid rgba(34,197,94,.24);border-radius:13px;background:rgba(20,83,45,.13)}.fan-standby.visible{display:block}.fan-standby-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.fan-standby-title{font-weight:800}.fan-standby-toggle{display:flex;align-items:center;gap:8px;color:var(--text);margin:0}.fan-standby-toggle input{width:auto}.fan-standby-note{font-size:.79rem;color:var(--muted);line-height:1.45}.fan-standby-controller.disabled{opacity:.45;pointer-events:none}
 @media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}.setpoint-row{grid-template-columns:1fr 78px}}
 </style>
 {% endblock %}
@@ -173,6 +174,28 @@ button:disabled{opacity:.45;cursor:not-allowed}
                 proportionale Klima-Regelung kann diesen Sollwert dynamisch verändern.
             </div>
             <div id="env-controller" class="mode-controller"></div>
+
+            <div id="fan-standby" class="fan-standby">
+                <div class="fan-standby-head">
+                    <span class="fan-standby-title">🌿 Standby-Grundlüftung</span>
+                    <label class="fan-standby-toggle">
+                        <input type="checkbox" id="fan-standby-enabled">
+                        Aktiv
+                    </label>
+                </div>
+                <div class="fan-standby-note">
+                    Wenn alle ausgewählten Umweltwerte im Sollbereich liegen,
+                    bleibt der Lüfter auf dieser niedrigeren Stufe aktiv.
+                    Bei Regelbedarf wechselt Growstar automatisch auf die
+                    normale ENV-Regelleistung.
+                </div>
+                <div id="fan-standby-controller" class="mode-controller"></div>
+                <div id="fan-standby-unavailable" class="controller-note" style="display:none">
+                    Standby benötigt einen zugewiesenen Controller mit
+                    regelbarer Leistung. Ohne passenden Controller bleibt
+                    das bisherige EIN/AUS-Verhalten aktiv.
+                </div>
+            </div>
         </div>
 
         <button id="save-button" onclick="saveDevice()">💾 Für {{ tent_name }} speichern</button>
@@ -200,6 +223,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
     const onController = document.getElementById("on-controller");
     const timeController = document.getElementById("time-controller");
     const envController = document.getElementById("env-controller");
+    const fanStandby = document.getElementById("fan-standby");
+    const fanStandbyEnabled = document.getElementById("fan-standby-enabled");
+    const fanStandbyController = document.getElementById("fan-standby-controller");
+    const fanStandbyUnavailable = document.getElementById("fan-standby-unavailable");
     const intervalAController = document.getElementById("interval-a-controller");
     const intervalBController = document.getElementById("interval-b-controller");
 
@@ -214,7 +241,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
         "use-temp",
         "use-hum",
         "logic",
-        "direction"
+        "direction",
+        "fan-standby-enabled"
     ];
 
     let hardwareConfigured = false;
@@ -322,7 +350,38 @@ button:disabled{opacity:.45;cursor:not-allowed}
             generic.style.display = "block";
         }
 
+        fanStandby.classList.toggle(
+            "visible",
+            DEVICE === "fan" && current === "ENV"
+        );
+        updateFanStandbyAvailability();
         updateIntervalPowerVisibility();
+    }
+
+    function updateFanStandbyAvailability(){
+        if(DEVICE !== "fan") return;
+
+        const hasController =
+            controllerCard.classList.contains("visible");
+        const hasLevel =
+            Boolean(controllerSchema.level);
+        const available =
+            hasController && hasLevel;
+
+        fanStandbyEnabled.disabled =
+            !CAN_CONFIGURE || !available;
+
+        fanStandbyController.classList.toggle(
+            "disabled",
+            !available || !fanStandbyEnabled.checked
+        );
+
+        fanStandbyUnavailable.style.display =
+            available ? "none" : "block";
+
+        if(!available){
+            fanStandbyEnabled.checked = false;
+        }
     }
 
     function setpointDefault(spec){
@@ -436,7 +495,29 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
         renderInto(onController, "on", "Controller-Werte Dauerbetrieb");
         renderInto(timeController, "time", "Controller-Werte Zeitsteuerung");
-        renderInto(envController, "env", "Controller-Werte ENV");
+        renderInto(envController, "env", "Regelleistung bei ENV-Anforderung");
+
+        if(DEVICE === "fan"){
+            const standbyValues =
+                states.env_standby?.controller || {};
+
+            if(!entries.length){
+                fanStandbyController.innerHTML = "";
+            } else {
+                fanStandbyController.innerHTML =
+                    `<div class="hint">Standby-Leistung bei normalen Umweltwerten</div>` +
+                    entries.map(([name, spec]) =>
+                        stateSetpointField(
+                            "env_standby",
+                            name,
+                            spec,
+                            standbyValues[name]
+                        )
+                    ).join("");
+            }
+        } else {
+            fanStandbyController.innerHTML = "";
+        }
 
         const a = states.interval_a || {};
         const b = states.interval_b || {};
@@ -470,8 +551,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
             onController.innerHTML = "";
             timeController.innerHTML = "";
             envController.innerHTML = "";
+            fanStandbyController.innerHTML = "";
             intervalAController.innerHTML = "";
             intervalBController.innerHTML = "";
+            updateFanStandbyAvailability();
             return;
         }
 
@@ -493,6 +576,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
             params,
             controller.setpoints || {}
         );
+        updateFanStandbyAvailability();
     }
 
     function syncStateDisplay(stateName, name, value){
@@ -540,6 +624,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         document.getElementById("use-hum").checked = Boolean(env.use_hum);
         document.getElementById("logic").value = env.logic || "OR";
         document.getElementById("direction").value = env.direction || "HIGH";
+        fanStandbyEnabled.checked = Boolean(env.standby_enabled);
 
         renderController(data.controller || {}, {
             syncValues: true,
@@ -684,6 +769,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
                     env: {
                         power: true,
                         controller: readStateController(envController)
+                    },
+                    env_standby: {
+                        power:
+                            DEVICE === "fan" &&
+                            fanStandbyEnabled.checked,
+                        controller: (
+                            DEVICE === "fan" &&
+                            fanStandbyEnabled.checked
+                                ? readStateController(fanStandbyController)
+                                : {}
+                        )
                     }
                 }
             },
@@ -691,7 +787,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
                 use_temp: document.getElementById("use-temp").checked,
                 use_hum: document.getElementById("use-hum").checked,
                 logic: document.getElementById("logic").value,
-                direction: document.getElementById("direction").value
+                direction: document.getElementById("direction").value,
+                standby_enabled:
+                    DEVICE === "fan" &&
+                    fanStandbyEnabled.checked
             }
         };
 
@@ -744,6 +843,9 @@ button:disabled{opacity:.45;cursor:not-allowed}
             if (id === "interval-a-power" || id === "interval-b-power") {
                 updateIntervalPowerVisibility();
             }
+            if (id === "fan-standby-enabled") {
+                updateFanStandbyAvailability();
+            }
         });
     });
 
@@ -780,6 +882,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     onController.addEventListener("input", handleStateControllerInput);
     timeController.addEventListener("input", handleStateControllerInput);
     envController.addEventListener("input", handleStateControllerInput);
+    fanStandbyController.addEventListener("input", handleStateControllerInput);
     intervalAController.addEventListener("input", handleStateControllerInput);
     intervalBController.addEventListener("input", handleStateControllerInput);
 
