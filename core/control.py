@@ -199,6 +199,10 @@ def control_device(device, runtime=None):
             control_light_profile(runtime=rt)
             return
 
+        if device == "fan":
+            control_fan_env(runtime=rt)
+            return
+
         should_run = evaluate_env_conditions(device, runtime=rt)
         state_name = "env" if should_run else "off"
         apply_device_state(
@@ -347,10 +351,109 @@ def control_heating_env(runtime=None):
         set_heating(False, f"(Soll {target:.1f}°C erreicht)", runtime=rt)
 
 
-def control_fan_env(runtime=None):
+def _env_inputs_ready(device, runtime=None):
+    """Prüft, ob alle für ENV ausgewählten Sensorwerte verwertbar sind.
+
+    Für die Standby-Entscheidung bedeutet "kein Regelbedarf" nicht automatisch
+    "alles okay". Fehlt ein ausgewählter Messwert oder sein Sollwert/Toleranz,
+    wird Standby bewusst nicht freigegeben.
+    """
+
     rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
+
+    env_cfg = cfg.get("DEVICE_ENV_CONFIG", {}).get(device, {})
+    if not isinstance(env_cfg, dict):
+        return False
+
+    selected = 0
+
+    if env_cfg.get("use_temp", False):
+        selected += 1
+        if None in (
+            st.live_state.get("temp"),
+            st.live_state.get("temp_target"),
+            st.live_state.get("temp_tol"),
+        ):
+            return False
+
+    if env_cfg.get("use_hum", False):
+        selected += 1
+        if None in (
+            st.live_state.get("hum"),
+            st.live_state.get("hum_target"),
+            st.live_state.get("hum_tol"),
+        ):
+            return False
+
+    return selected > 0
+
+
+def control_fan_env(runtime=None):
+    """ENV-Lüfterregelung mit optionaler Standby-Grundlüftung.
+
+    Regelbedarf:
+        normale ENV-Leistung.
+
+    Alle ausgewählten Werte innerhalb der Grenzen:
+        optionaler env_standby-Zustand.
+
+    Standby deaktiviert, nicht vollständig konfiguriert oder Sensorstatus
+    unvollständig:
+        historisches/sicheres AUS-Verhalten.
+    """
+
+    rt = resolve_runtime(runtime)
+    cfg = rt.config
+    st = rt.state
+
+    params = get_device_params("fan", runtime=rt)
+    env_cfg = cfg.get("DEVICE_ENV_CONFIG", {}).get("fan", {})
+    if not isinstance(env_cfg, dict):
+        env_cfg = {}
+
     should_run = evaluate_env_conditions("fan", runtime=rt)
-    set_fan(should_run, runtime=rt)
+
+    if should_run:
+        state_name = "env"
+        phase = "regulation"
+
+    elif not _env_inputs_ready("fan", runtime=rt):
+        state_name = "off"
+        phase = "sensor_unavailable"
+
+    elif env_cfg.get("standby_enabled", False):
+        standby_state = resolve_control_state(
+            params,
+            "env_standby",
+        )
+
+        # Grundlüftung ist nur sinnvoll, wenn wirklich ein separater
+        # Controller-Sollwert vorhanden ist. Shelly EIN ohne Controller-Level
+        # könnte bei manchen Lüftern sonst Vollleistung bedeuten.
+        if (
+            standby_state.get("power")
+            and standby_state.get("controller")
+        ):
+            state_name = "env_standby"
+            phase = "standby"
+        else:
+            state_name = "off"
+            phase = "standby_unavailable"
+
+    else:
+        state_name = "off"
+        phase = "off"
+
+    with rt.state_lock:
+        st.live_state["fan_env_phase"] = phase
+
+    apply_device_state(
+        "fan",
+        resolve_control_state(params, state_name),
+        runtime=rt,
+    )
 
 
 def control_ventilator_env(runtime=None):

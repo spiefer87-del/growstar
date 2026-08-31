@@ -100,6 +100,22 @@ def resolve_control_state(params, name):
             "controller": _mapping(raw.get("controller")) or base,
         }
 
+    if name == "env_standby":
+        # FAN.STANDBY.1: bewusst opt-in und ohne Legacy-Fallback.
+        #
+        # Ein altes params["controller"] darf niemals versehentlich zu einer
+        # Grundlüftung werden. Nur ein explizit gespeicherter env_standby-
+        # Zustand kann Shelly + Controller für Standby anfordern.
+        power = bool(raw.get("power", False))
+        return {
+            "power": power,
+            "controller": (
+                _mapping(raw.get("controller"))
+                if power
+                else {}
+            ),
+        }
+
     if name == "interval_a":
         return {
             "power": bool(raw.get("power", True)),
