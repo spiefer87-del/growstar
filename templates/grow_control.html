@@ -230,6 +230,7 @@ h3 {
 }
 .badge.tag { background: #22c55e; color: #022c22; }
 .badge.nacht { background: #38bdf8; color: #082f49; }
+.badge.profile { background: #a78bfa; color: #2e1065; }
 
 .device.on { background: linear-gradient(135deg, #14532d, #16a34a); }
 .device.off { background: linear-gradient(135deg, #0f172a, #334155); }
@@ -341,11 +342,11 @@ h3 {
     </a>
 
     {% if has_permission('settings.view') %}
-    <a href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}" class="card-link">
+    <a href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}" class="card-link">
         <div class="card env" id="profile-card">
             <h2>Profil</h2>
             <div class="value"><span id="profile-badge" class="badge">---</span></div>
-            <div class="sub">Regelprofil</div>
+            <div class="sub"><span id="profile-phase">---</span> · Anzeigen & verwalten</div>
         </div>
     </a>
     {% endif %}
@@ -400,6 +401,12 @@ h3 {
         TIME: "Zeitgesteuert",
         INTERVAL: "Intervall",
         ENV: "Umgebung"
+    };
+
+    const PROFILE_LABELS = {
+        veg: "Vegetation",
+        bloom: "Blüte",
+        dry: "Trocknung"
     };
 
     const AUX_DEVICES = ["aux1", "aux2", "aux3", "aux4"];
@@ -721,9 +728,13 @@ h3 {
 
             const profile = document.getElementById("profile-badge");
             if (profile) {
-                profile.textContent = state.profile || "---";
-                profile.className = `badge ${state.profile === "TAG" ? "tag" : "nacht"}`;
+                profile.textContent =
+                    PROFILE_LABELS[state.active_profile] ||
+                    state.active_profile ||
+                    "---";
+                profile.className = "badge profile";
             }
+            safeText("profile-phase", state.profile || "---");
 
             updateRuntimeMode(state);
             ["heating", "fan", "light", "vent", "irrigation", "humidifier", "dehumidifier", "light2", "vent2", "aux1", "aux2", "aux3", "aux4"]

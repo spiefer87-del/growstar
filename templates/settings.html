@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Klima & Profileinstellungen – {{ tent_name }}</title>
+<title>Klima & Grenzwerte – {{ tent_name }}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
@@ -49,7 +49,8 @@ h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
 .num-control button{display:inline-flex;width:28px;height:28px;border-radius:50%;border:0;background:#334155;color:var(--text);font-size:1rem;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
 button{padding:8px 15px;border-radius:999px;border:0;background:#334155;color:var(--text);font-weight:650;cursor:pointer}
 button:hover{background:#475569}
-.profile-btn.active{background:var(--green);color:#052e16;box-shadow:0 0 0 2px rgba(34,197,94,.32)}
+.profile-link{display:inline-block;padding:9px 16px;border-radius:999px;background:var(--blue);color:#082f49;text-decoration:none;font-weight:750}
+.active-profile{font-size:1.15rem;font-weight:800;text-align:center;color:#86efac;margin:4px 0 12px}
 .hint{color:var(--muted);font-size:.76rem;line-height:1.5;text-align:center}
 .info{margin:10px 0 14px;padding:11px 12px;border-radius:11px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);color:#bae6fd;font-size:.76rem;line-height:1.5}
 .warning{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.26);color:#fde68a}
@@ -61,6 +62,12 @@ button:hover{background:#475569}
 .preview strong{color:#fcd34d}
 .feedback{min-height:20px;margin:10px 0 0;text-align:center;font-size:.76rem;color:var(--muted)}
 .feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
+.feedback.dirty{color:#fde68a}
+.settings-actions{position:sticky;bottom:10px;z-index:5;margin-top:16px;text-align:center;border-color:rgba(34,197,94,.3)}
+.action-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.save-button{background:var(--green);color:#052e16;min-width:170px}
+.discard-button{background:#334155}
+button:disabled{opacity:.48;cursor:not-allowed}
 .divider{height:1px;background:var(--border);margin:14px 0}
 .lighting-duration{
     margin:4px auto 0;
@@ -88,11 +95,12 @@ button:hover{background:#475569}
 <div class="wrap">
     <div class="nav">
         <a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← {{ tent_name }}</a>
+        <a href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}">🌱 Profile verwalten</a>
         <a href="{{ url_for('grow_control_setup') }}">⚙️ Setup</a>
     </div>
 
-    <h1>⚙️ {{ tent_name }} · Klima & Profile</h1>
-    <div class="subtitle">Sollwerte, Regel-Toleranzen, Alarm-Toleranzen und absolute Grenzen</div>
+    <h1>⚙️ {{ tent_name }} · Klima & Grenzwerte</h1>
+    <div class="subtitle">Änderungen werden erst nach „Einstellungen speichern“ übernommen</div>
 
     <div class="levels">
         <div class="level">
@@ -109,19 +117,18 @@ button:hover{background:#475569}
         </div>
     </div>
 
-    <div id="save-feedback" class="feedback"></div>
-
     <div class="grid">
 
         <div class="card">
-            <h2>🌱 Profile</h2>
+            <h2>🌱 Aktives Profil</h2>
+            <div id="active-profile-name" class="active-profile">--</div>
             <div class="row-inline">
-                <button class="profile-btn" data-profile="veg" onclick="setProfile('veg')">Veg</button>
-                <button class="profile-btn" data-profile="bloom" onclick="setProfile('bloom')">Bloom</button>
-                <button class="profile-btn" data-profile="dry" onclick="setProfile('dry')">Dry</button>
+                <a class="profile-link" href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}">
+                    Profile bearbeiten oder wechseln
+                </a>
             </div>
             <div class="hint">
-                Presets laden Startwerte. Eigene Grenz- und Alarmtoleranzen bleiben stationsbezogene Einstellungen.
+                Profilvorlagen werden auf einer eigenen Seite vorbereitet. Ein Wechsel erfolgt dort erst nach ausdrücklicher Bestätigung.
             </div>
         </div>
 
@@ -374,15 +381,39 @@ button:hover{background:#475569}
         </div>
 
     </div>
+
+    <div class="card settings-actions">
+        <div class="action-row">
+            <button id="save-settings-button" type="button" class="save-button" onclick="save()" disabled>
+                Einstellungen speichern
+            </button>
+            <button id="discard-settings-button" type="button" class="discard-button" onclick="discardChanges()" disabled>
+                Änderungen verwerfen
+            </button>
+        </div>
+        <div id="save-feedback" class="feedback"></div>
+        <div class="hint">
+            Plus/Minus, Eingaben und Schalter verändern bis zum Speichern ausschließlich diesen Entwurf.
+        </div>
+    </div>
 </div>
 
 <script>
 const TENT_ID = {{ tent_id|tojson }};
 const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
-const PROFILE_URL = name => `/api/tents/${encodeURIComponent(TENT_ID)}/profile/${encodeURIComponent(name)}`;
 
 let lightSunAvailable = false;
 let lightSunUnavailableReason = "";
+let settingsDirty = false;
+let saveInFlight = false;
+let loadInFlight = false;
+let configLoaded = false;
+
+const PROFILE_LABELS = {
+    veg: "Vegetation",
+    bloom: "Blüte",
+    dry: "Trocknung"
+};
 
 const ids = [
     "DAY_TEMP","DAY_TEMP_TOL","NIGHT_TEMP","NIGHT_TEMP_TOL",
@@ -401,6 +432,58 @@ function feedback(text, cls=""){
     const box = el("save-feedback");
     box.className = `feedback ${cls}`;
     box.textContent = text || "";
+}
+
+function syncSaveActions(){
+    const busy = saveInFlight || loadInFlight;
+    el("save-settings-button").disabled = busy || !configLoaded || !settingsDirty;
+    el("discard-settings-button").disabled = busy || !configLoaded || !settingsDirty;
+}
+
+function setDirty(value=true){
+    settingsDirty = !!value;
+    syncSaveActions();
+
+    if(settingsDirty){
+        feedback("Ungespeicherte Änderungen.","dirty");
+    }
+}
+
+function syncFormControls(){
+    const busy = saveInFlight || loadInFlight;
+
+    document.querySelectorAll("input,.num-control button").forEach(control=>{
+        if(
+            !lightSunAvailable &&
+            (
+                control.id?.startsWith("LIGHT_SUN") ||
+                control.closest?.("#light-sun-card")
+            )
+        ){
+            control.disabled = true;
+        }else{
+            control.disabled = busy || !configLoaded;
+        }
+    });
+    syncSaveActions();
+}
+
+function setSaveInFlight(value){
+    saveInFlight = !!value;
+    syncFormControls();
+}
+
+function setLoadInFlight(value){
+    loadInFlight = !!value;
+    syncFormControls();
+}
+
+function profileLabel(name){
+    return PROFILE_LABELS[name] || String(name || "Kein Profil aktiv");
+}
+
+function renderActiveProfile(name){
+    el("active-profile-name").textContent = profileLabel(name);
 }
 
 function minToTime(m){
@@ -590,37 +673,82 @@ function applyLightSunAvailability(payload){
             toggle.checked = false;
         }
     }
+
+    syncFormControls();
 }
 
 
-async function load(){
-    const response = await fetch(CONFIG_URL,{cache:"no-store"});
-    const payload = await response.json().catch(()=>({}));
-    if(!response.ok){
-        feedback(payload.error || "Konfiguration konnte nicht geladen werden.","err");
-        return;
+async function load({successMessage=""}={}){
+    if(loadInFlight || saveInFlight) return;
+    setLoadInFlight(true);
+
+    try{
+        const response = await fetch(CONFIG_URL,{cache:"no-store"});
+        const payload = await response.json().catch(()=>({}));
+        if(!response.ok){
+            feedback(payload.error || "Konfiguration konnte nicht geladen werden.","err");
+            return;
+        }
+        const c = payload.config || payload;
+
+        applyLightSunAvailability(payload);
+
+        for(const id of ids){
+            if(el(id) && c[id] !== undefined) el(id).value = c[id];
+        }
+
+        el("DAY_START_TIME").value = minToTime(c.DAY_START_MIN);
+        el("NIGHT_START_TIME").value = minToTime(c.NIGHT_START_MIN);
+        el("RAMP_ENABLED").checked = !!c.RAMP_ENABLED;
+        el("LIGHT_SUN_ENABLED").checked =
+            lightSunAvailable && !!c.LIGHT_SUN_ENABLED;
+        updateLightingDuration();
+
+        renderActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
+        applyLimits(c);
+        updatePreview();
+        configLoaded = true;
+        settingsDirty = false;
+        syncSaveActions();
+        feedback(successMessage, successMessage ? "ok" : "");
+    }catch(error){
+        feedback("Konfiguration konnte nicht geladen werden: Growstar ist nicht erreichbar.","err");
+    }finally{
+        setLoadInFlight(false);
     }
-    const c = payload.config || payload;
-
-    applyLightSunAvailability(payload);
-
-    for(const id of ids){
-        if(el(id) && c[id] !== undefined) el(id).value = c[id];
-    }
-
-    el("DAY_START_TIME").value = minToTime(c.DAY_START_MIN);
-    el("NIGHT_START_TIME").value = minToTime(c.NIGHT_START_MIN);
-    el("RAMP_ENABLED").checked = !!c.RAMP_ENABLED;
-    el("LIGHT_SUN_ENABLED").checked =
-        lightSunAvailable && !!c.LIGHT_SUN_ENABLED;
-    updateLightingDuration();
-
-    highlightActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
-    applyLimits(c);
-    updatePreview();
 }
 
 async function save(){
+    if(saveInFlight || !settingsDirty) return;
+
+    const missing = ids
+        .map(id=>el(id))
+        .filter(input=>input && !input.disabled)
+        .find(input=>{
+            return input.value === "" || !Number.isFinite(Number(input.value));
+        });
+
+    if(missing){
+        missing.focus();
+        feedback("Bitte alle Klima- und Grenzwerte vollständig ausfüllen.","err");
+        return;
+    }
+
+    if(!el("DAY_START_TIME").value || !el("NIGHT_START_TIME").value){
+        feedback("Tag Start und Nacht Start müssen vollständig gesetzt sein.","err");
+        return;
+    }
+
+    const invalid = Array.from(
+        document.querySelectorAll("input:not(:disabled)")
+    ).find(input=>!input.checkValidity());
+
+    if(invalid){
+        invalid.reportValidity();
+        feedback("Bitte alle markierten Werte korrigieren.","err");
+        return;
+    }
+
     updatePreview();
     updateLightingDuration();
     feedback("Speichere …");
@@ -643,60 +771,52 @@ async function save(){
         DAY_START_MIN:timeToMin(el("DAY_START_TIME").value),
         NIGHT_START_MIN:timeToMin(el("NIGHT_START_TIME").value),
         RAMP_ENABLED:el("RAMP_ENABLED").checked ? 1 : 0,
-        RAMP_DURATION_MIN:num("RAMP_DURATION_MIN"),
-        LIGHT_SUN_ENABLED:(
-            lightSunAvailable &&
-            el("LIGHT_SUN_ENABLED").checked
-        ) ? 1 : 0,
-        LIGHT_SUNRISE_DURATION_MIN:num("LIGHT_SUNRISE_DURATION_MIN"),
-        LIGHT_SUNSET_DURATION_MIN:num("LIGHT_SUNSET_DURATION_MIN"),
-        LIGHT_SUN_MIN_LEVEL:num("LIGHT_SUN_MIN_LEVEL")
+        RAMP_DURATION_MIN:num("RAMP_DURATION_MIN")
     };
 
-    const response = await fetch(CONFIG_URL,{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(body)
-    });
-    const payload = await response.json().catch(()=>({}));
-
-    if(!response.ok || payload.success === false){
-        feedback(payload.error || "Speichern fehlgeschlagen.","err");
-        return;
+    // Nicht verfügbare Sonnensteuerung wird bei einem Klima-Speichervorgang
+    // nicht versehentlich überschrieben.
+    if(lightSunAvailable){
+        Object.assign(body,{
+            LIGHT_SUN_ENABLED:el("LIGHT_SUN_ENABLED").checked ? 1 : 0,
+            LIGHT_SUNRISE_DURATION_MIN:num("LIGHT_SUNRISE_DURATION_MIN"),
+            LIGHT_SUNSET_DURATION_MIN:num("LIGHT_SUNSET_DURATION_MIN"),
+            LIGHT_SUN_MIN_LEVEL:num("LIGHT_SUN_MIN_LEVEL")
+        });
     }
 
-    const c = payload.config || body;
-    applyLightSunAvailability(payload);
-    applyLimits(c);
-    updatePreview();
-    feedback("Einstellungen gespeichert.","ok");
+    setSaveInFlight(true);
+
+    try{
+        const response = await fetch(CONFIG_URL,{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(body)
+        });
+        const payload = await response.json().catch(()=>({}));
+
+        if(!response.ok || payload.success === false){
+            feedback(payload.message || payload.error || "Speichern fehlgeschlagen.","err");
+            return;
+        }
+
+        const c = payload.config || body;
+        applyLightSunAvailability(payload);
+        applyLimits(c);
+        updatePreview();
+        settingsDirty = false;
+        syncSaveActions();
+        feedback("Einstellungen gespeichert.","ok");
+    }catch(error){
+        feedback("Speichern fehlgeschlagen: Growstar ist nicht erreichbar.","err");
+    }finally{
+        setSaveInFlight(false);
+    }
 }
 
-async function setProfile(name){
-    const response = await fetch(CONFIG_URL,{cache:"no-store"});
-    const payload = await response.json().catch(()=>({}));
-    const c = payload.config || payload;
-    const activeProfile = payload.active_profile ?? c.ACTIVE_PROFILE;
-
-    if(activeProfile === name) return;
-
-    const ok = confirm(
-        "⚠️ Profil wirklich wechseln?\n\n" +
-        "• Profil-Sollwerte werden geladen\n" +
-        "• Eine laufende Rampe wird beendet\n" +
-        "• Alarm-/Schutzgrenzen bleiben stationsbezogen\n\n" +
-        "Fortfahren?"
-    );
-    if(!ok) return;
-
-    const result = await fetch(PROFILE_URL(name),{method:"POST"});
-    if(!result.ok){
-        const data = await result.json().catch(()=>({}));
-        feedback(data.error || "Profilwechsel fehlgeschlagen.","err");
-        return;
-    }
-
-    await load();
+async function discardChanges(){
+    if(saveInFlight || !settingsDirty) return;
+    await load({successMessage:"Ungespeicherte Änderungen wurden verworfen."});
 }
 
 function step(id,delta){
@@ -719,26 +839,26 @@ function step(id,delta){
     value = Math.round((value + delta) * 10) / 10;
     value = Math.min(max,Math.max(min,value));
     input.value = value;
-    save();
-}
-
-function highlightActiveProfile(active){
-    document.querySelectorAll(".profile-btn").forEach(btn=>{
-        btn.classList.toggle("active",btn.dataset.profile === active);
-    });
+    updateLightingDuration();
+    updatePreview();
+    setDirty(true);
 }
 
 document.querySelectorAll("input").forEach(input=>{
-    input.addEventListener("change",save);
-    if(input.type === "number") input.addEventListener("input",updatePreview);
-    if(input.id === "LIGHT_SUN_ENABLED") input.addEventListener("input",updatePreview);
-});
-
-["DAY_START_TIME","NIGHT_START_TIME"].forEach(id=>{
-    el(id)?.addEventListener("input",()=>{
+    const updateDraft = ()=>{
         updateLightingDuration();
         updatePreview();
-    });
+        setDirty(true);
+    };
+
+    input.addEventListener("input",updateDraft);
+    if(input.type === "checkbox") input.addEventListener("change",updateDraft);
+});
+
+window.addEventListener("beforeunload",event=>{
+    if(!settingsDirty) return;
+    event.preventDefault();
+    event.returnValue = "";
 });
 
 load();

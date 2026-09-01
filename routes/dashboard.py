@@ -161,6 +161,13 @@ def register(app):
             **_tent_page_context(tent_id),
         )
 
+    @app.route("/grow-control/tents/<tent_id>/profiles")
+    def grow_control_tent_profiles(tent_id):
+        return render_template(
+            "profiles.html",
+            **_tent_page_context(tent_id),
+        )
+
     @app.route("/grow-control/tents/<tent_id>/design")
     def grow_control_tent_design(tent_id):
         return render_template(
@@ -215,6 +222,10 @@ def register(app):
     @app.route("/settings")
     def settings():
         return redirect(_default_tent_url("grow_control_tent_settings"), code=302)
+
+    @app.route("/profiles")
+    def profiles():
+        return redirect(_default_tent_url("grow_control_tent_profiles"), code=302)
 
     @app.route("/sensoren")
     def sensoren_page():

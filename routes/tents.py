@@ -16,7 +16,14 @@ from core.hardware_assignments import (
     hardware_snapshot,
     update_hardware_assignments,
 )
-from core.profile import PROFILES, apply_profile, get_active_profile
+from core.profile import (
+    PROFILE_SETTING_KEYS,
+    PROFILES,
+    apply_profile,
+    get_active_profile,
+    profile_catalog,
+    update_profile,
+)
 from core.live_preflight import evaluate_live_preflight
 from core.runtime import get_runtime, list_runtimes
 from core.safety import get_runtime_safety_snapshot
@@ -420,6 +427,17 @@ def _config_payload(runtime):
     }
 
 
+def _profiles_payload(runtime):
+    return {
+        "success": True,
+        "tent_id": runtime.tent_id,
+        "active_profile": get_active_profile(runtime=runtime),
+        "profiles": profile_catalog(),
+        "profile_setting_keys": list(PROFILE_SETTING_KEYS),
+        "catalog_scope": "controller",
+    }
+
+
 def _tent_list_payload():
     runtimes = _runtime_map()
     result = []
@@ -638,6 +656,47 @@ def register(app):
             ), 404
 
         return jsonify(_config_payload(runtime))
+
+    @app.get("/api/tents/<tent_id>/profiles")
+    def api_tent_profiles(tent_id):
+        runtime, error = _find_runtime(tent_id)
+        if error:
+            return error
+
+        return jsonify(_profiles_payload(runtime))
+
+    @app.put("/api/tents/<tent_id>/profiles/<name>")
+    def api_tent_profile_update(tent_id, name):
+        runtime, error = _find_runtime(tent_id)
+        if error:
+            return error
+
+        data = request.get_json(silent=True)
+
+        try:
+            saved = update_profile(name, data)
+        except KeyError:
+            return jsonify(
+                success=False,
+                error="profile_not_found",
+                profile=name,
+            ), 404
+        except (TypeError, ValueError) as exc:
+            return jsonify(success=False, error=str(exc)), 400
+        except OSError:
+            return jsonify(
+                success=False,
+                error="profile_save_failed",
+                message="Profil konnte nicht dauerhaft gespeichert werden.",
+            ), 500
+
+        payload = _profiles_payload(runtime)
+        payload.update({
+            "saved_profile": name,
+            "saved_settings": saved,
+            "runtime_config_changed": False,
+        })
+        return jsonify(payload)
 
     @app.route("/api/tents/<tent_id>/hardware", methods=["GET", "POST"])
     def api_tent_hardware(tent_id):
