@@ -49,15 +49,15 @@ def main():
     )
 
     hierarchy = (
-        dashboard.find("<h2>Klimamodus</h2>"),
         dashboard.find('id="climate-mode"'),
+        dashboard.find('id="profile-card"'),
         dashboard.find('id="profile-badge"'),
         dashboard.find("Klima &amp; Grenzwerte"),
     )
     require(
         all(position >= 0 for position in hierarchy)
         and list(hierarchy) == sorted(hierarchy),
-        "Profilkarte zeigt Tag/Nacht vor Wachstumsphase und Zielseite",
+        "Stationskopf zeigt Tag/Nacht vor Profilkarte, Wachstumsphase und Zielseite",
     )
     require(
         'safeText("profile-phase", state.profile' in dashboard
@@ -70,8 +70,8 @@ def main():
     require(
         'mode === "TAG" ? "☀️"' in dashboard
         and 'mode === "NACHT" ? "🌙"' in dashboard
-        and 'class="climate-mode"' in dashboard,
-        "Tag und Nacht besitzen eine klare primäre Darstellung",
+        and 'class="header-climate-mode"' in dashboard,
+        "Tag und Nacht besitzen einen eigenen Indikator im Stationskopf",
     )
     require(
         "background: linear-gradient(135deg, #fde047, #fb923c)" in dashboard
@@ -116,7 +116,7 @@ def main():
     require(
         "grow_control_tent_settings" in dashboard
         and 'id="profile-card"' in dashboard,
-        "Neu gestaltete Klimamodus-Karte öffnet weiterhin Klima & Grenzwerte",
+        "Neu gestaltete Profilkarte öffnet weiterhin Klima & Grenzwerte",
     )
 
     print("✅ Growstar 3.15.11 / DASHBOARD.PROFILE.1 vollständig geprüft")

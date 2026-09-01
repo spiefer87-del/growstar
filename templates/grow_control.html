@@ -69,6 +69,7 @@ h3 {
     gap: 12px;
     min-width: 0;
 }
+.heading-content { min-width: 0; }
 
 .back-link,
 .system-link {
@@ -90,6 +91,50 @@ h3 {
     margin-top: 5px;
     color: var(--muted);
     font-size: .86rem;
+}
+.heading-climate-slot {
+    display: flex;
+    align-items: center;
+    min-height: 42px;
+    margin-top: 10px;
+}
+.header-climate-mode {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border: 1px solid rgba(148,163,184,.3);
+    border-radius: 50%;
+    background: linear-gradient(135deg, #334155, #1e293b);
+    color: var(--text);
+    box-shadow: 0 6px 18px rgba(0,0,0,.22);
+}
+.header-climate-mode.tag {
+    border-color: rgba(253,186,116,.7);
+    background: linear-gradient(135deg, #fde047, #fb923c);
+    box-shadow: 0 6px 18px rgba(251,146,60,.2);
+}
+.header-climate-mode.nacht {
+    border-color: rgba(125,211,252,.65);
+    background: linear-gradient(135deg, #0369a1, #4338ca);
+    box-shadow: 0 6px 18px rgba(56,189,248,.18);
+}
+.header-climate-mode-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0,0,0,0);
+    white-space: nowrap;
+    border: 0;
 }
 .design-text-link {
     color: #c4b5fd;
@@ -273,36 +318,7 @@ h3 {
         ),
         var(--card);
 }
-.climate-mode {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    min-width: 88px;
-    padding: 7px 15px;
-    border: 1px solid rgba(148,163,184,.28);
-    border-radius: 999px;
-    background: linear-gradient(135deg, #334155, #1e293b);
-    color: var(--text);
-    font-size: 1.08rem;
-    font-weight: 800;
-    letter-spacing: .035em;
-    line-height: 1;
-}
-.climate-mode.tag {
-    border-color: rgba(253,186,116,.68);
-    background: linear-gradient(135deg, #fde047, #fb923c);
-    color: #422006;
-    box-shadow: 0 5px 14px rgba(251,146,60,.18);
-}
-.climate-mode.nacht {
-    border-color: rgba(125,211,252,.62);
-    background: linear-gradient(135deg, #0369a1, #4338ca);
-    color: #f8fafc;
-    box-shadow: 0 5px 14px rgba(56,189,248,.17);
-}
-.climate-mode-icon { font-size: .95em; }
-.profile-phase-row { margin-top: 8px; }
+.profile-phase-row { margin-top: 0; }
 .phase-badge {
     display: inline-flex;
     align-items: center;
@@ -315,6 +331,10 @@ h3 {
     font-size: .76rem;
     font-weight: 750;
     line-height: 1.1;
+}
+#profile-card .phase-badge {
+    padding: 7px 13px;
+    font-size: .9rem;
 }
 .phase-badge.veg {
     border-color: rgba(34,197,94,.5);
@@ -379,9 +399,9 @@ h3 {
     .tent-switcher { max-width: 145px; }
     .user-panel { display: none; }
     .card { padding: 13px 8px; min-height: 105px; }
-    .climate-mode { min-width: 74px; padding: 6px 11px; }
-    .phase-badge { padding: 3px 8px; font-size: .7rem; }
-    .profile-phase-row { margin-top: 6px; }
+    .heading-climate-slot { margin-top: 8px; }
+    .header-climate-mode { width: 40px; height: 40px; flex-basis: 40px; }
+    #profile-card .phase-badge { padding: 5px 9px; font-size: .78rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -407,7 +427,7 @@ h3 {
 <div class="topline">
     <div class="heading-wrap">
         <a class="back-link" href="{{ url_for('grow_control_dashboard') }}" title="Zur Grow-Control-Übersicht">←</a>
-        <div>
+        <div class="heading-content">
             <h1>🏕️ {{ tent_name }}</h1>
             <div class="heading-meta">
                 Grow Control · {{ tent_id }}
@@ -415,6 +435,20 @@ h3 {
                     · <a class="design-text-link" href="{{ url_for('grow_control_tent_design', tent_id=tent_id) }}">🎨 Design</a>
                 {% endif %}
             </div>
+            {% if has_permission('grow.view') %}
+            <div class="heading-climate-slot">
+                <div
+                    id="climate-mode"
+                    class="header-climate-mode"
+                    role="img"
+                    aria-label="Tag- oder Nachtmodus wird geladen"
+                    aria-live="polite"
+                >
+                    <span id="climate-mode-icon" class="header-climate-mode-icon" aria-hidden="true">◐</span>
+                    <span id="profile-phase" class="visually-hidden">---</span>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 
@@ -461,11 +495,7 @@ h3 {
     {% if has_permission('settings.view') %}
     <a href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}" class="card-link">
         <div class="card env" id="profile-card">
-            <h2>Klimamodus</h2>
-            <div id="climate-mode" class="climate-mode" aria-label="Aktueller Tag- oder Nachtmodus">
-                <span id="climate-mode-icon" class="climate-mode-icon" aria-hidden="true">◐</span>
-                <span id="profile-phase">---</span>
-            </div>
+            <h2>Profil</h2>
             <div class="profile-phase-row">
                 <span id="profile-badge" class="phase-badge">◌ Profil unbekannt</span>
             </div>
@@ -595,11 +625,12 @@ h3 {
         const modeIcon = mode === "TAG" ? "☀️" : mode === "NACHT" ? "🌙" : "◐";
         const climateMode = document.getElementById("climate-mode");
         if (climateMode) {
-            climateMode.className = `climate-mode ${modeClass}`.trim();
+            climateMode.className = `header-climate-mode ${modeClass}`.trim();
             climateMode.setAttribute(
                 "aria-label",
                 mode ? `Aktueller Klimamodus: ${mode}` : "Klimamodus unbekannt"
             );
+            climateMode.title = mode || "Klimamodus unbekannt";
         }
         safeText("climate-mode-icon", modeIcon);
         safeText("profile-phase", state.profile || "---");
