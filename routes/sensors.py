@@ -238,6 +238,23 @@ def _normalize_assignment(sensor_name, data):
     }
 
 
+def _normalize_optional_assignment(sensor_name, data):
+    """Leere optionale Sensorzuweisungen als bewusst unzugewiesen lesen."""
+    if data is None:
+        return None
+
+    if not isinstance(data, dict):
+        raise TypeError(f"{sensor_name} muss ein JSON-Objekt sein")
+
+    source_id = str(data.get("source_id") or "").strip()
+    if not source_id:
+        return None
+
+    normalized_data = dict(data)
+    normalized_data["source_id"] = source_id
+    return _normalize_assignment(sensor_name, normalized_data)
+
+
 def _find_runtime(tent_id):
     try:
         tent_id = validate_tent_id(tent_id)
@@ -296,10 +313,14 @@ def _save_assignments(runtime, data):
         )
 
     if "ppfd" in data:
-        assignments["ppfd"] = _normalize_assignment(
+        ppfd_assignment = _normalize_optional_assignment(
             "ppfd",
             data["ppfd"],
         )
+        if ppfd_assignment is None:
+            assignments.pop("ppfd", None)
+        else:
+            assignments["ppfd"] = ppfd_assignment
 
     offsets = data.get("offsets", {})
     if offsets is None:
