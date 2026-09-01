@@ -202,7 +202,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <label>Alarm ± °C</label>
                     <div class="num-control">
                         <button type="button" onclick="step('TEMP_ALERT_TOL',-0.5)">−</button>
-                        <input type="number" step="0.5" id="TEMP_ALERT_TOL" class="compact-input">
+                        <input type="number" step="any" id="TEMP_ALERT_TOL" class="compact-input">
                         <button type="button" onclick="step('TEMP_ALERT_TOL',0.5)">+</button>
                     </div>
                 </div>
@@ -210,7 +210,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <label>MIN_TEMP °C</label>
                     <div class="num-control">
                         <button type="button" onclick="step('MIN_TEMP',-0.5)">−</button>
-                        <input type="number" step="0.5" id="MIN_TEMP" class="compact-input">
+                        <input type="number" step="any" id="MIN_TEMP" class="compact-input">
                         <button type="button" onclick="step('MIN_TEMP',0.5)">+</button>
                     </div>
                 </div>
@@ -218,7 +218,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <label>MAX_TEMP °C</label>
                     <div class="num-control">
                         <button type="button" onclick="step('MAX_TEMP',-0.5)">−</button>
-                        <input type="number" step="0.5" id="MAX_TEMP" class="compact-input">
+                        <input type="number" step="any" id="MAX_TEMP" class="compact-input">
                         <button type="button" onclick="step('MAX_TEMP',0.5)">+</button>
                     </div>
                 </div>
@@ -280,7 +280,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <label>Alarm ± %</label>
                     <div class="num-control">
                         <button type="button" onclick="step('HUM_ALERT_TOL',-1)">−</button>
-                        <input type="number" step="1" id="HUM_ALERT_TOL" class="compact-input">
+                        <input type="number" step="any" id="HUM_ALERT_TOL" class="compact-input">
                         <button type="button" onclick="step('HUM_ALERT_TOL',1)">+</button>
                     </div>
                 </div>
@@ -288,7 +288,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <label>MIN_HUM %</label>
                     <div class="num-control">
                         <button type="button" onclick="step('MIN_HUM',-1)">−</button>
-                        <input type="number" step="1" id="MIN_HUM" class="compact-input">
+                        <input type="number" step="any" id="MIN_HUM" class="compact-input">
                         <button type="button" onclick="step('MIN_HUM',1)">+</button>
                     </div>
                 </div>
@@ -296,7 +296,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <label>MAX_HUM %</label>
                     <div class="num-control">
                         <button type="button" onclick="step('MAX_HUM',-1)">−</button>
-                        <input type="number" step="1" id="MAX_HUM" class="compact-input">
+                        <input type="number" step="any" id="MAX_HUM" class="compact-input">
                         <button type="button" onclick="step('MAX_HUM',1)">+</button>
                     </div>
                 </div>
@@ -320,7 +320,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <label>Dauer (min)</label>
                     <div class="num-control">
                         <button type="button" onclick="step('RAMP_DURATION_MIN',-5)">−</button>
-                        <input type="number" step="10" id="RAMP_DURATION_MIN" class="compact-input">
+                        <input type="number" step="5" id="RAMP_DURATION_MIN" class="compact-input">
                         <button type="button" onclick="step('RAMP_DURATION_MIN',5)">+</button>
                     </div>
                 </div>
