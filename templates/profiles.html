@@ -39,6 +39,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .status-item{padding:10px;border-radius:11px;background:var(--card2);border:1px solid var(--border);text-align:center}
 .status-item span{display:block;color:var(--muted);font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
 .status-item strong{font-size:.9rem}
+.copy-current{margin-top:13px;text-align:center}
+.copy-button{background:#a78bfa;color:#2e1065;min-width:240px}
 .hint,.info{color:var(--muted);font-size:.76rem;line-height:1.5;text-align:center}
 .info{margin:10px 0 0;padding:11px 12px;border-radius:11px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);color:#bae6fd}
 .warning{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.26);color:#fde68a}
@@ -53,7 +55,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .activate-button{background:var(--blue);color:#082f49;min-width:150px}
 .discard-button{background:#334155}
 .separate-note{margin:12px auto 0;max-width:580px;color:var(--muted);font-size:.72rem;line-height:1.45}
-@media(max-width:620px){body{padding:13px}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.actions{bottom:6px}}
+@media(max-width:620px){body{padding:13px}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.actions{position:static}.copy-button{min-width:0;width:100%}}
 </style>
 </head>
 
@@ -83,6 +85,21 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 <div class="status-item">
                     <span>Wird bearbeitet</span>
                     <strong id="editing-profile-label">--</strong>
+                </div>
+            </div>
+            <div class="copy-current">
+                <button
+                    id="copy-current-button"
+                    type="button"
+                    class="copy-button"
+                    onclick="copyCurrentSettings()"
+                    disabled
+                >
+                    Aktuelle Werte aus {{ tent_name }} übernehmen
+                </button>
+                <div class="hint">
+                    Kopiert die gespeicherten Stationswerte nur in den Entwurf
+                    des ausgewählten Profils. Erst „Profil speichern“ ändert die Vorlage.
                 </div>
             </div>
             <div class="info warning">
@@ -210,6 +227,46 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 Bei aktiver Rampe sind mindestens 5 Minuten erforderlich. Bei deaktivierter Rampe ist 0 zulässig.
             </div>
         </div>
+
+        <div class="card" id="profile-light-sun-card">
+            <h2>☀️ Sonnenaufgang & Sonnenuntergang</h2>
+            <div class="row-inline">
+                <div class="field">
+                    <label for="LIGHT_SUN_ENABLED">Aktiv</label>
+                    <input type="checkbox" id="LIGHT_SUN_ENABLED">
+                </div>
+                <div class="field">
+                    <label for="LIGHT_SUNRISE_DURATION_MIN">Sonnenaufgang (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('LIGHT_SUNRISE_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="1" min="0" max="240" id="LIGHT_SUNRISE_DURATION_MIN" class="compact-input" required>
+                        <button type="button" onclick="stepValue('LIGHT_SUNRISE_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="LIGHT_SUNSET_DURATION_MIN">Sonnenuntergang (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('LIGHT_SUNSET_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="1" min="0" max="240" id="LIGHT_SUNSET_DURATION_MIN" class="compact-input" required>
+                        <button type="button" onclick="stepValue('LIGHT_SUNSET_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="LIGHT_SUN_MIN_LEVEL">Start-/Endleistung %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('LIGHT_SUN_MIN_LEVEL',-1)">−</button>
+                        <input type="number" step="1" min="11" max="100" id="LIGHT_SUN_MIN_LEVEL" class="compact-input" required>
+                        <button type="button" onclick="stepValue('LIGHT_SUN_MIN_LEVEL',1)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="light-sun-preview" class="preview"></div>
+            <div id="profile-light-sun-note" class="info"></div>
+            <div class="hint">
+                Tag Start beginnt den Sonnenaufgang. Nacht Start beendet den
+                Sonnenuntergang und schaltet das Licht aus.
+            </div>
+        </div>
     </div>
 
     <div class="card actions">
@@ -250,7 +307,9 @@ const PROFILE_LABELS = {
 const NUMBER_IDS = [
     "DAY_TEMP","NIGHT_TEMP","DAY_HUM","NIGHT_HUM",
     "DAY_TEMP_TOL","NIGHT_TEMP_TOL","DAY_HUM_TOL","NIGHT_HUM_TOL",
-    "RAMP_DURATION_MIN"
+    "RAMP_DURATION_MIN",
+    "LIGHT_SUNRISE_DURATION_MIN","LIGHT_SUNSET_DURATION_MIN",
+    "LIGHT_SUN_MIN_LEVEL"
 ];
 
 let catalog = {};
@@ -258,6 +317,8 @@ let activeProfile = null;
 let selectedProfile = null;
 let dirty = false;
 let requestInFlight = false;
+let lightSunAvailable = false;
+let lightSunUnavailableReason = "Kein geeigneter Licht-Controller zugewiesen.";
 
 function el(id){ return document.getElementById(id); }
 function num(id){ return Number(el(id)?.value); }
@@ -292,6 +353,23 @@ function formatLightingDuration(totalMinutes){
     return `${hours} Std. ${rest} Min.`;
 }
 
+function renderLightSunAvailability(){
+    const note = el("profile-light-sun-note");
+    if(!note) return;
+
+    if(lightSunAvailable){
+        note.className = "info";
+        note.textContent =
+            `In ${TENT_NAME} ist ein geeigneter Licht-Controller zugewiesen.`;
+        return;
+    }
+
+    note.className = "info warning";
+    note.textContent = el("LIGHT_SUN_ENABLED")?.checked
+        ? `Die Vorlage kann gespeichert werden. Aktivieren ist in ${TENT_NAME} jedoch gesperrt: ${lightSunUnavailableReason}`
+        : `Hinweis für ${TENT_NAME}: ${lightSunUnavailableReason} Eine Vorlage mit deaktiviertem Sonnenverlauf kann trotzdem aktiviert werden.`;
+}
+
 function updatePreview(){
     const dayStart = timeToMin(el("DAY_START_TIME")?.value);
     const nightStart = timeToMin(el("NIGHT_START_TIME")?.value);
@@ -314,6 +392,18 @@ function updatePreview(){
         Tag: ${num("DAY_HUM").toFixed(1)} % ± ${num("DAY_HUM_TOL").toFixed(1)} %<br>
         Nacht: ${num("NIGHT_HUM").toFixed(1)} % ± ${num("NIGHT_HUM_TOL").toFixed(1)} %
     `;
+
+    const sunActive = !!el("LIGHT_SUN_ENABLED")?.checked;
+    el("light-sun-preview").innerHTML = sunActive
+        ? `<strong>Sonnenverlauf aktiv</strong><br>
+           ${el("DAY_START_TIME")?.value || "--:--"}: Start bei ${num("LIGHT_SUN_MIN_LEVEL").toFixed(0)} %<br>
+           Hochdimmen: ${num("LIGHT_SUNRISE_DURATION_MIN").toFixed(0)} Min. ·
+           Herunterdimmen: ${num("LIGHT_SUNSET_DURATION_MIN").toFixed(0)} Min.<br>
+           ${el("NIGHT_START_TIME")?.value || "--:--"}: Licht AUS`
+        : `<strong>Sonnenverlauf deaktiviert</strong><br>
+           Das Profil verwendet die bestehende ENV-EIN/AUS-Steuerung.`;
+
+    renderLightSunAvailability();
 }
 
 function setDirty(value=true){
@@ -325,11 +415,25 @@ function setDirty(value=true){
     }
 }
 
+function savedProfileNeedsLightController(){
+    return !!(
+        selectedProfile &&
+        catalog[selectedProfile]?.LIGHT_SUN_ENABLED &&
+        !lightSunAvailable
+    );
+}
+
 function syncActionState(){
     const unavailable = !selectedProfile;
+    const activationBlocked = savedProfileNeedsLightController();
     el("save-profile-button").disabled = requestInFlight || unavailable || !dirty;
     el("discard-profile-button").disabled = requestInFlight || unavailable || !dirty;
-    el("activate-profile-button").disabled = requestInFlight || unavailable || dirty;
+    el("copy-current-button").disabled = requestInFlight || unavailable;
+    el("activate-profile-button").disabled =
+        requestInFlight || unavailable || dirty || activationBlocked;
+    el("activate-profile-button").title = activationBlocked
+        ? lightSunUnavailableReason
+        : "";
 }
 
 function renderProfileButtons(){
@@ -356,9 +460,10 @@ function renderProfileButtons(){
     activate.textContent = selectedProfile === activeProfile
         ? "Profil erneut anwenden"
         : "Profil aktivieren";
+    syncActionState();
 }
 
-function fillEditor(profile){
+function fillEditor(profile,{markDirty=false}={}){
     if(!profile) return;
 
     NUMBER_IDS.forEach(id=>{
@@ -368,8 +473,9 @@ function fillEditor(profile){
     el("DAY_START_TIME").value = minToTime(profile.DAY_START_MIN);
     el("NIGHT_START_TIME").value = minToTime(profile.NIGHT_START_MIN);
     el("RAMP_ENABLED").checked = !!profile.RAMP_ENABLED;
+    el("LIGHT_SUN_ENABLED").checked = !!profile.LIGHT_SUN_ENABLED;
     updatePreview();
-    setDirty(false);
+    setDirty(markDirty);
 }
 
 function selectProfile(name){
@@ -390,6 +496,57 @@ function selectProfile(name){
 function discardChanges(){
     fillEditor(catalog[selectedProfile]);
     feedback("Ungespeicherte Änderungen wurden verworfen.");
+}
+
+async function copyCurrentSettings(){
+    if(requestInFlight || !selectedProfile) return;
+
+    if(
+        dirty &&
+        !confirm(
+            "Der aktuelle Profilentwurf wird durch die gespeicherten " +
+            `Stationswerte aus ${TENT_NAME} ersetzt. Fortfahren?`
+        )
+    ){
+        return;
+    }
+
+    setRequestInFlight(true);
+    feedback(`Aktuelle Werte aus ${TENT_NAME} werden geladen …`);
+
+    try{
+        const response = await fetch(PROFILES_URL,{cache:"no-store"});
+        const payload = await response.json().catch(()=>({}));
+        if(!response.ok || payload.success === false || !payload.current_settings){
+            feedback(
+                payload.message || payload.error ||
+                "Aktuelle Stationswerte konnten nicht geladen werden.",
+                "err"
+            );
+            return;
+        }
+
+        activeProfile = payload.active_profile ?? activeProfile;
+        lightSunAvailable = !!payload.light_sun_available;
+        lightSunUnavailableReason =
+            payload.light_sun_unavailable_reason ||
+            "Kein geeigneter Licht-Controller zugewiesen.";
+
+        fillEditor(payload.current_settings,{markDirty:true});
+        renderProfileButtons();
+        feedback(
+            `Aktuelle Werte aus ${TENT_NAME} wurden in den Entwurf für ` +
+            `${profileLabel(selectedProfile)} kopiert. Bitte Profil speichern.`,
+            "ok"
+        );
+    }catch(error){
+        feedback(
+            "Aktuelle Stationswerte konnten nicht geladen werden: Growstar ist nicht erreichbar.",
+            "err"
+        );
+    }finally{
+        setRequestInFlight(false);
+    }
 }
 
 function stepValue(id, delta){
@@ -424,6 +581,7 @@ function collectProfile(){
     result.DAY_START_MIN = timeToMin(el("DAY_START_TIME").value);
     result.NIGHT_START_MIN = timeToMin(el("NIGHT_START_TIME").value);
     result.RAMP_ENABLED = el("RAMP_ENABLED").checked ? 1 : 0;
+    result.LIGHT_SUN_ENABLED = el("LIGHT_SUN_ENABLED").checked ? 1 : 0;
 
     if(!Number.isFinite(result.DAY_START_MIN) || !Number.isFinite(result.NIGHT_START_MIN)){
         throw new Error("Tag Start und Nacht Start müssen vollständig gesetzt sein.");
@@ -479,8 +637,12 @@ async function saveProfile(){
             [selectedProfile]: payload.saved_settings || settings
         };
         activeProfile = payload.active_profile ?? activeProfile;
+        lightSunAvailable = payload.light_sun_available ?? lightSunAvailable;
+        lightSunUnavailableReason =
+            payload.light_sun_unavailable_reason || lightSunUnavailableReason;
         dirty = false;
         renderProfileButtons();
+        updatePreview();
         feedback(
             `${profileLabel(selectedProfile)} gespeichert. Das laufende Profil wurde nicht verändert.`,
             "ok"
@@ -500,10 +662,16 @@ async function activateProfile(){
         return;
     }
 
+    if(savedProfileNeedsLightController()){
+        feedback(lightSunUnavailableReason,"err");
+        return;
+    }
+
     const reapply = selectedProfile === activeProfile;
     const confirmed = confirm(
         `${profileLabel(selectedProfile)} ${reapply ? "erneut anwenden" : "aktivieren"}?\n\n` +
         "• Die gespeicherten Profilwerte werden in diese Station übernommen.\n" +
+        "• Temperatur-Rampe und Sonnenverlauf werden mit übernommen.\n" +
         "• Eine laufende Rampe wird beendet.\n" +
         "• Die Profilvorlage selbst wird dabei nicht verändert."
     );
@@ -524,7 +692,11 @@ async function activateProfile(){
         }
 
         activeProfile = payload.active_profile || selectedProfile;
+        lightSunAvailable = payload.light_sun_available ?? lightSunAvailable;
+        lightSunUnavailableReason =
+            payload.light_sun_unavailable_reason || lightSunUnavailableReason;
         renderProfileButtons();
+        updatePreview();
         feedback(`${profileLabel(selectedProfile)} ist jetzt in ${TENT_NAME} aktiv.`,"ok");
     }catch(error){
         feedback("Profil konnte nicht aktiviert werden: Growstar ist nicht erreichbar.","err");
@@ -548,6 +720,10 @@ async function loadProfiles(){
 
         catalog = payload.profiles || {};
         activeProfile = payload.active_profile || null;
+        lightSunAvailable = !!payload.light_sun_available;
+        lightSunUnavailableReason =
+            payload.light_sun_unavailable_reason ||
+            "Kein geeigneter Licht-Controller zugewiesen.";
         selectedProfile = catalog[activeProfile]
             ? activeProfile
             : Object.keys(catalog)[0] || null;

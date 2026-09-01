@@ -342,11 +342,11 @@ h3 {
     </a>
 
     {% if has_permission('settings.view') %}
-    <a href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}" class="card-link">
+    <a href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}" class="card-link">
         <div class="card env" id="profile-card">
             <h2>Profil</h2>
             <div class="value"><span id="profile-badge" class="badge">---</span></div>
-            <div class="sub"><span id="profile-phase">---</span> · Anzeigen & verwalten</div>
+            <div class="sub"><span id="profile-phase">---</span> · Klima & Grenzwerte</div>
         </div>
     </a>
     {% endif %}

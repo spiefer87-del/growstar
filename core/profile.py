@@ -8,6 +8,7 @@ from pathlib import Path
 import tempfile
 import threading
 
+from core.config import DEFAULT_CONFIG
 from core.runtime import resolve_runtime
 from core.tents import DEFAULT_TENT_ID
 from core.helpers import (
@@ -59,9 +60,31 @@ PROFILE_SETTING_KEYS = (
     "NIGHT_START_MIN",
     "RAMP_ENABLED",
     "RAMP_DURATION_MIN",
+    "LIGHT_SUN_ENABLED",
+    "LIGHT_SUNRISE_DURATION_MIN",
+    "LIGHT_SUNSET_DURATION_MIN",
+    "LIGHT_SUN_MIN_LEVEL",
 )
 
+PROFILE_COMPATIBILITY_DEFAULTS = {
+    key: deepcopy(DEFAULT_CONFIG[key])
+    for key in (
+        "LIGHT_SUN_ENABLED",
+        "LIGHT_SUNRISE_DURATION_MIN",
+        "LIGHT_SUNSET_DURATION_MIN",
+        "LIGHT_SUN_MIN_LEVEL",
+    )
+}
+
 _PROFILE_LOCK = threading.RLock()
+
+
+class ProfileActivationError(ValueError):
+    """Ein vorhandenes Profil ist mit der Zielstation nicht sicher nutzbar."""
+
+    def __init__(self, code, message):
+        self.code = str(code)
+        super().__init__(message)
 
 
 def _finite_number(data, key):
@@ -178,6 +201,30 @@ def normalize_profile_settings(data):
             "RAMP_DURATION_MIN muss bei aktiver Rampe mindestens 5 sein"
         )
 
+    light_sun_enabled = _finite_number(data, "LIGHT_SUN_ENABLED")
+    if (
+        not light_sun_enabled.is_integer()
+        or int(light_sun_enabled) not in {0, 1}
+    ):
+        raise ValueError("LIGHT_SUN_ENABLED muss 0 oder 1 sein")
+    result["LIGHT_SUN_ENABLED"] = int(light_sun_enabled)
+
+    for key in (
+        "LIGHT_SUNRISE_DURATION_MIN",
+        "LIGHT_SUNSET_DURATION_MIN",
+    ):
+        value = _finite_number(data, key)
+        if not value.is_integer():
+            raise ValueError(f"{key} muss eine ganze Minute sein")
+        result[key] = int(_bounded(value, key, 0, 240))
+
+    light_sun_min_level = _finite_number(data, "LIGHT_SUN_MIN_LEVEL")
+    if not light_sun_min_level.is_integer():
+        raise ValueError("LIGHT_SUN_MIN_LEVEL muss eine ganze Prozentzahl sein")
+    result["LIGHT_SUN_MIN_LEVEL"] = int(
+        _bounded(light_sun_min_level, "LIGHT_SUN_MIN_LEVEL", 11, 100)
+    )
+
     return result
 
 
@@ -203,7 +250,22 @@ def get_active_profile(runtime=None):
 def load_profiles():
     if os.path.exists(PROFILE_FILE):
         with open(PROFILE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+            catalog = json.load(f)
+
+        profiles = catalog.get("profiles") if isinstance(catalog, dict) else None
+        if not isinstance(profiles, dict):
+            raise RuntimeError("profiles.json enthält keinen gültigen Profilkatalog")
+
+        # Bestehende Installationen besitzen diese vier Werte noch nicht in
+        # profiles.json. Sie werden nur im Arbeitsspeicher sicher ergänzt und
+        # erst beim nächsten bewussten Profilspeichern dauerhaft geschrieben.
+        for name, settings in profiles.items():
+            if not isinstance(settings, dict):
+                raise RuntimeError(f"Profil {name!r} ist kein JSON-Objekt")
+            for key, default in PROFILE_COMPATIBILITY_DEFAULTS.items():
+                settings.setdefault(key, deepcopy(default))
+
+        return catalog
     raise RuntimeError("profiles.json fehlt")
 
 
@@ -253,6 +315,18 @@ def profile_catalog():
         return deepcopy(PROFILES.get("profiles") or {})
 
 
+def profile_settings_from_config(config):
+    """Kopierbarer Profil-Snapshot der aktuell gespeicherten Stationswerte."""
+
+    if not isinstance(config, dict):
+        raise TypeError("Stationskonfiguration muss ein JSON-Objekt sein")
+
+    return {
+        key: deepcopy(config.get(key, DEFAULT_CONFIG[key]))
+        for key in PROFILE_SETTING_KEYS
+    }
+
+
 def update_profile(name, data):
     """Speichert ein Preset, ohne irgendeine Runtime zu verändern."""
 
@@ -296,6 +370,48 @@ def apply_profile(name, runtime=None):
             return False
 
         profile = deepcopy(PROFILES["profiles"][name])
+
+        try:
+            light_sun_enabled = _finite_number(profile, "LIGHT_SUN_ENABLED")
+        except ValueError as exc:
+            raise ProfileActivationError(
+                "profile_invalid",
+                "Das Profil enthält keinen gültigen Sonnenverlauf-Schalter.",
+            ) from exc
+
+        if (
+            not light_sun_enabled.is_integer()
+            or int(light_sun_enabled) not in {0, 1}
+        ):
+            raise ProfileActivationError(
+                "profile_invalid",
+                "Das Profil enthält keinen gültigen Sonnenverlauf-Schalter.",
+            )
+
+        if int(light_sun_enabled):
+            from core.capability_routing import controller_assignment_for_config
+
+            try:
+                assignment = controller_assignment_for_config(cfg, "light")
+            except ValueError as exc:
+                raise ProfileActivationError(
+                    "light_sun_controller_required",
+                    "Die Licht-Controller-Zuordnung dieser Station ist ungültig. "
+                    "Bitte die Zuordnung vor dem Profilwechsel korrigieren.",
+                ) from exc
+
+            target_id = (
+                str(assignment.get("target_id") or "").strip()
+                if isinstance(assignment, dict)
+                else ""
+            )
+            if not target_id:
+                raise ProfileActivationError(
+                    "light_sun_controller_required",
+                    "Dieses Profil aktiviert Sonnenaufgang und Sonnenuntergang. "
+                    "Dafür muss der Station zuerst ein geeigneter "
+                    "Licht-Controller zugewiesen werden.",
+                )
 
     for key, value in profile.items():
         cfg[key] = deepcopy(value)

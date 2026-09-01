@@ -41,6 +41,10 @@ def sample_profile(day_temp=24.0):
         "NIGHT_START_MIN": 1320,
         "RAMP_ENABLED": 1,
         "RAMP_DURATION_MIN": 30,
+        "LIGHT_SUN_ENABLED": 0,
+        "LIGHT_SUNRISE_DURATION_MIN": 30,
+        "LIGHT_SUNSET_DURATION_MIN": 30,
+        "LIGHT_SUN_MIN_LEVEL": 11,
     }
 
 
@@ -109,11 +113,12 @@ def check_ui_contract():
         "Profilauswahl öffnet nur den Editor und aktiviert nicht automatisch",
     )
     require(
-        "grow_control_tent_profiles" in dashboard
+        "grow_control_tent_settings" in dashboard
+        and "grow_control_tent_profiles" in settings
         and '"profiles.html"' in dashboard_routes
         and "PROFILE_LABELS[state.active_profile]" in dashboard
         and 'safeText("profile-phase", state.profile' in dashboard,
-        "Dashboard öffnet die Profilverwaltung und trennt Preset von Tag/Nacht-Phase",
+        "Dashboard öffnet zuerst Klima, während die Profilverwaltung erreichbar bleibt",
     )
     require(
         '@app.get("/api/tents/<tent_id>/profiles")' in routes

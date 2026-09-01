@@ -19,9 +19,11 @@ from core.hardware_assignments import (
 from core.profile import (
     PROFILE_SETTING_KEYS,
     PROFILES,
+    ProfileActivationError,
     apply_profile,
     get_active_profile,
     profile_catalog,
+    profile_settings_from_config,
     update_profile,
 )
 from core.live_preflight import evaluate_live_preflight
@@ -428,13 +430,19 @@ def _config_payload(runtime):
 
 
 def _profiles_payload(runtime):
+    sun = _light_sun_availability(runtime)
+
     return {
         "success": True,
         "tent_id": runtime.tent_id,
         "active_profile": get_active_profile(runtime=runtime),
         "profiles": profile_catalog(),
+        "current_settings": profile_settings_from_config(runtime.config),
         "profile_setting_keys": list(PROFILE_SETTING_KEYS),
         "catalog_scope": "controller",
+        "current_settings_scope": "station",
+        "light_sun_available": bool(sun["available"]),
+        "light_sun_unavailable_reason": sun["reason"],
     }
 
 
@@ -648,7 +656,17 @@ def register(app):
         if error:
             return error
 
-        if not apply_profile(name, runtime=runtime):
+        try:
+            applied = apply_profile(name, runtime=runtime)
+        except ProfileActivationError as exc:
+            return jsonify(
+                success=False,
+                error=exc.code,
+                message=str(exc),
+                profile=name,
+            ), 409
+
+        if not applied:
             return jsonify(
                 success=False,
                 error="profile_not_found",
