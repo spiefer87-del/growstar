@@ -46,7 +46,7 @@ def main():
         "Sendecache-Sonderfall ist auf Ventilator-Oszillation begrenzt",
     )
     require(
-        "function controllerDetail(device, controller)" in ui,
+        'function controllerDetail(device, controller, mode = "")' in ui,
         "Dashboard formatiert Controllerwerte",
     )
     require(
@@ -58,7 +58,7 @@ def main():
         "Licht zeigt Dimm-Level",
     )
     require(
-        'return `Leistung ${level}`;' in ui,
+        '`Leistung ${level}`' in ui,
         "Abluft/Gebläse zeigt Controller-Leistung",
     )
     require(

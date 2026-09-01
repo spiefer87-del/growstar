@@ -16,7 +16,12 @@ def main():
     req('<div class="sub ppfd-unit">µmol/m²/s</div>' in html, "Einheit steht dezent unter dem Wert")
     req(".ppfd-unit{" in html, "Eigener kleiner PPFD-Einheitenstil vorhanden")
 
-    m = re.search(r'<div class="card-link ppfd-card-shell" id="light-level-link">.*?</div>\s*</div>', html, re.S)
+    m = re.search(
+        r'<a\s+[^>]*class="card-link ppfd-card-shell"\s+'
+        r'id="light-level-link"[^>]*>.*?</a>',
+        html,
+        re.S,
+    )
     req(m is not None, "PPFD-Kachelblock gefunden")
     block = m.group(0)
 

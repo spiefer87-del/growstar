@@ -32,8 +32,12 @@ button{padding:9px 16px;border-radius:999px;border:0;background:#334155;color:va
 button:hover{background:#475569}
 button:disabled{opacity:.48;cursor:not-allowed}
 .profile-list{display:flex;gap:9px;justify-content:center;flex-wrap:wrap}
-.profile-btn{position:relative;padding:10px 17px}
-.profile-btn.editing{background:var(--blue);color:#082f49;box-shadow:0 0 0 2px rgba(56,189,248,.28)}
+.profile-btn{--profile-rgb:100,116,139;position:relative;padding:10px 17px;border:1px solid rgba(var(--profile-rgb),.38);background:linear-gradient(135deg,rgba(var(--profile-rgb),.17),rgba(51,65,85,.86));color:#e2e8f0}
+.profile-btn[data-profile="veg"]{--profile-rgb:34,197,94}
+.profile-btn[data-profile="bloom"]{--profile-rgb:167,139,250}
+.profile-btn[data-profile="dry"]{--profile-rgb:217,119,6}
+.profile-btn:hover{background:linear-gradient(135deg,rgba(var(--profile-rgb),.3),rgba(71,85,105,.9))}
+.profile-btn.editing{background:linear-gradient(135deg,rgba(var(--profile-rgb),.58),rgba(var(--profile-rgb),.25));color:#fff;border-color:rgba(var(--profile-rgb),.82);box-shadow:0 0 0 2px rgba(var(--profile-rgb),.22),0 6px 16px rgba(var(--profile-rgb),.13)}
 .profile-btn.current::after{content:"AKTIV";position:absolute;top:-8px;right:-7px;padding:2px 5px;border-radius:999px;background:var(--green);color:#052e16;font-size:.52rem;letter-spacing:.05em;font-weight:900}
 .status-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:13px}
 .status-item{padding:10px;border-radius:11px;background:var(--card2);border:1px solid var(--border);text-align:center}
@@ -303,6 +307,7 @@ const PROFILE_LABELS = {
     bloom: "Blüte",
     dry: "Trocknung"
 };
+const PROFILE_ORDER = Object.freeze(["veg","bloom","dry"]);
 
 const NUMBER_IDS = [
     "DAY_TEMP","NIGHT_TEMP","DAY_HUM","NIGHT_HUM",
@@ -324,6 +329,15 @@ function el(id){ return document.getElementById(id); }
 function num(id){ return Number(el(id)?.value); }
 function profileLabel(name){
     return PROFILE_LABELS[name] || String(name || "--");
+}
+
+function orderedProfileNames(){
+    const available = Object.keys(catalog);
+    const known = PROFILE_ORDER.filter(name=>available.includes(name));
+    const custom = available
+        .filter(name=>!PROFILE_ORDER.includes(name))
+        .sort((left,right)=>profileLabel(left).localeCompare(profileLabel(right),"de"));
+    return [...known,...custom];
 }
 
 function feedback(text, cls=""){
@@ -440,7 +454,7 @@ function renderProfileButtons(){
     const box = el("profile-list");
     box.innerHTML = "";
 
-    Object.keys(catalog).forEach(name=>{
+    orderedProfileNames().forEach(name=>{
         const button = document.createElement("button");
         button.type = "button";
         button.className = "profile-btn";
@@ -726,7 +740,7 @@ async function loadProfiles(){
             "Kein geeigneter Licht-Controller zugewiesen.";
         selectedProfile = catalog[activeProfile]
             ? activeProfile
-            : Object.keys(catalog)[0] || null;
+            : orderedProfileNames()[0] || null;
 
         renderProfileButtons();
         fillEditor(catalog[selectedProfile]);

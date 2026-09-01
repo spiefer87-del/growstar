@@ -19,6 +19,8 @@
     --purple-dark: #312e81;
     --red: #ef4444;
     --amber: #f59e0b;
+    --phase-accent: #64748b;
+    --phase-accent-rgb: 100,116,139;
 }
 
 html { font-size: 16px; }
@@ -29,6 +31,19 @@ body {
     background: var(--bg);
     color: var(--text);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+body[data-growth-phase="veg"] {
+    --phase-accent: #22c55e;
+    --phase-accent-rgb: 34,197,94;
+}
+body[data-growth-phase="bloom"] {
+    --phase-accent: #a78bfa;
+    --phase-accent-rgb: 167,139,250;
+}
+body[data-growth-phase="dry"] {
+    --phase-accent: #d97706;
+    --phase-accent-rgb: 217,119,6;
 }
 
 h1 { margin: 0; font-size: 1.8rem; }
@@ -185,10 +200,21 @@ h3 {
 
 .card {
     position: relative;
-    background: var(--card);
+    overflow: hidden;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(var(--phase-accent-rgb),.075) 0%,
+            rgba(var(--phase-accent-rgb),.025) 42%,
+            transparent 72%
+        ),
+        var(--card);
+    border: 1px solid rgba(var(--phase-accent-rgb),.34);
     border-radius: 16px;
     padding: 20px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.3);
+    box-shadow:
+        0 10px 30px rgba(0,0,0,.3),
+        0 0 18px rgba(var(--phase-accent-rgb),.07);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -196,6 +222,7 @@ h3 {
     text-align: center;
     height: 100%;
     min-height: 120px;
+    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
 }
 .card h2 {
     margin: 0 0 8px;
@@ -205,6 +232,16 @@ h3 {
 }
 .value { font-size: 1.6rem; font-weight: 600; }
 .sub { margin-top: 6px; font-size: .8rem; color: var(--muted); }
+
+@media (hover:hover) {
+    .card-link:hover .card {
+        border-color: rgba(var(--phase-accent-rgb),.62);
+        box-shadow:
+            0 12px 34px rgba(0,0,0,.34),
+            0 0 22px rgba(var(--phase-accent-rgb),.13);
+        transform: translateY(-1px);
+    }
+}
 
 .ppfd-card-shell{
     color:inherit;
@@ -222,15 +259,88 @@ h3 {
 }
 
 
-.badge {
-    padding: 6px 14px;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 1rem;
+#profile-card {
+    background:
+        radial-gradient(
+            circle at 50% 0%,
+            rgba(var(--phase-accent-rgb),.19),
+            transparent 58%
+        ),
+        linear-gradient(
+            145deg,
+            rgba(var(--phase-accent-rgb),.12),
+            rgba(var(--phase-accent-rgb),.025) 56%
+        ),
+        var(--card);
 }
-.badge.tag { background: #22c55e; color: #022c22; }
-.badge.nacht { background: #38bdf8; color: #082f49; }
-.badge.profile { background: #a78bfa; color: #2e1065; }
+.climate-mode {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 88px;
+    padding: 7px 15px;
+    border: 1px solid rgba(148,163,184,.28);
+    border-radius: 999px;
+    background: linear-gradient(135deg, #334155, #1e293b);
+    color: var(--text);
+    font-size: 1.08rem;
+    font-weight: 800;
+    letter-spacing: .035em;
+    line-height: 1;
+}
+.climate-mode.tag {
+    border-color: rgba(253,186,116,.68);
+    background: linear-gradient(135deg, #fde047, #fb923c);
+    color: #422006;
+    box-shadow: 0 5px 14px rgba(251,146,60,.18);
+}
+.climate-mode.nacht {
+    border-color: rgba(125,211,252,.62);
+    background: linear-gradient(135deg, #0369a1, #4338ca);
+    color: #f8fafc;
+    box-shadow: 0 5px 14px rgba(56,189,248,.17);
+}
+.climate-mode-icon { font-size: .95em; }
+.profile-phase-row { margin-top: 8px; }
+.phase-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 10px;
+    border: 1px solid rgba(148,163,184,.3);
+    border-radius: 999px;
+    background: rgba(51,65,85,.58);
+    color: #cbd5e1;
+    font-size: .76rem;
+    font-weight: 750;
+    line-height: 1.1;
+}
+.phase-badge.veg {
+    border-color: rgba(34,197,94,.5);
+    background: linear-gradient(135deg, rgba(34,197,94,.28), rgba(21,128,61,.14));
+    color: #bbf7d0;
+}
+.phase-badge.bloom {
+    border-color: rgba(167,139,250,.55);
+    background: linear-gradient(135deg, rgba(167,139,250,.3), rgba(109,40,217,.14));
+    color: #e9d5ff;
+}
+.phase-badge.dry {
+    border-color: rgba(217,119,6,.6);
+    background: linear-gradient(135deg, rgba(217,119,6,.34), rgba(146,64,14,.16));
+    color: #fed7aa;
+}
+.profile-link-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.profile-link-arrow {
+    color: var(--phase-accent);
+    font-size: 1rem;
+    line-height: .8;
+}
 
 .device.on { background: linear-gradient(135deg, #14532d, #16a34a); }
 .device.off { background: linear-gradient(135deg, #0f172a, #334155); }
@@ -269,6 +379,13 @@ h3 {
     .tent-switcher { max-width: 145px; }
     .user-panel { display: none; }
     .card { padding: 13px 8px; min-height: 105px; }
+    .climate-mode { min-width: 74px; padding: 6px 11px; }
+    .phase-badge { padding: 3px 8px; font-size: .7rem; }
+    .profile-phase-row { margin-top: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .card { transition: none; }
 }
 </style>
 {% endblock %}
@@ -344,9 +461,17 @@ h3 {
     {% if has_permission('settings.view') %}
     <a href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}" class="card-link">
         <div class="card env" id="profile-card">
-            <h2>Profil</h2>
-            <div class="value"><span id="profile-badge" class="badge">---</span></div>
-            <div class="sub"><span id="profile-phase">---</span> · Klima & Grenzwerte</div>
+            <h2>Klimamodus</h2>
+            <div id="climate-mode" class="climate-mode" aria-label="Aktueller Tag- oder Nachtmodus">
+                <span id="climate-mode-icon" class="climate-mode-icon" aria-hidden="true">◐</span>
+                <span id="profile-phase">---</span>
+            </div>
+            <div class="profile-phase-row">
+                <span id="profile-badge" class="phase-badge">◌ Profil unbekannt</span>
+            </div>
+            <div class="sub profile-link-label">
+                Klima &amp; Grenzwerte <span class="profile-link-arrow" aria-hidden="true">›</span>
+            </div>
         </div>
     </a>
     {% endif %}
@@ -408,6 +533,11 @@ h3 {
         bloom: "Blüte",
         dry: "Trocknung"
     };
+    const PROFILE_ICONS = {
+        veg: "🌱",
+        bloom: "🌸",
+        dry: "🍂"
+    };
 
     const AUX_DEVICES = ["aux1", "aux2", "aux3", "aux4"];
     const AUX_DEFAULT_LABELS = {aux1:"Wasserpumpen", aux2:"Zusatzgerät 2", aux3:"Zusatzgerät 3", aux4:"Zusatzgerät 4"};
@@ -438,6 +568,42 @@ h3 {
         const n = Number(value);
         return Number.isFinite(n) ? n.toFixed(digits) : "--";
     };
+
+    function renderProfileSummary(state) {
+        const activeProfile = Object.prototype.hasOwnProperty.call(
+            PROFILE_LABELS,
+            state.active_profile
+        ) ? state.active_profile : "neutral";
+        const phaseLabel =
+            PROFILE_LABELS[state.active_profile] ||
+            state.active_profile ||
+            "Profil unbekannt";
+        const phaseIcon = PROFILE_ICONS[state.active_profile] || "◌";
+
+        document.body.dataset.growthPhase = activeProfile;
+
+        const profileBadge = document.getElementById("profile-badge");
+        if (profileBadge) {
+            profileBadge.textContent = `${phaseIcon} ${phaseLabel}`;
+            profileBadge.className = `phase-badge ${activeProfile}`;
+        }
+
+        const mode = String(state.profile || "").trim().toUpperCase();
+        const modeClass = mode === "TAG"
+            ? "tag"
+            : mode === "NACHT" ? "nacht" : "";
+        const modeIcon = mode === "TAG" ? "☀️" : mode === "NACHT" ? "🌙" : "◐";
+        const climateMode = document.getElementById("climate-mode");
+        if (climateMode) {
+            climateMode.className = `climate-mode ${modeClass}`.trim();
+            climateMode.setAttribute(
+                "aria-label",
+                mode ? `Aktueller Klimamodus: ${mode}` : "Klimamodus unbekannt"
+            );
+        }
+        safeText("climate-mode-icon", modeIcon);
+        safeText("profile-phase", state.profile || "---");
+    }
 
     function controllerDetail(device, controller, mode = "") {
         if (!controller || controller.provider !== "spiderfarmer") return "";
@@ -726,15 +892,7 @@ h3 {
             const ramp = document.getElementById("temp-ramp");
             if (ramp) ramp.textContent = state.ramp_active ? " ⏱️ Rampe aktiv" : "";
 
-            const profile = document.getElementById("profile-badge");
-            if (profile) {
-                profile.textContent =
-                    PROFILE_LABELS[state.active_profile] ||
-                    state.active_profile ||
-                    "---";
-                profile.className = "badge profile";
-            }
-            safeText("profile-phase", state.profile || "---");
+            renderProfileSummary(state);
 
             updateRuntimeMode(state);
             ["heating", "fan", "light", "vent", "irrigation", "humidifier", "dehumidifier", "light2", "vent2", "aux1", "aux2", "aux3", "aux4"]
