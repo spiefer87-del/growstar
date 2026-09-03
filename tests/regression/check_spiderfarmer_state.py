@@ -261,7 +261,7 @@ def check_diagnostics_persistence():
     print("✅ SF.2 persistiert ausschließlich normalisierten read-only Growstar-State")
 
 
-def check_config_survives_bridge_restart():
+def check_timestamped_state_survives_bridge_restart():
     with tempfile.TemporaryDirectory() as td:
         first = BridgeDiagnostics(td, max_capture_bytes=300000)
         sid = first.session_bound(
@@ -283,6 +283,7 @@ def check_config_survives_bridge_restart():
             first_state["controllers"][SESSION]["config"]["fan"]["run_level"]
             == 8
         )
+        persisted_last_seen = first_state["controllers"][SESSION]["last_seen"]
 
         # Simulated bridge restart: a new BridgeDiagnostics instance is created
         # against the same private state directory.
@@ -290,8 +291,10 @@ def check_config_survives_bridge_restart():
 
         controller = restarted.growstar_state["controllers"][SESSION]
 
-        assert controller["live"] == {}
-        assert controller["last_seen"] is None
+        assert controller["live"]["sensor"]["temperature_c"] == 23.5
+        assert controller["live"]["sensor"]["humidity_percent"] == 63.5
+        assert controller["live"]["fan"]["level"] == 4
+        assert controller["last_seen"] == persisted_last_seen
         assert controller["pid"] == "744DBD59D734"
         assert controller["prefix"] == "CB"
 
@@ -318,7 +321,10 @@ def check_config_survives_bridge_restart():
         assert after_live["config"]["fan"]["oscillation_level"] == 5
         assert after_live["last_seen"] is not None
 
-    print("✅ SF.3B.1 behält Config über Bridge-Neustart, verwirft aber stale Live-State")
+    print(
+        "✅ SF.RESTART.1 behält Config und zeitgestempelten Live-State "
+        "ohne Frischeverlängerung"
+    )
 
 
 def check_invalid_persisted_state_is_not_trusted():
@@ -380,7 +386,7 @@ def main():
     check_fan_config_normalization()
     check_state_merge()
     check_diagnostics_persistence()
-    check_config_survives_bridge_restart()
+    check_timestamped_state_survives_bridge_restart()
     check_invalid_persisted_state_is_not_trusted()
     check_no_command_encoder()
     print("✅ Spider Farmer SF.3B.1 Config-Persistenz Regression vollständig erfolgreich")

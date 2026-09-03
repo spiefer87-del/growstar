@@ -51,9 +51,11 @@ class BridgeDiagnostics:
         normalized, read-only operational state for Growstar
 
     Restart semantics:
-        Live state is never trusted across a bridge restart. Previously
-        observed normalized configuration is restored because Spider Farmer
-        does not necessarily resend setConfigField after every reconnect.
+        Previously observed normalized configuration is restored because
+        Spider Farmer does not necessarily resend setConfigField after every
+        reconnect. The last normalized live sample is retained together with
+        its original timestamp. Consumers must evaluate that timestamp against
+        their normal freshness timeout; restoring it never refreshes its age.
     """
 
     def __init__(
@@ -94,14 +96,13 @@ class BridgeDiagnostics:
             "last_error": None,
         }
 
-        # SF.3B.1 restart rule:
-        # - LIVE values are rebuilt exclusively from newly observed getDevSta.
-        # - CONFIG values may be restored from the already-normalized local
-        #   state because setConfigField is event-driven and may not be sent
-        #   again after a bridge restart.
-        # - last_seen is deliberately cleared so restored config can never
-        #   make an old controller appear freshly observed.
-        self.growstar_state = self._load_persisted_config_state()
+        # SF.RESTART.1 restart rule:
+        # - CONFIG remains available because setConfigField is event-driven.
+        # - The last normalized LIVE sample keeps its ORIGINAL last_seen.
+        # - Nothing in the bridge advances that timestamp until a genuinely
+        #   new MQTT publish arrives. Growstar's normal sensor timeout therefore
+        #   remains the only freshness authority during a controller reconnect.
+        self.growstar_state = self._load_persisted_state()
 
         self._last_flush_monotonic = 0.0
         self._last_growstar_flush_monotonic = 0.0
@@ -109,7 +110,7 @@ class BridgeDiagnostics:
         self.flush(force=True)
         self.flush_growstar_state(force=True)
 
-    def _load_persisted_config_state(self):
+    def _load_persisted_state(self):
         restored = new_state()
 
         try:
@@ -135,7 +136,21 @@ class BridgeDiagnostics:
                 continue
 
             config = previous.get("config")
-            if not isinstance(config, dict) or not config:
+            if not isinstance(config, dict):
+                config = {}
+
+            live = previous.get("live")
+            if not isinstance(live, dict):
+                live = {}
+
+            last_seen = str(previous.get("last_seen") or "").strip()
+
+            # Livewerte ohne Herkunftszeit sind für eine Wiederherstellung
+            # unbrauchbar. Konfiguration darf weiterhin ohne Liveprobe bleiben.
+            restored_live = deepcopy(live) if last_seen else {}
+            restored_last_seen = last_seen if restored_live else None
+
+            if not config and not restored_live:
                 continue
 
             session_id = (
@@ -147,8 +162,8 @@ class BridgeDiagnostics:
                 "id": session_id,
                 "pid": deepcopy(previous.get("pid")),
                 "prefix": deepcopy(previous.get("prefix")),
-                "last_seen": None,
-                "live": {},
+                "last_seen": restored_last_seen,
+                "live": restored_live,
                 "config": deepcopy(config),
             }
 

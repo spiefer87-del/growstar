@@ -250,6 +250,14 @@ def sync_sensor_sources(path=None, *, now=None):
             })
             continue
 
+        observed_at = _parse_timestamp(last_seen)
+        if observed_at is None:
+            skipped.append({
+                "id": controller_id,
+                "reason": "invalid_timestamp",
+            })
+            continue
+
         sensor = (
             (item.get("live") or {})
             .get("sensor")
@@ -326,7 +334,15 @@ def sync_sensor_sources(path=None, *, now=None):
             humidity=humidity,
             ppfd=ppfd,
             raw=raw,
+            observed_at=observed_at,
         )
+
+        if source is None:
+            skipped.append({
+                "id": controller_id,
+                "reason": "source_rejected",
+            })
+            continue
 
         with _lock:
             _last_published_seen[
@@ -352,6 +368,7 @@ def sync_sensor_sources(path=None, *, now=None):
                 else ppfd
             ),
             "bridge_last_seen": last_seen,
+            "observed_at": observed_at,
             "published_at": current,
         })
 

@@ -111,6 +111,12 @@ def main():
             )
 
             require(
+                kwargs["observed_at"]
+                == spiderfarmer._parse_timestamp("2026-08-22T22:20:00Z"),
+                "Der echte Bridge-Zeitstempel wird bis zur Sensorquelle durchgereicht",
+            )
+
+            require(
                 kwargs["raw"]["vpd_kpa"] == 0.94
                 and "payload" not in kwargs["raw"],
                 "Sensorquelle enthält normalisierte Metadaten, aber keinen MQTT-Rohpayload",
@@ -172,17 +178,27 @@ def main():
         )
 
     thread_text = (
-        ROOT / "threads/hardware.py"
+        ROOT / "threads/spiderfarmer.py"
     ).read_text(encoding="utf-8")
 
     require(
         "sync_sensor_sources()" in thread_text,
-        "Bestehender Hardware-Thread integriert den read-only Spider-Farmer-Sync",
+        "Eigener Thread integriert den read-only Spider-Farmer-Sync",
     )
 
     require(
-        "HARDWARE_REFRESH_INTERVAL = 30" in thread_text,
-        "Bestehender Hardware-Poll-Takt bleibt unverändert",
+        "SPIDERFARMER_SYNC_INTERVAL = 2.0" in thread_text,
+        "Spider-Farmer-Werte werden unabhängig vom langsamen Hardware-Scan übernommen",
+    )
+
+    hardware_thread_text = (
+        ROOT / "threads/hardware.py"
+    ).read_text(encoding="utf-8")
+
+    require(
+        "sync_sensor_sources" not in hardware_thread_text
+        and "HARDWARE_REFRESH_INTERVAL = 30" in hardware_thread_text,
+        "Der normale Hardware-Poll bleibt unverändert und ohne doppelten SF-Sync",
     )
 
     print(

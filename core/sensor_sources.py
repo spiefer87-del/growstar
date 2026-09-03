@@ -29,21 +29,45 @@ def update_sensor_source(
     battery=None,
     rssi=None,
     raw=None,
+    observed_at=None,
 ):
     if not source_id:
         return None
 
     now = time.time()
 
+    # Normalerweise entspricht der lokale Empfangszeitpunkt ``now``. Quellen
+    # mit einem eigenen, vertrauenswürdigen Zeitstempel (aktuell die separate
+    # Spider-Farmer-Bridge) dürfen diesen explizit mitgeben. Das ist für einen
+    # Prozessneustart entscheidend: Ein persistierter Messwert behält sein
+    # echtes Alter und wird niemals allein durch das erneute Einlesen frisch.
+    sample_seen = now
+    if observed_at is not None:
+        try:
+            sample_seen = float(observed_at)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(sample_seen) or sample_seen <= 0:
+            return None
+
     with ctx.state_lock:
         sources = controller_state.live_state.setdefault("sensor_sources", {})
         source = sources.get(source_id, {})
 
+        # Ein verzögert eingelesener Persistenzstand darf eine bereits neuere
+        # Liveprobe nie zurückdrehen.
+        try:
+            previous_seen = float(source.get("last_seen") or 0)
+        except (TypeError, ValueError):
+            previous_seen = 0.0
+        if observed_at is not None and previous_seen > sample_seen:
+            return dict(source)
+
         source["id"] = source_id
         source["label"] = label or source.get("label") or source_id
         source["type"] = source_type or source.get("type") or "unknown"
-        source["last_seen"] = now
-        source["online"] = True
+        source["last_seen"] = sample_seen
+        source["online"] = 0 <= (now - sample_seen) <= SENSOR_TIMEOUT
 
         if temperature is not None:
             source["temperature"] = float(temperature)
@@ -163,7 +187,8 @@ def _source_is_fresh(source, now=None):
         return False
 
     current = time.time() if now is None else float(now)
-    return (current - last_seen) <= SENSOR_TIMEOUT
+    age = current - last_seen
+    return 0 <= age <= SENSOR_TIMEOUT
 
 
 def apply_sensor_assignments(runtime=None):

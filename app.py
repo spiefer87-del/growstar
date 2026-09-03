@@ -23,6 +23,7 @@ from core.runtime import (
 )
 from core.hardware_assignments import DEVICE_HARDWARE, device_display_label
 from core.release import GROWSTAR_VERSION
+from core.sensor_sources import apply_sensor_assignments
 
 from services.watchdog import log_event, watchdog_loop
 from services.shelly import sync_relay
@@ -32,6 +33,10 @@ from threads.shelly import shelly_background_loop
 from threads.safety import safety_supervisor_loop
 from threads.main import main_loop
 from threads.hardware import hardware_loop
+from threads.spiderfarmer import (
+    spiderfarmer_sensor_loop,
+    sync_spiderfarmer_sensor_sources_once,
+)
 from threads.blu import start_blu_thread
 from services.hardware_recovery import start_hardware_recovery_thread
 from services.live_control import live_arming_loop
@@ -228,6 +233,19 @@ def start_backend():
         runtime = get_default_runtime()
 
         try:
+            # Vor Safety- und Regelthreads den letzten echten Spider-Farmer-
+            # Messpunkt mit seinem ORIGINALEN Bridge-Zeitstempel einlesen. Ist
+            # er noch innerhalb des normalen 120-s-Sensorfensters, entsteht bei
+            # einem langsam reconnectenden D734 keine künstliche Nullphase.
+            # Ein alter Messpunkt bleibt dagegen stale und kann den Failsafe
+            # nicht umgehen.
+            try:
+                sync_spiderfarmer_sensor_sources_once()
+                for sensor_runtime in list_runtimes():
+                    apply_sensor_assignments(runtime=sensor_runtime)
+            except Exception as exc:
+                print("⚠️ Spider-Farmer-Start-Sync Fehler:", exc)
+
             _sync_all_relays(runtime=runtime)
 
             _start_daemon_thread(
@@ -247,6 +265,12 @@ def start_backend():
                 mqtt_thread,
             )
             print("📡 MQTT Sensor Thread läuft")
+
+            _start_daemon_thread(
+                "growstar-spiderfarmer-sensors",
+                spiderfarmer_sensor_loop,
+            )
+            print("🌿 Spider Farmer Sensor Thread läuft")
 
             _start_daemon_thread(
                 "growstar-blu",
