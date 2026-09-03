@@ -27,7 +27,9 @@ def register(app):
 
             "vpd": state.live_state.get("vpd"),
             "vpd_control": state.live_state.get("vpd_control"),
+            "outside_temp_raw": state.live_state.get("outside_temp_raw"),
             "outside_temp": state.live_state.get("outside_temp"),
+            "outside_hum_raw": state.live_state.get("outside_hum_raw"),
             "outside_hum": state.live_state.get("outside_hum"),
 
             # ================= PROFILE =================

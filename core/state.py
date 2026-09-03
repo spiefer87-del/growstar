@@ -21,7 +21,9 @@ _LIVE_STATE_TEMPLATE = {
     # Optionales Außenklima für die intelligente VPD-Wirkungsprognose.
     # Diese Werte sind nie Ersatz für die Innenraumsensoren.
     "outside_temp": None,
+    "outside_temp_raw": None,
     "outside_hum": None,
+    "outside_hum_raw": None,
     "outside_temp_source": None,
     "outside_hum_source": None,
 

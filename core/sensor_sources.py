@@ -310,12 +310,18 @@ def apply_sensor_assignments(runtime=None):
             st.live_state.pop("light_ppfd", None)
             st.live_state.pop("light_ppfd_source", None)
 
-        # Außenwerte bleiben bewusst unkorrigiert: TEMP_OFFSET/HUM_OFFSET
-        # kalibrieren ausschließlich die Regelquelle im Zelt. Der echte
-        # Quellenzeitstempel wird mit ausgegeben, damit der VPD-Kern nie mit
-        # einem alten Außenwert weiterrechnet.
+        # Außenquellen besitzen eigene Kalibrierwerte. Die Innen-Offsets
+        # bleiben dadurch ausschließlich den Regelquellen im Zelt zugeordnet.
+        # Der VPD-Kern rechnet mit den korrigierten Außenwerten; RAW bleibt für
+        # die nachvollziehbare Kalibrierung separat sichtbar.
         if outside_temp_fresh:
-            st.live_state["outside_temp"] = float(outside_temp_raw)
+            outside_temp_offset = float(
+                cfg.get("OUTSIDE_TEMP_OFFSET", 0.0)
+            )
+            outside_temp = float(outside_temp_raw) + outside_temp_offset
+
+            st.live_state["outside_temp_raw"] = float(outside_temp_raw)
+            st.live_state["outside_temp"] = outside_temp
             st.live_state["outside_temp_source"] = {
                 "source_id": outside_temp_assignment.get("source_id"),
                 "label": (
@@ -327,11 +333,18 @@ def apply_sensor_assignments(runtime=None):
             }
             changed = True
         else:
+            st.live_state["outside_temp_raw"] = None
             st.live_state["outside_temp"] = None
             st.live_state["outside_temp_source"] = None
 
         if outside_hum_fresh:
-            st.live_state["outside_hum"] = float(outside_hum_raw)
+            outside_hum_offset = float(
+                cfg.get("OUTSIDE_HUM_OFFSET", 0.0)
+            )
+            outside_hum = float(outside_hum_raw) + outside_hum_offset
+
+            st.live_state["outside_hum_raw"] = float(outside_hum_raw)
+            st.live_state["outside_hum"] = outside_hum
             st.live_state["outside_hum_source"] = {
                 "source_id": outside_hum_assignment.get("source_id"),
                 "label": (
@@ -343,6 +356,7 @@ def apply_sensor_assignments(runtime=None):
             }
             changed = True
         else:
+            st.live_state["outside_hum_raw"] = None
             st.live_state["outside_hum"] = None
             st.live_state["outside_hum_source"] = None
 

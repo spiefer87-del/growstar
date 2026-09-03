@@ -1,5 +1,7 @@
 # routes/sensors.py
 
+import math
+
 from flask import jsonify, request
 
 from core.runtime import get_default_runtime, get_runtime
@@ -14,7 +16,12 @@ from core.vpd import reset_vpd_control
 from services.hardware import hardware
 
 
-_OFFSET_KEYS = ("TEMP_OFFSET", "HUM_OFFSET")
+_OFFSET_KEYS = (
+    "TEMP_OFFSET",
+    "HUM_OFFSET",
+    "OUTSIDE_TEMP_OFFSET",
+    "OUTSIDE_HUM_OFFSET",
+)
 _RETIRED_SOURCE_IDS = {
     "mqtt:ds18b20",
     "mqtt:dht22",
@@ -288,6 +295,12 @@ def _offsets(runtime):
     return {
         "TEMP_OFFSET": float(runtime.config.get("TEMP_OFFSET", 0.0) or 0.0),
         "HUM_OFFSET": float(runtime.config.get("HUM_OFFSET", 0.0) or 0.0),
+        "OUTSIDE_TEMP_OFFSET": float(
+            runtime.config.get("OUTSIDE_TEMP_OFFSET", 0.0) or 0.0
+        ),
+        "OUTSIDE_HUM_OFFSET": float(
+            runtime.config.get("OUTSIDE_HUM_OFFSET", 0.0) or 0.0
+        ),
     }
 
 
@@ -360,9 +373,12 @@ def _save_assignments(runtime, data):
         if raw is None:
             continue
         try:
-            new_offsets[key] = float(raw)
+            value = float(raw)
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{key} muss numerisch sein") from exc
+        if not math.isfinite(value):
+            raise ValueError(f"{key} muss endlich sein")
+        new_offsets[key] = value
 
     if any(
         key in data

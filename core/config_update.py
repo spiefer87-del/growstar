@@ -212,6 +212,8 @@ def apply_config_patch(data, runtime=None):
         "SENSOR_ASSIGNMENTS",
         "TEMP_OFFSET",
         "HUM_OFFSET",
+        "OUTSIDE_TEMP_OFFSET",
+        "OUTSIDE_HUM_OFFSET",
     }):
         reset_vpd_control(runtime=rt, reason="VPD-Sensorbasis geändert")
 

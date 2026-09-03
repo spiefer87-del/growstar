@@ -196,9 +196,17 @@
         </p>
 
         <div class="value" style="text-align:left; margin-top:16px;">
-            Temperatur außen:
-            <span id="outside_temp_value">--</span>
+            RAW:
+            <span id="outside_temp_raw">--</span>
             °C
+        </div>
+
+        <div class="sub">
+            Korrigiert:
+            <strong>
+                <span id="outside_temp_value">--</span>
+                °C
+            </strong>
         </div>
 
         <div class="sub">
@@ -217,12 +225,51 @@
             class="form-control">
         </select>
 
+        <label
+            for="OUTSIDE_TEMP_OFFSET"
+            class="form-label"
+            style="text-align:center;">
+            Offset Außen-Temperatur °C
+        </label>
+
+        <div class="offset-row" style="margin-top:8px;">
+
+            <button onclick="changeOffset('OUTSIDE_TEMP_OFFSET', -0.1)">
+                −
+            </button>
+
+            <input
+                id="OUTSIDE_TEMP_OFFSET"
+                class="number-input"
+                type="number"
+                step="0.1">
+
+            <button onclick="changeOffset('OUTSIDE_TEMP_OFFSET', 0.1)">
+                +
+            </button>
+
+        </div>
+
+        <div
+            class="saved"
+            id="saved_outside_temp">
+            ✓ gespeichert
+        </div>
+
         <div style="margin-top:20px; padding-top:18px; border-top:1px solid rgba(255,255,255,.08);">
 
             <div class="value" style="text-align:left;">
-                Luftfeuchte außen:
-                <span id="outside_hum_value">--</span>
+                RAW:
+                <span id="outside_hum_raw">--</span>
                 %
+            </div>
+
+            <div class="sub">
+                Korrigiert:
+                <strong>
+                    <span id="outside_hum_value">--</span>
+                    %
+                </strong>
             </div>
 
             <div class="sub">
@@ -241,12 +288,44 @@
                 class="form-control">
             </select>
 
+            <label
+                for="OUTSIDE_HUM_OFFSET"
+                class="form-label"
+                style="text-align:center;">
+                Offset Außen-Luftfeuchte %
+            </label>
+
+            <div class="offset-row" style="margin-top:8px;">
+
+                <button onclick="changeOffset('OUTSIDE_HUM_OFFSET', -0.1)">
+                    −
+                </button>
+
+                <input
+                    id="OUTSIDE_HUM_OFFSET"
+                    class="number-input"
+                    type="number"
+                    step="0.1">
+
+                <button onclick="changeOffset('OUTSIDE_HUM_OFFSET', 0.1)">
+                    +
+                </button>
+
+            </div>
+
+            <div
+                class="saved"
+                id="saved_outside_hum">
+                ✓ gespeichert
+            </div>
+
         </div>
 
         <div class="sub" style="margin-top:14px;">
             „Nicht zugewiesen“ entfernt nur die jeweilige Außenquelle.
             Für die VPD-Auswertung muss die Außenquelle von den
-            Innensensoren getrennt sein.
+            Innensensoren getrennt sein. Die VPD-Steuerung verwendet die
+            korrigierten Außenwerte.
         </div>
 
     </div>
@@ -353,6 +432,18 @@ const offsetSaveState = {
         promise: null
     },
     HUM_OFFSET: {
+        timer: null,
+        inFlight: false,
+        pending: null,
+        promise: null
+    },
+    OUTSIDE_TEMP_OFFSET: {
+        timer: null,
+        inFlight: false,
+        pending: null,
+        promise: null
+    },
+    OUTSIDE_HUM_OFFSET: {
         timer: null,
         inFlight: false,
         pending: null,
@@ -703,8 +794,12 @@ async function loadState(){
             s.light_ppfd === null || s.light_ppfd === undefined
                 ? "--"
                 : Math.round(Number(s.light_ppfd));
+        document.getElementById("outside_temp_raw").textContent =
+            fmt(s.outside_temp_raw);
         document.getElementById("outside_temp_value").textContent =
             fmt(s.outside_temp);
+        document.getElementById("outside_hum_raw").textContent =
+            fmt(s.outside_hum_raw);
         document.getElementById("outside_hum_value").textContent =
             fmt(s.outside_hum);
 
@@ -732,6 +827,12 @@ function applyAssignmentControls(data){
 
     document.getElementById("HUM_OFFSET").value =
         offsets.HUM_OFFSET ?? 0;
+
+    document.getElementById("OUTSIDE_TEMP_OFFSET").value =
+        offsets.OUTSIDE_TEMP_OFFSET ?? 0;
+
+    document.getElementById("OUTSIDE_HUM_OFFSET").value =
+        offsets.OUTSIDE_HUM_OFFSET ?? 0;
 
     sensorOptions =
         data.options || {
@@ -835,10 +936,15 @@ async function loadAll({syncControls = true} = {}){
 
 function offsetSavedElement(key){
 
+    const ids = {
+        TEMP_OFFSET: "saved_temp",
+        HUM_OFFSET: "saved_hum",
+        OUTSIDE_TEMP_OFFSET: "saved_outside_temp",
+        OUTSIDE_HUM_OFFSET: "saved_outside_hum"
+    };
+
     return document.getElementById(
-        key === "TEMP_OFFSET"
-        ? "saved_temp"
-        : "saved_hum"
+        ids[key]
     );
 
 }
@@ -1026,7 +1132,9 @@ async function flushAllOffsets(){
 
     await Promise.all([
         flushOffsetSave("TEMP_OFFSET"),
-        flushOffsetSave("HUM_OFFSET")
+        flushOffsetSave("HUM_OFFSET"),
+        flushOffsetSave("OUTSIDE_TEMP_OFFSET"),
+        flushOffsetSave("OUTSIDE_HUM_OFFSET")
     ]);
 
 }
@@ -1091,6 +1199,10 @@ async function saveSensorAssignments(){
     saveButton.disabled = true;
 
     try{
+
+        // Der gemeinsame Speicherknopf wartet auf noch ausstehende
+        // Innen- und Außenkalibrierungen, bevor Quellen gespeichert werden.
+        await flushAllOffsets();
 
         const response = await fetch(
             ASSIGNMENTS_URL,
@@ -1176,7 +1288,12 @@ async function saveSensorAssignments(){
 );
 
 
-["TEMP_OFFSET", "HUM_OFFSET"].forEach(
+[
+    "TEMP_OFFSET",
+    "HUM_OFFSET",
+    "OUTSIDE_TEMP_OFFSET",
+    "OUTSIDE_HUM_OFFSET"
+].forEach(
     key=>{
 
         const input =

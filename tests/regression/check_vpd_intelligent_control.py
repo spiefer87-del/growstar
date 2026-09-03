@@ -213,8 +213,10 @@ def main():
         migrated_tent_config["VPD_TOLERANCE_DAY"] == 0.08
         and migrated_tent_config["VPD_TOLERANCE_NIGHT"] == 0.08
         and migrated_tent_config["VPD_HUM_MAX_DAY"] == 76.0
-        and migrated_tent_config["VPD_HUM_MAX_NIGHT"] == 76.0,
-        "Zusätzliche Zelte übernehmen ihre bisherigen gemeinsamen Werte ebenfalls",
+        and migrated_tent_config["VPD_HUM_MAX_NIGHT"] == 76.0
+        and migrated_tent_config["OUTSIDE_TEMP_OFFSET"] == 0.0
+        and migrated_tent_config["OUTSIDE_HUM_OFFSET"] == 0.0,
+        "Zusätzliche Zelte übernehmen VPD-Werte und sichere Außen-Offset-Defaults",
     )
 
     incompatible = deepcopy(cfg)
@@ -302,6 +304,8 @@ def main():
     )
 
     sensor_runtime = runtime_for(mode="OFF")
+    sensor_runtime.config["OUTSIDE_TEMP_OFFSET"] = 0.6
+    sensor_runtime.config["OUTSIDE_HUM_OFFSET"] = -2.0
     update_sensor_source(
         "sensor:inside",
         temperature=24.1,
@@ -314,11 +318,31 @@ def main():
     )
     apply_sensor_assignments(runtime=sensor_runtime)
     require(
-        sensor_runtime.state.live_state["outside_temp"] == 15.2
-        and sensor_runtime.state.live_state["outside_hum"] == 54.0
+        sensor_runtime.state.live_state["outside_temp_raw"] == 15.2
+        and round(sensor_runtime.state.live_state["outside_temp"], 1) == 15.8
+        and sensor_runtime.state.live_state["outside_hum_raw"] == 54.0
+        and sensor_runtime.state.live_state["outside_hum"] == 52.0
         and sensor_runtime.state.live_state["outside_temp_source"]["source_id"]
         == "sensor:outside",
-        "Optionale Außenquelle wird frisch und getrennt in die TentRuntime übernommen",
+        "Außenquelle wird frisch, RAW und separat korrigiert in die TentRuntime übernommen",
+    )
+    sensor_runtime.config["VPD_CONTROL_MODE"] = "MONITOR"
+    corrected_outside_plan = update_vpd_control(sensor_runtime, now=1000)
+    require(
+        corrected_outside_plan["outside"]["temp"] == 15.8
+        and corrected_outside_plan["outside"]["hum"] == 52.0,
+        "VPD-Wirkungsprognose verwendet ausschließlich die korrigierten Außenwerte",
+    )
+
+    sensor_runtime.config["SENSOR_ASSIGNMENTS"].pop("outside_temperature")
+    sensor_runtime.config["SENSOR_ASSIGNMENTS"].pop("outside_humidity")
+    apply_sensor_assignments(runtime=sensor_runtime)
+    require(
+        sensor_runtime.state.live_state["outside_temp_raw"] is None
+        and sensor_runtime.state.live_state["outside_temp"] is None
+        and sensor_runtime.state.live_state["outside_hum_raw"] is None
+        and sensor_runtime.state.live_state["outside_hum"] is None,
+        "Entfernte Außenquellen löschen RAW- und korrigierte Werte gemeinsam",
     )
 
     stale_browser_runtime = runtime_for(mode="OFF")

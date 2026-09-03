@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import ast
+import math
 import threading
 
 
@@ -39,8 +40,14 @@ def load_assignment_functions():
     )
 
     namespace = {
-        "_OFFSET_KEYS": ("TEMP_OFFSET", "HUM_OFFSET"),
+        "_OFFSET_KEYS": (
+            "TEMP_OFFSET",
+            "HUM_OFFSET",
+            "OUTSIDE_TEMP_OFFSET",
+            "OUTSIDE_HUM_OFFSET",
+        ),
         "_RETIRED_SOURCE_IDS": {"mqtt:ds18b20", "mqtt:dht22"},
+        "math": math,
         "reset_vpd_control": lambda runtime=None, reason="": None,
     }
     exec(
@@ -66,6 +73,8 @@ class FakeRuntime:
             "SENSOR_ASSIGNMENTS": dict(assignments),
             "TEMP_OFFSET": 0.0,
             "HUM_OFFSET": 0.0,
+            "OUTSIDE_TEMP_OFFSET": 0.0,
+            "OUTSIDE_HUM_OFFSET": 0.0,
         }
         self.state = FakeState()
         self.state_lock = threading.Lock()
@@ -200,6 +209,42 @@ def main():
     )
 
     reset_calls.clear()
+    outside_offset_result = save_assignments(outside_runtime, {
+        "offsets": {
+            "OUTSIDE_TEMP_OFFSET": 0.6,
+            "OUTSIDE_HUM_OFFSET": -2.5,
+        },
+    })
+    require(
+        outside_runtime.config["OUTSIDE_TEMP_OFFSET"] == 0.6
+        and outside_runtime.config["OUTSIDE_HUM_OFFSET"] == -2.5
+        and outside_offset_result["offsets"]["OUTSIDE_TEMP_OFFSET"] == 0.6
+        and outside_offset_result["offsets"]["OUTSIDE_HUM_OFFSET"] == -2.5,
+        "Beide Außen-Offsets werden stationsbezogen persistiert und zurückgegeben",
+    )
+    require(
+        outside_runtime.config["TEMP_OFFSET"] == 0.0
+        and outside_runtime.config["HUM_OFFSET"] == 0.0,
+        "Außenkalibrierung verändert niemals die Innen-Offsets",
+    )
+    require(
+        reset_calls == [(outside_runtime, "Sensor-Offset geändert")],
+        "Eine Außenkalibrierung startet die VPD-Wirkungsprüfung frisch",
+    )
+
+    try:
+        save_assignments(outside_runtime, {
+            "offsets": {"OUTSIDE_TEMP_OFFSET": float("nan")},
+        })
+    except ValueError as exc:
+        require(
+            "OUTSIDE_TEMP_OFFSET muss endlich sein" in str(exc),
+            "Nicht-endliche Außen-Offsets werden sicher abgewiesen",
+        )
+    else:
+        raise AssertionError("NaN wurde unerwartet als Außen-Offset akzeptiert")
+
+    reset_calls.clear()
     offset_runtime = FakeRuntime({
         "temperature": assignment("inside:temp", "temperature"),
         "humidity": assignment("inside:hum", "humidity"),
@@ -276,8 +321,44 @@ def main():
         and "fmt(s.outside_hum)" in ui,
         "Detailseite zeigt die aktuell angewendeten Außenmesswerte",
     )
+    require(
+        'id="OUTSIDE_TEMP_OFFSET"' in ui
+        and 'id="OUTSIDE_HUM_OFFSET"' in ui
+        and "flushOffsetSave(\"OUTSIDE_TEMP_OFFSET\")" in ui
+        and "flushOffsetSave(\"OUTSIDE_HUM_OFFSET\")" in ui,
+        "Detailseite besitzt speicherbare Offset-Regler für beide Außenwerte",
+    )
+    require(
+        "fmt(s.outside_temp_raw)" in ui
+        and "fmt(s.outside_hum_raw)" in ui,
+        "RAW- und korrigierte Außenwerte bleiben bei der Kalibrierung sichtbar",
+    )
 
-    print("✅ Growstar 3.16.2 / SENSOR.OUTSIDE.1 vollständig geprüft")
+    config_source = (ROOT / "core/config.py").read_text(encoding="utf-8")
+    config_update_source = (ROOT / "core/config_update.py").read_text(
+        encoding="utf-8"
+    )
+    state_source = (ROOT / "core/state.py").read_text(encoding="utf-8")
+    tent_route_source = (ROOT / "routes/tents.py").read_text(encoding="utf-8")
+    require(
+        '"OUTSIDE_TEMP_OFFSET": 0.0' in config_source
+        and '"OUTSIDE_HUM_OFFSET": 0.0' in config_source,
+        "Bestehende Stationen erhalten für beide Außen-Offsets sichere Null-Defaults",
+    )
+    require(
+        '"outside_temp_raw": None' in state_source
+        and '"outside_hum_raw": None' in state_source,
+        "Runtime-State trennt RAW- und korrigierte Außenwerte",
+    )
+    require(
+        '"OUTSIDE_TEMP_OFFSET"' in config_update_source
+        and '"OUTSIDE_HUM_OFFSET"' in config_update_source
+        and '"OUTSIDE_TEMP_OFFSET"' in tent_route_source
+        and '"OUTSIDE_HUM_OFFSET"' in tent_route_source,
+        "Außen-Offsets bleiben auf den stationsbezogenen Sensor-Endpunkt begrenzt",
+    )
+
+    print("✅ Growstar 3.16.3 / SENSOR.OUTSIDE.2 vollständig geprüft")
 
 
 if __name__ == "__main__":
