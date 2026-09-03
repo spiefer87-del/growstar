@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 
+from core.config import migrate_vpd_phase_config
 from core.helpers import calculate_vpd
 from core.runtime import resolve_runtime
 
@@ -43,64 +44,94 @@ def _bounded(cfg, key, minimum, maximum):
 
 
 def validate_vpd_config(cfg):
-    """Validiert VPD-Parameter einschließlich physikalischer Erreichbarkeit."""
+    """Validiert beide VPD-Phasen einschließlich Erreichbarkeit."""
 
-    mode = str(cfg.get("VPD_CONTROL_MODE", "OFF") or "OFF").upper()
+    effective = dict(cfg or {})
+    migrate_vpd_phase_config(effective)
+
+    mode = str(effective.get("VPD_CONTROL_MODE", "OFF") or "OFF").upper()
     if mode not in VPD_CONTROL_MODES:
         raise ValueError("VPD_CONTROL_MODE muss OFF, MONITOR oder AUTO sein")
 
-    target_day = _bounded(cfg, "VPD_TARGET_DAY", 0.1, 3.5)
-    target_night = _bounded(cfg, "VPD_TARGET_NIGHT", 0.1, 3.5)
-    tolerance = _bounded(cfg, "VPD_TOLERANCE", 0.01, 0.5)
+    phases = {}
+    for profile, suffix, label in (
+        ("TAG", "DAY", "Tag"),
+        ("NACHT", "NIGHT", "Nacht"),
+    ):
+        target_key = f"VPD_TARGET_{suffix}"
+        tolerance_key = f"VPD_TOLERANCE_{suffix}"
+        temp_min_key = f"VPD_TEMP_MIN_{suffix}"
+        temp_max_key = f"VPD_TEMP_MAX_{suffix}"
+        hum_min_key = f"VPD_HUM_MIN_{suffix}"
+        hum_max_key = f"VPD_HUM_MAX_{suffix}"
 
-    temp_min = _bounded(cfg, "VPD_TEMP_MIN", -10.0, 50.0)
-    temp_max = _bounded(cfg, "VPD_TEMP_MAX", -10.0, 50.0)
-    hum_min = _bounded(cfg, "VPD_HUM_MIN", 1.0, 99.0)
-    hum_max = _bounded(cfg, "VPD_HUM_MAX", 1.0, 99.0)
+        target = _bounded(effective, target_key, 0.1, 3.5)
+        tolerance = _bounded(effective, tolerance_key, 0.01, 0.5)
+        temp_min = _bounded(effective, temp_min_key, -10.0, 50.0)
+        temp_max = _bounded(effective, temp_max_key, -10.0, 50.0)
+        hum_min = _bounded(effective, hum_min_key, 1.0, 99.0)
+        hum_max = _bounded(effective, hum_max_key, 1.0, 99.0)
 
-    if temp_min >= temp_max:
-        raise ValueError("VPD_TEMP_MIN muss kleiner als VPD_TEMP_MAX sein")
-    if hum_min >= hum_max:
-        raise ValueError("VPD_HUM_MIN muss kleiner als VPD_HUM_MAX sein")
+        if temp_min >= temp_max:
+            raise ValueError(
+                f"{temp_min_key} muss kleiner als {temp_max_key} sein"
+            )
+        if hum_min >= hum_max:
+            raise ValueError(
+                f"{hum_min_key} muss kleiner als {hum_max_key} sein"
+            )
 
-    effect_window = _bounded(cfg, "VPD_EFFECT_WINDOW_MIN", 1, 30)
+        attainable_min = float(calculate_vpd(temp_min, hum_max))
+        attainable_max = float(calculate_vpd(temp_max, hum_min))
+        if target + tolerance < attainable_min or target - tolerance > attainable_max:
+            raise ValueError(
+                f"{target_key} ist im VPD-Fenster für {label} nicht "
+                f"erreichbar ({attainable_min:.2f} bis "
+                f"{attainable_max:.2f} kPa)"
+            )
+
+        phases[profile] = {
+            "name": profile,
+            "label": label,
+            "target": target,
+            "tolerance": tolerance,
+            "temp_min": temp_min,
+            "temp_max": temp_max,
+            "hum_min": hum_min,
+            "hum_max": hum_max,
+            "attainable_min": attainable_min,
+            "attainable_max": attainable_max,
+        }
+
+    effect_window = _bounded(effective, "VPD_EFFECT_WINDOW_MIN", 1, 30)
     if not effect_window.is_integer():
         raise ValueError("VPD_EFFECT_WINDOW_MIN muss eine ganze Minute sein")
 
-    min_effect = _bounded(cfg, "VPD_MIN_EFFECT_KPA", 0.005, 0.5)
-    temp_step = _bounded(cfg, "VPD_TEMP_STEP", 0.1, 2.0)
-    fan_step = _bounded(cfg, "VPD_FAN_STEP", 1, 25)
+    min_effect = _bounded(effective, "VPD_MIN_EFFECT_KPA", 0.005, 0.5)
+    temp_step = _bounded(effective, "VPD_TEMP_STEP", 0.1, 2.0)
+    fan_step = _bounded(effective, "VPD_FAN_STEP", 1, 25)
     if not fan_step.is_integer():
         raise ValueError("VPD_FAN_STEP muss ganzzahlig sein")
 
-    attainable_min = float(calculate_vpd(temp_min, hum_max))
-    attainable_max = float(calculate_vpd(temp_max, hum_min))
-
-    for key, target in (
-        ("VPD_TARGET_DAY", target_day),
-        ("VPD_TARGET_NIGHT", target_night),
-    ):
-        if target + tolerance < attainable_min or target - tolerance > attainable_max:
-            raise ValueError(
-                f"{key} ist im gewählten VPD-Temperatur-/Feuchtefenster nicht "
-                f"erreichbar ({attainable_min:.2f} bis {attainable_max:.2f} kPa)"
-            )
-
     return {
         "mode": mode,
-        "target_day": target_day,
-        "target_night": target_night,
-        "tolerance": tolerance,
-        "temp_min": temp_min,
-        "temp_max": temp_max,
-        "hum_min": hum_min,
-        "hum_max": hum_max,
+        "target_day": phases["TAG"]["target"],
+        "target_night": phases["NACHT"]["target"],
+        "tolerance_day": phases["TAG"]["tolerance"],
+        "tolerance_night": phases["NACHT"]["tolerance"],
+        "phases": phases,
         "effect_window_sec": int(effect_window * 60),
         "min_effect": min_effect,
         "temp_step": temp_step,
         "fan_step": int(fan_step),
-        "attainable_min": attainable_min,
-        "attainable_max": attainable_max,
+        # Aggregierte Werte bleiben für Diagnose-Clients aus 3.16.0 erhalten;
+        # die Regelung selbst verwendet ausschließlich das aktive Phasenobjekt.
+        "attainable_min": min(
+            phase["attainable_min"] for phase in phases.values()
+        ),
+        "attainable_max": max(
+            phase["attainable_max"] for phase in phases.values()
+        ),
     }
 
 
@@ -120,14 +151,17 @@ def validate_vpd_environment_alignment(cfg):
     min_hum = _finite(cfg, "MIN_HUM")
     max_hum = _finite(cfg, "MAX_HUM")
 
-    if settings["temp_min"] < min_temp or settings["temp_max"] > max_temp:
-        raise ValueError(
-            "Das VPD-Temperaturfenster muss innerhalb MIN_TEMP/MAX_TEMP liegen"
-        )
-    if settings["hum_min"] < min_hum or settings["hum_max"] > max_hum:
-        raise ValueError(
-            "Das VPD-Feuchtefenster muss innerhalb MIN_HUM/MAX_HUM liegen"
-        )
+    for phase in settings["phases"].values():
+        if phase["temp_min"] < min_temp or phase["temp_max"] > max_temp:
+            raise ValueError(
+                f"Das VPD-Temperaturfenster für {phase['label']} muss "
+                "innerhalb MIN_TEMP/MAX_TEMP liegen"
+            )
+        if phase["hum_min"] < min_hum or phase["hum_max"] > max_hum:
+            raise ValueError(
+                f"Das VPD-Feuchtefenster für {phase['label']} muss "
+                "innerhalb MIN_HUM/MAX_HUM liegen"
+            )
     return settings
 
 

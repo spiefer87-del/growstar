@@ -31,13 +31,21 @@ if "requests" not in sys.modules:
     sys.modules["requests"] = requests_stub
 
 
-from core.config import DEFAULT_CONFIG
+from core.config import DEFAULT_CONFIG, migrate_vpd_phase_config
+from core.config_update import apply_config_patch
 from core.control import control_device
 from core.helpers import calculate_vpd
+from core.profile import (
+    PROFILE_SETTING_KEYS,
+    VPD_PROFILE_SETTING_KEYS,
+    normalize_profile_settings,
+    profile_settings_from_config,
+)
 from core.runtime import TentRuntime
 from core.sensor_sources import apply_sensor_assignments, update_sensor_source
 from core.safety import _device_dependencies
 from core.state import create_runtime_state
+from core.tent_config import _with_defaults
 from core.vpd import validate_vpd_environment_alignment
 from core.vpd_control import update_vpd_control, vpd_manages_device
 
@@ -68,11 +76,16 @@ def runtime_for(
         "VPD_CONTROL_MODE": mode,
         "VPD_TARGET_DAY": 1.10,
         "VPD_TARGET_NIGHT": 0.90,
-        "VPD_TOLERANCE": 0.05,
-        "VPD_TEMP_MIN": 22.0,
-        "VPD_TEMP_MAX": 26.0,
-        "VPD_HUM_MIN": 50.0,
-        "VPD_HUM_MAX": 80.0,
+        "VPD_TOLERANCE_DAY": 0.05,
+        "VPD_TOLERANCE_NIGHT": 0.05,
+        "VPD_TEMP_MIN_DAY": 22.0,
+        "VPD_TEMP_MAX_DAY": 26.0,
+        "VPD_HUM_MIN_DAY": 50.0,
+        "VPD_HUM_MAX_DAY": 80.0,
+        "VPD_TEMP_MIN_NIGHT": 22.0,
+        "VPD_TEMP_MAX_NIGHT": 26.0,
+        "VPD_HUM_MIN_NIGHT": 50.0,
+        "VPD_HUM_MAX_NIGHT": 80.0,
         "VPD_EFFECT_WINDOW_MIN": 5,
         "VPD_MIN_EFFECT_KPA": 0.03,
         "VPD_TEMP_STEP": 0.5,
@@ -161,9 +174,52 @@ def main():
         "VPD-Defaults sind gültig und bewerten Wirkung erst nach fünf Minuten",
     )
 
+    legacy_values = {
+        "VPD_TOLERANCE": 0.08,
+        "VPD_TEMP_MIN": 21.5,
+        "VPD_TEMP_MAX": 27.5,
+        "VPD_HUM_MIN": 44.0,
+        "VPD_HUM_MAX": 76.0,
+    }
+    migrated_values = migrate_vpd_phase_config(
+        deepcopy(legacy_values),
+        remove_legacy=True,
+    )
+    require(
+        migrated_values["VPD_TOLERANCE_DAY"] == 0.08
+        and migrated_values["VPD_TOLERANCE_NIGHT"] == 0.08
+        and migrated_values["VPD_TEMP_MIN_DAY"] == 21.5
+        and migrated_values["VPD_TEMP_MIN_NIGHT"] == 21.5
+        and migrated_values["VPD_HUM_MAX_DAY"] == 76.0
+        and migrated_values["VPD_HUM_MAX_NIGHT"] == 76.0
+        and not set(legacy_values).intersection(migrated_values),
+        "Gemeinsame VPD-Werte aus 3.16.0 werden verlustfrei auf Tag und Nacht gespiegelt",
+    )
+
+    legacy_cfg = deepcopy(DEFAULT_CONFIG)
+    for key in VPD_PROFILE_SETTING_KEYS:
+        if key not in {"VPD_TARGET_DAY", "VPD_TARGET_NIGHT"}:
+            legacy_cfg.pop(key, None)
+    legacy_cfg.update(legacy_values)
+    legacy_validated = validate_vpd_environment_alignment(legacy_cfg)
+    require(
+        legacy_validated["phases"]["TAG"]["temp_min"] == 21.5
+        and legacy_validated["phases"]["NACHT"]["hum_max"] == 76.0,
+        "Der Regler validiert auch eine noch nicht persistierte 3.16.0-Konfiguration",
+    )
+
+    migrated_tent_config = _with_defaults(legacy_values)
+    require(
+        migrated_tent_config["VPD_TOLERANCE_DAY"] == 0.08
+        and migrated_tent_config["VPD_TOLERANCE_NIGHT"] == 0.08
+        and migrated_tent_config["VPD_HUM_MAX_DAY"] == 76.0
+        and migrated_tent_config["VPD_HUM_MAX_NIGHT"] == 76.0,
+        "Zusätzliche Zelte übernehmen ihre bisherigen gemeinsamen Werte ebenfalls",
+    )
+
     incompatible = deepcopy(cfg)
     incompatible["VPD_CONTROL_MODE"] = "MONITOR"
-    incompatible["VPD_TEMP_MAX"] = float(incompatible["MAX_TEMP"]) + 1
+    incompatible["VPD_TEMP_MAX_DAY"] = float(incompatible["MAX_TEMP"]) + 1
     try:
         validate_vpd_environment_alignment(incompatible)
     except ValueError:
@@ -172,12 +228,77 @@ def main():
         raise AssertionError("VPD-Fenster außerhalb der Schutzgrenze wurde akzeptiert")
     require(True, "VPD-Betriebsfenster bleibt innerhalb der Stations-Schutzgrenzen")
 
+    incompatible_night = deepcopy(cfg)
+    incompatible_night["VPD_CONTROL_MODE"] = "AUTO"
+    incompatible_night["VPD_HUM_MAX_NIGHT"] = 80.0
+    try:
+        validate_vpd_environment_alignment(incompatible_night)
+    except ValueError as exc:
+        require(
+            "Nacht" in str(exc),
+            "Eine verletzte Nachtgrenze wird phasengenau gemeldet",
+        )
+    else:
+        raise AssertionError("VPD-Nachtfenster außerhalb der Schutzgrenze wurde akzeptiert")
+
     prepared_off = deepcopy(incompatible)
     prepared_off["VPD_CONTROL_MODE"] = "OFF"
     validate_vpd_environment_alignment(prepared_off)
     require(
         True,
         "Vorbereitete VPD-Werte blockieren im ausgeschalteten Modus keine Klimaänderung",
+    )
+
+    profile_base = {
+        key: deepcopy(DEFAULT_CONFIG[key])
+        for key in PROFILE_SETTING_KEYS
+        if key not in VPD_PROFILE_SETTING_KEYS
+    }
+    legacy_profile = {
+        **profile_base,
+        "VPD_TARGET_DAY": 1.15,
+        "VPD_TARGET_NIGHT": 0.85,
+        **legacy_values,
+    }
+    normalized_legacy_profile = normalize_profile_settings(legacy_profile)
+    require(
+        normalized_legacy_profile["VPD_TOLERANCE_DAY"] == 0.08
+        and normalized_legacy_profile["VPD_TOLERANCE_NIGHT"] == 0.08
+        and normalized_legacy_profile["VPD_TEMP_MAX_DAY"] == 27.5
+        and normalized_legacy_profile["VPD_TEMP_MAX_NIGHT"] == 27.5
+        and not set(legacy_values).intersection(normalized_legacy_profile),
+        "Gespeicherte 3.16.0-Profile behalten ihr gemeinsames Fenster in beiden Phasen",
+    )
+
+    legacy_station_snapshot = profile_settings_from_config(legacy_profile)
+    require(
+        legacy_station_snapshot["VPD_TOLERANCE_DAY"] == 0.08
+        and legacy_station_snapshot["VPD_TOLERANCE_NIGHT"] == 0.08
+        and legacy_station_snapshot["VPD_HUM_MIN_DAY"] == 44.0
+        and legacy_station_snapshot["VPD_HUM_MIN_NIGHT"] == 44.0,
+        "Aktuelle Stationswerte lassen sich nach der Migration vollständig ins Profil kopieren",
+    )
+
+    pre_vpd_profile = deepcopy(profile_base)
+    pre_vpd_profile.update({
+        "DAY_TEMP": 26.0,
+        "DAY_TEMP_TOL": 1.0,
+        "DAY_HUM": 58.0,
+        "DAY_HUM_TOL": 4.0,
+        "NIGHT_TEMP": 20.0,
+        "NIGHT_TEMP_TOL": 2.0,
+        "NIGHT_HUM": 68.0,
+        "NIGHT_HUM_TOL": 6.0,
+    })
+    normalized_pre_vpd_profile = normalize_profile_settings(pre_vpd_profile)
+    require(
+        normalized_pre_vpd_profile["VPD_TEMP_MIN_DAY"] == 25.0
+        and normalized_pre_vpd_profile["VPD_TEMP_MAX_DAY"] == 27.0
+        and normalized_pre_vpd_profile["VPD_HUM_MIN_DAY"] == 54.0
+        and normalized_pre_vpd_profile["VPD_TEMP_MIN_NIGHT"] == 18.0
+        and normalized_pre_vpd_profile["VPD_TEMP_MAX_NIGHT"] == 22.0
+        and normalized_pre_vpd_profile["VPD_HUM_MIN_NIGHT"] == 62.0,
+        "Profile von vor 3.16 erhalten getrennte, aus Tag/Nacht abgeleitete Fenster",
     )
 
     sensor_runtime = runtime_for(mode="OFF")
@@ -200,6 +321,22 @@ def main():
         "Optionale Außenquelle wird frisch und getrennt in die TentRuntime übernommen",
     )
 
+    stale_browser_runtime = runtime_for(mode="OFF")
+    stale_browser_result = apply_config_patch(
+        legacy_values,
+        runtime=stale_browser_runtime,
+    )
+    require(
+        stale_browser_runtime.config["VPD_TEMP_MIN_DAY"] == 21.5
+        and stale_browser_runtime.config["VPD_TEMP_MIN_NIGHT"] == 21.5
+        and stale_browser_runtime.config["VPD_HUM_MAX_DAY"] == 76.0
+        and stale_browser_runtime.config["VPD_HUM_MAX_NIGHT"] == 76.0
+        and not set(legacy_values).intersection(stale_browser_runtime.config)
+        and "VPD_TOLERANCE_DAY" in stale_browser_result["changed_keys"]
+        and "VPD_TOLERANCE_NIGHT" in stale_browser_result["changed_keys"],
+        "Eine noch geöffnete 3.16.0-Webseite speichert sicher in beide Phasen",
+    )
+
     monitor = runtime_for(mode="MONITOR")
     monitor_plan = update_vpd_control(monitor, now=1000)
     require(
@@ -207,6 +344,55 @@ def main():
         and monitor_plan["takeover"] is False
         and not vpd_manages_device("fan", runtime=monitor),
         "Beobachten berechnet Abluft, übernimmt aber keinen Aktor",
+    )
+
+    tolerance_runtime = runtime_for(mode="MONITOR", temp=24.0, hum=60.0)
+    tolerance_runtime.config.update({
+        "VPD_TARGET_NIGHT": 1.10,
+        "VPD_TOLERANCE_NIGHT": 0.20,
+        "VPD_TEMP_MIN_NIGHT": 19.0,
+        "VPD_TEMP_MAX_NIGHT": 25.0,
+        "VPD_HUM_MIN_NIGHT": 55.0,
+        "VPD_HUM_MAX_NIGHT": 85.0,
+    })
+    day_tolerance_plan = update_vpd_control(tolerance_runtime, now=1000)
+    tolerance_runtime.state.current_profile = "NACHT"
+    tolerance_runtime.state.live_state["profile"] = "NACHT"
+    night_tolerance_plan = update_vpd_control(tolerance_runtime, now=1001)
+    require(
+        day_tolerance_plan["direction"] == "lower"
+        and day_tolerance_plan["tolerance"] == 0.05
+        and night_tolerance_plan["stage"] == "in_band"
+        and night_tolerance_plan["tolerance"] == 0.20
+        and night_tolerance_plan["range"] == {
+            "temp_min": 19.0,
+            "temp_max": 25.0,
+            "hum_min": 55.0,
+            "hum_max": 85.0,
+        },
+        "Tag und Nacht verwenden ihre eigene Toleranz und ihr eigenes Klimafenster",
+    )
+
+    phase_reset = runtime_for(mode="MONITOR")
+    first_day_stage = update_vpd_control(phase_reset, now=1000)
+    escalated_day_stage = update_vpd_control(phase_reset, now=1301)
+    phase_reset.config.update({
+        "VPD_TOLERANCE_NIGHT": 0.05,
+        "VPD_TEMP_MIN_NIGHT": 19.0,
+        "VPD_TEMP_MAX_NIGHT": 25.0,
+        "VPD_HUM_MIN_NIGHT": 55.0,
+        "VPD_HUM_MAX_NIGHT": 85.0,
+    })
+    phase_reset.state.current_profile = "NACHT"
+    phase_reset.state.live_state["profile"] = "NACHT"
+    first_night_stage = update_vpd_control(phase_reset, now=1302)
+    require(
+        first_day_stage["stage"] == "exhaust"
+        and escalated_day_stage["stage"] == "heat"
+        and first_night_stage["profile"] == "NACHT"
+        and first_night_stage["stage"] == "exhaust"
+        and first_night_stage["effect"]["next_evaluation_sec"] == 300,
+        "Der Tag-/Nachtwechsel startet die Wirkungsprüfung mit dem neuen Fenster frisch",
     )
 
     missing = runtime_for(outside=False)
@@ -330,7 +516,7 @@ def main():
     humidity_guard = runtime_for(temp=26.0, hum=66.0)
     humidity_guard.config.update({
         "VPD_TARGET_DAY": 0.95,
-        "VPD_HUM_MAX": 65.0,
+        "VPD_HUM_MAX_DAY": 65.0,
     })
     humidity_guard_plan = update_vpd_control(humidity_guard, now=1000)
     require(
@@ -380,13 +566,17 @@ def main():
     require(
         'id="VPD_CONTROL_MODE"' in settings_page
         and "MONITOR" in settings_page
+        and 'id="VPD_TOLERANCE_DAY"' in settings_page
+        and 'id="VPD_TEMP_MIN_NIGHT"' in settings_page
         and 'id="VPD_TARGET_DAY"' in profile_page
+        and 'id="VPD_TOLERANCE_NIGHT"' in profile_page
+        and 'id="VPD_HUM_MAX_DAY"' in profile_page
         and "outside_temperature" in sensor_page
         and 'id="vpd-control-summary"' in dashboard,
-        "Einstellungen, Profile, Außensensoren und Dashboard zeigen die VPD-Funktion vollständig",
+        "Einstellungen, Profile, Außensensoren und Dashboard zeigen beide VPD-Phasen vollständig",
     )
 
-    print("✅ Growstar 3.16.0 / VPD.CONTROL.1 vollständig geprüft")
+    print("✅ Growstar 3.16.1 / VPD.CONTROL.2 vollständig geprüft")
 
 
 if __name__ == "__main__":

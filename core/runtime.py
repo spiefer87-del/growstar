@@ -8,7 +8,12 @@ import time
 import core.context as ctx
 import core.state as legacy_state
 
-from core.config import DEFAULT_CONFIG, config as legacy_config, save_config
+from core.config import (
+    DEFAULT_CONFIG,
+    config as legacy_config,
+    migrate_vpd_phase_config,
+    save_config,
+)
 from core.tent_config import (
     ensure_tent_config,
     load_tent_config,
@@ -215,7 +220,9 @@ def create_isolated_runtime(
             cfg.pop(key, None)
 
     if config_data:
-        cfg.update(deepcopy(config_data))
+        loaded_config = deepcopy(config_data)
+        migrate_vpd_phase_config(loaded_config)
+        cfg.update(loaded_config)
 
     return TentRuntime(
         tent_id=tent_id,

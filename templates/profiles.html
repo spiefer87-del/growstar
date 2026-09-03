@@ -50,6 +50,11 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .warning{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.26);color:#fde68a}
 .preview{margin-top:9px;padding:11px;border-radius:11px;background:#0f172a;border:1px solid var(--border);font-size:.76rem;line-height:1.55}
 .preview strong{color:#fcd34d}
+.vpd-phase-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.vpd-phase{padding:13px 9px 5px;border-radius:13px;background:linear-gradient(145deg,rgba(15,23,42,.88),rgba(30,41,59,.72));border:1px solid var(--border)}
+.vpd-phase.day{border-color:rgba(250,204,21,.25)}
+.vpd-phase.night{border-color:rgba(129,140,248,.28)}
+.vpd-phase h3{margin:0 0 11px;text-align:center;font-size:.82rem;letter-spacing:.04em;color:#e2e8f0}
 .lighting-duration{margin:4px auto 0;padding:10px 12px;max-width:360px;text-align:center;border-radius:11px;background:rgba(250,204,21,.07);border:1px solid rgba(250,204,21,.22);color:#fde68a;font-size:.8rem}
 .feedback{min-height:20px;margin:10px 0 0;text-align:center;font-size:.78rem;color:var(--muted)}
 .feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.feedback.dirty{color:#fde68a}
@@ -59,7 +64,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .activate-button{background:var(--blue);color:#082f49;min-width:150px}
 .discard-button{background:#334155}
 .separate-note{margin:12px auto 0;max-width:580px;color:var(--muted);font-size:.72rem;line-height:1.45}
-@media(max-width:620px){body{padding:13px}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.actions{position:static}.copy-button{min-width:0;width:100%}}
+@media(max-width:620px){body{padding:13px}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.vpd-phase-grid{grid-template-columns:1fr}.actions{position:static}.copy-button{min-width:0;width:100%}}
 </style>
 </head>
 
@@ -218,65 +223,122 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 <strong>beobachtet</strong> oder <strong>automatisch regelt</strong>,
                 bleibt eine stationsbezogene Sicherheitsentscheidung unter Klima &amp; Grenzwerte.
             </div>
-            <div class="row-inline">
-                <div class="field">
-                    <label for="VPD_TARGET_DAY">Tag Ziel kPa</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('VPD_TARGET_DAY',-0.05)">−</button>
-                        <input type="number" step="0.01" min="0.1" max="3.5" id="VPD_TARGET_DAY" class="compact-input" required>
-                        <button type="button" onclick="stepValue('VPD_TARGET_DAY',0.05)">+</button>
+            <div class="vpd-phase-grid">
+                <section class="vpd-phase day" aria-labelledby="profile-vpd-day-heading">
+                    <h3 id="profile-vpd-day-heading">☀️ Tag</h3>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_TARGET_DAY">VPD-Ziel kPa</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TARGET_DAY',-0.05)">−</button>
+                                <input type="number" step="any" min="0.1" max="3.5" id="VPD_TARGET_DAY" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TARGET_DAY',0.05)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="VPD_TOLERANCE_DAY">VPD-Toleranz ±</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TOLERANCE_DAY',-0.01)">−</button>
+                                <input type="number" step="any" min="0.01" max="0.5" id="VPD_TOLERANCE_DAY" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TOLERANCE_DAY',0.01)">+</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="field">
-                    <label for="VPD_TARGET_NIGHT">Nacht Ziel kPa</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('VPD_TARGET_NIGHT',-0.05)">−</button>
-                        <input type="number" step="0.01" min="0.1" max="3.5" id="VPD_TARGET_NIGHT" class="compact-input" required>
-                        <button type="button" onclick="stepValue('VPD_TARGET_NIGHT',0.05)">+</button>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_TEMP_MIN_DAY">Temperatur min °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TEMP_MIN_DAY',-0.5)">−</button>
+                                <input type="number" step="any" min="-10" max="50" id="VPD_TEMP_MIN_DAY" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TEMP_MIN_DAY',0.5)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="VPD_TEMP_MAX_DAY">Temperatur max °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TEMP_MAX_DAY',-0.5)">−</button>
+                                <input type="number" step="any" min="-10" max="50" id="VPD_TEMP_MAX_DAY" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TEMP_MAX_DAY',0.5)">+</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="field">
-                    <label for="VPD_TOLERANCE">Toleranz ± kPa</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('VPD_TOLERANCE',-0.01)">−</button>
-                        <input type="number" step="0.01" min="0.01" max="0.5" id="VPD_TOLERANCE" class="compact-input" required>
-                        <button type="button" onclick="stepValue('VPD_TOLERANCE',0.01)">+</button>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_HUM_MIN_DAY">Feuchte min %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_HUM_MIN_DAY',-1)">−</button>
+                                <input type="number" step="any" min="1" max="99" id="VPD_HUM_MIN_DAY" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_HUM_MIN_DAY',1)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="VPD_HUM_MAX_DAY">Feuchte max %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_HUM_MAX_DAY',-1)">−</button>
+                                <input type="number" step="any" min="1" max="99" id="VPD_HUM_MAX_DAY" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_HUM_MAX_DAY',1)">+</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </div>
-            <div class="row-inline">
-                <div class="field">
-                    <label for="VPD_TEMP_MIN">Temperatur min °C</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('VPD_TEMP_MIN',-0.5)">−</button>
-                        <input type="number" step="0.1" min="-10" max="50" id="VPD_TEMP_MIN" class="compact-input" required>
-                        <button type="button" onclick="stepValue('VPD_TEMP_MIN',0.5)">+</button>
+                </section>
+
+                <section class="vpd-phase night" aria-labelledby="profile-vpd-night-heading">
+                    <h3 id="profile-vpd-night-heading">🌙 Nacht</h3>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_TARGET_NIGHT">VPD-Ziel kPa</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TARGET_NIGHT',-0.05)">−</button>
+                                <input type="number" step="any" min="0.1" max="3.5" id="VPD_TARGET_NIGHT" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TARGET_NIGHT',0.05)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="VPD_TOLERANCE_NIGHT">VPD-Toleranz ±</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TOLERANCE_NIGHT',-0.01)">−</button>
+                                <input type="number" step="any" min="0.01" max="0.5" id="VPD_TOLERANCE_NIGHT" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TOLERANCE_NIGHT',0.01)">+</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="field">
-                    <label for="VPD_TEMP_MAX">Temperatur max °C</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('VPD_TEMP_MAX',-0.5)">−</button>
-                        <input type="number" step="0.1" min="-10" max="50" id="VPD_TEMP_MAX" class="compact-input" required>
-                        <button type="button" onclick="stepValue('VPD_TEMP_MAX',0.5)">+</button>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_TEMP_MIN_NIGHT">Temperatur min °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TEMP_MIN_NIGHT',-0.5)">−</button>
+                                <input type="number" step="any" min="-10" max="50" id="VPD_TEMP_MIN_NIGHT" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TEMP_MIN_NIGHT',0.5)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="VPD_TEMP_MAX_NIGHT">Temperatur max °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_TEMP_MAX_NIGHT',-0.5)">−</button>
+                                <input type="number" step="any" min="-10" max="50" id="VPD_TEMP_MAX_NIGHT" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_TEMP_MAX_NIGHT',0.5)">+</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="field">
-                    <label for="VPD_HUM_MIN">Feuchte min %</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('VPD_HUM_MIN',-1)">−</button>
-                        <input type="number" step="0.1" min="1" max="99" id="VPD_HUM_MIN" class="compact-input" required>
-                        <button type="button" onclick="stepValue('VPD_HUM_MIN',1)">+</button>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_HUM_MIN_NIGHT">Feuchte min %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_HUM_MIN_NIGHT',-1)">−</button>
+                                <input type="number" step="any" min="1" max="99" id="VPD_HUM_MIN_NIGHT" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_HUM_MIN_NIGHT',1)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="VPD_HUM_MAX_NIGHT">Feuchte max %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="stepValue('VPD_HUM_MAX_NIGHT',-1)">−</button>
+                                <input type="number" step="any" min="1" max="99" id="VPD_HUM_MAX_NIGHT" class="compact-input" required>
+                                <button type="button" onclick="stepValue('VPD_HUM_MAX_NIGHT',1)">+</button>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="field">
-                    <label for="VPD_HUM_MAX">Feuchte max %</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('VPD_HUM_MAX',-1)">−</button>
-                        <input type="number" step="0.1" min="1" max="99" id="VPD_HUM_MAX" class="compact-input" required>
-                        <button type="button" onclick="stepValue('VPD_HUM_MAX',1)">+</button>
-                    </div>
-                </div>
+                </section>
             </div>
             <div id="vpd-profile-preview" class="preview"></div>
         </div>
@@ -385,8 +447,10 @@ const NUMBER_IDS = [
     "RAMP_DURATION_MIN",
     "LIGHT_SUNRISE_DURATION_MIN","LIGHT_SUNSET_DURATION_MIN",
     "LIGHT_SUN_MIN_LEVEL",
-    "VPD_TARGET_DAY","VPD_TARGET_NIGHT","VPD_TOLERANCE",
-    "VPD_TEMP_MIN","VPD_TEMP_MAX","VPD_HUM_MIN","VPD_HUM_MAX"
+    "VPD_TARGET_DAY","VPD_TOLERANCE_DAY",
+    "VPD_TEMP_MIN_DAY","VPD_TEMP_MAX_DAY","VPD_HUM_MIN_DAY","VPD_HUM_MAX_DAY",
+    "VPD_TARGET_NIGHT","VPD_TOLERANCE_NIGHT",
+    "VPD_TEMP_MIN_NIGHT","VPD_TEMP_MAX_NIGHT","VPD_HUM_MIN_NIGHT","VPD_HUM_MAX_NIGHT"
 ];
 
 let catalog = {};
@@ -447,6 +511,28 @@ function calculateVpd(temp,hum){
     return svp * (1-h/100);
 }
 
+function withVpdPhaseCompatibility(raw){
+    const profile = {...(raw || {})};
+    const aliases = {
+        VPD_TOLERANCE_DAY:"VPD_TOLERANCE",
+        VPD_TOLERANCE_NIGHT:"VPD_TOLERANCE",
+        VPD_TEMP_MIN_DAY:"VPD_TEMP_MIN",
+        VPD_TEMP_MAX_DAY:"VPD_TEMP_MAX",
+        VPD_HUM_MIN_DAY:"VPD_HUM_MIN",
+        VPD_HUM_MAX_DAY:"VPD_HUM_MAX",
+        VPD_TEMP_MIN_NIGHT:"VPD_TEMP_MIN",
+        VPD_TEMP_MAX_NIGHT:"VPD_TEMP_MAX",
+        VPD_HUM_MIN_NIGHT:"VPD_HUM_MIN",
+        VPD_HUM_MAX_NIGHT:"VPD_HUM_MAX"
+    };
+    Object.entries(aliases).forEach(([phaseKey,legacyKey])=>{
+        if(profile[phaseKey] === undefined && profile[legacyKey] !== undefined){
+            profile[phaseKey] = profile[legacyKey];
+        }
+    });
+    return profile;
+}
+
 function renderLightSunAvailability(){
     const note = el("profile-light-sun-note");
     if(!note) return;
@@ -487,15 +573,20 @@ function updatePreview(){
         Nacht: ${num("NIGHT_HUM").toFixed(1)} % ± ${num("NIGHT_HUM_TOL").toFixed(1)} %
     `;
 
-    const attainableMin = calculateVpd(num("VPD_TEMP_MIN"),num("VPD_HUM_MAX"));
-    const attainableMax = calculateVpd(num("VPD_TEMP_MAX"),num("VPD_HUM_MIN"));
+    const dayAttainableMin = calculateVpd(num("VPD_TEMP_MIN_DAY"),num("VPD_HUM_MAX_DAY"));
+    const dayAttainableMax = calculateVpd(num("VPD_TEMP_MAX_DAY"),num("VPD_HUM_MIN_DAY"));
+    const nightAttainableMin = calculateVpd(num("VPD_TEMP_MIN_NIGHT"),num("VPD_HUM_MAX_NIGHT"));
+    const nightAttainableMax = calculateVpd(num("VPD_TEMP_MAX_NIGHT"),num("VPD_HUM_MIN_NIGHT"));
     el("vpd-profile-preview").innerHTML = `
         <strong>VPD-Profil</strong><br>
-        Tag: ${num("VPD_TARGET_DAY").toFixed(2)} kPa ± ${num("VPD_TOLERANCE").toFixed(2)} kPa<br>
-        Nacht: ${num("VPD_TARGET_NIGHT").toFixed(2)} kPa ± ${num("VPD_TOLERANCE").toFixed(2)} kPa<br>
-        Temperaturfenster: ${num("VPD_TEMP_MIN").toFixed(1)} bis ${num("VPD_TEMP_MAX").toFixed(1)} °C<br>
-        Feuchtefenster: ${num("VPD_HUM_MIN").toFixed(1)} bis ${num("VPD_HUM_MAX").toFixed(1)} %<br>
-        Darin erreichbar: ${Number.isFinite(attainableMin) ? attainableMin.toFixed(2) : "--"} bis ${Number.isFinite(attainableMax) ? attainableMax.toFixed(2) : "--"} kPa
+        ☀️ Tag: ${num("VPD_TARGET_DAY").toFixed(2)} kPa ± ${num("VPD_TOLERANCE_DAY").toFixed(2)} ·
+        ${num("VPD_TEMP_MIN_DAY").toFixed(1)}–${num("VPD_TEMP_MAX_DAY").toFixed(1)} °C ·
+        ${num("VPD_HUM_MIN_DAY").toFixed(1)}–${num("VPD_HUM_MAX_DAY").toFixed(1)} %<br>
+        Erreichbar: ${Number.isFinite(dayAttainableMin) ? dayAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(dayAttainableMax) ? dayAttainableMax.toFixed(2) : "--"} kPa<br>
+        🌙 Nacht: ${num("VPD_TARGET_NIGHT").toFixed(2)} kPa ± ${num("VPD_TOLERANCE_NIGHT").toFixed(2)} ·
+        ${num("VPD_TEMP_MIN_NIGHT").toFixed(1)}–${num("VPD_TEMP_MAX_NIGHT").toFixed(1)} °C ·
+        ${num("VPD_HUM_MIN_NIGHT").toFixed(1)}–${num("VPD_HUM_MAX_NIGHT").toFixed(1)} %<br>
+        Erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa
     `;
 
     const sunActive = !!el("LIGHT_SUN_ENABLED")?.checked;
@@ -570,6 +661,8 @@ function renderProfileButtons(){
 
 function fillEditor(profile,{markDirty=false}={}){
     if(!profile) return;
+
+    profile = withVpdPhaseCompatibility(profile);
 
     NUMBER_IDS.forEach(id=>{
         if(profile[id] !== undefined) el(id).value = profile[id];
@@ -778,7 +871,7 @@ async function activateProfile(){
         `${profileLabel(selectedProfile)} ${reapply ? "erneut anwenden" : "aktivieren"}?\n\n` +
         "• Die gespeicherten Profilwerte werden in diese Station übernommen.\n" +
         "• Temperatur-Rampe und Sonnenverlauf werden mit übernommen.\n" +
-        "• VPD-Ziel und erlaubtes Temperatur-/Feuchtefenster werden mit übernommen.\n" +
+        "• Getrennte VPD-Ziele und Betriebsfenster für Tag/Nacht werden mit übernommen.\n" +
         "• Eine laufende Rampe wird beendet.\n" +
         "• Die Profilvorlage selbst wird dabei nicht verändert."
     );

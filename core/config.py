@@ -3,6 +3,47 @@ import json
 
 CONFIG_FILE = "config.json"
 
+
+# Growstar 3.16.0 kannte für Tag und Nacht noch ein gemeinsames VPD-Fenster.
+# Die Alias-Tabelle wird beim Laden und an den API-Grenzen verwendet, damit
+# bestehende config.json-/tent_configs-Dateien ohne manuellen Eingriff exakt
+# dieselben Werte zunächst für beide Phasen erhalten.
+VPD_PHASE_COMPATIBILITY_MAP = {
+    "VPD_TOLERANCE_DAY": "VPD_TOLERANCE",
+    "VPD_TOLERANCE_NIGHT": "VPD_TOLERANCE",
+    "VPD_TEMP_MIN_DAY": "VPD_TEMP_MIN",
+    "VPD_TEMP_MAX_DAY": "VPD_TEMP_MAX",
+    "VPD_HUM_MIN_DAY": "VPD_HUM_MIN",
+    "VPD_HUM_MAX_DAY": "VPD_HUM_MAX",
+    "VPD_TEMP_MIN_NIGHT": "VPD_TEMP_MIN",
+    "VPD_TEMP_MAX_NIGHT": "VPD_TEMP_MAX",
+    "VPD_HUM_MIN_NIGHT": "VPD_HUM_MIN",
+    "VPD_HUM_MAX_NIGHT": "VPD_HUM_MAX",
+}
+VPD_LEGACY_SHARED_KEYS = tuple(sorted(set(VPD_PHASE_COMPATIBILITY_MAP.values())))
+
+
+def migrate_vpd_phase_config(data, *, remove_legacy=False):
+    """Ergänzt die phasengetrennten VPD-Werte aus dem 3.16.0-Schema.
+
+    Bereits vorhandene neue Werte gewinnen immer. Dadurch ist die Funktion
+    idempotent und kann sicher sowohl beim Laden als auch bei alten API-
+    Payloads eingesetzt werden.
+    """
+
+    if not isinstance(data, dict):
+        return data
+
+    for phase_key, legacy_key in VPD_PHASE_COMPATIBILITY_MAP.items():
+        if phase_key not in data and legacy_key in data:
+            data[phase_key] = data[legacy_key]
+
+    if remove_legacy:
+        for legacy_key in VPD_LEGACY_SHARED_KEYS:
+            data.pop(legacy_key, None)
+
+    return data
+
 # =========================================
 # 🔧 DYNAMISCHE KONFIGURATION (Web-UI)
 # =========================================
@@ -13,6 +54,7 @@ def load_config():
     return {}
 
 config = load_config()
+migrate_vpd_phase_config(config)
 
 # =========================================
 # 🧠 DEFAULT CONFIG (neue Architektur)
@@ -63,14 +105,21 @@ DEFAULT_CONFIG = {
     "VPD_CONTROL_MODE": "OFF",
     "VPD_TARGET_DAY": 1.10,
     "VPD_TARGET_NIGHT": 0.90,
-    "VPD_TOLERANCE": 0.05,
+    "VPD_TOLERANCE_DAY": 0.05,
+    "VPD_TOLERANCE_NIGHT": 0.05,
 
-    # Erlaubtes Betriebsfenster der VPD-Optimierung. Die bestehenden
-    # MIN_/MAX_-Werte bleiben davon getrennte Schutz-/Alarmgrenzen.
-    "VPD_TEMP_MIN": 20.0,
-    "VPD_TEMP_MAX": 28.0,
-    "VPD_HUM_MIN": 40.0,
-    "VPD_HUM_MAX": 70.0,
+    # Tag und Nacht besitzen jeweils ein eigenes erlaubtes Betriebsfenster.
+    # Die bestehenden MIN_/MAX_-Werte bleiben davon getrennte, übergeordnete
+    # Schutz-/Alarmgrenzen.
+    "VPD_TEMP_MIN_DAY": 20.0,
+    "VPD_TEMP_MAX_DAY": 28.0,
+    "VPD_HUM_MIN_DAY": 40.0,
+    "VPD_HUM_MAX_DAY": 70.0,
+
+    "VPD_TEMP_MIN_NIGHT": 20.0,
+    "VPD_TEMP_MAX_NIGHT": 28.0,
+    "VPD_HUM_MIN_NIGHT": 40.0,
+    "VPD_HUM_MAX_NIGHT": 70.0,
 
     # Eine Stufe wird erst nach fünf Minuten anhand des echten VPD-Trends
     # bewertet. Temperatur und Abluft werden nur in kleinen Schritten verändert.

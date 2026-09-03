@@ -6,7 +6,7 @@ import os
 import tempfile
 import threading
 
-from core.config import DEFAULT_CONFIG
+from core.config import DEFAULT_CONFIG, migrate_vpd_phase_config
 from core.tents import DEFAULT_TENT_ID, validate_tent_id
 
 
@@ -166,9 +166,9 @@ def _with_defaults(data):
     _remove_hardware_defaults(result)
 
     if isinstance(data, dict):
-        result.update(
-            deepcopy(data)
-        )
+        loaded = deepcopy(data)
+        migrate_vpd_phase_config(loaded)
+        result.update(loaded)
 
     return result
 

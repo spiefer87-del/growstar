@@ -8,7 +8,11 @@ from pathlib import Path
 import tempfile
 import threading
 
-from core.config import DEFAULT_CONFIG
+from core.config import (
+    DEFAULT_CONFIG,
+    VPD_LEGACY_SHARED_KEYS,
+    migrate_vpd_phase_config,
+)
 from core.runtime import resolve_runtime
 from core.tents import DEFAULT_TENT_ID
 from core.helpers import (
@@ -48,6 +52,22 @@ def get_profile(runtime=None):
 
 PROFILE_FILE = "profiles.json"
 
+VPD_PROFILE_SETTING_KEYS = (
+    "VPD_TARGET_DAY",
+    "VPD_TOLERANCE_DAY",
+    "VPD_TEMP_MIN_DAY",
+    "VPD_TEMP_MAX_DAY",
+    "VPD_HUM_MIN_DAY",
+    "VPD_HUM_MAX_DAY",
+    "VPD_TARGET_NIGHT",
+    "VPD_TOLERANCE_NIGHT",
+    "VPD_TEMP_MIN_NIGHT",
+    "VPD_TEMP_MAX_NIGHT",
+    "VPD_HUM_MIN_NIGHT",
+    "VPD_HUM_MAX_NIGHT",
+)
+
+
 PROFILE_SETTING_KEYS = (
     "DAY_TEMP",
     "NIGHT_TEMP",
@@ -65,13 +85,7 @@ PROFILE_SETTING_KEYS = (
     "LIGHT_SUNRISE_DURATION_MIN",
     "LIGHT_SUNSET_DURATION_MIN",
     "LIGHT_SUN_MIN_LEVEL",
-    "VPD_TARGET_DAY",
-    "VPD_TARGET_NIGHT",
-    "VPD_TOLERANCE",
-    "VPD_TEMP_MIN",
-    "VPD_TEMP_MAX",
-    "VPD_HUM_MIN",
-    "VPD_HUM_MAX",
+    *VPD_PROFILE_SETTING_KEYS,
 )
 
 PROFILE_COMPATIBILITY_DEFAULTS = {
@@ -95,49 +109,51 @@ def _profile_compatibility_values(settings):
     """
 
     values = deepcopy(PROFILE_COMPATIBILITY_DEFAULTS)
+    source = deepcopy(settings) if isinstance(settings, dict) else {}
+    migrate_vpd_phase_config(source, remove_legacy=True)
+
+    derived = {
+        key: deepcopy(DEFAULT_CONFIG[key])
+        for key in VPD_PROFILE_SETTING_KEYS
+    }
 
     try:
-        day_temp = float(settings["DAY_TEMP"])
-        night_temp = float(settings["NIGHT_TEMP"])
-        day_hum = float(settings["DAY_HUM"])
-        night_hum = float(settings["NIGHT_HUM"])
-        day_temp_tol = abs(float(settings["DAY_TEMP_TOL"]))
-        night_temp_tol = abs(float(settings["NIGHT_TEMP_TOL"]))
-        day_hum_tol = abs(float(settings["DAY_HUM_TOL"]))
-        night_hum_tol = abs(float(settings["NIGHT_HUM_TOL"]))
+        for suffix in ("DAY", "NIGHT"):
+            temp = float(settings[f"{suffix}_TEMP"])
+            hum = float(settings[f"{suffix}_HUM"])
+            temp_tol = abs(float(settings[f"{suffix}_TEMP_TOL"]))
+            hum_tol = abs(float(settings[f"{suffix}_HUM_TOL"]))
 
-        temp_min = min(day_temp - day_temp_tol, night_temp - night_temp_tol)
-        temp_max = max(day_temp + day_temp_tol, night_temp + night_temp_tol)
-        hum_min = max(1.0, min(day_hum - day_hum_tol, night_hum - night_hum_tol))
-        hum_max = min(99.0, max(day_hum + day_hum_tol, night_hum + night_hum_tol))
+            temp_min = temp - temp_tol
+            temp_max = temp + temp_tol
+            hum_min = max(1.0, hum - hum_tol)
+            hum_max = min(99.0, hum + hum_tol)
 
-        if temp_max - temp_min < 0.2:
-            temp_min -= 0.1
-            temp_max += 0.1
-        if hum_max - hum_min < 1.0:
-            hum_min = max(1.0, hum_min - 0.5)
-            hum_max = min(99.0, hum_max + 0.5)
+            if temp_max - temp_min < 0.2:
+                temp_min -= 0.1
+                temp_max += 0.1
+            if hum_max - hum_min < 1.0:
+                hum_min = max(1.0, hum_min - 0.5)
+                hum_max = min(99.0, hum_max + 0.5)
 
-        values.update({
-            "VPD_TARGET_DAY": float(calculate_vpd(day_temp, day_hum)),
-            "VPD_TARGET_NIGHT": float(calculate_vpd(night_temp, night_hum)),
-            "VPD_TOLERANCE": float(DEFAULT_CONFIG["VPD_TOLERANCE"]),
-            "VPD_TEMP_MIN": round(temp_min, 2),
-            "VPD_TEMP_MAX": round(temp_max, 2),
-            "VPD_HUM_MIN": round(hum_min, 2),
-            "VPD_HUM_MAX": round(hum_max, 2),
-        })
+            derived.update({
+                f"VPD_TARGET_{suffix}": round(
+                    float(calculate_vpd(temp, hum)),
+                    2,
+                ),
+                f"VPD_TOLERANCE_{suffix}": float(
+                    DEFAULT_CONFIG[f"VPD_TOLERANCE_{suffix}"]
+                ),
+                f"VPD_TEMP_MIN_{suffix}": round(temp_min, 2),
+                f"VPD_TEMP_MAX_{suffix}": round(temp_max, 2),
+                f"VPD_HUM_MIN_{suffix}": round(hum_min, 2),
+                f"VPD_HUM_MAX_{suffix}": round(hum_max, 2),
+            })
     except (KeyError, TypeError, ValueError, OverflowError):
-        for key in (
-            "VPD_TARGET_DAY",
-            "VPD_TARGET_NIGHT",
-            "VPD_TOLERANCE",
-            "VPD_TEMP_MIN",
-            "VPD_TEMP_MAX",
-            "VPD_HUM_MIN",
-            "VPD_HUM_MAX",
-        ):
-            values[key] = deepcopy(DEFAULT_CONFIG[key])
+        pass
+
+    for key in VPD_PROFILE_SETTING_KEYS:
+        values[key] = deepcopy(source.get(key, derived[key]))
 
     return values
 
@@ -184,7 +200,9 @@ def normalize_profile_settings(data):
     # die später ergänzten Sonnen-/VPD-Felder senden. Die fehlenden VPD-Werte
     # werden aus genau diesem Profil abgeleitet, nicht aus einem fremden Preset.
     data = deepcopy(data)
-    for key, default in _profile_compatibility_values(data).items():
+    compatibility = _profile_compatibility_values(data)
+    migrate_vpd_phase_config(data, remove_legacy=True)
+    for key, default in compatibility.items():
         data.setdefault(key, deepcopy(default))
 
     unknown = sorted(set(data) - set(PROFILE_SETTING_KEYS))
@@ -297,50 +315,34 @@ def normalize_profile_settings(data):
         _bounded(light_sun_min_level, "LIGHT_SUN_MIN_LEVEL", 11, 100)
     )
 
-    result.update({
-        "VPD_TARGET_DAY": _bounded(
-            _finite_number(data, "VPD_TARGET_DAY"),
-            "VPD_TARGET_DAY",
-            0.1,
-            3.5,
-        ),
-        "VPD_TARGET_NIGHT": _bounded(
-            _finite_number(data, "VPD_TARGET_NIGHT"),
-            "VPD_TARGET_NIGHT",
-            0.1,
-            3.5,
-        ),
-        "VPD_TOLERANCE": _bounded(
-            _finite_number(data, "VPD_TOLERANCE"),
-            "VPD_TOLERANCE",
-            0.01,
-            0.5,
-        ),
-        "VPD_TEMP_MIN": _bounded(
-            _finite_number(data, "VPD_TEMP_MIN"),
-            "VPD_TEMP_MIN",
-            -10,
-            50,
-        ),
-        "VPD_TEMP_MAX": _bounded(
-            _finite_number(data, "VPD_TEMP_MAX"),
-            "VPD_TEMP_MAX",
-            -10,
-            50,
-        ),
-        "VPD_HUM_MIN": _bounded(
-            _finite_number(data, "VPD_HUM_MIN"),
-            "VPD_HUM_MIN",
-            1,
-            99,
-        ),
-        "VPD_HUM_MAX": _bounded(
-            _finite_number(data, "VPD_HUM_MAX"),
-            "VPD_HUM_MAX",
-            1,
-            99,
-        ),
-    })
+    for suffix in ("DAY", "NIGHT"):
+        target_key = f"VPD_TARGET_{suffix}"
+        tolerance_key = f"VPD_TOLERANCE_{suffix}"
+        temp_min_key = f"VPD_TEMP_MIN_{suffix}"
+        temp_max_key = f"VPD_TEMP_MAX_{suffix}"
+        hum_min_key = f"VPD_HUM_MIN_{suffix}"
+        hum_max_key = f"VPD_HUM_MAX_{suffix}"
+
+        result.update({
+            target_key: _bounded(
+                _finite_number(data, target_key), target_key, 0.1, 3.5
+            ),
+            tolerance_key: _bounded(
+                _finite_number(data, tolerance_key), tolerance_key, 0.01, 0.5
+            ),
+            temp_min_key: _bounded(
+                _finite_number(data, temp_min_key), temp_min_key, -10, 50
+            ),
+            temp_max_key: _bounded(
+                _finite_number(data, temp_max_key), temp_max_key, -10, 50
+            ),
+            hum_min_key: _bounded(
+                _finite_number(data, hum_min_key), hum_min_key, 1, 99
+            ),
+            hum_max_key: _bounded(
+                _finite_number(data, hum_max_key), hum_max_key, 1, 99
+            ),
+        })
 
     # Dieselbe Erreichbarkeitsprüfung wie bei einer Stationskonfiguration.
     from core.vpd import validate_vpd_config
@@ -386,7 +388,9 @@ def load_profiles():
         for name, settings in profiles.items():
             if not isinstance(settings, dict):
                 raise RuntimeError(f"Profil {name!r} ist kein JSON-Objekt")
-            for key, default in _profile_compatibility_values(settings).items():
+            compatibility = _profile_compatibility_values(settings)
+            migrate_vpd_phase_config(settings, remove_legacy=True)
+            for key, default in compatibility.items():
                 settings.setdefault(key, deepcopy(default))
 
         return catalog
@@ -445,8 +449,11 @@ def profile_settings_from_config(config):
     if not isinstance(config, dict):
         raise TypeError("Stationskonfiguration muss ein JSON-Objekt sein")
 
+    source = deepcopy(config)
+    migrate_vpd_phase_config(source, remove_legacy=True)
+
     return {
-        key: deepcopy(config.get(key, DEFAULT_CONFIG[key]))
+        key: deepcopy(source.get(key, DEFAULT_CONFIG[key]))
         for key in PROFILE_SETTING_KEYS
     }
 
@@ -553,6 +560,9 @@ def apply_profile(name, runtime=None):
                     "Das VPD-Fenster dieses Profils ist mit den Schutzgrenzen "
                     f"der Station nicht vereinbar: {exc}",
                 ) from exc
+
+    for legacy_key in VPD_LEGACY_SHARED_KEYS:
+        cfg.pop(legacy_key, None)
 
     for key, value in profile.items():
         cfg[key] = deepcopy(value)

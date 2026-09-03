@@ -2,7 +2,11 @@
 
 from copy import deepcopy
 
-from core.config import DEFAULT_CONFIG
+from core.config import (
+    DEFAULT_CONFIG,
+    VPD_LEGACY_SHARED_KEYS,
+    migrate_vpd_phase_config,
+)
 from core.devices import AUX_DEVICE_NAMES, normalize_device_label
 from core.environment_limits import validate_environment_limits
 from core.profile import get_active_profile
@@ -50,6 +54,7 @@ def active_profile_for_runtime(runtime=None):
 def config_snapshot(runtime=None):
     rt = resolve_runtime(runtime)
     snapshot = deepcopy(rt.config)
+    migrate_vpd_phase_config(snapshot)
     snapshot["ACTIVE_PROFILE"] = active_profile_for_runtime(rt)
     return snapshot
 
@@ -111,6 +116,12 @@ def apply_config_patch(data, runtime=None):
     if not isinstance(data, dict):
         raise TypeError("Config-Update muss ein JSON-Objekt sein")
 
+    # Ein noch im Browser geöffneter 3.16.0-Client kann die fünf gemeinsamen
+    # Felder senden. Sie werden atomar auf Tag und Nacht gespiegelt. Neue
+    # phasenbezogene Felder haben Vorrang, falls beide Schemas vorkommen.
+    incoming = deepcopy(data)
+    migrate_vpd_phase_config(incoming, remove_legacy=True)
+
     rt = resolve_runtime(runtime)
     cfg = rt.config
     st = rt.state
@@ -118,7 +129,7 @@ def apply_config_patch(data, runtime=None):
 
     changed_keys = set()
 
-    for key, value in data.items():
+    for key, value in incoming.items():
         if key == "ACTIVE_PROFILE":
             # Profilwechsel läuft über den expliziten Profil-Endpunkt, damit
             # Rampen-/Persistenzzustand konsistent zurückgesetzt wird.
@@ -164,6 +175,13 @@ def apply_config_patch(data, runtime=None):
 
         working[key] = _coerce_scalar(key, value)
         changed_keys.add(key)
+
+    if any(
+        key.startswith("VPD_")
+        for key in incoming
+    ):
+        for legacy_key in VPD_LEGACY_SHARED_KEYS:
+            working.pop(legacy_key, None)
 
     # Phase 4V.2: Klima-/Alarmgrenzen werden VOR dem Commit validiert.
     validate_environment_limits(working)

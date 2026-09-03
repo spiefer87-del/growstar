@@ -31,6 +31,7 @@ def input_tag(template, field_id):
 
 def main():
     settings = (ROOT / "templates/settings.html").read_text(encoding="utf-8")
+    profiles = (ROOT / "templates/profiles.html").read_text(encoding="utf-8")
 
     continuous_fields = (
         "TEMP_ALERT_TOL",
@@ -39,11 +40,29 @@ def main():
         "HUM_ALERT_TOL",
         "MIN_HUM",
         "MAX_HUM",
+        "VPD_TARGET_DAY",
+        "VPD_TOLERANCE_DAY",
+        "VPD_TEMP_MIN_DAY",
+        "VPD_TEMP_MAX_DAY",
+        "VPD_HUM_MIN_DAY",
+        "VPD_HUM_MAX_DAY",
+        "VPD_TARGET_NIGHT",
+        "VPD_TOLERANCE_NIGHT",
+        "VPD_TEMP_MIN_NIGHT",
+        "VPD_TEMP_MAX_NIGHT",
+        "VPD_HUM_MIN_NIGHT",
+        "VPD_HUM_MAX_NIGHT",
     )
     for field_id in continuous_fields:
         require(
             'step="any"' in input_tag(settings, field_id),
             f"{field_id} besitzt kein künstliches Browser-Schrittgitter",
+        )
+
+    for field_id in continuous_fields[6:]:
+        require(
+            'step="any"' in input_tag(profiles, field_id),
+            f"Profilfeld {field_id} akzeptiert vorhandene Dezimalwerte",
         )
 
     require(

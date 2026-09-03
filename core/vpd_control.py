@@ -318,19 +318,23 @@ def _base_temp_target(runtime, settings):
     return _clip(current_number, settings["temp_min"], settings["temp_max"])
 
 
-def _target_for_phase(runtime, settings):
+def _settings_for_phase(runtime, settings):
     profile = str(
         runtime.state.live_state.get("profile")
         or runtime.state.current_profile
         or "TAG"
     ).upper()
-    return (
-        settings["target_night"] if profile == "NACHT"
-        else settings["target_day"]
-    ), profile
+    profile = "NACHT" if profile == "NACHT" else "TAG"
+    phase = dict((settings.get("phases") or {}).get(profile) or {})
+    if not phase:
+        raise ValueError(f"VPD-Phasenkonfiguration für {profile} fehlt")
+
+    active = dict(settings)
+    active.update(phase)
+    return active, profile
 
 
-def _public_waiting_state(settings, values, blockers):
+def _public_waiting_state(settings, profile, values, blockers):
     return {
         "mode": settings["mode"],
         "active": False,
@@ -342,6 +346,15 @@ def _public_waiting_state(settings, values, blockers):
         "direction": None,
         "reason": "; ".join(blockers),
         "vpd": values.get("vpd"),
+        "profile": profile,
+        "target": settings["target"],
+        "tolerance": settings["tolerance"],
+        "range": {
+            "temp_min": settings["temp_min"],
+            "temp_max": settings["temp_max"],
+            "hum_min": settings["hum_min"],
+            "hum_max": settings["hum_max"],
+        },
         "managed_devices": [],
         "actions": {},
         "blockers": list(blockers),
@@ -510,6 +523,26 @@ def update_vpd_control(runtime=None, *, now=None):
             st.live_state.pop("vpd_base_temp_target", None)
         return public
 
+    try:
+        settings, profile = _settings_for_phase(rt, settings)
+    except ValueError as exc:
+        public = {
+            "mode": settings["mode"],
+            "active": False,
+            "takeover": False,
+            "ready": False,
+            "fallback": True,
+            "stage": "invalid_config",
+            "stage_label": "Konfiguration fehlerhaft",
+            "reason": str(exc),
+            "managed_devices": [],
+            "actions": {},
+        }
+        with rt.state_lock:
+            st.live_state[_PUBLIC_KEY] = public
+            st.live_state.pop(_ENGINE_KEY, None)
+        return public
+
     with rt.state_lock:
         values = {
             "temp": st.live_state.get("temp"),
@@ -522,7 +555,7 @@ def update_vpd_control(runtime=None, *, now=None):
 
     blockers = _readiness(rt, values)
     if blockers:
-        public = _public_waiting_state(settings, values, blockers)
+        public = _public_waiting_state(settings, profile, values, blockers)
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
             st.live_state.pop(_ENGINE_KEY, None)
@@ -535,7 +568,7 @@ def update_vpd_control(runtime=None, *, now=None):
     outside_temp = float(values["outside_temp"])
     outside_hum = float(values["outside_hum"])
     vpd = float(calculate_vpd(temp, hum))
-    target, profile = _target_for_phase(rt, settings)
+    target = settings["target"]
     error = vpd - target
 
     inside_ah = _absolute_humidity(temp, hum)
@@ -558,6 +591,13 @@ def update_vpd_control(runtime=None, *, now=None):
         engine = deepcopy(st.live_state.get(_ENGINE_KEY))
         if not isinstance(engine, dict):
             engine = {}
+
+    # Beim realen Tag-/Nachtwechsel gelten ein anderes Zielband und ein
+    # anderes Betriebsfenster. Keine Wirkungsprobe oder Eskalationsstufe darf
+    # deshalb aus der vorherigen Phase übernommen werden.
+    if engine.get("profile") != profile:
+        engine = {}
+    engine["profile"] = profile
 
     engine.setdefault("temp_target", base_target)
     previous_base_target = engine.get("base_temp_target")
