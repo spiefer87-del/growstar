@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PPFD bleibt bei stationsbezogenen Sensorzuweisungen optional."""
+"""Optionale PPFD- und Außenquellen bleiben sicher manuell zuweisbar."""
 
 from pathlib import Path
 import ast
@@ -20,6 +20,8 @@ def load_assignment_functions():
     source = SENSORS_PATH.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(SENSORS_PATH))
     names = {
+        "_supports",
+        "_sensor_options",
         "_normalize_assignment",
         "_normalize_optional_assignment",
         "_offsets",
@@ -84,6 +86,33 @@ def assignment(source_id, field):
 def main():
     namespace = load_assignment_functions()
     save_assignments = namespace["_save_assignments"]
+
+    namespace["_source_map"] = lambda: {
+        "climate:inside": {
+            "id": "climate:inside",
+            "label": "Klimasensor innen",
+            "type": "mqtt",
+            "temperature": 24.2,
+            "humidity": 61.0,
+        },
+        "light:only": {
+            "id": "light:only",
+            "label": "Lichtsensor",
+            "type": "hardware",
+            "ppfd": 450,
+        },
+    }
+    options = namespace["_sensor_options"]()
+    require(
+        options["outside_temperature"] == options["temperature"]
+        and options["outside_humidity"] == options["humidity"],
+        "Sensor-API bietet Außen-Temperatur und Außen-Feuchte als eigene Auswahllisten",
+    )
+    require(
+        options["outside_temperature"][0]["field"] == "temperature"
+        and options["outside_humidity"][0]["field"] == "humidity",
+        "Außenauswahl verwendet weiterhin die physisch korrekten Sensorfelder",
+    )
 
     apply_calls = []
     reset_calls = []
@@ -162,10 +191,12 @@ def main():
     )
 
     save_assignments(outside_runtime, {"outside_humidity": None})
+    remaining_outside = outside_runtime.config["SENSOR_ASSIGNMENTS"]
     require(
-        "outside_humidity"
-        not in outside_runtime.config["SENSOR_ASSIGNMENTS"],
-        "Eine optionale Außen-Zuweisung kann gezielt entfernt werden",
+        "outside_humidity" not in remaining_outside
+        and remaining_outside["outside_temperature"]["source_id"]
+        == "outside:climate",
+        "Eine Außen-Zuweisung kann einzeln entfernt werden, ohne die andere zu löschen",
     )
 
     reset_calls.clear()
@@ -220,7 +251,33 @@ def main():
     else:
         raise AssertionError("Leere Temperaturzuweisung wurde unerwartet akzeptiert")
 
-    print("✅ Growstar 3.15.8 / SENSOR.PPFD.3 vollständig geprüft")
+    ui = (ROOT / "templates/sensoren.html").read_text(encoding="utf-8")
+    require(
+        'id="outside-temperature-source"' in ui
+        and 'id="outside-humidity-source"' in ui,
+        "Offsets-&-Details-Seite besitzt manuelle Dropdowns für beide Außenwerte",
+    )
+    require(
+        'outside_temperature: outsideTempOption' in ui
+        and 'outside_humidity: outsideHumOption' in ui,
+        "Gemeinsames Speichern überträgt beide manuellen Außenzuweisungen",
+    )
+    require(
+        'outside_temperature: "Keine Außen-Temperatur zugewiesen"' in ui
+        and 'outside_humidity: "Keine Außen-Luftfeuchte zugewiesen"' in ui,
+        "Beide optionalen Außenquellen lassen sich im Dropdown gezielt entfernen",
+    )
+    require(
+        "gespeichert · derzeit nicht verfügbar" in ui,
+        "Vorübergehend offline Quellen bleiben beim Speichern unverändert erhalten",
+    )
+    require(
+        "fmt(s.outside_temp)" in ui
+        and "fmt(s.outside_hum)" in ui,
+        "Detailseite zeigt die aktuell angewendeten Außenmesswerte",
+    )
+
+    print("✅ Growstar 3.16.2 / SENSOR.OUTSIDE.1 vollständig geprüft")
 
 
 if __name__ == "__main__":

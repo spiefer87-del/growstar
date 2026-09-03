@@ -183,6 +183,11 @@ def _sensor_options():
         "temperature": temperature,
         "humidity": humidity,
         "ppfd": ppfd,
+        # Die Detailseite verwendet dieselben physischen Messfelder auch
+        # für die optionalen Außenquellen. Eigene Schlüssel halten den
+        # API-Vertrag eindeutig und vermeiden UI-Sonderfälle.
+        "outside_temperature": list(temperature),
+        "outside_humidity": list(humidity),
     }
 
 

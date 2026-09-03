@@ -186,6 +186,71 @@
 
     </div>
 
+    <div class="card">
+
+        <h2>Außenklima · VPD (optional)</h2>
+
+        <p class="sub">
+            Außenwerte helfen der intelligenten VPD-Steuerung,
+            die Wirkung der Abluft vorab einzuschätzen.
+        </p>
+
+        <div class="value" style="text-align:left; margin-top:16px;">
+            Temperatur außen:
+            <span id="outside_temp_value">--</span>
+            °C
+        </div>
+
+        <div class="sub">
+            Aktuelle Quelle:
+            <strong id="outside_temp_source_label">
+                --
+            </strong>
+        </div>
+
+        <label class="form-label">
+            Außensensor für Temperatur
+        </label>
+
+        <select
+            id="outside-temperature-source"
+            class="form-control">
+        </select>
+
+        <div style="margin-top:20px; padding-top:18px; border-top:1px solid rgba(255,255,255,.08);">
+
+            <div class="value" style="text-align:left;">
+                Luftfeuchte außen:
+                <span id="outside_hum_value">--</span>
+                %
+            </div>
+
+            <div class="sub">
+                Aktuelle Quelle:
+                <strong id="outside_hum_source_label">
+                    --
+                </strong>
+            </div>
+
+            <label class="form-label">
+                Außensensor für Luftfeuchte
+            </label>
+
+            <select
+                id="outside-humidity-source"
+                class="form-control">
+            </select>
+
+        </div>
+
+        <div class="sub" style="margin-top:14px;">
+            „Nicht zugewiesen“ entfernt nur die jeweilige Außenquelle.
+            Für die VPD-Auswertung muss die Außenquelle von den
+            Innensensoren getrennt sein.
+        </div>
+
+    </div>
+
 </div>
 
 
@@ -202,7 +267,7 @@
     <div class="actions">
 
         <button id="save-assignment-button" onclick="saveSensorAssignments()">
-            Sensor-Zuweisung speichern
+            Alle Sensor-Zuweisungen speichern
         </button>
 
         <button
@@ -247,7 +312,9 @@ const OFFSET_DEBOUNCE_MS = 350;
 let sensorOptions = {
     temperature: [],
     humidity: [],
-    ppfd: []
+    ppfd: [],
+    outside_temperature: [],
+    outside_humidity: []
 };
 
 let sensorSources = [];
@@ -257,6 +324,26 @@ let stateLoadInFlight = false;
 let assignmentLoadInFlight = false;
 let assignmentSaveInFlight = false;
 let assignmentDirty = false;
+
+const SENSOR_FIELDS = {
+    temperature: "temperature",
+    humidity: "humidity",
+    ppfd: "ppfd",
+    outside_temperature: "temperature",
+    outside_humidity: "humidity"
+};
+
+const SENSOR_UNITS = {
+    temperature: " °C",
+    humidity: " %",
+    ppfd: " µmol/m²/s"
+};
+
+const OPTIONAL_ASSIGNMENT_LABELS = {
+    ppfd: "Kein Helligkeitssensor zugewiesen",
+    outside_temperature: "Keine Außen-Temperatur zugewiesen",
+    outside_humidity: "Keine Außen-Luftfeuchte zugewiesen"
+};
 
 const offsetSaveState = {
     TEMP_OFFSET: {
@@ -318,9 +405,13 @@ function parseOptionValue(value){
 
 function assignmentValue(assignment){
 
+    if(!assignment?.source_id){
+        return "";
+    }
+
     return [
-        assignment?.source_id || "",
-        assignment?.field || ""
+        assignment.source_id,
+        assignment.field || ""
     ].join("|");
 
 }
@@ -335,8 +426,71 @@ function renderSelect(sensorName, selectId){
 
     select.innerHTML = "";
 
+    const emptyLabel =
+        OPTIONAL_ASSIGNMENT_LABELS[sensorName];
+
+    if(emptyLabel){
+
+        const emptyOption =
+            document.createElement(
+                "option"
+            );
+
+        emptyOption.value = "";
+        emptyOption.textContent = emptyLabel;
+        emptyOption.dataset.sourceLabel = "";
+
+        select.appendChild(
+            emptyOption
+        );
+
+    }
+
+    const fieldName =
+        SENSOR_FIELDS[sensorName] || sensorName;
+
+    const directOptions =
+        sensorOptions[sensorName];
+
     const options =
-        sensorOptions[sensorName] || [];
+        Array.isArray(directOptions)
+            ? directOptions
+            : (sensorOptions[fieldName] || []);
+
+    const currentAssignment =
+        assignments[sensorName] || null;
+
+    const currentValue =
+        assignmentValue(
+            currentAssignment
+        );
+
+    const currentIsAvailable =
+        options.some(
+            option=>optionValue(option) === currentValue
+        );
+
+    if(currentValue && !currentIsAvailable){
+
+        const retainedOption =
+            document.createElement(
+                "option"
+            );
+
+        const retainedLabel =
+            currentAssignment.label ||
+            currentAssignment.source_id;
+
+        retainedOption.value = currentValue;
+        retainedOption.textContent =
+            retainedLabel + " (gespeichert · derzeit nicht verfügbar)";
+        retainedOption.dataset.sourceLabel = retainedLabel;
+
+        select.appendChild(
+            retainedOption
+        );
+
+    }
 
     options.forEach(option=>{
 
@@ -361,15 +515,7 @@ function renderSelect(sensorName, selectId){
             label +=
                 " (" +
                 option.value +
-                (
-                    sensorName === "temperature"
-                    ? " °C"
-                    : (
-                        sensorName === "humidity"
-                        ? " %"
-                        : " µmol/m²/s"
-                    )
-                ) +
+                (SENSOR_UNITS[fieldName] || "") +
                 ")";
 
         }
@@ -380,23 +526,44 @@ function renderSelect(sensorName, selectId){
         el.textContent =
             label;
 
+        el.dataset.sourceLabel =
+            option.label || option.source_id || value;
+
         select.appendChild(
             el
         );
 
     });
 
-    const selected =
-        assignmentValue(
-            assignments[sensorName]
+    select.value = currentValue;
+
+}
+
+
+function selectedAssignment(sensorName, selectId){
+
+    const select =
+        document.getElementById(
+            selectId
         );
 
-    if(selected){
+    const selected =
+        parseOptionValue(
+            select.value
+        );
 
-        select.value =
-            selected;
-
+    if(!selected.source_id){
+        return null;
     }
+
+    selected.field =
+        SENSOR_FIELDS[sensorName] || selected.field;
+
+    selected.label =
+        select.selectedOptions[0]?.dataset.sourceLabel ||
+        selected.source_id;
+
+    return selected;
 
 }
 
@@ -412,6 +579,12 @@ function renderSourceLabels(){
     const ppfd =
         assignments.ppfd || {};
 
+    const outsideTemp =
+        assignments.outside_temperature || {};
+
+    const outsideHum =
+        assignments.outside_humidity || {};
+
     document.getElementById("temp_source_label").textContent =
         temp.label ||
         temp.source_id ||
@@ -425,6 +598,16 @@ function renderSourceLabels(){
     document.getElementById("ppfd_source_label").textContent =
         ppfd.label ||
         ppfd.source_id ||
+        "--";
+
+    document.getElementById("outside_temp_source_label").textContent =
+        outsideTemp.label ||
+        outsideTemp.source_id ||
+        "--";
+
+    document.getElementById("outside_hum_source_label").textContent =
+        outsideHum.label ||
+        outsideHum.source_id ||
         "--";
 
 }
@@ -520,6 +703,10 @@ async function loadState(){
             s.light_ppfd === null || s.light_ppfd === undefined
                 ? "--"
                 : Math.round(Number(s.light_ppfd));
+        document.getElementById("outside_temp_value").textContent =
+            fmt(s.outside_temp);
+        document.getElementById("outside_hum_value").textContent =
+            fmt(s.outside_hum);
 
     }finally{
 
@@ -550,7 +737,9 @@ function applyAssignmentControls(data){
         data.options || {
             temperature: [],
             humidity: [],
-            ppfd: []
+            ppfd: [],
+            outside_temperature: [],
+            outside_humidity: []
         };
 
     renderSelect(
@@ -566,6 +755,16 @@ function applyAssignmentControls(data){
     renderSelect(
         "ppfd",
         "ppfd-source"
+    );
+
+    renderSelect(
+        "outside_temperature",
+        "outside-temperature-source"
+    );
+
+    renderSelect(
+        "outside_humidity",
+        "outside-humidity-source"
     );
 
     renderSourceLabels();
@@ -851,56 +1050,37 @@ async function saveSensorAssignments(){
         return;
     }
 
-    const tempOption =
-        parseOptionValue(
-            document.getElementById(
-                "temperature-source"
-            ).value
+    const tempOption = selectedAssignment(
+        "temperature",
+        "temperature-source"
+    );
+
+    const humOption = selectedAssignment(
+        "humidity",
+        "humidity-source"
+    );
+
+    const ppfdOption = selectedAssignment(
+        "ppfd",
+        "ppfd-source"
+    );
+
+    const outsideTempOption = selectedAssignment(
+        "outside_temperature",
+        "outside-temperature-source"
+    );
+
+    const outsideHumOption = selectedAssignment(
+        "outside_humidity",
+        "outside-humidity-source"
+    );
+
+    if(!tempOption || !humOption){
+        alert(
+            "Innen-Temperatur und Innen-Luftfeuchte müssen zugewiesen bleiben."
         );
-
-    const humOption =
-        parseOptionValue(
-            document.getElementById(
-                "humidity-source"
-            ).value
-        );
-
-    const ppfdOption =
-        parseOptionValue(
-            document.getElementById(
-                "ppfd-source"
-            ).value
-        );
-
-    const tempSelect =
-        document.getElementById(
-            "temperature-source"
-        );
-
-    const humSelect =
-        document.getElementById(
-            "humidity-source"
-        );
-
-    const ppfdSelect =
-        document.getElementById(
-            "ppfd-source"
-        );
-
-    tempOption.label =
-        tempSelect.selectedOptions[0]?.textContent
-        ?.replace(/\s\(.+\)$/, "") ||
-        tempOption.source_id;
-
-    humOption.label =
-        humSelect.selectedOptions[0]?.textContent
-        ?.replace(/\s\(.+\)$/, "") ||
-        humOption.source_id;
-
-    ppfdOption.label =
-        ppfdSelect.selectedOptions[0]?.textContent
-        ?.replace(/\s\(.+\)$/, "") ||
-        ppfdOption.source_id;
+        return;
+    }
 
     const saveButton =
         document.getElementById(
@@ -922,7 +1102,9 @@ async function saveSensorAssignments(){
                 body:JSON.stringify({
                     temperature: tempOption,
                     humidity: humOption,
-                    ppfd: ppfdOption
+                    ppfd: ppfdOption,
+                    outside_temperature: outsideTempOption,
+                    outside_humidity: outsideHumOption
                 })
             }
         );
@@ -975,30 +1157,23 @@ async function saveSensorAssignments(){
 }
 
 
-document.getElementById("temperature-source")
-    .addEventListener(
-        "change",
-        ()=>{
-            assignmentDirty = true;
-        }
-    );
-
-
-document.getElementById("humidity-source")
-    .addEventListener(
-        "change",
-        ()=>{
-            assignmentDirty = true;
-        }
-    );
-
-document.getElementById("ppfd-source")
-    .addEventListener(
-        "change",
-        ()=>{
-            assignmentDirty = true;
-        }
-    );
+[
+    "temperature-source",
+    "humidity-source",
+    "ppfd-source",
+    "outside-temperature-source",
+    "outside-humidity-source"
+].forEach(
+    selectId=>{
+        document.getElementById(selectId)
+            .addEventListener(
+                "change",
+                ()=>{
+                    assignmentDirty = true;
+                }
+            );
+    }
+);
 
 
 ["TEMP_OFFSET", "HUM_OFFSET"].forEach(
