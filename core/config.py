@@ -91,6 +91,8 @@ DEFAULT_CONFIG = {
     "OUTSIDE_TEMP_OFFSET": 0.0,
     "OUTSIDE_HUM_OFFSET": 0.0,
 
+    # Ohne VPD-AUTO: klassische Temperatur-Rampe. Im intelligenten Modus:
+    # gleitender VPD-Ziel-/Betriebsfensterwechsel; MONITOR simuliert ihn nur.
     "RAMP_DURATION_MIN": 60,
     "RAMP_ENABLED": 0,
 

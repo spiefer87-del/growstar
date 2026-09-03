@@ -650,15 +650,23 @@ h3 {
 
         const target = Number(control.target);
         const targetText = Number.isFinite(target) ? `Ziel ${target.toFixed(2)}` : "Ziel --";
+        const ramp = control.ramp || {};
+        const progress = Number(ramp.progress);
+        const rampText = ramp.active && Number.isFinite(progress)
+            ? ` · VPD-Rampe ${Math.round(progress * 100)} %`
+            : "";
+        const rampTitle = ramp.active
+            ? `${ramp.kind === "evening" ? "Abend" : "Morgen"}: ${Number(ramp.start_target).toFixed(2)} → ${Number(ramp.end_target).toFixed(2)} kPa`
+            : "";
         if(control.fallback || !control.ready){
-            summary.textContent = `${mode === "AUTO" ? "AUTO-Fallback" : "Beobachten wartet"} · ${targetText}`;
-            summary.title = control.reason || "VPD-Sensoren nicht bereit";
+            summary.textContent = `${mode === "AUTO" ? "AUTO-Fallback" : "Beobachten wartet"} · ${targetText}${rampText}`;
+            summary.title = [control.reason || "VPD-Sensoren nicht bereit",rampTitle].filter(Boolean).join(" · ");
             return;
         }
 
         const modeText = mode === "AUTO" ? "AUTO" : "Beobachten";
-        summary.textContent = `${targetText} · ${modeText}: ${control.stage_label || control.stage || "aktiv"}`;
-        summary.title = control.reason || summary.textContent;
+        summary.textContent = `${targetText}${rampText} · ${modeText}: ${control.stage_label || control.stage || "aktiv"}`;
+        summary.title = [control.reason || summary.textContent,rampTitle].filter(Boolean).join(" · ");
     }
 
     function controllerDetail(device, controller, mode = "") {
@@ -946,7 +954,16 @@ h3 {
             );
 
             const ramp = document.getElementById("temp-ramp");
-            if (ramp) ramp.textContent = state.ramp_active ? " ⏱️ Rampe aktiv" : "";
+            if (ramp) {
+                const vpdControl = state.vpd_control || {};
+                const vpdAutoRamp = String(vpdControl.mode || "").toUpperCase() === "AUTO"
+                    && vpdControl.takeover
+                    && (vpdControl.managed_devices || []).includes("heating")
+                    && vpdControl.ramp?.active;
+                ramp.textContent = vpdAutoRamp
+                    ? " 🧠 VPD-Rampe"
+                    : state.ramp_active ? " ⏱️ Temperatur-Rampe" : "";
+            }
 
             renderProfileSummary(state);
             renderVpdControl(state);

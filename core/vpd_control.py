@@ -12,6 +12,14 @@ Regelstrategie bei zu niedrigem VPD / zu hoher Feuchte:
 3. Ohne ausreichende Wirkung den Temperatur-Sollwert schrittweise anheben.
 4. Erst wenn auch das nicht genügt, den Entfeuchter anfordern.
 
+Bei zu hohem VPD wird dagegen zuerst das Temperaturziel innerhalb des
+phasenbezogenen Min-/Max-Fensters abgesenkt. Geeignete kühlere Außenluft darf
+diesen Schritt unterstützen; erst danach folgen Befeuchtungsschritte.
+
+Eine aktivierte Profilrampe interpoliert im intelligenten Modus VPD-Ziel,
+Toleranz und Klimafenster. Klassische DAY_TEMP/NIGHT_TEMP-Werte sind keine
+Regelbasis des VPD-Koordinators mehr.
+
 Der MONITOR-Modus berechnet exakt denselben Plan, übernimmt aber keine Aktoren.
 """
 
@@ -32,6 +40,7 @@ from core.vpd import (
     VPD_GENERATION_KEY as _GENERATION_KEY,
     VPD_MANAGED_DEVICES,
     VPD_PUBLIC_KEY as _PUBLIC_KEY,
+    calculate_vpd_schedule,
     reset_vpd_control,
     validate_vpd_environment_alignment,
 )
@@ -260,81 +269,79 @@ def _readiness(runtime, values):
     return blockers
 
 
-def _base_temp_target(runtime, settings):
+def _base_temp_target(runtime, settings, current_temp=None):
+    """Temperaturreferenz des VPD-Reglers ohne klassische Sollwertkopplung."""
+
     st = runtime.state
     live = st.live_state
-    climate_target = live.get("climate_temp_target")
-    try:
-        climate_number = float(climate_target)
-    except (TypeError, ValueError):
-        climate_number = None
 
-    if climate_number is not None and math.isfinite(climate_number):
-        return _clip(climate_number, settings["temp_min"], settings["temp_max"])
+    # Der letzte eigene VPD-Sollwert gewinnt. Beim ersten Zyklus wird die
+    # gemessene Temperatur stoßfrei übernommen. DAY_TEMP/NIGHT_TEMP dienen im
+    # AUTO-Modus damit nicht länger als Rampenbasis, bleiben aber außerhalb
+    # einer bereiten AUTO-Übernahme als klassischer Fallback erhalten.
+    candidates = (
+        live.get("vpd_temp_target"),
+        current_temp,
+        live.get("temp"),
+        live.get("climate_temp_target"),
+    )
+    for candidate in candidates:
+        try:
+            number = float(candidate)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number):
+            return _clip(number, settings["temp_min"], settings["temp_max"])
 
-    current = live.get("temp_target")
-    previous_effective = live.get("vpd_temp_target")
-
-    try:
-        current_number = float(current)
-    except (TypeError, ValueError):
-        current_number = None
-    if current_number is not None and not math.isfinite(current_number):
-        current_number = None
-
-    try:
-        previous_effective_number = float(previous_effective)
-    except (TypeError, ValueError):
-        previous_effective_number = None
-    if (
-        previous_effective_number is not None
-        and not math.isfinite(previous_effective_number)
-    ):
-        previous_effective_number = None
-
-    try:
-        previous_base_number = float(live.get("vpd_base_temp_target"))
-    except (TypeError, ValueError):
-        previous_base_number = None
-    if previous_base_number is not None and not math.isfinite(previous_base_number):
-        previous_base_number = None
-
-    # Tests/Diagnose können den VPD-Kern direkt mehrfach aufrufen. Wenn der
-    # normale Regelzyklus den Basissollwert noch nicht neu geschrieben hat,
-    # darf ein alter VPD-Zielsollwert nicht zur neuen Basis werden.
-    if (
-        current_number is not None
-        and previous_effective_number is not None
-        and abs(current_number - previous_effective_number) < 1e-9
-        and previous_base_number is not None
-    ):
-        current_number = previous_base_number
-
-    if current_number is None:
-        profile = str(live.get("profile") or st.current_profile or "TAG").upper()
-        key = "NIGHT_TEMP" if profile == "NACHT" else "DAY_TEMP"
-        current_number = float(runtime.config.get(key, 24.0))
-
-    return _clip(current_number, settings["temp_min"], settings["temp_max"])
+    return (float(settings["temp_min"]) + float(settings["temp_max"])) / 2.0
 
 
-def _settings_for_phase(runtime, settings):
+def _temperature_for_vpd(target_vpd, humidity, temp_min, temp_max):
+    """Temperatur, die beim aktuellen RH rechnerisch den Ziel-VPD ergibt."""
+
+    humidity = _clip(humidity, 0.0, 99.9)
+    vapor_fraction = 1.0 - humidity / 100.0
+    if vapor_fraction <= 0.0:
+        return float(temp_max)
+
+    saturation_target = float(target_vpd) / vapor_fraction
+    if saturation_target <= 0.0:
+        return float(temp_min)
+
+    logarithm = math.log(saturation_target / 0.6108)
+    denominator = 17.27 - logarithm
+    if abs(denominator) < 1e-9:
+        return float(temp_max)
+
+    temperature = 237.3 * logarithm / denominator
+    return _clip(temperature, temp_min, temp_max)
+
+
+def _step_temperature(current, destination, step):
+    current = float(current)
+    destination = float(destination)
+    step = abs(float(step))
+    if destination < current:
+        return max(destination, current - step)
+    if destination > current:
+        return min(destination, current + step)
+    return current
+
+
+def _settings_for_schedule(runtime, settings):
     profile = str(
         runtime.state.live_state.get("profile")
         or runtime.state.current_profile
         or "TAG"
     ).upper()
     profile = "NACHT" if profile == "NACHT" else "TAG"
-    phase = dict((settings.get("phases") or {}).get(profile) or {})
-    if not phase:
-        raise ValueError(f"VPD-Phasenkonfiguration für {profile} fehlt")
-
+    phase, ramp = calculate_vpd_schedule(settings, runtime.config, profile)
     active = dict(settings)
     active.update(phase)
-    return active, profile
+    return active, profile, ramp
 
 
-def _public_waiting_state(settings, profile, values, blockers):
+def _public_waiting_state(settings, profile, values, blockers, ramp):
     return {
         "mode": settings["mode"],
         "active": False,
@@ -349,6 +356,7 @@ def _public_waiting_state(settings, profile, values, blockers):
         "profile": profile,
         "target": settings["target"],
         "tolerance": settings["tolerance"],
+        "ramp": ramp,
         "range": {
             "temp_min": settings["temp_min"],
             "temp_max": settings["temp_max"],
@@ -450,21 +458,36 @@ def _advance_lower_stage(
     settings,
     availability,
     outside_humidifying,
+    preferred_temp,
 ):
     stage = engine.get("stage")
 
-    if stage == "conserve":
+    if stage in {"cool", "conserve"}:
         if improvement >= settings["min_effect"]:
-            engine["temp_target"] = max(
-                settings["temp_min"],
-                float(engine.get("temp_target") or settings["temp_min"])
-                - settings["temp_step"],
+            current_target = float(
+                engine.get("temp_target") or settings["temp_min"]
             )
-            _set_stage(engine, direction="lower", stage="conserve", now=now, vpd=vpd, note="Reduzierte Abluft/Heizung wirkt")
+            engine["temp_target"] = _clip(
+                _step_temperature(
+                    current_target,
+                    min(float(preferred_temp), current_target),
+                    settings["temp_step"],
+                ),
+                settings["temp_min"],
+                settings["temp_max"],
+            )
+            _set_stage(
+                engine,
+                direction="lower",
+                stage="cool",
+                now=now,
+                vpd=vpd,
+                note="Temperaturabsenkung wirkt; Sollwert folgt dem VPD-Ziel",
+            )
         elif availability["humidifier"]:
-            _set_stage(engine, direction="lower", stage="humidify", now=now, vpd=vpd, note="Passive Korrektur ohne Wirkung; Luftbefeuchter angefordert")
+            _set_stage(engine, direction="lower", stage="humidify", now=now, vpd=vpd, note="Temperaturabsenkung ohne ausreichende Wirkung; Luftbefeuchter angefordert")
         elif availability["fan"] and outside_humidifying:
-            _set_stage(engine, direction="lower", stage="outside_assist", now=now, vpd=vpd, note="Feuchtere Außenluft wird unterstützend genutzt")
+            _set_stage(engine, direction="lower", stage="outside_assist", now=now, vpd=vpd, note="Temperaturabsenkung ohne ausreichende Wirkung; feuchtere Außenluft unterstützt")
         else:
             _set_stage(engine, direction="lower", stage="limited", now=now, vpd=vpd, note="Keine weitere sichere VPD-Stufe verfügbar")
         return
@@ -524,7 +547,7 @@ def update_vpd_control(runtime=None, *, now=None):
         return public
 
     try:
-        settings, profile = _settings_for_phase(rt, settings)
+        settings, profile, ramp = _settings_for_schedule(rt, settings)
     except ValueError as exc:
         public = {
             "mode": settings["mode"],
@@ -555,7 +578,13 @@ def update_vpd_control(runtime=None, *, now=None):
 
     blockers = _readiness(rt, values)
     if blockers:
-        public = _public_waiting_state(settings, profile, values, blockers)
+        public = _public_waiting_state(
+            settings,
+            profile,
+            values,
+            blockers,
+            ramp,
+        )
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
             st.live_state.pop(_ENGINE_KEY, None)
@@ -578,6 +607,19 @@ def update_vpd_control(runtime=None, *, now=None):
     outside_drying = outside_ah <= inside_ah - 0.3
     outside_humidifying = outside_vapor >= inside_vapor + 0.05
     outside_cooling = outside_temp <= temp - 0.5
+    outside_vpd = float(calculate_vpd(outside_temp, outside_hum))
+    # Reine Außen-VPD-Werte überschätzen sehr kalte, aber extrem trockene Luft.
+    # Für die Kühlhilfe wird deshalb ein konservativer Mischzustand aus halber
+    # Temperaturannäherung und dem Außen-Dampfdruck bewertet.
+    projected_exchange_temp = (temp + outside_temp) / 2.0
+    projected_exchange_vpd = max(
+        0.0,
+        _saturation_vapor_pressure(projected_exchange_temp) - outside_vapor,
+    )
+    outside_lowering = (
+        outside_cooling
+        and projected_exchange_vpd < vpd - 0.02
+    )
 
     availability = {
         device: _device_is_env(rt, device)
@@ -585,34 +627,28 @@ def update_vpd_control(runtime=None, *, now=None):
     }
     managed_devices = [device for device, available in availability.items() if available]
 
-    base_target = _base_temp_target(rt, settings)
+    base_target = _base_temp_target(rt, settings, current_temp=temp)
+    preferred_temp = _temperature_for_vpd(
+        target,
+        hum,
+        settings["temp_min"],
+        settings["temp_max"],
+    )
 
     with rt.state_lock:
         engine = deepcopy(st.live_state.get(_ENGINE_KEY))
         if not isinstance(engine, dict):
             engine = {}
 
-    # Beim realen Tag-/Nachtwechsel gelten ein anderes Zielband und ein
-    # anderes Betriebsfenster. Keine Wirkungsprobe oder Eskalationsstufe darf
-    # deshalb aus der vorherigen Phase übernommen werden.
-    if engine.get("profile") != profile:
+    # Beginn/Ende einer VPD-Rampe und der reale Tag-/Nachtwechsel eröffnen ein
+    # neues Zielband. Keine Wirkungsprobe oder Eskalationsstufe darf aus dem
+    # vorherigen Zeitabschnitt übernommen werden.
+    if engine.get("schedule_key") != ramp["key"]:
         engine = {}
     engine["profile"] = profile
+    engine["schedule_key"] = ramp["key"]
 
     engine.setdefault("temp_target", base_target)
-    previous_base_target = engine.get("base_temp_target")
-    try:
-        previous_base_target = float(previous_base_target)
-    except (TypeError, ValueError):
-        previous_base_target = None
-
-    # Eine laufende Tag-/Nacht-Rampe bleibt auch während einer VPD-Stufe die
-    # bewegliche Basis. Der adaptive Abstand bleibt erhalten, statt die Rampe
-    # auf dem Wert des ersten VPD-Zyklus einzufrieren.
-    if previous_base_target is not None and math.isfinite(previous_base_target):
-        engine["temp_target"] = float(engine.get("temp_target", base_target)) + (
-            base_target - previous_base_target
-        )
     engine["base_temp_target"] = base_target
     engine["temp_target"] = _clip(
         engine.get("temp_target", base_target),
@@ -660,11 +696,38 @@ def update_vpd_control(runtime=None, *, now=None):
                 initial_stage = "limited"
             _set_stage(engine, direction="raise", stage=initial_stage, now=now, vpd=vpd, note="VPD ist zu niedrig")
         elif direction == "lower":
-            engine["temp_target"] = max(
-                settings["temp_min"],
-                base_target - settings["temp_step"],
+            temperature_path_available = bool(
+                availability["heating"]
+                or (availability["fan"] and outside_lowering)
             )
-            _set_stage(engine, direction="lower", stage="conserve", now=now, vpd=vpd, note="VPD ist zu hoch")
+            if (
+                temperature_path_available
+                and preferred_temp < base_target - 0.01
+            ):
+                engine["temp_target"] = _step_temperature(
+                    base_target,
+                    preferred_temp,
+                    settings["temp_step"],
+                )
+                initial_stage = "cool"
+                note = "VPD ist zu hoch; Temperatur wird bevorzugt abgesenkt"
+            elif availability["humidifier"]:
+                initial_stage = "humidify"
+                note = "Temperaturgrenze erreicht; Luftbefeuchter angefordert"
+            elif availability["fan"] and outside_humidifying:
+                initial_stage = "outside_assist"
+                note = "Temperaturgrenze erreicht; feuchtere Außenluft unterstützt"
+            else:
+                initial_stage = "limited"
+                note = "Keine sichere Stufe zur VPD-Senkung verfügbar"
+            _set_stage(
+                engine,
+                direction="lower",
+                stage=initial_stage,
+                now=now,
+                vpd=vpd,
+                note=note,
+            )
         else:
             _set_stage(engine, direction=None, stage="in_band", now=now, vpd=vpd, note="VPD und Betriebsfenster sind im Ziel")
     else:
@@ -696,6 +759,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 settings=settings,
                 availability=availability,
                 outside_humidifying=outside_humidifying,
+                preferred_temp=preferred_temp,
             )
         elapsed = 0.0
         improvement = 0.0
@@ -750,6 +814,13 @@ def update_vpd_control(runtime=None, *, now=None):
             "(VPD feuchtere Außenluft unterstützt)",
         )
 
+    if stage in {"cool", "conserve"} and availability["fan"] and outside_lowering:
+        actions["fan"] = _fan_regulation_action(
+            rt,
+            engine.get("fan_level"),
+            "(VPD Temperatur bevorzugt senken)",
+        )
+
     # Bei zu hohem VPD darf die normale Hysterese nicht weiterheizen und den
     # Dampfdruckdefizit dadurch noch vergrößern. Einzige Ausnahme bleibt die
     # explizite VPD-Temperatur-Untergrenze direkt darunter.
@@ -778,6 +849,7 @@ def update_vpd_control(runtime=None, *, now=None):
         "exhaust": "Abluft prüfen",
         "heat": "Temperatur anheben",
         "dehumidify": "Entfeuchter",
+        "cool": "Temperatur senken",
         "conserve": "Abluft und Heizung reduzieren",
         "humidify": "Luft befeuchten",
         "outside_assist": "Außenluft nutzen",
@@ -802,7 +874,9 @@ def update_vpd_control(runtime=None, *, now=None):
         "tolerance": settings["tolerance"],
         "error": round(error, 3),
         "base_temp_target": round(base_target, 2),
+        "preferred_temp_target": round(preferred_temp, 2),
         "effective_temp_target": round(effective_target, 2),
+        "ramp": deepcopy(ramp),
         "range": {
             "temp_min": settings["temp_min"],
             "temp_max": settings["temp_max"],
@@ -817,6 +891,9 @@ def update_vpd_control(runtime=None, *, now=None):
             "drying": outside_drying,
             "humidifying": outside_humidifying,
             "cooling": outside_cooling,
+            "lowering": outside_lowering,
+            "vpd": round(outside_vpd, 3),
+            "projected_exchange_vpd": round(projected_exchange_vpd, 3),
         },
         "effect": {
             "window_sec": settings["effect_window_sec"],

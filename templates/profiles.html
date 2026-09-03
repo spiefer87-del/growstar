@@ -344,7 +344,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
         </div>
 
         <div class="card">
-            <h2>⏱️ Rampe</h2>
+            <h2>⏱️ Klima- / VPD-Rampe</h2>
             <div class="row-inline">
                 <div class="field">
                     <label for="RAMP_ENABLED">Aktiv</label>
@@ -360,7 +360,10 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 </div>
             </div>
             <div class="hint">
-                Bei aktiver Rampe sind mindestens 5 Minuten erforderlich. Bei deaktivierter Rampe ist 0 zulässig.
+                Im automatischen VPD-Modus gilt diese Dauer für den gleitenden
+                Wechsel von VPD-Ziel, Toleranz und Min-/Max-Fenstern. Ohne
+                AUTO bleibt sie die klassische Temperatur-Rampe. Bei aktiver
+                Rampe sind mindestens 5 Minuten erforderlich.
             </div>
         </div>
 
@@ -577,8 +580,12 @@ function updatePreview(){
     const dayAttainableMax = calculateVpd(num("VPD_TEMP_MAX_DAY"),num("VPD_HUM_MIN_DAY"));
     const nightAttainableMin = calculateVpd(num("VPD_TEMP_MIN_NIGHT"),num("VPD_HUM_MAX_NIGHT"));
     const nightAttainableMax = calculateVpd(num("VPD_TEMP_MAX_NIGHT"),num("VPD_HUM_MIN_NIGHT"));
+    const rampText = el("RAMP_ENABLED")?.checked
+        ? `⏱️ ${num("RAMP_DURATION_MIN").toFixed(0)} Min. gleitender Tag-/Nachtwechsel (in AUTO über VPD und Klima-Fenster)`
+        : "⏱️ Rampe deaktiviert";
     el("vpd-profile-preview").innerHTML = `
         <strong>VPD-Profil</strong><br>
+        ${rampText}<br>
         ☀️ Tag: ${num("VPD_TARGET_DAY").toFixed(2)} kPa ± ${num("VPD_TOLERANCE_DAY").toFixed(2)} ·
         ${num("VPD_TEMP_MIN_DAY").toFixed(1)}–${num("VPD_TEMP_MAX_DAY").toFixed(1)} °C ·
         ${num("VPD_HUM_MIN_DAY").toFixed(1)}–${num("VPD_HUM_MAX_DAY").toFixed(1)} %<br>

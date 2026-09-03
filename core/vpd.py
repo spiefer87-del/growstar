@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 
 from core.config import migrate_vpd_phase_config
-from core.helpers import calculate_vpd
+from core.helpers import calculate_vpd, minutes_now
 from core.runtime import resolve_runtime
 
 
@@ -19,6 +19,15 @@ VPD_MANAGED_DEVICES = ("fan", "heating", "humidifier", "dehumidifier")
 VPD_ENGINE_KEY = "_vpd_control_engine"
 VPD_GENERATION_KEY = "_vpd_control_generation"
 VPD_PUBLIC_KEY = "vpd_control"
+
+_RAMPED_PHASE_KEYS = (
+    "target",
+    "tolerance",
+    "temp_min",
+    "temp_max",
+    "hum_min",
+    "hum_max",
+)
 
 
 def _finite(cfg, key):
@@ -165,6 +174,119 @@ def validate_vpd_environment_alignment(cfg):
     return settings
 
 
+def _forward_progress(now_min, start_min, duration_min):
+    """Fortschritt eines vorwärts laufenden Tageszeitfensters oder ``None``."""
+
+    if duration_min <= 0:
+        return None
+
+    elapsed = (float(now_min) - float(start_min)) % 1440.0
+    if elapsed >= float(duration_min):
+        return None
+    return max(0.0, min(1.0, elapsed / float(duration_min)))
+
+
+def _interpolate_phase(source, destination, progress):
+    effective = {
+        key: float(source[key])
+        + (float(destination[key]) - float(source[key])) * float(progress)
+        for key in _RAMPED_PHASE_KEYS
+    }
+    effective["attainable_min"] = float(
+        calculate_vpd(effective["temp_min"], effective["hum_max"])
+    )
+    effective["attainable_max"] = float(
+        calculate_vpd(effective["temp_max"], effective["hum_min"])
+    )
+    return effective
+
+
+def calculate_vpd_schedule(settings, cfg, profile, *, now_min=None):
+    """Berechnet das geglättete VPD-Ziel samt erlaubtem Klimafenster.
+
+    Die vorhandene Rampendauer bleibt die gemeinsame Profilvorgabe. Im
+    intelligenten Modus interpoliert sie jedoch VPD-Ziel, Toleranz und
+    Betriebsfenster statt eines festen Temperatur-Sollwerts. Die Funktion ist
+    rein und verändert weder Runtime- noch Aktorzustand.
+    """
+
+    phases = settings.get("phases") or {}
+    normalized_profile = "NACHT" if str(profile).upper() == "NACHT" else "TAG"
+    day = dict(phases.get("TAG") or {})
+    night = dict(phases.get("NACHT") or {})
+    if not day or not night:
+        raise ValueError("VPD-Phasenkonfiguration für Tag/Nacht fehlt")
+
+    duration = max(0, min(1440, int(cfg.get("RAMP_DURATION_MIN", 0) or 0)))
+    enabled = bool(cfg.get("RAMP_ENABLED", 0)) and duration > 0
+    current_minute = minutes_now() if now_min is None else float(now_min) % 1440.0
+    day_start = int(cfg.get("DAY_START_MIN", 0)) % 1440
+    night_start = int(cfg.get("NIGHT_START_MIN", 0)) % 1440
+
+    transition = None
+    progress = None
+    source = None
+    destination = None
+    start_min = None
+    end_min = None
+
+    if enabled:
+        morning_progress = _forward_progress(
+            current_minute,
+            day_start,
+            duration,
+        )
+        evening_start = (night_start - duration) % 1440
+        evening_progress = _forward_progress(
+            current_minute,
+            evening_start,
+            duration,
+        )
+
+        if morning_progress is not None:
+            transition = "morning"
+            progress = morning_progress
+            source, destination = night, day
+            start_min = day_start
+            end_min = (day_start + duration) % 1440
+        elif evening_progress is not None:
+            transition = "evening"
+            progress = evening_progress
+            source, destination = day, night
+            start_min = evening_start
+            end_min = night_start
+
+    if transition is None:
+        effective = dict(phases[normalized_profile])
+        schedule_key = f"steady:{normalized_profile}"
+        start_target = end_target = float(effective["target"])
+        progress_value = 1.0
+    else:
+        effective = _interpolate_phase(source, destination, progress)
+        schedule_key = f"ramp:{transition}"
+        start_target = float(source["target"])
+        end_target = float(destination["target"])
+        progress_value = float(progress)
+
+    effective["name"] = normalized_profile
+    effective["label"] = "Nacht" if normalized_profile == "NACHT" else "Tag"
+
+    ramp = {
+        "enabled": enabled,
+        "active": transition is not None,
+        "kind": transition,
+        "key": schedule_key,
+        "duration_min": duration,
+        "progress": progress_value,
+        "start_min": start_min,
+        "end_min": end_min,
+        "start_target": start_target,
+        "end_target": end_target,
+        "target": float(effective["target"]),
+    }
+    return effective, ramp
+
+
 def reset_vpd_control(runtime=None, *, reason="zurückgesetzt"):
     """Setzt ausschließlich den flüchtigen VPD-Lern-/Stufenzustand zurück."""
 
@@ -204,6 +326,7 @@ __all__ = (
     "VPD_GENERATION_KEY",
     "VPD_MANAGED_DEVICES",
     "VPD_PUBLIC_KEY",
+    "calculate_vpd_schedule",
     "reset_vpd_control",
     "validate_vpd_config",
     "validate_vpd_environment_alignment",

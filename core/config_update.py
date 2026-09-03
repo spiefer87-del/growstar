@@ -10,7 +10,7 @@ from core.config import (
 from core.devices import AUX_DEVICE_NAMES, normalize_device_label
 from core.environment_limits import validate_environment_limits
 from core.profile import get_active_profile
-from core.ramp import resync_active_ramp, stop_ramp, update_ramp_duration
+from core.ramp import resync_active_ramp, stop_ramp
 from core.runtime import resolve_runtime
 from core.vpd import reset_vpd_control, validate_vpd_environment_alignment
 
@@ -127,7 +127,10 @@ def apply_config_patch(data, runtime=None):
     st = rt.state
     working = deepcopy(cfg)
 
-    changed_keys = set()
+    tracked_keys = {
+        key for key in incoming
+        if key != "ACTIVE_PROFILE"
+    }
 
     for key, value in incoming.items():
         if key == "ACTIVE_PROFILE":
@@ -137,7 +140,6 @@ def apply_config_patch(data, runtime=None):
 
         if key in _NESTED_DEVICE_KEYS:
             _merge_nested_config(working, key, value)
-            changed_keys.add(key)
             continue
 
         if key == "DEVICE_LABELS":
@@ -158,23 +160,19 @@ def apply_config_patch(data, runtime=None):
             for device, label in value.items():
                 target[device] = normalize_device_label(device, label)
 
-            changed_keys.add(key)
             continue
 
         if key.startswith(_PASSTHROUGH_PREFIXES):
             working[key] = deepcopy(value)
-            changed_keys.add(key)
             continue
 
         if key == "SENSOR_ASSIGNMENTS":
             if not isinstance(value, dict):
                 raise TypeError("SENSOR_ASSIGNMENTS muss ein JSON-Objekt sein")
             working[key] = deepcopy(value)
-            changed_keys.add(key)
             continue
 
         working[key] = _coerce_scalar(key, value)
-        changed_keys.add(key)
 
     if any(
         key.startswith("VPD_")
@@ -182,6 +180,18 @@ def apply_config_patch(data, runtime=None):
     ):
         for legacy_key in VPD_LEGACY_SHARED_KEYS:
             working.pop(legacy_key, None)
+            tracked_keys.add(legacy_key)
+
+    # Browserformulare senden absichtlich einen vollständigen Snapshot. Nur
+    # tatsächlich veränderte, bereits normalisierte Werte dürfen jedoch
+    # Seiteneffekte wie Rampen-Neustart oder VPD-Reset auslösen. Insbesondere
+    # ein reines Speichern des Beobachtungsmodus darf eine laufende Rampe nicht
+    # anfassen.
+    missing = object()
+    changed_keys = {
+        key for key in tracked_keys
+        if cfg.get(key, missing) != working.get(key, missing)
+    }
 
     # Phase 4V.2: Klima-/Alarmgrenzen werden VOR dem Commit validiert.
     validate_environment_limits(working)
@@ -195,19 +205,38 @@ def apply_config_patch(data, runtime=None):
     cfg.update(working)
 
     if st.ramp_active:
-        if "RAMP_DURATION_MIN" in changed_keys:
-            update_ramp_duration(runtime=rt)
-
-        if {"DAY_TEMP", "NIGHT_TEMP"}.intersection(changed_keys):
+        if not cfg.get("RAMP_ENABLED", 0):
+            stop_ramp(runtime=rt)
+            st.live_state["ramp_active"] = False
+            st.live_state["ramp_target"] = None
+        elif changed_keys.intersection({
+            "DAY_TEMP",
+            "NIGHT_TEMP",
+            "DAY_START_MIN",
+            "NIGHT_START_MIN",
+            "RAMP_DURATION_MIN",
+        }):
+            # Ein einziger, phasenbewusster Neustart übernimmt Ziel und Ende.
+            # Zwei aufeinanderfolgende Restarts konnten die Abendrampe bisher
+            # erst verlängern und anschließend sogar in Richtung TAG drehen.
             resync_active_ramp(runtime=rt)
 
-    if not cfg.get("RAMP_ENABLED", 0):
-        stop_ramp(runtime=rt)
+    elif not cfg.get("RAMP_ENABLED", 0) and st.live_state.get("ramp_active"):
         st.live_state["ramp_active"] = False
         st.live_state["ramp_target"] = None
 
+    vpd_schedule_changed = changed_keys.intersection({
+        "DAY_START_MIN",
+        "NIGHT_START_MIN",
+        "RAMP_ENABLED",
+        "RAMP_DURATION_MIN",
+    })
+    vpd_mode = str(cfg.get("VPD_CONTROL_MODE", "OFF") or "OFF").upper()
+
     if any(key.startswith("VPD_") for key in changed_keys):
         reset_vpd_control(runtime=rt, reason="VPD-Einstellungen geändert")
+    elif vpd_mode in {"MONITOR", "AUTO"} and vpd_schedule_changed:
+        reset_vpd_control(runtime=rt, reason="VPD-Rampenplan geändert")
     elif changed_keys.intersection({
         "SENSOR_ASSIGNMENTS",
         "TEMP_OFFSET",

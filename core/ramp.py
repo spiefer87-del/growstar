@@ -4,7 +4,7 @@ import time
 import datetime
 
 from core.runtime import resolve_runtime
-from core.helpers import minutes_now
+from core.helpers import in_time_window, minutes_now
 from core.profile import get_profile
 
 
@@ -114,10 +114,70 @@ def update_ramp(runtime=None):
     stop_ramp(runtime=rt)
 
 
-def resync_active_ramp(runtime=None):
+def _active_ramp_destination(runtime=None):
+    """Liefert Ziel und Endzeit der tatsächlich laufenden Rampenrichtung.
+
+    Eine Abendrampe läuft definitionsgemäß noch im Profil ``TAG``. Das Profil
+    allein eignet sich deshalb nicht zur Richtungsbestimmung: Genau dadurch
+    konnte ein Speichern vor Nachtbeginn die fallende Rampe auf das Tagesziel
+    und den nächsten Morgen umbiegen.
+    """
+
     rt = resolve_runtime(runtime)
     st = rt.state
     cfg = rt.config
+
+    kind = str(getattr(st, "last_ramp_trigger_type", "") or "").lower()
+
+    if kind not in {"morning", "evening"}:
+        now_min = minutes_now()
+        duration = max(0, int(cfg.get("RAMP_DURATION_MIN", 0)))
+        morning_start = get_morning_ramp_start(runtime=rt)
+        morning_end = get_morning_ramp_end(runtime=rt)
+        evening_start = get_evening_ramp_start(runtime=rt)
+        night_start = int(cfg["NIGHT_START_MIN"]) % 1440
+
+        if duration and in_time_window(now_min, evening_start, night_start):
+            kind = "evening"
+        elif duration and in_time_window(now_min, morning_start, morning_end):
+            kind = "morning"
+        else:
+            # Kompatibilitätsfallback für manuell gestartete/ältere Runtime-
+            # Zustände ohne Rampentyp. Ein bereits bekanntes Ziel ist stärker
+            # als das aktuelle Profil.
+            try:
+                old_target = float(st.ramp_target_temp)
+            except (TypeError, ValueError):
+                old_target = None
+
+            if old_target is not None and abs(
+                old_target - float(cfg["NIGHT_TEMP"])
+            ) < 1e-9:
+                kind = "evening"
+            elif old_target is not None and abs(
+                old_target - float(cfg["DAY_TEMP"])
+            ) < 1e-9:
+                kind = "morning"
+            else:
+                kind = "morning" if get_profile(runtime=rt) == "TAG" else "evening"
+
+    if kind == "evening":
+        return (
+            "evening",
+            float(cfg["NIGHT_TEMP"]),
+            int(cfg["NIGHT_START_MIN"]) % 1440,
+        )
+
+    return (
+        "morning",
+        float(cfg["DAY_TEMP"]),
+        get_morning_ramp_end(runtime=rt),
+    )
+
+
+def resync_active_ramp(runtime=None):
+    rt = resolve_runtime(runtime)
+    st = rt.state
 
     if not st.ramp_active:
         return
@@ -126,14 +186,8 @@ def resync_active_ramp(runtime=None):
     if current is None:
         return
 
-    profile = get_profile(runtime=rt)
-
-    if profile == "TAG":
-        target = float(cfg["DAY_TEMP"])
-        end_min = get_morning_ramp_end(runtime=rt)
-    else:
-        target = float(cfg["NIGHT_TEMP"])
-        end_min = int(cfg["NIGHT_START_MIN"])
+    kind, target, end_min = _active_ramp_destination(runtime=rt)
+    st.last_ramp_trigger_type = kind
 
     _restart_ramp(current, target, end_min, runtime=rt)
 
@@ -141,7 +195,6 @@ def resync_active_ramp(runtime=None):
 def update_ramp_duration(runtime=None):
     rt = resolve_runtime(runtime)
     st = rt.state
-    cfg = rt.config
 
     if not st.ramp_active:
         return
@@ -150,16 +203,12 @@ def update_ramp_duration(runtime=None):
     if current is None:
         return
 
-    profile = get_profile(runtime=rt)
-
-    if profile == "TAG":
-        end_min = get_morning_ramp_end(runtime=rt)
-    else:
-        end_min = int(cfg["NIGHT_START_MIN"])
+    kind, target, end_min = _active_ramp_destination(runtime=rt)
+    st.last_ramp_trigger_type = kind
 
     _restart_ramp(
         current,
-        st.ramp_target_temp,
+        target,
         end_min,
         runtime=rt,
     )

@@ -514,9 +514,9 @@ def main():
     ramp_tracking.state.live_state["temp_target"] = 23.4
     ramp_second = update_vpd_control(ramp_tracking, now=1001)
     require(
-        ramp_first["effective_temp_target"] == 23.0
-        and ramp_second["effective_temp_target"] == 23.4,
-        "Ein VPD-Zyklus im Zielband folgt einer laufenden Temperatur-Rampe",
+        ramp_first["effective_temp_target"] == 24.0
+        and ramp_second["effective_temp_target"] == 24.0,
+        "Der VPD-Regler übernimmt keine klassische Temperatur-Rampe mehr als Regelbasis",
     )
 
     effective = runtime_for(mode="MONITOR")
@@ -553,11 +553,11 @@ def main():
     high_first = update_vpd_control(high, now=1000)
     high_second = update_vpd_control(high, now=1301)
     require(
-        high_first["stage"] == "conserve"
+        high_first["stage"] == "cool"
         and high_first["actions"]["heating"]["power"] is False
         and high_second["stage"] == "humidify"
         and high_second["actions"]["humidifier"]["power"] is True,
-        "Zu hoher VPD reduziert zuerst Wärme/Abluft und nutzt danach den Befeuchter",
+        "Zu hoher VPD senkt zuerst das Temperaturziel und nutzt danach den Befeuchter",
     )
 
     off_devices = runtime_for(device_modes={

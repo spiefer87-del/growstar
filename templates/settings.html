@@ -495,9 +495,10 @@ button:disabled{opacity:.48;cursor:not-allowed}
             </div>
 
             <div class="vpd-sequence">
-                <div class="vpd-step"><strong>1 · Außenluft + Abluft</strong><span>Nur wenn sie physikalisch trocknen oder sinnvoll kühlen kann.</span></div>
-                <div class="vpd-step"><strong>2 · Temperatur fein anpassen</strong><span>Erst nach dem Wirkungsfenster und innerhalb des erlaubten Bereichs.</span></div>
-                <div class="vpd-step"><strong>3 · Be-/Entfeuchter</strong><span>Letzte Stufe, wenn die schonenderen Schritte nicht genügen.</span></div>
+                <div class="vpd-step"><strong>1 · VPD-Ziel rampen</strong><span>Tag-/Nachtziel sowie die erlaubten Klima-Fenster wechseln gleitend.</span></div>
+                <div class="vpd-step"><strong>2 · Zu hoher VPD</strong><span>Temperatur innerhalb Min/Max zuerst absenken; geeignete kühlere Außenluft darf unterstützen.</span></div>
+                <div class="vpd-step"><strong>3 · Zu niedriger VPD</strong><span>Zuerst wirksame trockenere Außenluft, danach Temperatur vorsichtig anheben.</span></div>
+                <div class="vpd-step"><strong>4 · Be-/Entfeuchter</strong><span>Erst wenn die bevorzugten Schritte nach dem Wirkungsfenster nicht genügen.</span></div>
             </div>
 
             <div id="vpd-sensor-note" class="info warning"></div>
@@ -505,7 +506,12 @@ button:disabled{opacity:.48;cursor:not-allowed}
         </div>
 
         <div class="card">
-            <h2>⏱️ Rampe</h2>
+            <h2>⏱️ Klima- / VPD-Rampe</h2>
+            <div class="info">
+                <strong>Aus:</strong> klassische Temperatur-Rampe zwischen Tag und Nacht.<br>
+                <strong>Beobachten:</strong> VPD-Rampe wird parallel simuliert, ohne den klassischen Regler zu verändern.<br>
+                <strong>Automatisch:</strong> nur VPD-Ziel, Toleranz und Min-/Max-Fenster werden gerampt; DAY_TEMP/NIGHT_TEMP bleiben ausschließlich Fallback.
+            </div>
             <div class="row-inline">
                 <div class="field">
                     <label>Aktiv</label>
@@ -843,8 +849,18 @@ function updatePreview(){
         MONITOR:"Beobachten · keine Aktorübernahme",
         AUTO:"Automatisch · nur ENV-Aktoren"
     }[mode] || mode;
+    const rampEnabled = !!el("RAMP_ENABLED")?.checked;
+    const rampMinutes = num("RAMP_DURATION_MIN");
+    const rampText = !rampEnabled
+        ? "⏱️ Rampe deaktiviert"
+        : mode === "AUTO"
+            ? `⏱️ ${rampMinutes.toFixed(0)} Min. VPD-Rampe · Ziel und Klima-Fenster gleiten zwischen Tag und Nacht`
+            : mode === "MONITOR"
+                ? `⏱️ ${rampMinutes.toFixed(0)} Min. VPD-Rampe wird beobachtet · klassische Temperatur-Rampe bleibt autoritativ`
+                : `⏱️ ${rampMinutes.toFixed(0)} Min. klassische Temperatur-Rampe`;
     el("vpd-preview").innerHTML = `
         <strong>${modeLabel}</strong><br>
+        ${rampText}<br>
         ☀️ Tag: ${(num("VPD_TARGET_DAY")-num("VPD_TOLERANCE_DAY")).toFixed(2)} bis ${(num("VPD_TARGET_DAY")+num("VPD_TOLERANCE_DAY")).toFixed(2)} kPa ·
         ${num("VPD_TEMP_MIN_DAY").toFixed(1)}–${num("VPD_TEMP_MAX_DAY").toFixed(1)} °C ·
         ${num("VPD_HUM_MIN_DAY").toFixed(1)}–${num("VPD_HUM_MAX_DAY").toFixed(1)} %<br>
