@@ -324,6 +324,10 @@ def _state_snapshot(runtime):
         "hum_tol": live.get("hum_tol"),
         "temp_source": live.get("temp_source"),
         "hum_source": live.get("hum_source"),
+        "outside_temp": live.get("outside_temp"),
+        "outside_hum": live.get("outside_hum"),
+        "outside_temp_source": live.get("outside_temp_source"),
+        "outside_hum_source": live.get("outside_hum_source"),
         "sensor_assignments": live.get(
             "sensor_assignments",
             cfg.get("SENSOR_ASSIGNMENTS", {}),
@@ -343,6 +347,10 @@ def _state_snapshot(runtime):
         "light_sun_phase": live.get("light_sun_phase"),
         "light_sun_level": live.get("light_sun_level"),
         "light_sun_progress": live.get("light_sun_progress"),
+
+        # Intelligente VPD-Regelung: ausschließlich öffentliche Diagnose,
+        # niemals der interne Sample-/Zustandsmaschinen-Cache.
+        "vpd_control": dict(live.get("vpd_control") or {}),
 
         # Sensorzustand
         "temp_ok": not st.temp_stale,

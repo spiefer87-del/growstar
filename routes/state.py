@@ -26,6 +26,9 @@ def register(app):
             "hum_tol": state.live_state.get("hum_tol"),
 
             "vpd": state.live_state.get("vpd"),
+            "vpd_control": state.live_state.get("vpd_control"),
+            "outside_temp": state.live_state.get("outside_temp"),
+            "outside_hum": state.live_state.get("outside_hum"),
 
             # ================= PROFILE =================
             "profile": state.current_profile,

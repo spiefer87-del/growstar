@@ -2,11 +2,13 @@
 
 from copy import deepcopy
 
+from core.config import DEFAULT_CONFIG
 from core.devices import AUX_DEVICE_NAMES, normalize_device_label
 from core.environment_limits import validate_environment_limits
 from core.profile import get_active_profile
 from core.ramp import resync_active_ramp, stop_ramp, update_ramp_duration
 from core.runtime import resolve_runtime
+from core.vpd import reset_vpd_control, validate_vpd_environment_alignment
 
 
 _NESTED_DEVICE_KEYS = {
@@ -26,6 +28,8 @@ _INTEGER_KEYS = {
     "LIGHT_SUN_MIN_LEVEL",
     "SENSOR_UPDATE_INTERVAL_SEC",
     "ENERGY_DAY_RESET_MIN",
+    "VPD_EFFECT_WINDOW_MIN",
+    "VPD_FAN_STEP",
 }
 
 # UI-/Dashboard-Strukturen bleiben JSON-Objekte/Listen und werden nicht
@@ -163,6 +167,9 @@ def apply_config_patch(data, runtime=None):
 
     # Phase 4V.2: Klima-/Alarmgrenzen werden VOR dem Commit validiert.
     validate_environment_limits(working)
+    vpd_validation = deepcopy(DEFAULT_CONFIG)
+    vpd_validation.update(working)
+    validate_vpd_environment_alignment(vpd_validation)
 
     # Erst nach vollständiger Validierung den vorhandenen Dict in-place
     # aktualisieren. Referenzen auf runtime.config bleiben dadurch gültig.
@@ -180,6 +187,15 @@ def apply_config_patch(data, runtime=None):
         stop_ramp(runtime=rt)
         st.live_state["ramp_active"] = False
         st.live_state["ramp_target"] = None
+
+    if any(key.startswith("VPD_") for key in changed_keys):
+        reset_vpd_control(runtime=rt, reason="VPD-Einstellungen geändert")
+    elif changed_keys.intersection({
+        "SENSOR_ASSIGNMENTS",
+        "TEMP_OFFSET",
+        "HUM_OFFSET",
+    }):
+        reset_vpd_control(runtime=rt, reason="VPD-Sensorbasis geändert")
 
     rt.persist_config()
 

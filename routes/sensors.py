@@ -10,6 +10,7 @@ from core.sensor_sources import (
     update_sensor_source,
 )
 from core.tents import manager as tent_manager, validate_tent_id
+from core.vpd import reset_vpd_control
 from services.hardware import hardware
 
 
@@ -221,15 +222,23 @@ def _normalize_assignment(sensor_name, data):
     if str(source_id) in _RETIRED_SOURCE_IDS:
         raise ValueError(f"{source_id} ist eine stillgelegte Legacy-Sensorquelle")
 
+    expected_field = {
+        "temperature": "temperature",
+        "humidity": "humidity",
+        "ppfd": "ppfd",
+        "outside_temperature": "temperature",
+        "outside_humidity": "humidity",
+    }.get(sensor_name)
+
     if not field:
-        field = {
-            "temperature": "temperature",
-            "humidity": "humidity",
-            "ppfd": "ppfd",
-        }.get(sensor_name)
+        field = expected_field
 
     if field not in {"temperature", "humidity", "ppfd"}:
         raise ValueError(f"Ungültiges Sensorfeld für {sensor_name}: {field}")
+    if expected_field and field != expected_field:
+        raise ValueError(
+            f"{sensor_name} benötigt das Sensorfeld {expected_field}"
+        )
 
     return {
         "source_id": str(source_id),
@@ -322,6 +331,18 @@ def _save_assignments(runtime, data):
         else:
             assignments["ppfd"] = ppfd_assignment
 
+    for sensor_name in ("outside_temperature", "outside_humidity"):
+        if sensor_name not in data:
+            continue
+        outside_assignment = _normalize_optional_assignment(
+            sensor_name,
+            data[sensor_name],
+        )
+        if outside_assignment is None:
+            assignments.pop(sensor_name, None)
+        else:
+            assignments[sensor_name] = outside_assignment
+
     offsets = data.get("offsets", {})
     if offsets is None:
         offsets = {}
@@ -338,8 +359,36 @@ def _save_assignments(runtime, data):
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{key} muss numerisch sein") from exc
 
-    if "temperature" in data or "humidity" in data or "ppfd" in data:
+    if any(
+        key in data
+        for key in (
+            "temperature",
+            "humidity",
+            "ppfd",
+            "outside_temperature",
+            "outside_humidity",
+        )
+    ):
         runtime.config["SENSOR_ASSIGNMENTS"] = assignments
+
+    assignment_changed = any(
+        key in data
+        for key in (
+            "temperature",
+            "humidity",
+            "outside_temperature",
+            "outside_humidity",
+        )
+    )
+    if assignment_changed or new_offsets:
+        reset_vpd_control(
+            runtime=runtime,
+            reason=(
+                "Sensorzuweisung geändert"
+                if assignment_changed
+                else "Sensor-Offset geändert"
+            ),
+        )
 
     for key, value in new_offsets.items():
         runtime.config[key] = value

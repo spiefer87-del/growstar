@@ -488,7 +488,7 @@ h3 {
         <div class="card env" id="vpd-card">
             <h2>VPD</h2>
             <div class="value"><span id="vpd">--.-</span> kPa</div>
-            <div class="sub">berechnet</div>
+            <div class="sub" id="vpd-control-summary">berechnet</div>
         </div>
     </a>
 
@@ -634,6 +634,31 @@ h3 {
         }
         safeText("climate-mode-icon", modeIcon);
         safeText("profile-phase", state.profile || "---");
+    }
+
+    function renderVpdControl(state) {
+        const summary = document.getElementById("vpd-control-summary");
+        if(!summary) return;
+
+        const control = state.vpd_control || {};
+        const mode = String(control.mode || "OFF").toUpperCase();
+        if(mode === "OFF"){
+            summary.textContent = "berechnet";
+            summary.title = "Intelligente VPD-Steuerung ist aus";
+            return;
+        }
+
+        const target = Number(control.target);
+        const targetText = Number.isFinite(target) ? `Ziel ${target.toFixed(2)}` : "Ziel --";
+        if(control.fallback || !control.ready){
+            summary.textContent = `${mode === "AUTO" ? "AUTO-Fallback" : "Beobachten wartet"} · ${targetText}`;
+            summary.title = control.reason || "VPD-Sensoren nicht bereit";
+            return;
+        }
+
+        const modeText = mode === "AUTO" ? "AUTO" : "Beobachten";
+        summary.textContent = `${targetText} · ${modeText}: ${control.stage_label || control.stage || "aktiv"}`;
+        summary.title = control.reason || summary.textContent;
     }
 
     function controllerDetail(device, controller, mode = "") {
@@ -924,6 +949,7 @@ h3 {
             if (ramp) ramp.textContent = state.ramp_active ? " ⏱️ Rampe aktiv" : "";
 
             renderProfileSummary(state);
+            renderVpdControl(state);
 
             updateRuntimeMode(state);
             ["heating", "fan", "light", "vent", "irrigation", "humidifier", "dehumidifier", "light2", "vent2", "aux1", "aux2", "aux3", "aux4"]

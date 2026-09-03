@@ -212,6 +212,76 @@ button:disabled{opacity:.48;cursor:not-allowed}
         </div>
 
         <div class="card">
+            <h2>🧠 VPD-Ziel &amp; Betriebsfenster</h2>
+            <div class="info">
+                Diese Werte gehören zur Profilvorlage. Ob Growstar sie nur
+                <strong>beobachtet</strong> oder <strong>automatisch regelt</strong>,
+                bleibt eine stationsbezogene Sicherheitsentscheidung unter Klima &amp; Grenzwerte.
+            </div>
+            <div class="row-inline">
+                <div class="field">
+                    <label for="VPD_TARGET_DAY">Tag Ziel kPa</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('VPD_TARGET_DAY',-0.05)">−</button>
+                        <input type="number" step="0.01" min="0.1" max="3.5" id="VPD_TARGET_DAY" class="compact-input" required>
+                        <button type="button" onclick="stepValue('VPD_TARGET_DAY',0.05)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="VPD_TARGET_NIGHT">Nacht Ziel kPa</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('VPD_TARGET_NIGHT',-0.05)">−</button>
+                        <input type="number" step="0.01" min="0.1" max="3.5" id="VPD_TARGET_NIGHT" class="compact-input" required>
+                        <button type="button" onclick="stepValue('VPD_TARGET_NIGHT',0.05)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="VPD_TOLERANCE">Toleranz ± kPa</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('VPD_TOLERANCE',-0.01)">−</button>
+                        <input type="number" step="0.01" min="0.01" max="0.5" id="VPD_TOLERANCE" class="compact-input" required>
+                        <button type="button" onclick="stepValue('VPD_TOLERANCE',0.01)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="row-inline">
+                <div class="field">
+                    <label for="VPD_TEMP_MIN">Temperatur min °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('VPD_TEMP_MIN',-0.5)">−</button>
+                        <input type="number" step="0.1" min="-10" max="50" id="VPD_TEMP_MIN" class="compact-input" required>
+                        <button type="button" onclick="stepValue('VPD_TEMP_MIN',0.5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="VPD_TEMP_MAX">Temperatur max °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('VPD_TEMP_MAX',-0.5)">−</button>
+                        <input type="number" step="0.1" min="-10" max="50" id="VPD_TEMP_MAX" class="compact-input" required>
+                        <button type="button" onclick="stepValue('VPD_TEMP_MAX',0.5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="VPD_HUM_MIN">Feuchte min %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('VPD_HUM_MIN',-1)">−</button>
+                        <input type="number" step="0.1" min="1" max="99" id="VPD_HUM_MIN" class="compact-input" required>
+                        <button type="button" onclick="stepValue('VPD_HUM_MIN',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="VPD_HUM_MAX">Feuchte max %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="stepValue('VPD_HUM_MAX',-1)">−</button>
+                        <input type="number" step="0.1" min="1" max="99" id="VPD_HUM_MAX" class="compact-input" required>
+                        <button type="button" onclick="stepValue('VPD_HUM_MAX',1)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="vpd-profile-preview" class="preview"></div>
+        </div>
+
+        <div class="card">
             <h2>⏱️ Rampe</h2>
             <div class="row-inline">
                 <div class="field">
@@ -314,7 +384,9 @@ const NUMBER_IDS = [
     "DAY_TEMP_TOL","NIGHT_TEMP_TOL","DAY_HUM_TOL","NIGHT_HUM_TOL",
     "RAMP_DURATION_MIN",
     "LIGHT_SUNRISE_DURATION_MIN","LIGHT_SUNSET_DURATION_MIN",
-    "LIGHT_SUN_MIN_LEVEL"
+    "LIGHT_SUN_MIN_LEVEL",
+    "VPD_TARGET_DAY","VPD_TARGET_NIGHT","VPD_TOLERANCE",
+    "VPD_TEMP_MIN","VPD_TEMP_MAX","VPD_HUM_MIN","VPD_HUM_MAX"
 ];
 
 let catalog = {};
@@ -367,6 +439,14 @@ function formatLightingDuration(totalMinutes){
     return `${hours} Std. ${rest} Min.`;
 }
 
+function calculateVpd(temp,hum){
+    const t = Number(temp);
+    const h = Number(hum);
+    if(!Number.isFinite(t) || !Number.isFinite(h)) return NaN;
+    const svp = 0.6108 * Math.exp((17.27*t)/(t+237.3));
+    return svp * (1-h/100);
+}
+
 function renderLightSunAvailability(){
     const note = el("profile-light-sun-note");
     if(!note) return;
@@ -405,6 +485,17 @@ function updatePreview(){
         <strong>Luftfeuchtigkeit</strong><br>
         Tag: ${num("DAY_HUM").toFixed(1)} % ± ${num("DAY_HUM_TOL").toFixed(1)} %<br>
         Nacht: ${num("NIGHT_HUM").toFixed(1)} % ± ${num("NIGHT_HUM_TOL").toFixed(1)} %
+    `;
+
+    const attainableMin = calculateVpd(num("VPD_TEMP_MIN"),num("VPD_HUM_MAX"));
+    const attainableMax = calculateVpd(num("VPD_TEMP_MAX"),num("VPD_HUM_MIN"));
+    el("vpd-profile-preview").innerHTML = `
+        <strong>VPD-Profil</strong><br>
+        Tag: ${num("VPD_TARGET_DAY").toFixed(2)} kPa ± ${num("VPD_TOLERANCE").toFixed(2)} kPa<br>
+        Nacht: ${num("VPD_TARGET_NIGHT").toFixed(2)} kPa ± ${num("VPD_TOLERANCE").toFixed(2)} kPa<br>
+        Temperaturfenster: ${num("VPD_TEMP_MIN").toFixed(1)} bis ${num("VPD_TEMP_MAX").toFixed(1)} °C<br>
+        Feuchtefenster: ${num("VPD_HUM_MIN").toFixed(1)} bis ${num("VPD_HUM_MAX").toFixed(1)} %<br>
+        Darin erreichbar: ${Number.isFinite(attainableMin) ? attainableMin.toFixed(2) : "--"} bis ${Number.isFinite(attainableMax) ? attainableMax.toFixed(2) : "--"} kPa
     `;
 
     const sunActive = !!el("LIGHT_SUN_ENABLED")?.checked;
@@ -572,7 +663,8 @@ function stepValue(id, delta){
     const minimum = input.min === "" ? -Infinity : Number(input.min);
     const maximum = input.max === "" ? Infinity : Number(input.max);
 
-    value = Math.round((value + delta) * 10) / 10;
+    const precision = Math.abs(delta) <= 0.01 ? 1000 : Math.abs(delta) < 0.1 ? 100 : 10;
+    value = Math.round((value + delta) * precision) / precision;
     input.value = Math.min(maximum, Math.max(minimum, value));
     updatePreview();
     setDirty(true);
@@ -686,6 +778,7 @@ async function activateProfile(){
         `${profileLabel(selectedProfile)} ${reapply ? "erneut anwenden" : "aktivieren"}?\n\n` +
         "• Die gespeicherten Profilwerte werden in diese Station übernommen.\n" +
         "• Temperatur-Rampe und Sonnenverlauf werden mit übernommen.\n" +
+        "• VPD-Ziel und erlaubtes Temperatur-/Feuchtefenster werden mit übernommen.\n" +
         "• Eine laufende Rampe wird beendet.\n" +
         "• Die Profilvorlage selbst wird dabei nicht verändert."
     );

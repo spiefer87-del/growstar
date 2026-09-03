@@ -39,6 +39,7 @@ def load_assignment_functions():
     namespace = {
         "_OFFSET_KEYS": ("TEMP_OFFSET", "HUM_OFFSET"),
         "_RETIRED_SOURCE_IDS": {"mqtt:ds18b20", "mqtt:dht22"},
+        "reset_vpd_control": lambda runtime=None, reason="": None,
     }
     exec(
         compile(
@@ -85,6 +86,7 @@ def main():
     save_assignments = namespace["_save_assignments"]
 
     apply_calls = []
+    reset_calls = []
 
     def apply_sensor_assignments(runtime=None):
         apply_calls.append(runtime)
@@ -94,6 +96,9 @@ def main():
         return True
 
     namespace["apply_sensor_assignments"] = apply_sensor_assignments
+    namespace["reset_vpd_control"] = lambda runtime=None, reason="": reset_calls.append(
+        (runtime, reason)
+    )
 
     runtime = FakeRuntime({
         "temperature": assignment("old:temp", "temperature"),
@@ -129,6 +134,52 @@ def main():
         and runtime.persist_calls == 1
         and apply_calls == [runtime],
         "Optionale PPFD-Zuweisung wird persistiert und angewendet",
+    )
+    require(
+        reset_calls == [(runtime, "Sensorzuweisung geändert")],
+        "Neue Innenzuweisungen setzen eine laufende VPD-Wirkungsprüfung zurück",
+    )
+
+    reset_calls.clear()
+    outside_runtime = FakeRuntime({
+        "temperature": assignment("inside:temp", "temperature"),
+        "humidity": assignment("inside:hum", "humidity"),
+    })
+    save_assignments(outside_runtime, {
+        "outside_temperature": assignment("outside:climate", "temperature"),
+        "outside_humidity": assignment("outside:climate", "humidity"),
+    })
+    require(
+        outside_runtime.config["SENSOR_ASSIGNMENTS"]["outside_temperature"]["field"]
+        == "temperature"
+        and outside_runtime.config["SENSOR_ASSIGNMENTS"]["outside_humidity"]["field"]
+        == "humidity",
+        "Optionale Außen-Temperatur und Außen-Feuchte werden streng gespeichert",
+    )
+    require(
+        reset_calls == [(outside_runtime, "Sensorzuweisung geändert")],
+        "Eine neue Außenquelle verwirft die Wirkungshistorie der alten Quelle",
+    )
+
+    save_assignments(outside_runtime, {"outside_humidity": None})
+    require(
+        "outside_humidity"
+        not in outside_runtime.config["SENSOR_ASSIGNMENTS"],
+        "Eine optionale Außen-Zuweisung kann gezielt entfernt werden",
+    )
+
+    reset_calls.clear()
+    offset_runtime = FakeRuntime({
+        "temperature": assignment("inside:temp", "temperature"),
+        "humidity": assignment("inside:hum", "humidity"),
+    })
+    save_assignments(offset_runtime, {
+        "offsets": {"TEMP_OFFSET": 0.4},
+    })
+    require(
+        offset_runtime.config["TEMP_OFFSET"] == 0.4
+        and reset_calls == [(offset_runtime, "Sensor-Offset geändert")],
+        "Eine geänderte Innenkalibrierung setzt die alte VPD-Wirkungshistorie zurück",
     )
 
     runtime = FakeRuntime({

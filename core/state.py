@@ -18,6 +18,25 @@ _LIVE_STATE_TEMPLATE = {
     "hum_raw": None,
     "vpd": None,
 
+    # Optionales Außenklima für die intelligente VPD-Wirkungsprognose.
+    # Diese Werte sind nie Ersatz für die Innenraumsensoren.
+    "outside_temp": None,
+    "outside_hum": None,
+    "outside_temp_source": None,
+    "outside_hum_source": None,
+
+    # Öffentliche Diagnose der VPD-Zustandsmaschine. Der interne Verlauf wird
+    # bei Bedarf separat und ausschließlich flüchtig im live_state angelegt.
+    "vpd_control": {
+        "mode": "OFF",
+        "active": False,
+        "takeover": False,
+        "ready": False,
+        "stage": "disabled",
+        "managed_devices": [],
+        "actions": {},
+    },
+
     "profile": None,
 
     # Sollwerte (für Dashboard)

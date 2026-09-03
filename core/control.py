@@ -21,6 +21,7 @@ from core.devices import (
     get_device_mode,
     get_device_params,
 )
+from core.vpd_control import apply_vpd_device_plan, vpd_manages_device
 
 
 # =========================================
@@ -65,6 +66,11 @@ def update_temperature_setpoint(runtime=None):
             target = ramp_target
 
     st.live_state["temp_target"] = target
+    # Unveränderter Sollwert der klassischen Profil-/Rampenlogik. Ein
+    # übergeordneter VPD-Koordinator darf temp_target später im selben Zyklus
+    # anpassen, ohne dadurch im nächsten Zyklus seine eigene Korrektur als
+    # neue Profilbasis zu missverstehen.
+    st.live_state["climate_temp_target"] = target
     st.live_state["temp_tol"] = tol
 
     print(
@@ -191,6 +197,13 @@ def control_device(device, runtime=None):
         return
 
     if mode == "ENV":
+        # Die VPD-Zustandsmaschine übernimmt ausschließlich explizite
+        # ENV-Geräte und wendet ihren Plan weiterhin über apply_device_state an.
+        # OFF/ON/TIME/INTERVAL bleiben jederzeit autoritativ beim Benutzer.
+        if vpd_manages_device(device, runtime=rt):
+            apply_vpd_device_plan(device, runtime=rt)
+            return
+
         if device == "heating":
             control_heating_env(runtime=rt)
             return

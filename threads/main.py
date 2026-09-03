@@ -24,6 +24,7 @@ from core.ramp import (
 )
 
 from services.sensor import mark_stale_sensors
+from core.vpd_control import update_vpd_control
 
 
 def run_control_cycle(runtime=None, *, now=None, shadow=None):
@@ -82,6 +83,11 @@ def run_control_cycle(runtime=None, *, now=None, shadow=None):
     # =========================================
 
     mark_stale_sensors(runtime=rt)
+
+    # Die intelligente VPD-Steuerung plant einmal pro Zyklus koordiniert über
+    # alle ENV-Aktoren. MONITOR berechnet nur, AUTO stellt den vorbereiteten
+    # Plan anschließend im generischen Geräte-Loop bereit.
+    update_vpd_control(runtime=rt, now=current_time)
 
     # =========================================
     # Snapshot

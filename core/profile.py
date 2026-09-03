@@ -12,6 +12,7 @@ from core.config import DEFAULT_CONFIG
 from core.runtime import resolve_runtime
 from core.tents import DEFAULT_TENT_ID
 from core.helpers import (
+    calculate_vpd,
     minutes_now,
     is_night,
 )
@@ -64,6 +65,13 @@ PROFILE_SETTING_KEYS = (
     "LIGHT_SUNRISE_DURATION_MIN",
     "LIGHT_SUNSET_DURATION_MIN",
     "LIGHT_SUN_MIN_LEVEL",
+    "VPD_TARGET_DAY",
+    "VPD_TARGET_NIGHT",
+    "VPD_TOLERANCE",
+    "VPD_TEMP_MIN",
+    "VPD_TEMP_MAX",
+    "VPD_HUM_MIN",
+    "VPD_HUM_MAX",
 )
 
 PROFILE_COMPATIBILITY_DEFAULTS = {
@@ -75,6 +83,63 @@ PROFILE_COMPATIBILITY_DEFAULTS = {
         "LIGHT_SUN_MIN_LEVEL",
     )
 }
+
+
+def _profile_compatibility_values(settings):
+    """Ergänzt alte Vorlagen ohne ihre bisherige Klimawirkung zu verändern.
+
+    VPD-Ziele werden aus den vorhandenen Tag-/Nacht-Sollwerten berechnet. Das
+    neue Betriebsfenster umschließt die vorhandenen Sollwerte samt Toleranzen.
+    Dadurch wird ein altes Profil beim ersten Laden nicht heimlich auf generische
+    VPD-Werte umgestellt.
+    """
+
+    values = deepcopy(PROFILE_COMPATIBILITY_DEFAULTS)
+
+    try:
+        day_temp = float(settings["DAY_TEMP"])
+        night_temp = float(settings["NIGHT_TEMP"])
+        day_hum = float(settings["DAY_HUM"])
+        night_hum = float(settings["NIGHT_HUM"])
+        day_temp_tol = abs(float(settings["DAY_TEMP_TOL"]))
+        night_temp_tol = abs(float(settings["NIGHT_TEMP_TOL"]))
+        day_hum_tol = abs(float(settings["DAY_HUM_TOL"]))
+        night_hum_tol = abs(float(settings["NIGHT_HUM_TOL"]))
+
+        temp_min = min(day_temp - day_temp_tol, night_temp - night_temp_tol)
+        temp_max = max(day_temp + day_temp_tol, night_temp + night_temp_tol)
+        hum_min = max(1.0, min(day_hum - day_hum_tol, night_hum - night_hum_tol))
+        hum_max = min(99.0, max(day_hum + day_hum_tol, night_hum + night_hum_tol))
+
+        if temp_max - temp_min < 0.2:
+            temp_min -= 0.1
+            temp_max += 0.1
+        if hum_max - hum_min < 1.0:
+            hum_min = max(1.0, hum_min - 0.5)
+            hum_max = min(99.0, hum_max + 0.5)
+
+        values.update({
+            "VPD_TARGET_DAY": float(calculate_vpd(day_temp, day_hum)),
+            "VPD_TARGET_NIGHT": float(calculate_vpd(night_temp, night_hum)),
+            "VPD_TOLERANCE": float(DEFAULT_CONFIG["VPD_TOLERANCE"]),
+            "VPD_TEMP_MIN": round(temp_min, 2),
+            "VPD_TEMP_MAX": round(temp_max, 2),
+            "VPD_HUM_MIN": round(hum_min, 2),
+            "VPD_HUM_MAX": round(hum_max, 2),
+        })
+    except (KeyError, TypeError, ValueError, OverflowError):
+        for key in (
+            "VPD_TARGET_DAY",
+            "VPD_TARGET_NIGHT",
+            "VPD_TOLERANCE",
+            "VPD_TEMP_MIN",
+            "VPD_TEMP_MAX",
+            "VPD_HUM_MIN",
+            "VPD_HUM_MAX",
+        ):
+            values[key] = deepcopy(DEFAULT_CONFIG[key])
+
+    return values
 
 _PROFILE_LOCK = threading.RLock()
 
@@ -114,6 +179,13 @@ def normalize_profile_settings(data):
 
     if not isinstance(data, dict):
         raise TypeError("Profil muss ein JSON-Objekt sein")
+
+    # Alte API-Clients und vorhandene Tests dürfen weiterhin ein Profil ohne
+    # die später ergänzten Sonnen-/VPD-Felder senden. Die fehlenden VPD-Werte
+    # werden aus genau diesem Profil abgeleitet, nicht aus einem fremden Preset.
+    data = deepcopy(data)
+    for key, default in _profile_compatibility_values(data).items():
+        data.setdefault(key, deepcopy(default))
 
     unknown = sorted(set(data) - set(PROFILE_SETTING_KEYS))
     if unknown:
@@ -225,6 +297,58 @@ def normalize_profile_settings(data):
         _bounded(light_sun_min_level, "LIGHT_SUN_MIN_LEVEL", 11, 100)
     )
 
+    result.update({
+        "VPD_TARGET_DAY": _bounded(
+            _finite_number(data, "VPD_TARGET_DAY"),
+            "VPD_TARGET_DAY",
+            0.1,
+            3.5,
+        ),
+        "VPD_TARGET_NIGHT": _bounded(
+            _finite_number(data, "VPD_TARGET_NIGHT"),
+            "VPD_TARGET_NIGHT",
+            0.1,
+            3.5,
+        ),
+        "VPD_TOLERANCE": _bounded(
+            _finite_number(data, "VPD_TOLERANCE"),
+            "VPD_TOLERANCE",
+            0.01,
+            0.5,
+        ),
+        "VPD_TEMP_MIN": _bounded(
+            _finite_number(data, "VPD_TEMP_MIN"),
+            "VPD_TEMP_MIN",
+            -10,
+            50,
+        ),
+        "VPD_TEMP_MAX": _bounded(
+            _finite_number(data, "VPD_TEMP_MAX"),
+            "VPD_TEMP_MAX",
+            -10,
+            50,
+        ),
+        "VPD_HUM_MIN": _bounded(
+            _finite_number(data, "VPD_HUM_MIN"),
+            "VPD_HUM_MIN",
+            1,
+            99,
+        ),
+        "VPD_HUM_MAX": _bounded(
+            _finite_number(data, "VPD_HUM_MAX"),
+            "VPD_HUM_MAX",
+            1,
+            99,
+        ),
+    })
+
+    # Dieselbe Erreichbarkeitsprüfung wie bei einer Stationskonfiguration.
+    from core.vpd import validate_vpd_config
+
+    validation_cfg = deepcopy(DEFAULT_CONFIG)
+    validation_cfg.update(result)
+    validate_vpd_config(validation_cfg)
+
     return result
 
 
@@ -256,13 +380,13 @@ def load_profiles():
         if not isinstance(profiles, dict):
             raise RuntimeError("profiles.json enthält keinen gültigen Profilkatalog")
 
-        # Bestehende Installationen besitzen diese vier Werte noch nicht in
-        # profiles.json. Sie werden nur im Arbeitsspeicher sicher ergänzt und
+        # Bestehende Installationen besitzen Sonnenverlauf und VPD-Werte noch
+        # nicht in profiles.json. Sie werden nur im Arbeitsspeicher ergänzt und
         # erst beim nächsten bewussten Profilspeichern dauerhaft geschrieben.
         for name, settings in profiles.items():
             if not isinstance(settings, dict):
                 raise RuntimeError(f"Profil {name!r} ist kein JSON-Objekt")
-            for key, default in PROFILE_COMPATIBILITY_DEFAULTS.items():
+            for key, default in _profile_compatibility_values(settings).items():
                 settings.setdefault(key, deepcopy(default))
 
         return catalog
@@ -413,6 +537,23 @@ def apply_profile(name, runtime=None):
                     "Licht-Controller zugewiesen werden.",
                 )
 
+        if str(cfg.get("VPD_CONTROL_MODE", "OFF") or "OFF").upper() in {
+            "MONITOR",
+            "AUTO",
+        }:
+            from core.vpd import validate_vpd_environment_alignment
+
+            candidate = deepcopy(cfg)
+            candidate.update(profile)
+            try:
+                validate_vpd_environment_alignment(candidate)
+            except (TypeError, ValueError) as exc:
+                raise ProfileActivationError(
+                    "vpd_profile_incompatible",
+                    "Das VPD-Fenster dieses Profils ist mit den Schutzgrenzen "
+                    f"der Station nicht vereinbar: {exc}",
+                ) from exc
+
     for key, value in profile.items():
         cfg[key] = deepcopy(value)
 
@@ -429,6 +570,9 @@ def apply_profile(name, runtime=None):
             PROFILES.update(working)
 
     rt.persist_config()
+
+    from core.vpd import reset_vpd_control
+    reset_vpd_control(runtime=rt, reason=f"Profil {name} aktiviert")
 
     # Profilwechsel setzt die Rampe nur in der betroffenen Runtime zurück.
     st.ramp_active = False

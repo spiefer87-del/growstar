@@ -87,6 +87,20 @@ def _device_dependencies(runtime, device, mode):
     if mode != "ENV":
         return set()
 
+    # Im VPD-AUTO-Modus beruhen alle koordinierten Entscheidungen auf dem
+    # gemeinsamen Temperatur-/Feuchte-Paar. Der Safety-Supervisor darf daher
+    # keinen dieser Aktoren bei nur teilweise frischen Innenwerten einschalten.
+    vpd_control = runtime.state.live_state.get("vpd_control") or {}
+    if (
+        str(runtime.config.get("VPD_CONTROL_MODE", "OFF") or "OFF").upper()
+        == "AUTO"
+        and isinstance(vpd_control, dict)
+        and bool(vpd_control.get("takeover"))
+        and bool(vpd_control.get("ready"))
+        and device in (vpd_control.get("managed_devices") or [])
+    ):
+        return {"temperature", "humidity"}
+
     if device == "heating":
         return {"temperature"}
 

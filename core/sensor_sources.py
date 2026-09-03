@@ -126,6 +126,10 @@ def _read_assigned_value(sensor_name, runtime=None):
             field = "humidity"
         elif sensor_name == "ppfd":
             field = "ppfd"
+        elif sensor_name == "outside_temperature":
+            field = "temperature"
+        elif sensor_name == "outside_humidity":
+            field = "humidity"
 
     source = get_sensor_source(source_id)
 
@@ -186,6 +190,18 @@ def apply_sensor_assignments(runtime=None):
         "ppfd",
         runtime=rt,
     )
+    outside_temp_raw, outside_temp_source, outside_temp_assignment = (
+        _read_assigned_value(
+            "outside_temperature",
+            runtime=rt,
+        )
+    )
+    outside_hum_raw, outside_hum_source, outside_hum_assignment = (
+        _read_assigned_value(
+            "outside_humidity",
+            runtime=rt,
+        )
+    )
 
     if ppfd_raw is None:
         assignments = cfg.get("SENSOR_ASSIGNMENTS", {})
@@ -213,9 +229,19 @@ def apply_sensor_assignments(runtime=None):
     temp_last_seen = _source_last_seen(temp_source)
     hum_last_seen = _source_last_seen(hum_source)
     ppfd_last_seen = _source_last_seen(ppfd_source)
+    outside_temp_last_seen = _source_last_seen(outside_temp_source)
+    outside_hum_last_seen = _source_last_seen(outside_hum_source)
     temp_fresh = temp_raw is not None and _source_is_fresh(temp_source, now)
     hum_fresh = hum_raw is not None and _source_is_fresh(hum_source, now)
     ppfd_fresh = ppfd_raw is not None and _source_is_fresh(ppfd_source, now)
+    outside_temp_fresh = (
+        outside_temp_raw is not None
+        and _source_is_fresh(outside_temp_source, now)
+    )
+    outside_hum_fresh = (
+        outside_hum_raw is not None
+        and _source_is_fresh(outside_hum_source, now)
+    )
 
     changed = False
 
@@ -283,6 +309,42 @@ def apply_sensor_assignments(runtime=None):
         else:
             st.live_state.pop("light_ppfd", None)
             st.live_state.pop("light_ppfd_source", None)
+
+        # Außenwerte bleiben bewusst unkorrigiert: TEMP_OFFSET/HUM_OFFSET
+        # kalibrieren ausschließlich die Regelquelle im Zelt. Der echte
+        # Quellenzeitstempel wird mit ausgegeben, damit der VPD-Kern nie mit
+        # einem alten Außenwert weiterrechnet.
+        if outside_temp_fresh:
+            st.live_state["outside_temp"] = float(outside_temp_raw)
+            st.live_state["outside_temp_source"] = {
+                "source_id": outside_temp_assignment.get("source_id"),
+                "label": (
+                    outside_temp_assignment.get("label")
+                    or (outside_temp_source or {}).get("label")
+                    or outside_temp_assignment.get("source_id")
+                ),
+                "last_seen": outside_temp_last_seen,
+            }
+            changed = True
+        else:
+            st.live_state["outside_temp"] = None
+            st.live_state["outside_temp_source"] = None
+
+        if outside_hum_fresh:
+            st.live_state["outside_hum"] = float(outside_hum_raw)
+            st.live_state["outside_hum_source"] = {
+                "source_id": outside_hum_assignment.get("source_id"),
+                "label": (
+                    outside_hum_assignment.get("label")
+                    or (outside_hum_source or {}).get("label")
+                    or outside_hum_assignment.get("source_id")
+                ),
+                "last_seen": outside_hum_last_seen,
+            }
+            changed = True
+        else:
+            st.live_state["outside_hum"] = None
+            st.live_state["outside_hum_source"] = None
 
         st.live_state["vpd"] = _calculate_vpd(
             st.live_state.get("temp"),

@@ -56,6 +56,29 @@ DEFAULT_CONFIG = {
     "LIGHT_SUNSET_DURATION_MIN": 30,
     "LIGHT_SUN_MIN_LEVEL": 11,
 
+    # ================= INTELLIGENTE VPD-STEUERUNG =================
+    # OFF     = bisherige Klima-/ENV-Regelung unverändert
+    # MONITOR = Entscheidungen und Wirkungstrends nur berechnen
+    # AUTO    = ausschließlich Geräte im Modus ENV übernehmen
+    "VPD_CONTROL_MODE": "OFF",
+    "VPD_TARGET_DAY": 1.10,
+    "VPD_TARGET_NIGHT": 0.90,
+    "VPD_TOLERANCE": 0.05,
+
+    # Erlaubtes Betriebsfenster der VPD-Optimierung. Die bestehenden
+    # MIN_/MAX_-Werte bleiben davon getrennte Schutz-/Alarmgrenzen.
+    "VPD_TEMP_MIN": 20.0,
+    "VPD_TEMP_MAX": 28.0,
+    "VPD_HUM_MIN": 40.0,
+    "VPD_HUM_MAX": 70.0,
+
+    # Eine Stufe wird erst nach fünf Minuten anhand des echten VPD-Trends
+    # bewertet. Temperatur und Abluft werden nur in kleinen Schritten verändert.
+    "VPD_EFFECT_WINDOW_MIN": 5,
+    "VPD_MIN_EFFECT_KPA": 0.03,
+    "VPD_TEMP_STEP": 0.5,
+    "VPD_FAN_STEP": 10,
+
     "SENSOR_ASSIGNMENTS": {
 
         "temperature": {
