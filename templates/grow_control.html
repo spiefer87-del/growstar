@@ -302,7 +302,7 @@ h3 {
 }
 .vpd-live-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0,1fr));
+    grid-template-columns: repeat(auto-fit, minmax(125px,1fr));
     gap: 8px;
     margin-top: 10px;
 }
@@ -686,6 +686,10 @@ h3 {
             <span class="vpd-live-label">Außenluft</span>
             <span id="vpd-live-outside" class="vpd-live-value">--</span>
         </div>
+        <div class="vpd-live-metric">
+            <span class="vpd-live-label">Stufenweg</span>
+            <span id="vpd-live-progress" class="vpd-live-value">--</span>
+        </div>
     </div>
     <div class="vpd-action-plan">
         <span id="vpd-action-label" class="vpd-live-label">Aktorplan</span>
@@ -901,12 +905,16 @@ h3 {
         const effect = control.effect || {};
         const nextEvaluation = optionalNumber(effect.next_evaluation_sec);
         const improvement = optionalNumber(effect.improvement_kpa);
+        const lastImprovement = optionalNumber(effect.last_improvement_kpa);
         const minimum = optionalNumber(effect.minimum_kpa);
         let effectText = Number.isFinite(nextEvaluation)
             ? `noch ${countdownText(nextEvaluation)}`
             : (waiting ? "pausiert" : "laufende Prüfung");
-        if (Number.isFinite(improvement) && Number.isFinite(minimum)) {
-            effectText += ` · Wirkung ${improvement >= 0 ? "+" : ""}${improvement.toFixed(3)} / ${minimum.toFixed(3)} kPa`;
+        const displayedImprovement = Number.isFinite(lastImprovement)
+            ? lastImprovement
+            : improvement;
+        if (Number.isFinite(displayedImprovement) && Number.isFinite(minimum)) {
+            effectText += ` · ${Number.isFinite(lastImprovement) ? "zuletzt" : "Wirkung"} ${displayedImprovement >= 0 ? "+" : ""}${displayedImprovement.toFixed(3)} / ${minimum.toFixed(3)} kPa`;
         }
         safeText("vpd-live-effect", effectText);
 
@@ -920,6 +928,22 @@ h3 {
         if (control.direction === "lower" && outside.lowering) outsideParts.push("senkt VPD");
         else if (control.direction === "lower" && outside.humidifying) outsideParts.push("feuchter");
         safeText("vpd-live-outside", outsideParts.join(" · ") || (waiting ? "nicht bewertbar" : "keine Hilfe"));
+
+        const progress = control.strategy_progress || {};
+        const fanProgress = progress.fan || {};
+        const tempProgress = progress.temperature || {};
+        const fanLevel = optionalNumber(fanProgress.level);
+        const fanMaximum = optionalNumber(fanProgress.maximum);
+        const tempTarget = optionalNumber(tempProgress.target);
+        const tempMaximum = optionalNumber(tempProgress.maximum);
+        const progressParts = [];
+        if (Number.isFinite(fanLevel) && Number.isFinite(fanMaximum)) {
+            progressParts.push(`Abluft ${fanLevel.toFixed(0)}/${fanMaximum.toFixed(0)}${fanProgress.complete ? " ✓" : ""}`);
+        }
+        if (Number.isFinite(tempTarget) && Number.isFinite(tempMaximum)) {
+            progressParts.push(`Temperatur ${tempTarget.toFixed(1)}/${tempMaximum.toFixed(1)} °C${tempProgress.complete ? " ✓" : ""}`);
+        }
+        safeText("vpd-live-progress", progressParts.join(" · ") || (waiting ? "wartet" : "--"));
 
         const actionLabel = document.getElementById("vpd-action-label");
         if (actionLabel) {

@@ -560,7 +560,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     </div>
                 </div>
                 <div class="field">
-                    <label>Abluft-Schritt %</label>
+                    <label>Abluft-Schritt Prozentpunkte</label>
                     <div class="num-control">
                         <button type="button" onclick="step('VPD_FAN_STEP',-1)">−</button>
                         <input type="number" step="1" id="VPD_FAN_STEP" class="compact-input">
@@ -572,8 +572,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <div class="vpd-sequence">
                 <div class="vpd-step"><strong>1 · VPD-Ziel rampen</strong><span>Tag-/Nachtziel sowie die erlaubten Klima-Fenster wechseln gleitend.</span></div>
                 <div class="vpd-step"><strong>2 · Zu hoher VPD</strong><span>Temperatur innerhalb Min/Max zuerst absenken; geeignete kühlere Außenluft darf unterstützen.</span></div>
-                <div class="vpd-step"><strong>3 · Zu niedriger VPD</strong><span>Zuerst wirksame trockenere Außenluft, danach Temperatur vorsichtig anheben.</span></div>
-                <div class="vpd-step"><strong>4 · Be-/Entfeuchter</strong><span>Erst wenn die bevorzugten Schritte nach dem Wirkungsfenster nicht genügen.</span></div>
+                <div class="vpd-step"><strong>3 · Zu niedriger VPD</strong><span>Trockene Außenluft stufenweise bis zur sicheren Controllergrenze nutzen, danach Temperatur bis zum erlaubten Phasenmaximum anheben.</span></div>
+                <div class="vpd-step"><strong>4 · Be-/Entfeuchter</strong><span>Erst wenn Abluft- und Temperaturweg vollständig geprüft oder technisch ohne Reaktion sind.</span></div>
             </div>
 
             <div id="vpd-sensor-note" class="info warning"></div>
@@ -1003,7 +1003,9 @@ function updatePreview(){
         ${num("VPD_TEMP_MIN_NIGHT").toFixed(1)}–${num("VPD_TEMP_MAX_NIGHT").toFixed(1)} °C ·
         ${num("VPD_HUM_MIN_NIGHT").toFixed(1)}–${num("VPD_HUM_MAX_NIGHT").toFixed(1)} %<br>
         Physikalisch erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa<br>
-        Eskalation nur bei weniger als ${num("VPD_MIN_EFFECT_KPA").toFixed(3)} kPa Wirkung nach ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten.
+        Jede Abluft- und Temperaturstufe wird ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten geprüft.
+        Solange Zielband oder Feuchtefenster verletzt sind, werden die erlaubten Stufen bis zu ihren sicheren Maximalwerten durchlaufen.
+        Ab ${num("VPD_MIN_EFFECT_KPA").toFixed(3)} kPa gilt eine Stufe als messbar wirksam; eine schwächere Einzelmessung beendet den Stufenweg nicht vorzeitig.
     `;
 }
 

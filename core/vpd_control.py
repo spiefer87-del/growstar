@@ -8,9 +8,11 @@ können im AUTO-Modus übernommen werden.
 Regelstrategie bei zu niedrigem VPD / zu hoher Feuchte:
 
 1. Abluft nur einsetzen, wenn die Außenluft tatsächlich trockener ist.
-2. Wirkung über ein konfigurierbares Zeitfenster beobachten.
-3. Ohne ausreichende Wirkung den Temperatur-Sollwert schrittweise anheben.
-4. Erst wenn auch das nicht genügt, den Entfeuchter anfordern.
+2. Jede erlaubte Abluftstufe über ein konfigurierbares Zeitfenster prüfen.
+3. Anschließend den Temperatur-Sollwert schrittweise bis zur Phasengrenze
+   anheben; eine einzelne schwache VPD-Reaktion beendet diesen Weg nicht.
+4. Erst wenn Abluft- und Temperaturweg ausgeschöpft oder technisch ohne
+   Reaktion sind, den Entfeuchter anfordern.
 
 Bei zu hohem VPD wird dagegen zuerst das Temperaturziel innerhalb des
 phasenbezogenen Min-/Max-Fensters abgesenkt. Geeignete kühlere Außenluft darf
@@ -30,7 +32,9 @@ import math
 from statistics import median
 import time
 
+from core.capability_routing import controller_assignment_for_config
 from core.controller_states import apply_device_state, resolve_control_state
+from core.controller_setpoints import controller_schema_for_family
 from core.devices import get_device_env_config, get_device_mode, get_device_params
 from core.helpers import calculate_vpd
 from core.runtime import resolve_runtime
@@ -119,6 +123,36 @@ def _fan_limits(runtime):
         minimum = min(standby_level, env_level)
         maximum = max(standby_level, env_level)
 
+    # Im ausdrücklich aktivierten VPD-AUTO-Modus ist der gespeicherte
+    # ENV-Wert die normale Regelleistung, nicht automatisch die technische
+    # Obergrenze. Bei einer gültigen Spider-Farmer-Abluftzuordnung darf der
+    # Koordinator deshalb innerhalb des bekannten Blower-Schemas bis 100 %
+    # staffeln. Ohne bestätigte Zuordnung bleibt der bisherige, konservative
+    # ENV-Wert die Grenze.
+    try:
+        assignment = controller_assignment_for_config(runtime.config, "fan")
+    except (TypeError, ValueError):
+        assignment = None
+    if (
+        env_level is not None
+        and isinstance(assignment, dict)
+        and assignment.get("provider") == "spiderfarmer"
+        and assignment.get("target_id")
+    ):
+        level_schema = controller_schema_for_family(
+            "blower",
+            ("level",),
+        ).get("level") or {}
+        try:
+            physical_min = int(level_schema["min"])
+            physical_max = int(level_schema["max"])
+        except (KeyError, TypeError, ValueError):
+            physical_min = physical_max = None
+
+        if physical_min is not None and physical_max is not None:
+            minimum = max(physical_min, int(minimum))
+            maximum = max(int(maximum), physical_max)
+
     return {
         "env_state": env_state,
         "standby_state": standby_state,
@@ -157,8 +191,10 @@ def _next_fan_level(current, minimum, maximum, step_percent):
     if current >= maximum:
         return maximum
 
-    span = max(0, int(maximum) - int(minimum))
-    increment = max(1, int(math.ceil(span * float(step_percent) / 100.0)))
+    # Der UI-Wert "Abluft-Schritt %" bezeichnet Prozentpunkte der
+    # Blower-Leistung. 10 bedeutet damit nachvollziehbar 75 -> 85 und nicht
+    # zehn Prozent des noch konfigurierten Regelbands.
+    increment = max(1, int(math.ceil(float(step_percent))))
     return min(int(maximum), int(current) + increment)
 
 
@@ -198,12 +234,33 @@ def _stage_effect(engine, direction):
     return float(median(early) - median(recent))
 
 
-def _set_stage(engine, *, direction, stage, now, vpd, note=None):
+def _set_stage(engine, *, direction, stage, now, vpd, temp=None, note=None):
     engine["direction"] = direction
     engine["stage"] = stage
     engine["stage_started_at"] = float(now)
     engine["samples"] = [(float(now), float(vpd))]
+    if temp is not None:
+        engine["stage_start_temp"] = float(temp)
     engine["last_transition_note"] = note
+
+
+def _remember_evaluation(engine, *, now, improvement):
+    engine["last_evaluation_at"] = float(now)
+    engine["last_evaluation_improvement"] = float(improvement)
+
+
+def _temperature_response(engine, temp, settings):
+    try:
+        start_temp = float(engine.get("stage_start_temp"))
+    except (TypeError, ValueError):
+        start_temp = float(temp)
+
+    change = float(temp) - start_temp
+    # Kleine Sensorschwankungen sollen nicht als Heizwirkung gelten. Bei sehr
+    # kleinen konfigurierten Sollwertschritten bleibt die Schwelle dennoch
+    # erreichbar.
+    threshold = min(0.10, max(0.03, float(settings["temp_step"]) * 0.20))
+    return change, change >= threshold
 
 
 def _append_sample(engine, now, vpd, effect_window_sec):
@@ -375,6 +432,7 @@ def _next_step_label(
     *,
     settings,
     availability,
+    outside_drying,
     outside_humidifying,
 ):
     """Beschreibt ausschließlich den im Zustandsautomaten möglichen Folgeschritt."""
@@ -384,28 +442,80 @@ def _next_step_label(
 
     if direction is None or stage == "in_band":
         return "Zielband halten und Klima weiter beobachten"
-    if stage == "limited":
-        return "Auf eine Klimaänderung oder eine weitere ENV-Aktorstufe warten"
-
     if direction == "raise":
+        fan_level = engine.get("fan_level")
+        fan_max = engine.get("fan_max")
+        temp_target = float(engine.get("temp_target") or settings["temp_min"])
+
+        if stage == "limited":
+            if bool(engine.get("fan_sweep_complete")):
+                fan_text = (
+                    f"Abluft {int(fan_level)}/{int(fan_max)} ausgeschöpft"
+                    if fan_level is not None and fan_max is not None
+                    else "Abluftweg ausgeschöpft"
+                )
+            elif not outside_drying:
+                fan_text = "Außenluft derzeit nicht zum Trocknen geeignet"
+            else:
+                fan_text = "Abluft derzeit nicht regelbar"
+            temp_text = (
+                f"Temperaturziel {temp_target:.1f}/{settings['temp_max']:.1f} °C ausgeschöpft"
+                if bool(engine.get("heat_sweep_complete"))
+                else f"Temperaturweg bis {settings['temp_max']:.1f} °C derzeit nicht verfügbar"
+            )
+            return (
+                f"{fan_text}; {temp_text}; Verfügbarkeit und Klima erneut prüfen"
+            )
         if stage == "exhaust":
-            if (
-                availability["heating"]
-                and float(engine.get("temp_target") or settings["temp_min"])
-                < settings["temp_max"]
-            ):
-                return "Bei zu geringer Abluftwirkung die Temperatur leicht anheben"
+            if not availability["fan"] or not outside_drying:
+                if availability["heating"] and temp_target < settings["temp_max"]:
+                    return "Außenluft nicht mehr geeignet; anschließend zur Temperaturregelung wechseln"
+                if availability["dehumidifier"]:
+                    return "Außenluft nicht mehr geeignet; anschließend den Entfeuchter zuschalten"
+                return "Außenluft neu bewerten und sichere Grenzen halten"
+            if fan_level is not None and fan_max is not None and fan_level < fan_max:
+                next_level = _next_fan_level(
+                    fan_level,
+                    engine.get("fan_min"),
+                    fan_max,
+                    settings["fan_step"],
+                )
+                return (
+                    f"Abluftstufe {int(fan_level)} prüfen; danach auf "
+                    f"{int(next_level)} von maximal {int(fan_max)} erhöhen"
+                )
+            if availability["heating"] and temp_target < settings["temp_max"]:
+                next_target = min(
+                    settings["temp_max"],
+                    max(temp_target, float(engine.get("last_temp") or temp_target))
+                    + settings["temp_step"],
+                )
+                return (
+                    f"Abluft-Maximum vollständig prüfen; danach Temperaturziel "
+                    f"auf {next_target:.1f} °C anheben"
+                )
             if availability["dehumidifier"]:
-                return "Bei zu geringer Abluftwirkung den Entfeuchter zuschalten"
-            return "Abluftwirkung erneut bewerten und die sichere Stufe halten"
+                return "Abluft-Maximum vollständig prüfen; danach den Entfeuchter zuschalten"
+            return "Abluft-Maximum vollständig prüfen und anschließend Grenzen neu bewerten"
         if stage == "heat":
+            if temp_target < settings["temp_max"]:
+                next_target = min(
+                    settings["temp_max"],
+                    temp_target + settings["temp_step"],
+                )
+                return (
+                    f"Temperaturziel {temp_target:.1f} °C erreichen und danach "
+                    f"auf {next_target:.1f} °C erhöhen (maximal {settings['temp_max']:.1f} °C)"
+                )
             if availability["dehumidifier"]:
-                return "Temperaturwirkung prüfen; bei Bedarf den Entfeuchter zuschalten"
-            return "Temperaturwirkung prüfen und den Sollwert gegebenenfalls nachführen"
+                return "Temperatur-Maximum vollständig prüfen; danach den Entfeuchter zuschalten"
+            return "Temperatur-Maximum vollständig prüfen und anschließend sicher halten"
         if stage == "dehumidify":
             return "Entfeuchterwirkung bis zum VPD-Zielband weiter prüfen"
 
     if direction == "lower":
+        if stage == "limited":
+            return "Auf eine Klimaänderung oder eine weitere ENV-Aktorstufe warten"
         if stage in {"cool", "conserve"}:
             if availability["humidifier"]:
                 return "Kühlwirkung prüfen; bei Bedarf den Luftbefeuchter zuschalten"
@@ -426,44 +536,83 @@ def _advance_raise_stage(
     *,
     now,
     vpd,
+    temp,
     improvement,
     settings,
     availability,
+    outside_drying,
 ):
     stage = engine.get("stage")
     min_effect = settings["min_effect"]
+    _remember_evaluation(engine, now=now, improvement=improvement)
 
     if stage == "exhaust":
-        if improvement >= min_effect:
-            current = engine.get("fan_level")
-            minimum = engine.get("fan_min")
-            maximum = engine.get("fan_max")
-            if current is not None and maximum is not None and current < maximum:
-                engine["fan_level"] = _next_fan_level(
-                    current,
-                    minimum,
-                    maximum,
-                    settings["fan_step"],
-                )
-                note = "Abluft wirkt; Leistung wurde behutsam erhöht"
-            else:
-                note = "Abluft wirkt; Wirkung wird weiter beobachtet"
-            _set_stage(engine, direction="raise", stage="exhaust", now=now, vpd=vpd, note=note)
+        current = engine.get("fan_level")
+        minimum = engine.get("fan_min")
+        maximum = engine.get("fan_max")
+
+        # Solange die Außenluft geeignet ist, bekommt jede konfigurierte
+        # Abluftstufe ihr eigenes vollständiges Wirkungsfenster. Auch ein noch
+        # schwacher Einzelwert darf den Abluftweg nicht vorschnell abbrechen.
+        if (
+            availability["fan"]
+            and outside_drying
+            and current is not None
+            and maximum is not None
+            and current < maximum
+        ):
+            next_level = _next_fan_level(
+                current,
+                minimum,
+                maximum,
+                settings["fan_step"],
+            )
+            engine["fan_level"] = next_level
+            effect_text = (
+                "wirkt"
+                if improvement >= min_effect
+                else "wirkt bisher noch zu schwach"
+            )
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="exhaust",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note=(
+                    f"Abluft {effect_text}; Stufe {int(next_level)} von "
+                    f"maximal {int(maximum)} wird jetzt geprüft"
+                ),
+            )
             return
+
+        # Die aktuell höchste Stufe wurde bereits ein volles Zeitfenster lang
+        # geprüft. Erst jetzt ist der Abluftweg tatsächlich ausgeschöpft.
+        if availability["fan"] and outside_drying:
+            engine["fan_sweep_complete"] = True
 
         if availability["heating"] and engine.get("temp_target", 0) < settings["temp_max"]:
             engine["temp_target"] = min(
                 settings["temp_max"],
-                float(engine.get("temp_target") or settings["temp_min"])
+                max(
+                    float(engine.get("temp_target") or settings["temp_min"]),
+                    float(temp),
+                )
                 + settings["temp_step"],
             )
+            engine["heat_stall_windows"] = 0
             _set_stage(
                 engine,
                 direction="raise",
                 stage="heat",
                 now=now,
                 vpd=vpd,
-                note="Abluft ohne ausreichende Wirkung; Temperatur leicht angehoben",
+                temp=temp,
+                note=(
+                    "Abluftweg ausgeschöpft; Temperaturziel wird auf "
+                    f"{engine['temp_target']:.1f} °C angehoben"
+                ),
             )
         elif availability["dehumidifier"]:
             _set_stage(
@@ -472,32 +621,220 @@ def _advance_raise_stage(
                 stage="dehumidify",
                 now=now,
                 vpd=vpd,
-                note="Abluft ohne Wirkung und keine Temperaturreserve; Entfeuchter angefordert",
+                temp=temp,
+                note="Abluftweg ausgeschöpft und keine Temperaturreserve; Entfeuchter angefordert",
             )
         else:
-            _set_stage(engine, direction="raise", stage="limited", now=now, vpd=vpd, note="Keine weitere sichere VPD-Stufe verfügbar")
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="limited",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Abluftweg ausgeschöpft; keine weitere sichere VPD-Stufe verfügbar",
+            )
         return
 
     if stage == "heat":
         current_target = float(engine.get("temp_target") or settings["temp_min"])
-        if improvement >= min_effect and current_target < settings["temp_max"]:
+        temp_change, heating_responded = _temperature_response(
+            engine,
+            temp,
+            settings,
+        )
+        reach_tolerance = min(
+            0.30,
+            max(0.15, float(settings["temp_step"]) / 2.0),
+        )
+        target_reached = float(temp) >= current_target - reach_tolerance
+
+        if target_reached and current_target < settings["temp_max"]:
             engine["temp_target"] = min(
                 settings["temp_max"],
                 current_target + settings["temp_step"],
             )
-            _set_stage(engine, direction="raise", stage="heat", now=now, vpd=vpd, note="Temperaturanhebung wirkt; Sollwert vorsichtig weiter angehoben")
-        elif improvement >= min_effect:
-            _set_stage(engine, direction="raise", stage="heat", now=now, vpd=vpd, note="Temperaturanhebung wirkt; Maximalwert bleibt bestehen")
-        elif availability["dehumidifier"]:
-            _set_stage(engine, direction="raise", stage="dehumidify", now=now, vpd=vpd, note="Temperaturanhebung ohne ausreichende Wirkung; Entfeuchter angefordert")
+            engine["heat_stall_windows"] = 0
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="heat",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note=(
+                    f"Temperaturstufe {current_target:.1f} °C erreicht; "
+                    f"{engine['temp_target']:.1f} °C wird jetzt geprüft"
+                ),
+            )
+            return
+
+        if not target_reached:
+            if heating_responded:
+                engine["heat_stall_windows"] = 0
+                note = (
+                    f"Heizung reagiert ({temp_change:+.1f} °C); Temperaturziel "
+                    f"{current_target:.1f} °C wird weiter angefahren"
+                )
+            else:
+                stall_windows = int(engine.get("heat_stall_windows") or 0) + 1
+                engine["heat_stall_windows"] = stall_windows
+                if stall_windows < 2:
+                    note = (
+                        f"Temperaturziel {current_target:.1f} °C noch nicht erreicht; "
+                        "ein zweites Prüfintervall folgt"
+                    )
+                else:
+                    engine["heat_sweep_complete"] = True
+                    if availability["dehumidifier"]:
+                        _set_stage(
+                            engine,
+                            direction="raise",
+                            stage="dehumidify",
+                            now=now,
+                            vpd=vpd,
+                            temp=temp,
+                            note=(
+                                "Heizung reagiert über zwei Prüfintervalle nicht; "
+                                "Entfeuchter angefordert"
+                            ),
+                        )
+                    else:
+                        _set_stage(
+                            engine,
+                            direction="raise",
+                            stage="limited",
+                            now=now,
+                            vpd=vpd,
+                            temp=temp,
+                            note=(
+                                "Heizung reagiert über zwei Prüfintervalle nicht; "
+                                "kein Entfeuchter im ENV-Modus"
+                            ),
+                        )
+                    return
+
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="heat",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note=note,
+            )
+            return
+
+        # Das erlaubte Temperatur-Maximum wurde erreicht und ein komplettes
+        # Wirkungsfenster lang gehalten. Erst danach folgt die letzte Stufe.
+        engine["heat_sweep_complete"] = True
+        if availability["dehumidifier"]:
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="dehumidify",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Temperatur-Maximum ausgeschöpft; Entfeuchter angefordert",
+            )
         else:
-            _set_stage(engine, direction="raise", stage="limited", now=now, vpd=vpd, note="Temperatur ohne Wirkung; kein Entfeuchter im ENV-Modus")
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="limited",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Temperatur-Maximum ausgeschöpft; kein Entfeuchter im ENV-Modus",
+            )
         return
 
     if stage == "dehumidify":
         # Die letzte Stufe bleibt aktiv, bis das Zielband erreicht ist. Das
         # eigentliche Abschalten erfolgt dann sofort über den in-band-Pfad.
-        _set_stage(engine, direction="raise", stage="dehumidify", now=now, vpd=vpd, note="Entfeuchterwirkung wird weiter beobachtet")
+        if availability["dehumidifier"]:
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="dehumidify",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Entfeuchterwirkung wird weiter beobachtet",
+            )
+        else:
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="limited",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Entfeuchter ist nicht mehr im ENV-Modus; sichere Grenzen werden gehalten",
+            )
+        return
+
+    if stage == "limited":
+        # LIMITED ist kein totes Ende. Änderungen an Außenklima oder
+        # Geräteverfügbarkeit werden in jedem Prüfintervall neu bewertet.
+        if (
+            availability["fan"]
+            and outside_drying
+            and not bool(engine.get("fan_sweep_complete"))
+        ):
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="exhaust",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Trockene Außenluft ist wieder nutzbar; Abluftweg wird erneut geprüft",
+            )
+        elif (
+            availability["heating"]
+            and not bool(engine.get("heat_sweep_complete"))
+            and float(engine.get("temp_target") or settings["temp_min"])
+            < settings["temp_max"]
+        ):
+            engine["temp_target"] = min(
+                settings["temp_max"],
+                max(
+                    float(engine.get("temp_target") or settings["temp_min"]),
+                    float(temp),
+                ) + settings["temp_step"],
+            )
+            engine["heat_stall_windows"] = 0
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="heat",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note=f"Temperaturweg ist wieder verfügbar; {engine['temp_target']:.1f} °C wird geprüft",
+            )
+        elif availability["dehumidifier"]:
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="dehumidify",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Entfeuchter ist jetzt verfügbar und wird angefordert",
+            )
+        else:
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="limited",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="Sichere Abluft- und Temperaturgrenzen bleiben ausgeschöpft",
+            )
 
 
 def _advance_lower_stage(
@@ -512,6 +849,7 @@ def _advance_lower_stage(
     preferred_temp,
 ):
     stage = engine.get("stage")
+    _remember_evaluation(engine, now=now, improvement=improvement)
 
     if stage in {"cool", "conserve"}:
         if improvement >= settings["min_effect"]:
@@ -712,6 +1050,16 @@ def update_vpd_control(runtime=None, *, now=None):
     engine["fan_max"] = fan_limits["maximum"]
     if engine.get("fan_level") is None:
         engine["fan_level"] = fan_limits["minimum"]
+    elif fan_limits["minimum"] is not None and fan_limits["maximum"] is not None:
+        engine["fan_level"] = int(
+            _clip(
+                engine["fan_level"],
+                fan_limits["minimum"],
+                fan_limits["maximum"],
+            )
+        )
+    else:
+        engine["fan_level"] = None
 
     low_needed = vpd < target - settings["tolerance"]
     high_needed = vpd > target + settings["tolerance"]
@@ -731,6 +1079,11 @@ def update_vpd_control(runtime=None, *, now=None):
     if direction != engine.get("direction"):
         engine["temp_target"] = base_target
         engine["fan_level"] = fan_limits["minimum"]
+        engine["fan_sweep_complete"] = False
+        engine["heat_sweep_complete"] = False
+        engine["heat_stall_windows"] = 0
+        engine.pop("last_evaluation_at", None)
+        engine.pop("last_evaluation_improvement", None)
 
         if direction == "raise":
             if availability["fan"] and outside_drying:
@@ -745,7 +1098,15 @@ def update_vpd_control(runtime=None, *, now=None):
                 initial_stage = "dehumidify"
             else:
                 initial_stage = "limited"
-            _set_stage(engine, direction="raise", stage=initial_stage, now=now, vpd=vpd, note="VPD ist zu niedrig")
+            _set_stage(
+                engine,
+                direction="raise",
+                stage=initial_stage,
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="VPD ist zu niedrig",
+            )
         elif direction == "lower":
             temperature_path_available = bool(
                 availability["heating"]
@@ -777,10 +1138,19 @@ def update_vpd_control(runtime=None, *, now=None):
                 stage=initial_stage,
                 now=now,
                 vpd=vpd,
+                temp=temp,
                 note=note,
             )
         else:
-            _set_stage(engine, direction=None, stage="in_band", now=now, vpd=vpd, note="VPD und Betriebsfenster sind im Ziel")
+            _set_stage(
+                engine,
+                direction=None,
+                stage="in_band",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                note="VPD und Betriebsfenster sind im Ziel",
+            )
     else:
         _append_sample(engine, now, vpd, settings["effect_window_sec"])
 
@@ -797,9 +1167,11 @@ def update_vpd_control(runtime=None, *, now=None):
                 engine,
                 now=now,
                 vpd=vpd,
+                temp=temp,
                 improvement=improvement,
                 settings=settings,
                 availability=availability,
+                outside_drying=outside_drying,
             )
         else:
             _advance_lower_stage(
@@ -814,6 +1186,8 @@ def update_vpd_control(runtime=None, *, now=None):
             )
         elapsed = 0.0
         improvement = 0.0
+
+    engine["last_temp"] = temp
 
     stage = engine.get("stage") or "in_band"
     effective_target = _clip(
@@ -912,6 +1286,7 @@ def update_vpd_control(runtime=None, *, now=None):
         engine,
         settings=settings,
         availability=availability,
+        outside_drying=outside_drying,
         outside_humidifying=outside_humidifying,
     )
 
@@ -958,13 +1333,33 @@ def update_vpd_control(runtime=None, *, now=None):
             "window_sec": settings["effect_window_sec"],
             "elapsed_sec": round(elapsed, 1),
             "improvement_kpa": round(improvement, 3),
+            "last_improvement_kpa": (
+                round(float(engine["last_evaluation_improvement"]), 3)
+                if engine.get("last_evaluation_improvement") is not None
+                else None
+            ),
             "minimum_kpa": settings["min_effect"],
             "next_evaluation_sec": max(
                 0,
                 int(round(settings["effect_window_sec"] - elapsed)),
-            ) if direction and stage not in {"limited", "in_band"} else None,
+            ) if direction and stage != "in_band" else None,
         },
         "fan_level": engine.get("fan_level"),
+        "strategy_progress": {
+            "fan": {
+                "level": engine.get("fan_level"),
+                "minimum": engine.get("fan_min"),
+                "maximum": engine.get("fan_max"),
+                "complete": bool(engine.get("fan_sweep_complete")),
+            },
+            "temperature": {
+                "measured": round(temp, 2),
+                "target": round(effective_target, 2),
+                "maximum": settings["temp_max"],
+                "complete": bool(engine.get("heat_sweep_complete")),
+                "stall_windows": int(engine.get("heat_stall_windows") or 0),
+            },
+        },
         "managed_devices": managed_devices,
         "unavailable_devices": [
             device for device in VPD_MANAGED_DEVICES if not availability[device]

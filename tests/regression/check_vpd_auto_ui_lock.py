@@ -100,9 +100,10 @@ def main():
         and 'id="vpd-live-stage"' in dashboard
         and 'id="vpd-live-effect"' in dashboard
         and 'id="vpd-live-outside"' in dashboard
+        and 'id="vpd-live-progress"' in dashboard
         and 'id="vpd-live-next"' in dashboard
         and 'id="vpd-action-chips"' in dashboard,
-        "Das Dashboard zeigt Strategie, Wirkung, Außenluft, Aktorplan und Folgeschritt",
+        "Das Dashboard zeigt Strategie, Wirkung, Außenluft, Stufenweg, Aktorplan und Folgeschritt",
     )
     require(
         "vpd.participating" in dashboard

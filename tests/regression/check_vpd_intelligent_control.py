@@ -66,6 +66,7 @@ def runtime_for(
     device_modes=None,
     outside=True,
     duplicate_source=False,
+    controller_assigned=False,
 ):
     cfg = deepcopy(DEFAULT_CONFIG)
     cfg.update({
@@ -114,6 +115,13 @@ def runtime_for(
             "fan": {"standby_enabled": True},
         },
     })
+    if controller_assigned:
+        cfg["CONTROLLER_ASSIGNMENTS"] = {
+            "fan": {
+                "provider": "spiderfarmer",
+                "target_id": "spiderfarmer:test:blower",
+            },
+        }
 
     inside_id = "sensor:inside"
     outside_id = inside_id if duplicate_source else "sensor:outside"
@@ -412,9 +420,11 @@ def main():
     first_night_stage = update_vpd_control(phase_reset, now=1302)
     require(
         first_day_stage["stage"] == "exhaust"
-        and escalated_day_stage["stage"] == "heat"
+        and escalated_day_stage["stage"] == "exhaust"
+        and escalated_day_stage["fan_level"] == 35
         and first_night_stage["profile"] == "NACHT"
         and first_night_stage["stage"] == "exhaust"
+        and first_night_stage["fan_level"] == 25
         and first_night_stage["effect"]["next_evaluation_sec"] == 300,
         "Der Tag-/Nachtwechsel startet die Wirkungsprüfung mit dem neuen Fenster frisch",
     )
@@ -473,19 +483,50 @@ def main():
         "Eine aktive AUTO-Übernahme benötigt im Safety-Supervisor beide Innenwerte",
     )
 
-    second = update_vpd_control(auto, now=1301)
+    fan_plans = []
+    now = 1301
+    for _expected_level in (35, 45, 55, 65, 75, 80):
+        plan = update_vpd_control(auto, now=now)
+        fan_plans.append(plan)
+        now += 301
     require(
-        second["stage"] == "heat"
-        and second["effective_temp_target"] == 24.5
-        and second["actions"]["dehumidifier"]["power"] is False,
-        "Ohne Abluftwirkung wird nach fünf Minuten nur die Temperatur leicht angehoben",
+        [plan["fan_level"] for plan in fan_plans]
+        == [35, 45, 55, 65, 75, 80]
+        and all(plan["stage"] == "exhaust" for plan in fan_plans)
+        and fan_plans[-1]["strategy_progress"]["fan"]["maximum"] == 80,
+        "Auch ohne sofort messbare Wirkung wird die Abluft vollständig und schrittweise bis zum ENV-Maximum geprüft",
     )
 
-    third = update_vpd_control(auto, now=1602)
+    heat_start = update_vpd_control(auto, now=now)
     require(
-        third["stage"] == "dehumidify"
-        and third["actions"]["dehumidifier"]["power"] is True,
-        "Erst nach einer weiteren wirkungslosen Stufe wird der Entfeuchter angefordert",
+        heat_start["stage"] == "heat"
+        and heat_start["effective_temp_target"] == 24.5
+        and heat_start["actions"]["heating"]["power"] is True
+        and heat_start["strategy_progress"]["fan"]["complete"] is True,
+        "Erst nach dem vollständig geprüften Abluft-Maximum beginnt der Temperaturweg",
+    )
+
+    temperature_targets = []
+    for measured_temp in (24.5, 25.0, 25.5):
+        now += 301
+        set_inside(auto, temp=measured_temp, hum=75.0)
+        plan = update_vpd_control(auto, now=now)
+        temperature_targets.append(plan["effective_temp_target"])
+    require(
+        temperature_targets == [25.0, 25.5, 26.0]
+        and plan["stage"] == "heat"
+        and plan["actions"]["dehumidifier"]["power"] is False,
+        "Erreichte Temperaturstufen werden trotz schwacher Einzelwirkung bis zur erlaubten Obergrenze fortgesetzt",
+    )
+
+    now += 301
+    set_inside(auto, temp=26.0, hum=75.0)
+    final_stage = update_vpd_control(auto, now=now)
+    require(
+        final_stage["stage"] == "dehumidify"
+        and final_stage["actions"]["dehumidifier"]["power"] is True
+        and final_stage["strategy_progress"]["temperature"]["complete"] is True,
+        "Der Entfeuchter folgt erst nach ausgeschöpfter Abluft und erreichter Temperatur-Obergrenze",
     )
     control_device("dehumidifier", runtime=auto)
     require(
@@ -494,7 +535,7 @@ def main():
     )
 
     set_inside(auto, temp=24.0, hum=63.0)
-    recovered = update_vpd_control(auto, now=1610)
+    recovered = update_vpd_control(auto, now=now + 10)
     require(
         recovered["stage"] == "in_band"
         and recovered["actions"]["dehumidifier"]["power"] is False,
@@ -525,8 +566,18 @@ def main():
     effective_plan = update_vpd_control(effective, now=1301)
     require(
         effective_plan["stage"] == "exhaust"
-        and effective_plan["fan_level"] == 31,
+        and effective_plan["fan_level"] == 35,
         "Messbar wirksame Abluft wird behutsam erhöht statt vorschnell eskaliert",
+    )
+
+    assigned_fan = runtime_for(mode="MONITOR", controller_assigned=True)
+    assigned_first = update_vpd_control(assigned_fan, now=1000)
+    assigned_second = update_vpd_control(assigned_fan, now=1301)
+    require(
+        assigned_first["strategy_progress"]["fan"]["maximum"] == 100
+        and assigned_second["fan_level"] == 35
+        and assigned_second["stage"] == "exhaust",
+        "Eine zugewiesene Spider-Farmer-Abluft darf in VPD-AUTO über den normalen ENV-Wert bis zur sicheren Geräteobergrenze steigen",
     )
 
     wet_outside = runtime_for(outside_temp=24.0, outside_hum=90.0)
