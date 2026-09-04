@@ -235,6 +235,31 @@ def _stage_effect(engine, direction):
 
 
 def _set_stage(engine, *, direction, stage, now, vpd, temp=None, note=None):
+    recorded_temp = temp if temp is not None else engine.get("last_temp")
+    event = {
+        "at": float(now),
+        "direction": direction,
+        "stage": stage,
+        "note": str(note or ""),
+        "vpd": round(float(vpd), 3),
+    }
+    try:
+        event["temp"] = round(float(recorded_temp), 2)
+    except (TypeError, ValueError):
+        event["temp"] = None
+    try:
+        event["fan_level"] = int(engine.get("fan_level"))
+    except (TypeError, ValueError):
+        event["fan_level"] = None
+    try:
+        event["temp_target"] = round(float(engine.get("temp_target")), 2)
+    except (TypeError, ValueError):
+        event["temp_target"] = None
+
+    events = list(engine.get("events") or [])
+    events.append(event)
+    engine["events"] = events[-30:]
+
     engine["direction"] = direction
     engine["stage"] = stage
     engine["stage_started_at"] = float(now)
@@ -424,6 +449,7 @@ def _public_waiting_state(settings, profile, values, blockers, ramp):
         "managed_devices": [],
         "actions": {},
         "blockers": list(blockers),
+        "events": [],
     }
 
 
@@ -909,6 +935,7 @@ def update_vpd_control(runtime=None, *, now=None):
             "reason": str(exc),
             "managed_devices": [],
             "actions": {},
+            "events": [],
         }
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
@@ -927,6 +954,7 @@ def update_vpd_control(runtime=None, *, now=None):
             "reason": "Intelligente VPD-Steuerung ist deaktiviert",
             "managed_devices": [],
             "actions": {},
+            "events": [],
         }
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
@@ -949,6 +977,7 @@ def update_vpd_control(runtime=None, *, now=None):
             "reason": str(exc),
             "managed_devices": [],
             "actions": {},
+            "events": [],
         }
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
@@ -964,6 +993,7 @@ def update_vpd_control(runtime=None, *, now=None):
             "outside_hum": st.live_state.get("outside_hum"),
         }
         generation = st.live_state.get(_GENERATION_KEY, 0)
+        previous_public = deepcopy(st.live_state.get(_PUBLIC_KEY) or {})
 
     blockers = _readiness(rt, values)
     if blockers:
@@ -973,6 +1003,9 @@ def update_vpd_control(runtime=None, *, now=None):
             values,
             blockers,
             ramp,
+        )
+        public["events"] = deepcopy(
+            list(previous_public.get("events") or [])[-20:]
         )
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
@@ -1033,7 +1066,11 @@ def update_vpd_control(runtime=None, *, now=None):
     # neues Zielband. Keine Wirkungsprobe oder Eskalationsstufe darf aus dem
     # vorherigen Zeitabschnitt übernommen werden.
     if engine.get("schedule_key") != ramp["key"]:
-        engine = {}
+        # Der Zustandsautomat startet beim Tag-/Nachtwechsel bewusst neu. Der
+        # kurze Diagnoseverlauf bleibt erhalten, damit die Regellog-Seite den
+        # Übergang weiterhin nachvollziehbar darstellen kann.
+        previous_events = list(engine.get("events") or [])[-30:]
+        engine = {"events": previous_events}
     engine["profile"] = profile
     engine["schedule_key"] = ramp["key"]
 
@@ -1365,6 +1402,10 @@ def update_vpd_control(runtime=None, *, now=None):
             device for device in VPD_MANAGED_DEVICES if not availability[device]
         ],
         "actions": deepcopy(actions),
+        # Ausschließlich ein begrenzter, öffentlicher Entscheidungsverlauf.
+        # Interne Samples und Zustandsmaschinen-Caches verlassen den Runtime-
+        # Prozess weiterhin nicht.
+        "events": deepcopy(list(engine.get("events") or [])[-20:]),
     }
 
     with rt.state_lock:

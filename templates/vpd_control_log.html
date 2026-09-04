@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}VPD-Regellog – {{ tent_name }}{% endblock %}
+
+{% block head %}
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{--vpd-bg:#0f172a;--vpd-card:#1e293b;--vpd-card-deep:#111827;--vpd-text:#e5e7eb;--vpd-muted:#94a3b8;--vpd-blue:#38bdf8;--vpd-green:#22c55e;--vpd-amber:#f59e0b;--vpd-red:#f87171;--vpd-border:rgba(148,163,184,.16)}
+body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),transparent 30rem),var(--vpd-bg);color:var(--vpd-text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.vpd-log-page{width:min(920px,100%);margin:0 auto;padding:22px 14px 40px}
+.vpd-log-top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px}
+.vpd-log-title{min-width:0}.vpd-log-eyebrow{color:var(--vpd-muted);font-size:.72rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase}.vpd-log-title h1{margin:4px 0 0;font-size:clamp(1.35rem,5vw,1.9rem)}
+.vpd-log-nav{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.vpd-log-link{display:inline-flex;align-items:center;min-height:38px;padding:8px 11px;border:1px solid var(--vpd-border);border-radius:11px;background:rgba(30,41,59,.9);color:var(--vpd-text);font-size:.78rem;font-weight:750;text-decoration:none;white-space:nowrap}
+.vpd-log-status{padding:18px;border:1px solid rgba(56,189,248,.34);border-radius:18px;background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.98));box-shadow:0 18px 48px rgba(0,0,0,.22)}
+.vpd-log-status.waiting{border-color:rgba(245,158,11,.42)}.vpd-log-status.off{border-color:var(--vpd-border)}
+.vpd-log-status-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.vpd-log-stage{font-size:1.12rem;font-weight:850}.vpd-log-reason{margin-top:5px;color:#cbd5e1;font-size:.82rem;line-height:1.45}
+.vpd-log-badge{flex:0 0 auto;padding:5px 9px;border-radius:999px;background:rgba(14,165,233,.16);color:#7dd3fc;font-size:.64rem;font-weight:850;letter-spacing:.05em}.vpd-log-badge.monitor{background:rgba(167,139,250,.14);color:#ddd6fe}.vpd-log-badge.waiting{background:rgba(245,158,11,.15);color:#fde68a}.vpd-log-badge.off{background:rgba(100,116,139,.18);color:#cbd5e1}.vpd-log-badge.error{background:rgba(248,113,113,.16);color:#fecaca}
+.vpd-log-updated{margin-top:10px;color:var(--vpd-muted);font-size:.7rem}
+.vpd-log-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.vpd-log-metric{min-width:0;padding:13px;border:1px solid var(--vpd-border);border-radius:14px;background:rgba(17,24,39,.72)}.vpd-log-metric.wide{grid-column:1/-1}.vpd-log-label{display:block;margin-bottom:5px;color:var(--vpd-muted);font-size:.65rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase}.vpd-log-value{color:var(--vpd-text);font-size:.82rem;line-height:1.45;overflow-wrap:anywhere}.vpd-log-value.emphasis{font-size:1rem;font-weight:800;color:#bae6fd}
+.vpd-log-actions{display:flex;flex-wrap:wrap;gap:7px}.vpd-log-chip{padding:6px 9px;border:1px solid rgba(56,189,248,.26);border-radius:999px;background:rgba(14,165,233,.08);color:#bae6fd;font-size:.72rem;font-weight:720}.vpd-log-empty{color:var(--vpd-muted);font-size:.78rem}
+.vpd-log-section{margin-top:14px;padding:16px;border:1px solid var(--vpd-border);border-radius:18px;background:rgba(30,41,59,.86)}.vpd-log-section-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.vpd-log-section h2{margin:0;font-size:.95rem}.vpd-log-section-note{color:var(--vpd-muted);font-size:.7rem;text-align:right}
+.vpd-event-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}.vpd-event{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;padding:11px;border:1px solid rgba(148,163,184,.12);border-radius:12px;background:rgba(15,23,42,.72)}.vpd-event-time{color:#7dd3fc;font-size:.72rem;font-weight:800}.vpd-event-title{font-size:.8rem;font-weight:800}.vpd-event-note{margin-top:3px;color:#cbd5e1;font-size:.75rem;line-height:1.42}.vpd-event-meta{margin-top:5px;color:var(--vpd-muted);font-size:.67rem}
+@media(max-width:620px){.vpd-log-page{padding:14px 10px 28px}.vpd-log-top{align-items:flex-start;flex-direction:column}.vpd-log-nav{justify-content:flex-start}.vpd-log-grid{grid-template-columns:1fr}.vpd-log-metric.wide{grid-column:auto}.vpd-log-status{padding:14px}.vpd-event{grid-template-columns:58px minmax(0,1fr)}.vpd-log-section-head{display:block}.vpd-log-section-note{margin-top:4px;text-align:left}}
+</style>
+{% endblock %}
+
+{% block page %}
+<main class="vpd-log-page">
+    <header class="vpd-log-top">
+        <div class="vpd-log-title">
+            <div class="vpd-log-eyebrow">{{ tent_name }} · Live-Diagnose</div>
+            <h1>🧠 Intelligenter VPD-Regellog</h1>
+        </div>
+        <nav class="vpd-log-nav" aria-label="VPD-Navigation">
+            <a class="vpd-log-link" href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← Dashboard</a>
+            <a class="vpd-log-link" href="{{ url_for('grow_control_tent_vpd', tent_id=tent_id) }}">📈 VPD-Verlauf</a>
+            {% if has_permission('settings.view') %}
+            <a class="vpd-log-link" href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}">⚙️ Regelwerte</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <section id="vpd-log-status" class="vpd-log-status" aria-live="polite">
+        <div class="vpd-log-status-head">
+            <div>
+                <div id="vpd-log-stage" class="vpd-log-stage">Regelstatus wird geladen …</div>
+                <div id="vpd-log-reason" class="vpd-log-reason">Growstar liest den aktuellen Stationszustand.</div>
+            </div>
+            <span id="vpd-log-badge" class="vpd-log-badge">LÄDT</span>
+        </div>
+        <div id="vpd-log-updated" class="vpd-log-updated">Noch keine Aktualisierung</div>
+
+        <div class="vpd-log-grid">
+            <div class="vpd-log-metric">
+                <span class="vpd-log-label">Aktueller VPD</span>
+                <span id="vpd-log-current" class="vpd-log-value emphasis">-- kPa</span>
+            </div>
+            <div class="vpd-log-metric">
+                <span class="vpd-log-label">Zielband</span>
+                <span id="vpd-log-target" class="vpd-log-value">--</span>
+            </div>
+            <div class="vpd-log-metric">
+                <span class="vpd-log-label">Erlaubtes Klima</span>
+                <span id="vpd-log-range" class="vpd-log-value">--</span>
+            </div>
+            <div class="vpd-log-metric">
+                <span class="vpd-log-label">Wirkungsprüfung</span>
+                <span id="vpd-log-effect" class="vpd-log-value">--</span>
+            </div>
+            <div class="vpd-log-metric">
+                <span class="vpd-log-label">Außenluft</span>
+                <span id="vpd-log-outside" class="vpd-log-value">--</span>
+            </div>
+            <div class="vpd-log-metric">
+                <span class="vpd-log-label">Stufenweg</span>
+                <span id="vpd-log-progress" class="vpd-log-value">--</span>
+            </div>
+            <div class="vpd-log-metric wide">
+                <span id="vpd-log-action-label" class="vpd-log-label">Aktorplan</span>
+                <div id="vpd-log-actions" class="vpd-log-actions"></div>
+            </div>
+            <div class="vpd-log-metric wide">
+                <span class="vpd-log-label">Nächster Schritt</span>
+                <span id="vpd-log-next" class="vpd-log-value">--</span>
+            </div>
+        </div>
+    </section>
+
+    <section class="vpd-log-section" aria-labelledby="vpd-event-heading">
+        <div class="vpd-log-section-head">
+            <h2 id="vpd-event-heading">Letzte Regelentscheidungen</h2>
+            <div class="vpd-log-section-note">Begrenzter Verlauf seit dem letzten Regel-/Konfigurationsreset</div>
+        </div>
+        <ol id="vpd-event-list" class="vpd-event-list">
+            <li class="vpd-log-empty">Noch keine Regelentscheidung vorhanden.</li>
+        </ol>
+    </section>
+</main>
+
+<script>
+(() => {
+    const TENT_ID = {{ tent_id|tojson }};
+    const STATE_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/state`;
+    const DEVICE_LABELS = {
+        fan:"Abluft", heating:"Heizung", humidifier:"Befeuchter",
+        dehumidifier:"Entfeuchter"
+    };
+    const STAGE_LABELS = {
+        in_band:"Im Zielbereich", exhaust:"Abluft prüfen", heat:"Temperatur anheben",
+        dehumidify:"Entfeuchter", cool:"Temperatur senken", conserve:"Abluft und Heizung reduzieren",
+        humidify:"Luft befeuchten", outside_assist:"Außenluft nutzen",
+        humidify_outside:"Befeuchten + Außenluft", limited:"Keine weitere Aktorstufe",
+        waiting_sensors:"Warte auf Sensoren", invalid_config:"Konfiguration fehlerhaft", disabled:"Aus"
+    };
+
+    const byId = id => document.getElementById(id);
+    const number = value => {
+        if(value === null || value === undefined || value === "") return null;
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+    };
+    const text = (id,value) => {
+        const node = byId(id);
+        if(node) node.textContent = value;
+    };
+    const fixed = (value,digits=1) => {
+        const parsed = number(value);
+        return parsed === null ? "--" : parsed.toFixed(digits);
+    };
+    const countdown = value => {
+        const seconds = number(value);
+        if(seconds === null) return "laufend";
+        const rounded = Math.max(0,Math.round(seconds));
+        return `${Math.floor(rounded/60)}:${String(rounded%60).padStart(2,"0")} min`;
+    };
+    const eventTime = value => {
+        const seconds = number(value);
+        if(seconds === null) return "--:--";
+        return new Date(seconds*1000).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    };
+
+    function actionText(device,action){
+        const label = DEVICE_LABELS[device] || device;
+        if(!action || typeof action !== "object") return `${label} --`;
+        const power = action.power === true ? "EIN" : action.power === false ? "AUS" : "--";
+        const level = number(action.controller?.level);
+        return `${label} ${power}` + (action.power === true && level !== null ? ` · Stufe ${level.toFixed(0)}` : "");
+    }
+
+    function renderActions(control){
+        const container = byId("vpd-log-actions");
+        if(!container) return;
+        container.replaceChildren();
+        const devices = Array.isArray(control.managed_devices) ? control.managed_devices : [];
+        if(!devices.length){
+            const empty = document.createElement("span");
+            empty.className = "vpd-log-empty";
+            empty.textContent = control.fallback || !control.ready
+                ? "Noch kein Aktorplan – die Sensorbasis wird geprüft."
+                : "Keine VPD-Aktoren stehen im Modus Umgebung bereit.";
+            container.appendChild(empty);
+            return;
+        }
+        devices.forEach(device => {
+            const chip = document.createElement("span");
+            const action = (control.actions || {})[device];
+            chip.className = "vpd-log-chip";
+            chip.textContent = actionText(device,action);
+            if(action?.reason) chip.title = action.reason;
+            container.appendChild(chip);
+        });
+    }
+
+    function renderEvents(events){
+        const list = byId("vpd-event-list");
+        if(!list) return;
+        list.replaceChildren();
+        const entries = Array.isArray(events) ? [...events].reverse() : [];
+        if(!entries.length){
+            const empty = document.createElement("li");
+            empty.className = "vpd-log-empty";
+            empty.textContent = "Noch keine Regelentscheidung vorhanden.";
+            list.appendChild(empty);
+            return;
+        }
+        entries.forEach(event => {
+            const item = document.createElement("li");
+            item.className = "vpd-event";
+            const time = document.createElement("time");
+            time.className = "vpd-event-time";
+            time.textContent = eventTime(event.at);
+            const content = document.createElement("div");
+            const title = document.createElement("div");
+            title.className = "vpd-event-title";
+            title.textContent = STAGE_LABELS[event.stage] || event.stage || "Regelentscheidung";
+            const note = document.createElement("div");
+            note.className = "vpd-event-note";
+            note.textContent = event.note || "Regelstufe neu bewertet";
+            const meta = document.createElement("div");
+            meta.className = "vpd-event-meta";
+            const parts = [];
+            if(number(event.vpd) !== null) parts.push(`VPD ${fixed(event.vpd,2)} kPa`);
+            if(number(event.temp) !== null) parts.push(`${fixed(event.temp,1)} °C`);
+            if(number(event.fan_level) !== null) parts.push(`Abluft ${fixed(event.fan_level,0)}`);
+            if(number(event.temp_target) !== null) parts.push(`Temperaturziel ${fixed(event.temp_target,1)} °C`);
+            meta.textContent = parts.join(" · ");
+            content.append(title,note,meta);
+            item.append(time,content);
+            list.appendChild(item);
+        });
+    }
+
+    function render(state){
+        const control = state?.vpd_control || {};
+        const mode = String(control.mode || "OFF").toUpperCase();
+        const waiting = Boolean(control.fallback || (mode !== "OFF" && !control.ready));
+        const status = byId("vpd-log-status");
+        status?.classList.toggle("waiting",waiting);
+        status?.classList.toggle("off",mode === "OFF");
+
+        const badge = byId("vpd-log-badge");
+        if(badge){
+            badge.className = "vpd-log-badge";
+            if(mode === "AUTO"){
+                badge.textContent = waiting ? "AUTO · WARTET" : "AUTO · ÜBERNIMMT";
+                if(waiting) badge.classList.add("waiting");
+            }else if(mode === "MONITOR"){
+                badge.textContent = waiting ? "BEOBACHTEN · WARTET" : "BEOBACHTEN";
+                badge.classList.add(waiting ? "waiting" : "monitor");
+            }else{
+                badge.textContent = "AUS";
+                badge.classList.add("off");
+            }
+        }
+
+        text("vpd-log-stage",control.stage_label || STAGE_LABELS[control.stage] || (mode === "OFF" ? "VPD-Regelung ist aus" : "Regelstatus"));
+        text("vpd-log-reason",control.reason || (mode === "OFF" ? "Die klassische Klima-Regelung ist aktiv." : "Regelplan wird berechnet."));
+        text("vpd-log-updated",`Live aktualisiert: ${new Date().toLocaleTimeString("de-DE")}`);
+        text("vpd-log-current",`${fixed(control.vpd ?? state?.vpd,2)} kPa`);
+
+        const target = number(control.target);
+        const tolerance = number(control.tolerance);
+        let targetText = target === null ? "--" : `${target.toFixed(2)} kPa`;
+        if(target !== null && tolerance !== null) targetText = `${(target-tolerance).toFixed(2)}–${(target+tolerance).toFixed(2)} kPa`;
+        const rampProgress = number(control.ramp?.progress);
+        if(control.ramp?.active && rampProgress !== null) targetText += ` · VPD-Rampe ${Math.round(rampProgress*100)} %`;
+        text("vpd-log-target",targetText);
+
+        const range = control.range || {};
+        const climate = [];
+        if(number(range.temp_min) !== null && number(range.temp_max) !== null) climate.push(`${fixed(range.temp_min,1)}–${fixed(range.temp_max,1)} °C`);
+        if(number(range.hum_min) !== null && number(range.hum_max) !== null) climate.push(`${fixed(range.hum_min,1)}–${fixed(range.hum_max,1)} %`);
+        text("vpd-log-range",climate.join(" · ") || "--");
+
+        const effect = control.effect || {};
+        const remaining = number(effect.next_evaluation_sec);
+        const last = number(effect.last_improvement_kpa);
+        const current = number(effect.improvement_kpa);
+        const minimum = number(effect.minimum_kpa);
+        let effectText = remaining !== null ? `Nächste Prüfung in ${countdown(remaining)}` : (waiting ? "Prüfung pausiert" : "Laufende Bewertung");
+        const shown = last !== null ? last : current;
+        if(shown !== null && minimum !== null) effectText += ` · ${last !== null ? "zuletzt" : "Wirkung"} ${shown >= 0 ? "+" : ""}${shown.toFixed(3)} / ${minimum.toFixed(3)} kPa`;
+        text("vpd-log-effect",effectText);
+
+        const outside = control.outside || {};
+        const outsideParts = [];
+        if(number(outside.temp) !== null) outsideParts.push(`${fixed(outside.temp,1)} °C`);
+        if(number(outside.hum) !== null) outsideParts.push(`${fixed(outside.hum,1)} %`);
+        if(control.direction === "raise" && outside.drying) outsideParts.push("zum Trocknen geeignet");
+        if(control.direction === "lower" && outside.lowering) outsideParts.push("kann VPD senken");
+        else if(control.direction === "lower" && outside.humidifying) outsideParts.push("feuchter");
+        text("vpd-log-outside",outsideParts.join(" · ") || (waiting ? "nicht bewertbar" : "keine Klimahilfe"));
+
+        const fan = control.strategy_progress?.fan || {};
+        const temperature = control.strategy_progress?.temperature || {};
+        const progress = [];
+        if(number(fan.level) !== null && number(fan.maximum) !== null) progress.push(`Abluft ${fixed(fan.level,0)}/${fixed(fan.maximum,0)}${fan.complete ? " ✓" : ""}`);
+        if(number(temperature.target) !== null && number(temperature.maximum) !== null) progress.push(`Temperatur ${fixed(temperature.target,1)}/${fixed(temperature.maximum,1)} °C${temperature.complete ? " ✓" : ""}`);
+        text("vpd-log-progress",progress.join(" · ") || (waiting ? "wartet" : "--"));
+        text("vpd-log-action-label",mode === "AUTO" ? "Aktiver Aktorplan" : "Simulierter Aktorplan");
+        text("vpd-log-next",control.next_step_label || (waiting ? "Sensorbasis vervollständigen und neu planen" : "Zielband halten und weiter beobachten"));
+        renderActions(control);
+        renderEvents(control.events);
+    }
+
+    async function load(){
+        try{
+            const response = await fetch(STATE_URL,{cache:"no-store"});
+            if(!response.ok) throw new Error(`HTTP ${response.status}`);
+            render(await response.json());
+        }catch(error){
+            const badge = byId("vpd-log-badge");
+            if(badge){badge.textContent="VERBINDUNGSFEHLER";badge.className="vpd-log-badge error";}
+            text("vpd-log-stage","Stationszustand nicht erreichbar");
+            text("vpd-log-reason","Der Live-Regellog wird automatisch erneut geladen.");
+            text("vpd-log-updated",`Letzter Versuch: ${new Date().toLocaleTimeString("de-DE")}`);
+        }
+    }
+
+    load();
+    window.setInterval(load,2000);
+})();
+</script>
+{% endblock %}

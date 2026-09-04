@@ -150,6 +150,13 @@ def register(app):
     def grow_control_tent_vpd(tent_id):
         return _environment_history_page(tent_id, "vpd")
 
+    @app.route("/grow-control/tents/<tent_id>/vpd-control")
+    def grow_control_tent_vpd_control(tent_id):
+        return render_template(
+            "vpd_control_log.html",
+            **_tent_page_context(tent_id),
+        )
+
     @app.route("/grow-control/tents/<tent_id>/ppfd")
     def grow_control_tent_ppfd(tent_id):
         return _environment_history_page(tent_id, "ppfd")

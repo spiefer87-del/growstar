@@ -249,106 +249,32 @@ h3 {
     color: #fde68a;
 }
 
-.vpd-live-card {
-    margin: 16px 0 6px;
-    padding: 17px 18px;
-    border: 1px solid rgba(56,189,248,.42);
-    border-radius: 16px;
-    background:
-        radial-gradient(circle at 100% 0%, rgba(56,189,248,.14), transparent 42%),
-        linear-gradient(145deg, rgba(30,41,59,.98), rgba(15,23,42,.98));
-    box-shadow: 0 10px 30px rgba(0,0,0,.24);
-}
-.vpd-live-card[hidden] { display: none; }
-.vpd-live-card.fallback {
-    border-color: rgba(245,158,11,.45);
-    background:
-        radial-gradient(circle at 100% 0%, rgba(245,158,11,.11), transparent 42%),
-        linear-gradient(145deg, rgba(30,41,59,.98), rgba(15,23,42,.98));
-}
-.vpd-live-head,
-.vpd-live-current,
-.vpd-live-next {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 12px;
-}
-.vpd-live-title { font-size: .92rem; font-weight: 850; }
-.vpd-live-badge {
-    flex: 0 0 auto;
-    padding: 5px 9px;
-    border-radius: 999px;
-    background: rgba(14,165,233,.16);
-    color: #7dd3fc;
-    font-size: .64rem;
-    font-weight: 850;
-    letter-spacing: .05em;
-}
-.vpd-live-current {
+.vpd-card-slot { position: relative; min-width: 0; }
+.vpd-card-slot > .card-link { display: block; height: 100%; }
+.vpd-card-slot #vpd-card { height: 100%; }
+.vpd-card-slot.has-vpd-log #vpd-card { padding-bottom: 38px; }
+.vpd-log-shortcut {
+    position: absolute;
+    left: 50%;
+    bottom: 8px;
+    z-index: 2;
+    transform: translateX(-50%);
+    display: inline-flex;
     align-items: center;
-    margin-top: 13px;
-    padding: 12px 13px;
-    border-radius: 12px;
-    background: rgba(2,6,23,.42);
-}
-.vpd-live-stage { font-size: 1rem; font-weight: 850; }
-.vpd-live-reason {
-    max-width: 62%;
-    color: #cbd5e1;
-    font-size: .76rem;
-    line-height: 1.4;
-    text-align: right;
-}
-.vpd-live-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(125px,1fr));
-    gap: 8px;
-    margin-top: 10px;
-}
-.vpd-live-metric {
-    min-width: 0;
-    padding: 9px 10px;
-    border: 1px solid rgba(148,163,184,.13);
-    border-radius: 10px;
-    background: rgba(2,6,23,.24);
-}
-.vpd-live-label {
-    display: block;
-    margin-bottom: 3px;
-    color: var(--muted);
+    justify-content: center;
+    min-height: 23px;
+    padding: 4px 8px;
+    border: 1px solid rgba(56,189,248,.35);
+    border-radius: 999px;
+    background: rgba(14,165,233,.14);
+    color: #bae6fd;
     font-size: .61rem;
     font-weight: 800;
-    letter-spacing: .045em;
-    text-transform: uppercase;
-}
-.vpd-live-value { color: #e2e8f0; font-size: .75rem; line-height: 1.35; }
-.vpd-action-plan { margin-top: 10px; }
-.vpd-action-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.vpd-action-chip {
-    padding: 5px 8px;
-    border: 1px solid rgba(56,189,248,.25);
-    border-radius: 999px;
-    background: rgba(14,165,233,.08);
-    color: #bae6fd;
-    font-size: .68rem;
-    font-weight: 720;
-}
-.vpd-action-empty { color: var(--muted); font-size: .72rem; }
-.vpd-live-next {
-    align-items: center;
-    margin-top: 11px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(148,163,184,.14);
-}
-.vpd-live-next-copy { color: #cbd5e1; font-size: .74rem; line-height: 1.4; }
-.vpd-live-settings {
-    flex: 0 0 auto;
-    color: #7dd3fc;
-    font-size: .7rem;
-    font-weight: 800;
+    line-height: 1;
     text-decoration: none;
+    white-space: nowrap;
 }
+.vpd-log-shortcut[hidden] { display: none; }
 
 .grid {
     display: grid;
@@ -530,10 +456,8 @@ h3 {
     .heading-climate-slot { margin-top: 8px; }
     .header-climate-mode { width: 40px; height: 40px; flex-basis: 40px; }
     #profile-card .phase-badge { padding: 5px 9px; font-size: .78rem; }
-    .vpd-live-card { padding: 13px; }
-    .vpd-live-grid { grid-template-columns: 1fr; }
-    .vpd-live-current { align-items: flex-start; flex-direction: column; }
-    .vpd-live-reason { max-width: none; text-align: left; }
+    .vpd-card-slot.has-vpd-log #vpd-card { padding-bottom: 34px; }
+    .vpd-log-shortcut { bottom: 6px; padding: 4px 6px; font-size: .56rem; }
     .vpd-device-badge { font-size: .5rem; }
 }
 
@@ -617,13 +541,23 @@ h3 {
         </div>
     </a>
 
-    <a href="{{ url_for('grow_control_tent_vpd', tent_id=tent_id) }}" class="card-link">
-        <div class="card env" id="vpd-card">
-            <h2>VPD</h2>
-            <div class="value"><span id="vpd">--.-</span> kPa</div>
-            <div class="sub" id="vpd-control-summary">berechnet</div>
-        </div>
-    </a>
+    <div id="vpd-card-slot" class="vpd-card-slot">
+        <a href="{{ url_for('grow_control_tent_vpd', tent_id=tent_id) }}" class="card-link">
+            <div class="card env" id="vpd-card">
+                <h2>VPD</h2>
+                <div class="value"><span id="vpd">--.-</span> kPa</div>
+                <div class="sub" id="vpd-control-summary">berechnet</div>
+            </div>
+        </a>
+        <a
+            id="vpd-log-link"
+            class="vpd-log-shortcut"
+            href="{{ url_for('grow_control_tent_vpd_control', tent_id=tent_id) }}"
+            aria-label="Live-Regellog der intelligenten VPD-Steuerung öffnen"
+            title="VPD-Live-Regellog öffnen"
+            hidden
+        >🧠 Regellog</a>
+    </div>
 
     {% if has_permission('settings.view') %}
     <a href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}" class="card-link">
@@ -656,53 +590,6 @@ h3 {
         </div>
     </a>
 </div>
-
-<section id="vpd-live-card" class="vpd-live-card" hidden aria-live="polite">
-    <div class="vpd-live-head">
-        <div class="vpd-live-title">🧠 Intelligente VPD-Steuerung</div>
-        <span id="vpd-live-badge" class="vpd-live-badge">--</span>
-    </div>
-    <div class="vpd-live-current">
-        <div>
-            <span class="vpd-live-label">Aktuelle Strategie</span>
-            <div id="vpd-live-stage" class="vpd-live-stage">Wird geladen …</div>
-        </div>
-        <div id="vpd-live-reason" class="vpd-live-reason"></div>
-    </div>
-    <div class="vpd-live-grid">
-        <div class="vpd-live-metric">
-            <span class="vpd-live-label">Zielband</span>
-            <span id="vpd-live-target" class="vpd-live-value">--</span>
-        </div>
-        <div class="vpd-live-metric">
-            <span class="vpd-live-label">Erlaubtes Klima</span>
-            <span id="vpd-live-range" class="vpd-live-value">--</span>
-        </div>
-        <div class="vpd-live-metric">
-            <span class="vpd-live-label">Wirkungsprüfung</span>
-            <span id="vpd-live-effect" class="vpd-live-value">--</span>
-        </div>
-        <div class="vpd-live-metric">
-            <span class="vpd-live-label">Außenluft</span>
-            <span id="vpd-live-outside" class="vpd-live-value">--</span>
-        </div>
-        <div class="vpd-live-metric">
-            <span class="vpd-live-label">Stufenweg</span>
-            <span id="vpd-live-progress" class="vpd-live-value">--</span>
-        </div>
-    </div>
-    <div class="vpd-action-plan">
-        <span id="vpd-action-label" class="vpd-live-label">Aktorplan</span>
-        <div id="vpd-action-chips" class="vpd-action-chips"></div>
-    </div>
-    <div class="vpd-live-next">
-        <div class="vpd-live-next-copy">
-            <strong>Nächster Schritt:</strong>
-            <span id="vpd-live-next">--</span>
-        </div>
-        <a class="vpd-live-settings" href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}">Regelwerte ›</a>
-    </div>
-</section>
 
 <h3>Geräte</h3>
 <div class="grid" id="device-grid">
@@ -827,13 +714,6 @@ h3 {
         safeText("profile-phase", state.profile || "---");
     }
 
-    function countdownText(value) {
-        const seconds = Math.max(0, Math.round(Number(value)));
-        if (!Number.isFinite(seconds)) return "laufend";
-        const minutes = Math.floor(seconds / 60);
-        return `${minutes}:${String(seconds % 60).padStart(2, "0")} min`;
-    }
-
     function vpdActionText(device, action) {
         const label = VPD_DEVICE_LABELS[device] || deviceDisplayName(device);
         if (!action || typeof action !== "object") return `${label} --`;
@@ -848,146 +728,17 @@ h3 {
         );
     }
 
-    function renderVpdLiveCard(control) {
-        const panel = document.getElementById("vpd-live-card");
-        if (!panel) return;
-
-        const mode = String(control.mode || "OFF").toUpperCase();
-        panel.hidden = mode === "OFF";
-        if (mode === "OFF") return;
-
-        const waiting = Boolean(control.fallback || !control.ready);
-        panel.classList.toggle("fallback", waiting);
-        safeText(
-            "vpd-live-badge",
-            mode === "AUTO"
-                ? (waiting ? "AUTO · WARTET" : "AUTO · ÜBERNIMMT")
-                : "BEOBACHTEN"
-        );
-        safeText(
-            "vpd-live-stage",
-            control.stage_label || control.stage || (waiting ? "Wartet" : "Aktiv")
-        );
-        safeText(
-            "vpd-live-reason",
-            control.reason || (waiting ? "Sensorbasis wird geprüft" : "Regelplan aktiv")
-        );
-
-        const target = optionalNumber(control.target);
-        const tolerance = optionalNumber(control.tolerance);
-        let targetText = Number.isFinite(target)
-            ? `${target.toFixed(2)} kPa`
-            : "--";
-        if (Number.isFinite(target) && Number.isFinite(tolerance)) {
-            targetText = `${(target - tolerance).toFixed(2)}–${(target + tolerance).toFixed(2)} kPa`;
-        }
-        const ramp = control.ramp || {};
-        const rampProgress = optionalNumber(ramp.progress);
-        if (ramp.active && Number.isFinite(rampProgress)) {
-            targetText += ` · Rampe ${Math.round(rampProgress * 100)} %`;
-        }
-        safeText("vpd-live-target", targetText);
-
-        const range = control.range || {};
-        const tempMin = optionalNumber(range.temp_min);
-        const tempMax = optionalNumber(range.temp_max);
-        const humMin = optionalNumber(range.hum_min);
-        const humMax = optionalNumber(range.hum_max);
-        const climateParts = [];
-        if (Number.isFinite(tempMin) && Number.isFinite(tempMax)) {
-            climateParts.push(`${tempMin.toFixed(1)}–${tempMax.toFixed(1)} °C`);
-        }
-        if (Number.isFinite(humMin) && Number.isFinite(humMax)) {
-            climateParts.push(`${humMin.toFixed(1)}–${humMax.toFixed(1)} %`);
-        }
-        safeText("vpd-live-range", climateParts.join(" · ") || "--");
-
-        const effect = control.effect || {};
-        const nextEvaluation = optionalNumber(effect.next_evaluation_sec);
-        const improvement = optionalNumber(effect.improvement_kpa);
-        const lastImprovement = optionalNumber(effect.last_improvement_kpa);
-        const minimum = optionalNumber(effect.minimum_kpa);
-        let effectText = Number.isFinite(nextEvaluation)
-            ? `noch ${countdownText(nextEvaluation)}`
-            : (waiting ? "pausiert" : "laufende Prüfung");
-        const displayedImprovement = Number.isFinite(lastImprovement)
-            ? lastImprovement
-            : improvement;
-        if (Number.isFinite(displayedImprovement) && Number.isFinite(minimum)) {
-            effectText += ` · ${Number.isFinite(lastImprovement) ? "zuletzt" : "Wirkung"} ${displayedImprovement >= 0 ? "+" : ""}${displayedImprovement.toFixed(3)} / ${minimum.toFixed(3)} kPa`;
-        }
-        safeText("vpd-live-effect", effectText);
-
-        const outside = control.outside || {};
-        const outsideTemp = optionalNumber(outside.temp);
-        const outsideHum = optionalNumber(outside.hum);
-        const outsideParts = [];
-        if (Number.isFinite(outsideTemp)) outsideParts.push(`${outsideTemp.toFixed(1)} °C`);
-        if (Number.isFinite(outsideHum)) outsideParts.push(`${outsideHum.toFixed(1)} %`);
-        if (control.direction === "raise" && outside.drying) outsideParts.push("trockener");
-        if (control.direction === "lower" && outside.lowering) outsideParts.push("senkt VPD");
-        else if (control.direction === "lower" && outside.humidifying) outsideParts.push("feuchter");
-        safeText("vpd-live-outside", outsideParts.join(" · ") || (waiting ? "nicht bewertbar" : "keine Hilfe"));
-
-        const progress = control.strategy_progress || {};
-        const fanProgress = progress.fan || {};
-        const tempProgress = progress.temperature || {};
-        const fanLevel = optionalNumber(fanProgress.level);
-        const fanMaximum = optionalNumber(fanProgress.maximum);
-        const tempTarget = optionalNumber(tempProgress.target);
-        const tempMaximum = optionalNumber(tempProgress.maximum);
-        const progressParts = [];
-        if (Number.isFinite(fanLevel) && Number.isFinite(fanMaximum)) {
-            progressParts.push(`Abluft ${fanLevel.toFixed(0)}/${fanMaximum.toFixed(0)}${fanProgress.complete ? " ✓" : ""}`);
-        }
-        if (Number.isFinite(tempTarget) && Number.isFinite(tempMaximum)) {
-            progressParts.push(`Temperatur ${tempTarget.toFixed(1)}/${tempMaximum.toFixed(1)} °C${tempProgress.complete ? " ✓" : ""}`);
-        }
-        safeText("vpd-live-progress", progressParts.join(" · ") || (waiting ? "wartet" : "--"));
-
-        const actionLabel = document.getElementById("vpd-action-label");
-        if (actionLabel) {
-            actionLabel.textContent = mode === "AUTO" ? "Aktiver Aktorplan" : "Simulierter Aktorplan";
-        }
-        const chips = document.getElementById("vpd-action-chips");
-        if (chips) {
-            chips.replaceChildren();
-            const devices = Array.isArray(control.managed_devices)
-                ? control.managed_devices
-                : [];
-            if (!devices.length) {
-                const empty = document.createElement("span");
-                empty.className = "vpd-action-empty";
-                empty.textContent = waiting
-                    ? "Noch kein Aktorplan – AUTO wartet auf vollständige Sensordaten."
-                    : "Keine VPD-Aktoren im Modus Umgebung / Profil.";
-                chips.appendChild(empty);
-            } else {
-                devices.forEach(device => {
-                    const chip = document.createElement("span");
-                    const action = (control.actions || {})[device];
-                    chip.className = "vpd-action-chip";
-                    chip.textContent = vpdActionText(device, action);
-                    if (action?.reason) chip.title = action.reason;
-                    chips.appendChild(chip);
-                });
-            }
-        }
-        safeText(
-            "vpd-live-next",
-            control.next_step_label || (waiting
-                ? "Sensorbasis vervollständigen und Regelplan neu berechnen"
-                : "Wirkung prüfen und anschließend neu planen")
-        );
-    }
-
     function renderVpdControl(state) {
         const summary = document.getElementById("vpd-control-summary");
         if(!summary) return;
 
         const control = state.vpd_control || {};
         const mode = String(control.mode || "OFF").toUpperCase();
-        renderVpdLiveCard(control);
+        const logLink = document.getElementById("vpd-log-link");
+        const cardSlot = document.getElementById("vpd-card-slot");
+        const showLog = mode !== "OFF";
+        if(logLink) logLink.hidden = !showLog;
+        if(cardSlot) cardSlot.classList.toggle("has-vpd-log",showLog);
         if(mode === "OFF"){
             summary.textContent = "berechnet";
             summary.title = "Intelligente VPD-Steuerung ist aus";
@@ -1111,7 +862,7 @@ h3 {
             profile: document.getElementById("profile-card")?.closest("a"),
             temp: document.getElementById("temp-card")?.closest("a"),
             hum: document.getElementById("hum-card")?.closest("a"),
-            vpd: document.getElementById("vpd-card")?.closest("a"),
+            vpd: document.getElementById("vpd-card-slot"),
             ph: document.getElementById("ph-link"),
             ec: document.getElementById("ec-link"),
             water_temp: document.getElementById("water-temp-link"),

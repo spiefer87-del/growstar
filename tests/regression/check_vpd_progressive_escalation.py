@@ -128,17 +128,17 @@ def main():
         "Ohne letzte ENV-Stufe bleibt LIMITED sicher, aber wird regelmäßig neu bewertet statt einzufrieren",
     )
 
-    dashboard = (ROOT / "templates" / "grow_control.html").read_text(
+    vpd_log = (ROOT / "templates" / "vpd_control_log.html").read_text(
         encoding="utf-8"
     )
     settings = (ROOT / "templates" / "settings.html").read_text(
         encoding="utf-8"
     )
     require(
-        'id="vpd-live-progress"' in dashboard
-        and "strategy_progress" in dashboard
+        'id="vpd-log-progress"' in vpd_log
+        and "strategy_progress" in vpd_log
         and "schwächere Einzelmessung beendet den Stufenweg nicht" in settings,
-        "Dashboard und Einstellungsseite erklären den vollständigen Stufenweg nachvollziehbar",
+        "Regellog und Einstellungsseite erklären den vollständigen Stufenweg nachvollziehbar",
     )
 
     print("✅ Growstar 3.16.8 / VPD.CONTROL.3 vollständig geprüft")

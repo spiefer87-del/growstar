@@ -77,10 +77,12 @@ def main():
     require(
         settings_page.count('id="RAMP_ENABLED"') == 1
         and settings_page.count('id="RAMP_DURATION_MIN"') == 1
-        and settings_page.index('id="vpd-control-card"')
+        and settings_page.index('id="lighting-duration"')
         < settings_page.index('id="vpd-ramp-settings"')
-        < settings_page.index('id="light-sun-card"'),
-        "Eigener VPD-Rampenschalter und Rampenzeit stehen direkt im VPD-Bereich",
+        < settings_page.index('id="classic-temperature-controls"')
+        and settings_page.index('id="vpd-ramp-settings"')
+        < settings_page.index('id="vpd-control-card"'),
+        "Rampenzeit bleibt als gemeinsame Karte in klassischer und intelligenter Ansicht erreichbar",
     )
     require(
         "vollständig von Helligkeitssensor und Sonnenverlauf" in settings_page

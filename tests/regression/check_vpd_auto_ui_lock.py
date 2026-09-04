@@ -89,21 +89,35 @@ def main():
     dashboard = (ROOT / "templates" / "grow_control.html").read_text(
         encoding="utf-8"
     )
+    vpd_log = (ROOT / "templates" / "vpd_control_log.html").read_text(
+        encoding="utf-8"
+    )
     detail = (ROOT / "templates" / "device_control.html").read_text(
+        encoding="utf-8"
+    )
+    dashboard_route = (ROOT / "routes" / "dashboard.py").read_text(
         encoding="utf-8"
     )
     device_route = (ROOT / "routes" / "device.py").read_text(encoding="utf-8")
     tent_route = (ROOT / "routes" / "tents.py").read_text(encoding="utf-8")
 
     require(
-        'id="vpd-live-card"' in dashboard
-        and 'id="vpd-live-stage"' in dashboard
-        and 'id="vpd-live-effect"' in dashboard
-        and 'id="vpd-live-outside"' in dashboard
-        and 'id="vpd-live-progress"' in dashboard
-        and 'id="vpd-live-next"' in dashboard
-        and 'id="vpd-action-chips"' in dashboard,
-        "Das Dashboard zeigt Strategie, Wirkung, Außenluft, Stufenweg, Aktorplan und Folgeschritt",
+        '<section id="vpd-live-card"' not in dashboard
+        and 'id="vpd-log-link"' in dashboard
+        and "grow_control_tent_vpd_control" in dashboard,
+        "Das Dashboard bleibt kompakt und öffnet den Regellog über die VPD-Kachel",
+    )
+    require(
+        'id="vpd-log-stage"' in vpd_log
+        and 'id="vpd-log-effect"' in vpd_log
+        and 'id="vpd-log-outside"' in vpd_log
+        and 'id="vpd-log-progress"' in vpd_log
+        and 'id="vpd-log-next"' in vpd_log
+        and 'id="vpd-event-list"' in vpd_log
+        and "window.setInterval(load,2000)" in vpd_log
+        and "grow_control_tent_vpd_control" in dashboard_route
+        and '"vpd_control_log.html"' in dashboard_route,
+        "Strategie, Wirkung, Außenluft, Stufenweg und Entscheidungen besitzen eine eigene Live-Seite",
     )
     require(
         "vpd.participating" in dashboard
@@ -128,7 +142,7 @@ def main():
         "Geräte- und Stations-API liefern denselben VPD-Status und HTTP 423 bei Schreibzugriff",
     )
 
-    print("✅ Growstar 3.16.7 / VPD.UI.2 vollständig geprüft")
+    print("✅ Growstar 3.16.9 / VPD.UI.3 vollständig geprüft")
 
 
 if __name__ == "__main__":
