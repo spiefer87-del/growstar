@@ -513,6 +513,14 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 <strong>Umgebung</strong> stehen. OFF/ON/Zeit/Intervall bleiben immer autoritativ.
             </div>
 
+            <div class="info">
+                <strong>Temperatur min/max</strong> sind die verbindlichen Grenzen des
+                Heiz- und Kühlwegs. <strong>Feuchte min/max</strong> bilden das bevorzugte
+                Arbeitsfenster für Abluft, Be- und Entfeuchtung. Bei zu niedrigem VPD darf
+                Growstar nach ausgeschöpfter Abluft trotzdem bis zur Temperatur-Obergrenze
+                heizen; beendet wird der Heizweg sofort am VPD-Zielband.
+            </div>
+
             <div class="row-inline">
                 <div class="field">
                     <label for="VPD_CONTROL_MODE">Betriebsart</label>
@@ -1157,7 +1165,7 @@ function updatePreview(){
         ${num("VPD_HUM_MIN_NIGHT").toFixed(1)}–${num("VPD_HUM_MAX_NIGHT").toFixed(1)} %<br>
         Physikalisch erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa<br>
         Jede Abluft- und Temperaturstufe wird ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten geprüft.
-        Solange Zielband oder Feuchtefenster verletzt sind, werden die erlaubten Stufen bis zu ihren sicheren Maximalwerten durchlaufen.
+        Das VPD-Zielband gibt die Regelrichtung vor. Bleibt der VPD nach maximaler Abluft zu niedrig, wird die Temperaturreserve bis zur eingestellten Obergrenze schrittweise genutzt.
         Ab ${num("VPD_MIN_EFFECT_KPA").toFixed(3)} kPa gilt eine Stufe als messbar wirksam; eine schwächere Einzelmessung beendet den Stufenweg nicht vorzeitig.
     `;
 }

@@ -595,9 +595,9 @@ def main():
     })
     humidity_guard_plan = update_vpd_control(humidity_guard, now=1000)
     require(
-        humidity_guard_plan["direction"] == "raise"
-        and humidity_guard_plan["stage"] == "exhaust",
-        "Die harte Feuchteobergrenze hat Vorrang vor einem widersprüchlichen VPD-Ziel",
+        humidity_guard_plan["direction"] == "lower"
+        and humidity_guard_plan["stage"] == "cool",
+        "Das VPD-Ziel verhindert eine widersprüchliche weitere Erwärmung trotz überschrittenem Feuchte-Arbeitsfenster",
     )
 
     high = runtime_for(hum=40.0)

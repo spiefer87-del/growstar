@@ -27,8 +27,8 @@ def require(condition, message):
 def coupled_runtime(*, mode="AUTO"):
     runtime = runtime_for(
         mode=mode,
-        temp=26.0,
-        hum=65.5,
+        temp=23.9,
+        hum=69.9,
         outside_temp=15.0,
         outside_hum=55.0,
         controller_assigned=True,
@@ -67,10 +67,10 @@ def main():
         "Bei 26 Grad wird der rechnerische Feuchtebedarf für 1,10 kPa korrekt mit rund 67,3 Prozent ausgewiesen",
     )
     require(
-        abs(setpoints["temp"] - 22.65) < 0.02
-        and abs(setpoints["hum"] - 60.0) < 0.02
+        abs(setpoints["temp"] - 23.9) < 0.02
+        and abs(setpoints["hum"] - 62.91) < 0.02
         and abs(setpoints["vpd"] - 1.10) < 0.001,
-        "Ein innerhalb von 20–26 Grad und 50–60 Prozent erreichbares gemeinsames Zielpaar wird berechnet",
+        "Der Live-Feuchtesollwert wird aus dem aktuellen VPD-Temperaturziel berechnet, ohne dessen Reserve zu verkürzen",
     )
     require(
         abs(automatic.state.live_state["temp_target"] - setpoints["temp"]) < 0.01
@@ -79,10 +79,12 @@ def main():
         "VPD-AUTO veröffentlicht Temperatur- und Feuchtesollwert gemeinsam im Live-State",
     )
     require(
-        "Feuchteobergrenze" in first["reason"]
+        "VPD ist zu niedrig" in first["reason"]
+        and "Arbeitsfenster" in first["reason"]
         and "26.0 °C" in setpoints["explanation"]
-        and "67.3 %" in setpoints["explanation"],
-        "Regellog erklärt die harte Feuchteabweichung und den daraus folgenden Temperaturdeckel",
+        and "67.3 %" in setpoints["explanation"]
+        and "sperrt die sichere Temperaturreserve nicht" in setpoints["explanation"],
+        "Regellog erklärt die Feuchteabweichung, ohne daraus einen falschen Temperaturdeckel abzuleiten",
     )
 
     dynamic = runtime_for(mode="AUTO", temp=24.0, hum=75.0)
@@ -110,21 +112,23 @@ def main():
     )
 
     now += 301
-    limited = update_vpd_control(automatic, now=now)
+    heat = update_vpd_control(automatic, now=now)
     require(
-        limited["stage"] == "limited"
-        and limited["strategy_progress"]["fan"]["complete"] is True
-        and limited["actions"]["fan"]["controller"]["level"] == 100
-        and "Maximum halten" in limited["actions"]["fan"]["reason"],
-        "Die begrenzte Endstufe hält die bereits erreichte Abluftleistung von 100 Prozent",
+        heat["stage"] == "heat"
+        and heat["effective_temp_target"] == 24.4
+        and heat["strategy_progress"]["fan"]["complete"] is True
+        and heat["actions"]["fan"]["controller"]["level"] == 100
+        and heat["actions"]["heating"]["power"] is True,
+        "Nach vollständig geprüfter Abluft wird die echte Temperaturreserve genutzt und Stufe 100 beibehalten",
     )
 
     now += 301
     held = update_vpd_control(automatic, now=now)
     require(
-        held["stage"] == "limited"
-        and held["actions"]["fan"]["controller"]["level"] == 100,
-        "Eine erneute Wirkungsprüfung fällt nicht auf die 75-Prozent-Grundlüftung zurück",
+        held["stage"] == "heat"
+        and held["actions"]["fan"]["controller"]["level"] == 100
+        and held["actions"]["heating"]["power"] is True,
+        "Die Heizprüfung hält die maximale Abluft und fällt weder auf LIMITED noch auf die Grundlüftung zurück",
     )
 
     automatic.state.live_state["outside_temp"] = 26.0
@@ -140,7 +144,7 @@ def main():
     monitor = coupled_runtime(mode="MONITOR")
     monitor_plan = update_vpd_control(monitor, now=1000)
     require(
-        monitor_plan["setpoints"]["hum"] == 60.0
+        abs(monitor_plan["setpoints"]["hum"] - 62.91) < 0.02
         and monitor.state.live_state["hum_target"] == 65.0,
         "Beobachten zeigt das gekoppelte Zielpaar, ersetzt aber keinen klassischen Live-Sollwert",
     )
