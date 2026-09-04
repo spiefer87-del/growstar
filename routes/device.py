@@ -24,7 +24,20 @@ from core.hardware_assignments import device_assignment
 from core.runtime import get_default_runtime, get_runtime
 from core.safety import get_runtime_safety_snapshot
 from core.tents import manager as tent_manager, validate_tent_id
+from core.vpd import vpd_device_context
 from services.spiderfarmer_commands import send_controller_setpoints
+
+
+class VpdDeviceLockedError(RuntimeError):
+    """Ein ENV-Aktor ist während AUTO ausschließlich dem VPD-Regler zugeordnet."""
+
+    def __init__(self, device, context):
+        self.device = str(device)
+        self.context = deepcopy(context or {})
+        super().__init__(
+            "Dieses Gerät wird gerade von VPD intelligent gesteuert. "
+            "Bitte zuerst unter Klima & Grenzwerte den Automatik-Modus verlassen."
+        )
 
 
 def _validate_device(device):
@@ -179,6 +192,7 @@ def _device_payload(runtime, device):
             "override": safety_override,
             "blocked": device in (safety.get("blocked_devices") or []),
         },
+        "vpd_control": vpd_device_context(device, runtime=runtime),
     }
 
 
@@ -213,6 +227,10 @@ def _normalize_device_update(runtime, device, data):
 
 
 def _save_device(runtime, device, data):
+    vpd_context = vpd_device_context(device, runtime=runtime)
+    if vpd_context.get("locked"):
+        raise VpdDeviceLockedError(device, vpd_context)
+
     normalized = _normalize_device_update(
         runtime,
         device,
@@ -294,6 +312,16 @@ def _hardware_required_response(exc):
     ), 409
 
 
+def _vpd_locked_response(exc):
+    return jsonify(
+        success=False,
+        error="vpd_device_locked",
+        message=str(exc),
+        device=exc.device,
+        vpd_control=exc.context,
+    ), 423
+
+
 def register(app):
 
     @app.route("/api/device/<device>", methods=["GET", "POST"])
@@ -307,6 +335,8 @@ def register(app):
         data = request.get_json(silent=True) or {}
         try:
             return jsonify(_save_device(runtime, device, data))
+        except VpdDeviceLockedError as exc:
+            return _vpd_locked_response(exc)
         except DeviceHardwareRequiredError as exc:
             return _hardware_required_response(exc)
         except (TypeError, ValueError) as exc:
@@ -321,6 +351,8 @@ def register(app):
         data = request.get_json(silent=True) or {}
         try:
             return jsonify(_save_device(runtime, device, data))
+        except VpdDeviceLockedError as exc:
+            return _vpd_locked_response(exc)
         except DeviceHardwareRequiredError as exc:
             return _hardware_required_response(exc)
         except (TypeError, ValueError) as exc:
@@ -339,6 +371,8 @@ def register(app):
         data = request.get_json(silent=True) or {}
         try:
             return jsonify(_save_device(runtime, device, data))
+        except VpdDeviceLockedError as exc:
+            return _vpd_locked_response(exc)
         except DeviceHardwareRequiredError as exc:
             return _hardware_required_response(exc)
         except (TypeError, ValueError) as exc:

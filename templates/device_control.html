@@ -19,11 +19,12 @@ select,input{width:100%;padding:10px;border-radius:9px;border:1px solid var(--bo
 .section.visible{display:block}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 button{width:100%;border:none;border-radius:10px;padding:11px;background:var(--accent);color:#052e16;font-weight:700;cursor:pointer}
 button:disabled{opacity:.45;cursor:not-allowed}
-.status{padding:12px 14px;border-radius:12px;background:#111827;color:var(--muted);margin-bottom:14px}.status.shadow{background:rgba(124,58,237,.16);color:#ddd6fe}.status.live{background:rgba(34,197,94,.14);color:#bbf7d0}
+.status{padding:12px 14px;border-radius:12px;background:#111827;color:var(--muted);margin-bottom:14px}.status.shadow{background:rgba(124,58,237,.16);color:#ddd6fe}.status.live{background:rgba(34,197,94,.14);color:#bbf7d0}.status.vpd{border:1px solid rgba(56,189,248,.34);background:rgba(14,165,233,.12);color:#bae6fd}
 .state-line{display:flex;justify-content:space-between;gap:12px}.state-value{font-weight:700}.hint{font-size:.84rem;color:var(--muted);line-height:1.5}.saved{display:none;margin-top:12px;color:#86efac;text-align:center}.saved.visible{display:block}.editing-hint{display:none;margin-top:10px;color:#fcd34d;text-align:center;font-size:.76rem}.editing-hint.visible{display:block}.assignment-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(245,158,11,.35);background:rgba(120,53,15,.18);color:#fde68a;font-size:.84rem;line-height:1.5}.assignment-warning.visible{display:block}.safety-warning{display:none;margin:0 0 14px;padding:13px 14px;border-radius:12px;border:1px solid rgba(239,68,68,.42);background:rgba(127,29,29,.22);color:#fecaca;font-size:.84rem;line-height:1.5}.safety-warning.visible{display:block}.hardware-line{margin-top:7px;color:var(--muted);font-size:.78rem}
 .controller-card{display:none;border:1px solid rgba(56,189,248,.22);background:linear-gradient(145deg,rgba(30,41,59,1),rgba(15,23,42,.98))}.controller-card.visible{display:block}.controller-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:16px}.controller-title{font-size:1rem;font-weight:800}.controller-meta{margin-top:5px;color:var(--muted);font-size:.78rem;line-height:1.4}.controller-badge{padding:5px 9px;border-radius:999px;font-size:.66rem;font-weight:800;background:rgba(56,189,248,.14);color:#7dd3fc}.controller-badge.offline{background:rgba(239,68,68,.14);color:#fca5a5}.setpoint{margin:14px 0;padding:13px;border:1px solid rgba(148,163,184,.13);border-radius:12px;background:rgba(2,6,23,.34)}.setpoint-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:9px}.setpoint-head label{margin:0;color:var(--text);font-weight:750}.setpoint-value{color:#bae6fd;font-size:.8rem;font-weight:800}.setpoint-row{display:grid;grid-template-columns:1fr 92px;gap:10px;align-items:center}.setpoint-row input[type="range"]{padding:0}.controller-note{margin-top:12px;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.77rem;line-height:1.45}
 .interval-phase{margin-top:14px;padding:15px;border:1px solid rgba(56,189,248,.18);border-radius:13px;background:rgba(2,6,23,.28)}.interval-phase-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:12px}.interval-phase-title{font-weight:800}.interval-phase-badge{font-size:.7rem;color:#7dd3fc;font-weight:800}.mode-controller,.interval-controller{margin-top:10px}.interval-controller.power-off{display:none}.shelly-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:rgba(245,158,11,.10);color:#fde68a;font-size:.78rem;line-height:1.45}
 .fan-standby{display:none;margin-top:16px;padding:15px;border:1px solid rgba(34,197,94,.24);border-radius:13px;background:rgba(20,83,45,.13)}.fan-standby.visible{display:block}.fan-standby-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.fan-standby-title{font-weight:800}.fan-standby-toggle{display:flex;align-items:center;gap:8px;color:var(--text);margin:0}.fan-standby-toggle input{width:auto}.fan-standby-note{font-size:.79rem;color:var(--muted);line-height:1.45}.fan-standby-controller.disabled{opacity:.45;pointer-events:none}
+.vpd-lock-warning{display:none;margin:0 0 14px;padding:15px;border:1px solid rgba(56,189,248,.42);border-radius:14px;background:linear-gradient(145deg,rgba(14,165,233,.13),rgba(49,46,129,.12));color:#e0f2fe}.vpd-lock-warning.visible{display:block}.vpd-lock-head{display:flex;align-items:center;justify-content:space-between;gap:10px}.vpd-lock-title{font-weight:850}.vpd-lock-badge{padding:4px 8px;border-radius:999px;background:rgba(14,165,233,.18);color:#7dd3fc;font-size:.66rem;font-weight:850}.vpd-lock-copy{margin-top:8px;color:#cbd5e1;font-size:.82rem;line-height:1.45}.vpd-lock-plan{margin-top:8px;color:#bae6fd;font-size:.78rem;font-weight:750}.vpd-lock-link{display:inline-block;margin-top:11px;color:#7dd3fc;font-size:.78rem;font-weight:800;text-decoration:none}.device-config-card.vpd-locked{border:1px solid rgba(56,189,248,.3);box-shadow:0 10px 30px rgba(0,0,0,.22),0 0 22px rgba(56,189,248,.08)}.device-config-card.vpd-locked input,.device-config-card.vpd-locked select,.device-config-card.vpd-locked button{filter:saturate(.45)}
 @media(max-width:600px){body{padding:12px}.grid2{grid-template-columns:1fr}.top{align-items:flex-start}.setpoint-row{grid-template-columns:1fr 78px}}
 </style>
 {% endblock %}
@@ -41,6 +42,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
     <div id="runtime-status" class="status">Status wird geladen …</div>
     <div id="assignment-warning" class="assignment-warning"></div>
     <div id="safety-warning" class="safety-warning"></div>
+    <div id="vpd-lock-warning" class="vpd-lock-warning" role="status">
+        <div class="vpd-lock-head">
+            <span class="vpd-lock-title">🧠 VPD intelligent steuert dieses Gerät</span>
+            <span id="vpd-lock-badge" class="vpd-lock-badge">AUTO</span>
+        </div>
+        <div id="vpd-lock-copy" class="vpd-lock-copy"></div>
+        <div id="vpd-lock-plan" class="vpd-lock-plan"></div>
+        <a class="vpd-lock-link" href="{{ url_for('grow_control_tent_settings', tent_id=tent_id) }}">
+            AUTO unter Klima &amp; Grenzwerte verlassen ›
+        </a>
+    </div>
 
     <div class="card">
         <div class="state-line">
@@ -66,7 +78,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         </div>
     </div>
 
-    <div class="card">
+    <div id="device-config-card" class="card device-config-card">
         <div class="row">
             <label for="mode">Modus</label>
             <select id="mode">
@@ -215,6 +227,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
     const saveButton = document.getElementById("save-button");
     const assignmentWarning = document.getElementById("assignment-warning");
     const safetyWarning = document.getElementById("safety-warning");
+    const vpdLockWarning = document.getElementById("vpd-lock-warning");
+    const vpdLockBadge = document.getElementById("vpd-lock-badge");
+    const vpdLockCopy = document.getElementById("vpd-lock-copy");
+    const vpdLockPlan = document.getElementById("vpd-lock-plan");
+    const deviceConfigCard = document.getElementById("device-config-card");
     const hardwareState = document.getElementById("hardware-state");
     const editingHint = document.getElementById("editing-hint");
     const controllerCard = document.getElementById("controller-card");
@@ -252,6 +269,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     let saveInProgress = false;
     let refreshEpoch = 0;
     let controllerSchema = {};
+    let vpdLocked = false;
 
     saveButton.disabled = !CAN_CONFIGURE;
 
@@ -265,7 +283,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
     }
 
     function markFormDirty() {
-        if (!CAN_CONFIGURE) return;
+        if (!CAN_CONFIGURE || vpdLocked) return;
         formDirty = true;
         editingHint.classList.add("visible");
     }
@@ -369,7 +387,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
             hasController && hasLevel;
 
         fanStandbyEnabled.disabled =
-            !CAN_CONFIGURE || !available;
+            !CAN_CONFIGURE || vpdLocked || !available;
 
         fanStandbyController.classList.toggle(
             "disabled",
@@ -412,7 +430,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
                         max="${escapeHtml(spec.max)}"
                         step="${escapeHtml(spec.step || 1)}"
                         value="${escapeHtml(initial)}"
-                        ${CAN_CONFIGURE ? "" : "disabled"}
+                        ${CAN_CONFIGURE && !vpdLocked ? "" : "disabled"}
                     >
                     <input
                         id="controller-${escapeHtml(name)}"
@@ -423,7 +441,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
                         max="${escapeHtml(spec.max)}"
                         step="${escapeHtml(spec.step || 1)}"
                         value="${escapeHtml(initial)}"
-                        ${CAN_CONFIGURE ? "" : "disabled"}
+                        ${CAN_CONFIGURE && !vpdLocked ? "" : "disabled"}
                     >
                 </div>
             </div>
@@ -453,7 +471,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
                         max="${escapeHtml(spec.max)}"
                         step="${escapeHtml(spec.step || 1)}"
                         value="${escapeHtml(initial)}"
-                        ${CAN_CONFIGURE ? "" : "disabled"}
+                        ${CAN_CONFIGURE && !vpdLocked ? "" : "disabled"}
                     >
                     <input
                         id="${prefix}"
@@ -465,7 +483,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
                         max="${escapeHtml(spec.max)}"
                         step="${escapeHtml(spec.step || 1)}"
                         value="${escapeHtml(initial)}"
-                        ${CAN_CONFIGURE ? "" : "disabled"}
+                        ${CAN_CONFIGURE && !vpdLocked ? "" : "disabled"}
                     >
                 </div>
             </div>
@@ -606,6 +624,50 @@ button:disabled{opacity:.45;cursor:not-allowed}
         return result;
     }
 
+    function renderVpdDeviceLock(data) {
+        const context = data.vpd_control || {};
+        vpdLocked = Boolean(context.locked && context.participating);
+        vpdLockWarning.classList.toggle("visible", vpdLocked);
+        deviceConfigCard.classList.toggle("vpd-locked", vpdLocked);
+
+        if (vpdLocked) {
+            const waiting = !context.ready || context.fallback;
+            vpdLockBadge.textContent = waiting ? "AUTO · WARTET" : "AUTO · AKTIV";
+            vpdLockCopy.textContent = waiting
+                ? `${context.stage_label || "AUTO wartet"}: ${context.reason || "Sensorbasis wird geprüft"}`
+                : `${context.stage_label || "Regelplan aktiv"}: ${context.reason || "VPD übernimmt den Aktor"}`;
+
+            const action = context.action || {};
+            const power = action.power === true
+                ? "EIN"
+                : action.power === false ? "AUS" : "--";
+            const rawLevel = action.controller?.level;
+            const level = rawLevel === null || rawLevel === undefined || rawLevel === ""
+                ? NaN
+                : Number(rawLevel);
+            vpdLockPlan.textContent = waiting
+                ? "Manuelle Änderungen bleiben gesperrt, damit AUTO nach dem Fallback sicher fortsetzen kann."
+                : `Aktueller VPD-Plan: ${power}` + (
+                    action.power === true && Number.isFinite(level)
+                        ? ` · Leistung ${level}`
+                        : ""
+                );
+        } else {
+            vpdLockCopy.textContent = "";
+            vpdLockPlan.textContent = "";
+        }
+
+        deviceConfigCard.querySelectorAll("input, select, button").forEach(control => {
+            control.disabled = !CAN_CONFIGURE || vpdLocked;
+        });
+
+        if (!vpdLocked) {
+            setModeAvailability(hardwareConfigured);
+            updateFanStandbyAvailability();
+        }
+        saveButton.disabled = !CAN_CONFIGURE || vpdLocked || saveInProgress;
+    }
+
     function applyDeviceForm(data) {
         const params = data.params || {};
         const env = data.env_config || {};
@@ -634,6 +696,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         formInitialized = true;
         markFormClean();
         updateSections();
+        renderVpdDeviceLock(data);
     }
 
     function renderRuntime(data) {
@@ -687,6 +750,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
             box.textContent = "⚪ BEREIT · Kein aktiver Regelkreis für diese Station.";
             if (!data.hardware_configured) output.textContent = "NICHT ZUGEORDNET";
         }
+
+        renderVpdDeviceLock(data);
+        if (vpdLocked) {
+            box.className = "status vpd";
+            box.textContent = "🧠 VPD AUTO · Live-Status sichtbar, Geräteeinstellungen schreibgeschützt.";
+        }
     }
 
     async function loadDevice({syncForm = false} = {}) {
@@ -702,9 +771,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
             const data = await response.json();
             if (requestEpoch !== refreshEpoch) return;
 
+            const wasVpdLocked = vpdLocked;
             renderRuntime(data);
 
-            if (syncForm && !formDirty) {
+            if ((syncForm && !formDirty) || (!wasVpdLocked && vpdLocked)) {
                 applyDeviceForm(data);
             }
         } finally {
@@ -714,6 +784,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
     window.saveDevice = async function saveDevice() {
         if (!CAN_CONFIGURE || saveInProgress) return;
+
+        if (vpdLocked) {
+            alert(
+                "Dieses Gerät wird von VPD intelligent gesteuert. " +
+                "Bitte zuerst unter Klima & Grenzwerte den Automatik-Modus verlassen."
+            );
+            return;
+        }
 
         if (mode.value !== "OFF" && !hardwareConfigured) {
             alert(
@@ -809,6 +887,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
                 const error = await response.json().catch(() => ({}));
                 if (error.error === "device_hardware_required") {
                     alert(error.message || "Aktiver Modus benötigt zuerst eine Hardware-Zuordnung.");
+                } else if (error.error === "vpd_device_locked") {
+                    alert(error.message || "VPD intelligent hat dieses Gerät gesperrt.");
                 } else {
                     alert(error.message || error.error || "Speichern fehlgeschlagen");
                 }
@@ -824,7 +904,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
             setTimeout(() => saved.classList.remove("visible"), 1200);
         } finally {
             saveInProgress = false;
-            saveButton.disabled = !CAN_CONFIGURE;
+            saveButton.disabled = !CAN_CONFIGURE || vpdLocked;
         }
     };
 

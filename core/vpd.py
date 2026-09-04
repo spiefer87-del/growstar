@@ -7,6 +7,7 @@ verwendbar.
 
 from __future__ import annotations
 
+from copy import deepcopy
 import math
 
 from core.config import migrate_vpd_phase_config
@@ -323,6 +324,83 @@ def reset_vpd_control(runtime=None, *, reason="zurückgesetzt"):
         }
 
 
+def vpd_device_context(device, runtime=None):
+    """Liefert die verbindliche AUTO-Zuordnung für eine Geräteoberfläche.
+
+    Die Konfiguration ist für die Sperrentscheidung maßgeblich. Dadurch bleibt
+    ein ENV-Gerät auch während eines Sensor-Fallbacks gesperrt und kann nicht
+    unbemerkt verändert werden, kurz bevor AUTO die Übernahme fortsetzt.
+    """
+
+    rt = resolve_runtime(runtime)
+
+    # Lazy Import hält die reine VPD-Konfiguration frei von einem Modulzyklus
+    # über core.devices -> core.runtime -> core.config.
+    from core.devices import get_device_mode, validate_device_name
+
+    validate_device_name(device)
+    configured_mode = str(
+        rt.config.get("VPD_CONTROL_MODE", "OFF") or "OFF"
+    ).upper()
+    device_mode = get_device_mode(device, runtime=rt)
+    supported = device in VPD_MANAGED_DEVICES
+    automatic = configured_mode == "AUTO"
+    participating = bool(
+        supported
+        and automatic
+        and device_mode == "ENV"
+    )
+
+    with rt.state_lock:
+        public = deepcopy(rt.state.live_state.get(VPD_PUBLIC_KEY) or {})
+
+    public_mode = str(public.get("mode") or configured_mode).upper()
+    ready = bool(
+        public_mode == "AUTO"
+        and public.get("takeover")
+        and public.get("ready")
+    )
+    managed = bool(
+        participating
+        and ready
+        and device in (public.get("managed_devices") or [])
+    )
+    action = (public.get("actions") or {}).get(device)
+    if not isinstance(action, dict) or not participating:
+        action = None
+
+    if managed:
+        status = "controlled"
+    elif participating:
+        status = "waiting"
+    elif supported and automatic:
+        status = "available"
+    elif supported:
+        status = "inactive"
+    else:
+        status = "not_supported"
+
+    action_reason = action.get("reason") if isinstance(action, dict) else None
+    return {
+        "supported": supported,
+        "automatic": automatic,
+        "participating": participating,
+        "managed": managed,
+        # Ein AUTO/ENV-Gerät bleibt auch im sicheren Fallback gesperrt.
+        "locked": participating,
+        "status": status,
+        "mode": configured_mode,
+        "ready": ready,
+        "fallback": bool(public.get("fallback")) if participating else False,
+        "stage": public.get("stage") if participating else None,
+        "stage_label": public.get("stage_label") if participating else None,
+        "reason": action_reason or (
+            public.get("reason") if participating else None
+        ),
+        "action": deepcopy(action),
+    }
+
+
 __all__ = (
     "VPD_CONTROL_MODES",
     "VPD_ENGINE_KEY",
@@ -331,6 +409,7 @@ __all__ = (
     "VPD_PUBLIC_KEY",
     "calculate_vpd_schedule",
     "reset_vpd_control",
+    "vpd_device_context",
     "validate_vpd_config",
     "validate_vpd_environment_alignment",
 )

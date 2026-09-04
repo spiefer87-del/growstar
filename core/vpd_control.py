@@ -352,6 +352,7 @@ def _public_waiting_state(settings, profile, values, blockers, ramp):
         "stage_label": "Warte auf Sensoren",
         "direction": None,
         "reason": "; ".join(blockers),
+        "next_step_label": "Sensorbasis vervollständigen; danach plant AUTO neu",
         "vpd": values.get("vpd"),
         "profile": profile,
         "target": settings["target"],
@@ -367,6 +368,56 @@ def _public_waiting_state(settings, profile, values, blockers, ramp):
         "actions": {},
         "blockers": list(blockers),
     }
+
+
+def _next_step_label(
+    engine,
+    *,
+    settings,
+    availability,
+    outside_humidifying,
+):
+    """Beschreibt ausschließlich den im Zustandsautomaten möglichen Folgeschritt."""
+
+    direction = engine.get("direction")
+    stage = engine.get("stage") or "in_band"
+
+    if direction is None or stage == "in_band":
+        return "Zielband halten und Klima weiter beobachten"
+    if stage == "limited":
+        return "Auf eine Klimaänderung oder eine weitere ENV-Aktorstufe warten"
+
+    if direction == "raise":
+        if stage == "exhaust":
+            if (
+                availability["heating"]
+                and float(engine.get("temp_target") or settings["temp_min"])
+                < settings["temp_max"]
+            ):
+                return "Bei zu geringer Abluftwirkung die Temperatur leicht anheben"
+            if availability["dehumidifier"]:
+                return "Bei zu geringer Abluftwirkung den Entfeuchter zuschalten"
+            return "Abluftwirkung erneut bewerten und die sichere Stufe halten"
+        if stage == "heat":
+            if availability["dehumidifier"]:
+                return "Temperaturwirkung prüfen; bei Bedarf den Entfeuchter zuschalten"
+            return "Temperaturwirkung prüfen und den Sollwert gegebenenfalls nachführen"
+        if stage == "dehumidify":
+            return "Entfeuchterwirkung bis zum VPD-Zielband weiter prüfen"
+
+    if direction == "lower":
+        if stage in {"cool", "conserve"}:
+            if availability["humidifier"]:
+                return "Kühlwirkung prüfen; bei Bedarf den Luftbefeuchter zuschalten"
+            if availability["fan"] and outside_humidifying:
+                return "Kühlwirkung prüfen; bei Bedarf feuchtere Außenluft nutzen"
+            return "Temperaturwirkung erneut bewerten und die sichere Stufe halten"
+        if stage == "humidify" and availability["fan"] and outside_humidifying:
+            return "Befeuchterwirkung prüfen; bei Bedarf Außenluft ergänzen"
+        if stage in {"humidify", "humidify_outside", "outside_assist"}:
+            return "VPD-Senkung weiter prüfen und bis zum Zielband nachführen"
+
+    return "Wirkung der aktuellen Strategie prüfen und anschließend neu planen"
 
 
 def _advance_raise_stage(
@@ -857,6 +908,13 @@ def update_vpd_control(runtime=None, *, now=None):
         "limited": "Keine weitere Aktorstufe",
     }
 
+    next_step_label = _next_step_label(
+        engine,
+        settings=settings,
+        availability=availability,
+        outside_humidifying=outside_humidifying,
+    )
+
     takeover = settings["mode"] == "AUTO"
     public = {
         "mode": settings["mode"],
@@ -869,6 +927,7 @@ def update_vpd_control(runtime=None, *, now=None):
         "stage_label": stage_labels.get(stage, stage),
         "direction": engine.get("direction"),
         "reason": engine.get("last_transition_note") or stage_labels.get(stage, stage),
+        "next_step_label": next_step_label,
         "vpd": round(vpd, 3),
         "target": round(target, 3),
         "tolerance": settings["tolerance"],

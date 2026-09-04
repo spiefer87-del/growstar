@@ -31,6 +31,7 @@ from core.runtime import get_runtime, list_runtimes
 from core.safety import get_runtime_safety_snapshot
 from core.tent_config import ensure_tent_config
 from core.tents import manager as tent_manager, validate_tent_id
+from core.vpd import vpd_device_context
 from services.live_control import LiveTransitionError, request_live, request_shadow
 from services.spiderfarmer import device as spiderfarmer_device
 from core.sensor_sources import get_sensor_source
@@ -297,6 +298,7 @@ def _state_snapshot(runtime):
             "safety_block_on": bool(safety_override.get("block_on")),
             "safety_reason": safety_override.get("reason"),
             "controller_readback": _controller_readback(runtime, device),
+            "vpd_control": vpd_device_context(device, runtime=runtime),
         }
 
     return {
