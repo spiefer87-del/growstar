@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Klima & Grenzwerte – {{ tent_name }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root{
+    --bg:#0f172a;--card:#1e293b;--card2:#111827;--text:#e5e7eb;
+    --muted:#94a3b8;--green:#22c55e;--blue:#38bdf8;--amber:#f59e0b;
+    --red:#f87171;--border:rgba(148,163,184,.18)
+}
+*{box-sizing:border-box}
+body{margin:0;padding:18px;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
+.wrap{max-width:760px;margin:auto}
+.nav{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
+.nav a{color:var(--muted);text-decoration:none;font-size:.86rem}
+h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
+.subtitle{text-align:center;color:var(--muted);font-size:.8rem;margin-bottom:20px}
+.grid{display:grid;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
+
+.card.feature-unavailable{
+    opacity:.52;
+    filter:grayscale(.28) saturate(.45);
+    border-color:rgba(148,163,184,.12);
+}
+.card.feature-unavailable .info,
+.card.feature-unavailable .preview{
+    opacity:.82;
+}
+.card.feature-unavailable input,
+.card.feature-unavailable button{
+    cursor:not-allowed !important;
+}
+.card.feature-unavailable input:disabled,
+.card.feature-unavailable button:disabled{
+    opacity:.55;
+}
+
+.card h2{margin:0 0 12px;text-align:center;font-size:1rem;color:#cbd5e1;text-transform:uppercase;letter-spacing:.04em}
+.row-inline{display:flex;gap:12px;justify-content:center;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px}
+.field{display:flex;flex-direction:column;align-items:center;min-width:118px}
+.field label{font-size:.74rem;color:var(--muted);margin-bottom:5px;text-align:center}
+.compact-input{width:96px;height:36px;padding:4px 7px;font-size:.92rem;text-align:center;border-radius:9px;border:1px solid var(--border);background:#0f172a;color:var(--text)}
+.compact-input:out-of-range{outline:2px solid var(--red)}
+.num-control{display:flex;align-items:center;gap:5px}
+.num-control button{display:inline-flex;width:28px;height:28px;border-radius:50%;border:0;background:#334155;color:var(--text);font-size:1rem;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
+button{padding:8px 15px;border-radius:999px;border:0;background:#334155;color:var(--text);font-weight:650;cursor:pointer}
+button:hover{background:#475569}
+.profile-link{display:inline-block;padding:9px 16px;border-radius:999px;background:var(--blue);color:#082f49;text-decoration:none;font-weight:750}
+.active-profile{font-size:1.15rem;font-weight:800;text-align:center;color:#86efac;margin:4px 0 12px}
+.hint{color:var(--muted);font-size:.76rem;line-height:1.5;text-align:center}
+.info{margin:10px 0 14px;padding:11px 12px;border-radius:11px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);color:#bae6fd;font-size:.76rem;line-height:1.5}
+.warning{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.26);color:#fde68a}
+.levels{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0 15px}
+.level{padding:10px;border-radius:11px;background:var(--card2);border:1px solid var(--border)}
+.level strong{display:block;font-size:.77rem;margin-bottom:4px}
+.level span{color:var(--muted);font-size:.7rem;line-height:1.4}
+.preview{margin-top:9px;padding:11px;border-radius:11px;background:#0f172a;border:1px solid var(--border);font-size:.76rem;line-height:1.55}
+.preview strong{color:#fcd34d}
+.feedback{min-height:20px;margin:10px 0 0;text-align:center;font-size:.76rem;color:var(--muted)}
+.feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}
+.feedback.dirty{color:#fde68a}
+.settings-actions{position:sticky;bottom:10px;z-index:5;margin-top:16px;text-align:center;border-color:rgba(34,197,94,.3)}
+.action-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.save-button{background:var(--green);color:#052e16;min-width:170px}
+.discard-button{background:#334155}
+button:disabled{opacity:.48;cursor:not-allowed}
+.divider{height:1px;background:var(--border);margin:14px 0}
+.lighting-duration{
+    margin:4px auto 0;
+    padding:10px 12px;
+    max-width:360px;
+    text-align:center;
+    border-radius:11px;
+    background:rgba(250,204,21,.07);
+    border:1px solid rgba(250,204,21,.22);
+    color:#fde68a;
+    font-size:.8rem;
+    line-height:1.45;
+}
+.lighting-duration strong{color:#facc15}
+.mode-select{min-width:210px;height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--border);background:#0f172a;color:var(--text);font-weight:700;text-align:center}
+.classic-control-fields{
+    margin:0 -7px 12px;
+    padding:7px 7px 1px;
+    border:1px solid transparent;
+    border-radius:13px;
+    transition:opacity .18s ease,filter .18s ease,background .18s ease,border-color .18s ease;
+}
+.classic-control-fields.vpd-locked{
+    opacity:.42;
+    filter:grayscale(.7) saturate(.4);
+    background:rgba(15,23,42,.42);
+    border-color:rgba(148,163,184,.16);
+}
+.classic-control-fields.vpd-locked input,
+.classic-control-fields.vpd-locked button{cursor:not-allowed !important}
+.vpd-lock-note[hidden]{display:none}
+.vpd-lock-note{
+    margin:0 0 12px;
+    background:rgba(167,139,250,.09);
+    border-color:rgba(167,139,250,.28);
+    color:#ddd6fe;
+}
+.vpd-ramp-settings{
+    margin:0;
+    padding:16px 14px 8px;
+    border-radius:14px;
+    background:linear-gradient(145deg,rgba(14,116,144,.13),rgba(15,23,42,.82));
+    border:1px solid rgba(56,189,248,.28);
+}
+.vpd-ramp-settings h3{
+    margin:0 0 8px;
+    text-align:center;
+    color:#bae6fd;
+    font-size:.88rem;
+}
+.vpd-ramp-settings .info{margin:8px 0 12px}
+.vpd-phase-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
+.vpd-phase{padding:13px 9px 5px;border-radius:13px;background:linear-gradient(145deg,rgba(15,23,42,.88),rgba(30,41,59,.72));border:1px solid var(--border)}
+.vpd-phase.day{border-color:rgba(250,204,21,.25)}
+.vpd-phase.night{border-color:rgba(129,140,248,.28)}
+.vpd-phase h3{margin:0 0 11px;text-align:center;font-size:.82rem;letter-spacing:.04em;color:#e2e8f0}
+.vpd-sequence{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.vpd-step{padding:10px;border-radius:11px;background:#0f172a;border:1px solid rgba(56,189,248,.17);text-align:center}.vpd-step strong{display:block;color:#bae6fd;font-size:.78rem}.vpd-step span{display:block;color:var(--muted);font-size:.68rem;line-height:1.4;margin-top:4px}
+.settings-mode-card{
+    border-color:rgba(56,189,248,.28);
+    background:
+        radial-gradient(circle at 100% 0,rgba(56,189,248,.11),transparent 48%),
+        var(--card);
+}
+.settings-mode-tabs{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    padding:6px;
+    border:1px solid var(--border);
+    border-radius:14px;
+    background:rgba(15,23,42,.72);
+}
+.settings-mode-tab{
+    min-height:45px;
+    border:1px solid transparent;
+    border-radius:10px;
+    background:transparent;
+    color:var(--muted);
+    font-size:.82rem;
+}
+.settings-mode-tab:hover{background:rgba(71,85,105,.45)}
+.settings-mode-tab.active{
+    border-color:rgba(56,189,248,.32);
+    background:linear-gradient(145deg,rgba(14,165,233,.22),rgba(30,41,59,.76));
+    color:#e0f2fe;
+    box-shadow:0 5px 18px rgba(2,132,199,.12);
+}
+.settings-mode-status{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    margin-top:10px;
+}
+.settings-mode-state{
+    padding:8px 10px;
+    border-radius:10px;
+    background:rgba(15,23,42,.58);
+    color:var(--muted);
+    font-size:.7rem;
+    line-height:1.4;
+    text-align:center;
+}
+.settings-mode-state strong{display:block;color:#e2e8f0;font-size:.74rem}
+.settings-mode-actions{display:flex;justify-content:center;margin-top:12px}
+.settings-vpd-log-link{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:34px;
+    padding:7px 13px;
+    border:1px solid rgba(56,189,248,.32);
+    border-radius:999px;
+    background:rgba(14,165,233,.12);
+    color:#bae6fd;
+    font-size:.74rem;
+    font-weight:750;
+    text-decoration:none;
+}
+.settings-vpd-log-link[hidden],
+[data-settings-panel][hidden]{display:none!important}
+.settings-view-hint{margin-top:10px;color:var(--muted);font-size:.7rem;line-height:1.45;text-align:center}
+@media(max-width:620px){
+    body{padding:13px}
+    .levels{grid-template-columns:1fr}
+    .vpd-sequence{grid-template-columns:1fr}
+    .vpd-phase-grid{grid-template-columns:1fr}
+    .field{min-width:105px}
+    .compact-input{width:86px}
+}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+    <div class="nav">
+        <a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← {{ tent_name }}</a>
+        <a href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}">🌱 Profile verwalten</a>
+        <a href="{{ url_for('grow_control_sensors_dashboard') }}">🧪 Sensoren</a>
+        <a href="{{ url_for('grow_control_setup') }}">⚙️ Setup</a>
+    </div>
+
+    <h1>⚙️ {{ tent_name }} · Klima & Grenzwerte</h1>
+    <div class="subtitle">Änderungen werden erst nach „Einstellungen speichern“ übernommen</div>
+
+    <div class="grid">
+
+        <div class="card">
+            <h2>🌱 Aktives Profil</h2>
+            <div id="active-profile-name" class="active-profile">--</div>
+            <div class="row-inline">
+                <a class="profile-link" href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}">
+                    Profile bearbeiten oder wechseln
+                </a>
+            </div>
+            <div class="hint">
+                Profilvorlagen werden auf einer eigenen Seite vorbereitet. Ein Wechsel erfolgt dort erst nach ausdrücklicher Bestätigung.
+            </div>
+        </div>
+
+        <div class="card settings-mode-card">
+            <h2>🎛️ Regelbereich</h2>
+            <div class="settings-mode-tabs" role="tablist" aria-label="Klima-Regelbereich auswählen">
+                <button
+                    id="settings-tab-classic"
+                    type="button"
+                    class="settings-mode-tab active"
+                    data-settings-tab="classic"
+                    role="tab"
+                    aria-selected="true"
+                    aria-controls="classic-temperature-controls"
+                >🌡️ Klassische Regelung</button>
+                <button
+                    id="settings-tab-vpd"
+                    type="button"
+                    class="settings-mode-tab"
+                    data-settings-tab="vpd"
+                    role="tab"
+                    aria-selected="false"
+                    aria-controls="vpd-control-card"
+                >🧠 Intelligente VPD-Regelung</button>
+            </div>
+            <div class="settings-mode-status">
+                <div class="settings-mode-state">
+                    <strong>Klassisch</strong>
+                    <span id="classic-mode-state">wird geladen</span>
+                </div>
+                <div class="settings-mode-state">
+                    <strong>VPD intelligent</strong>
+                    <span id="vpd-mode-state">wird geladen</span>
+                </div>
+            </div>
+            <div class="settings-mode-actions">
+                <a
+                    id="settings-vpd-log-link"
+                    class="settings-vpd-log-link"
+                    href="{{ url_for('grow_control_tent_vpd_control', tent_id=tent_id) }}"
+                    hidden
+                >🧠 Live-Regellog öffnen</a>
+            </div>
+            <div class="settings-view-hint">
+                Die Auswahl wechselt nur die Ansicht. Die Betriebsart wird erst mit
+                „Einstellungen speichern“ übernommen.
+            </div>
+        </div>
+
+        <div class="levels" data-settings-panel="classic">
+            <div class="level">
+                <strong>1 · Sollwert</strong>
+                <span>Gewünschte Temperatur bzw. Luftfeuchte für Tag/Nacht.</span>
+            </div>
+            <div class="level">
+                <strong>2 · Regel-Toleranz</strong>
+                <span>Steuert die normale Aktorregelung. Beispiel: 20 °C ±2 °C.</span>
+            </div>
+            <div class="level">
+                <strong>3 · Alarm-Toleranz</strong>
+                <span>Benachrichtigung erst bei deutlich größerer Abweichung, z. B. ±5 °C.</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>⏰ Zeiten</h2>
+            <div class="row-inline">
+                <div class="field">
+                    <label>Tag Start</label>
+                    <input type="time" id="DAY_START_TIME" class="compact-input">
+                </div>
+                <div class="field">
+                    <label>Nacht Start</label>
+                    <input type="time" id="NIGHT_START_TIME" class="compact-input">
+                </div>
+            </div>
+            <div id="lighting-duration" class="lighting-duration">
+                💡 Beleuchtungsdauer: <strong>--</strong>
+            </div>
+        </div>
+
+        <section id="vpd-ramp-settings" class="card vpd-ramp-settings" aria-labelledby="vpd-ramp-heading">
+            <h3 id="vpd-ramp-heading">⏱️ Eigene VPD-Rampe</h3>
+            <div class="info">
+                Diese Rampe ist vollständig von Helligkeitssensor und Sonnenverlauf
+                unabhängig. Morgens startet sie bei <strong>Tag Start</strong>, abends
+                endet sie bei <strong>Nacht Start</strong>. Die Lichtfunktion besitzt
+                weiterhin ihren eigenen Schalter und eigene Dimmzeiten.
+            </div>
+            <div class="row-inline">
+                <div class="field">
+                    <label id="ramp-enabled-label" for="RAMP_ENABLED">VPD-Rampe aktiv</label>
+                    <input type="checkbox" id="RAMP_ENABLED">
+                </div>
+                <div class="field">
+                    <label for="RAMP_DURATION_MIN">Rampenzeit (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('RAMP_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="5" id="RAMP_DURATION_MIN" class="compact-input">
+                        <button type="button" onclick="step('RAMP_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="vpd-ramp-preview" class="preview"></div>
+        </section>
+
+        <div class="card" data-settings-panel="classic">
+            <h2>🌡️ Temperatur</h2>
+
+            <div class="info">
+                <strong>Regel-Toleranz</strong> steuert weiterhin die Heizung/Lüftung.
+                <strong>Alarm ±</strong> beeinflusst nur Alarm & Benachrichtigungen.
+            </div>
+
+            <div id="temperature-vpd-lock-note" class="info vpd-lock-note" hidden>
+                <strong>🔒 VPD-Automatik aktiv:</strong> Die klassischen Tag-/Nacht-Sollwerte
+                und Regel-Toleranzen sind gesperrt. Alarm- und Schutzgrenzen bleiben einstellbar.
+            </div>
+
+            <div id="classic-temperature-controls" class="classic-control-fields" data-classic-control>
+            <div class="row-inline">
+                <div class="field">
+                    <label>Tag Soll °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_TEMP',-0.1)">−</button>
+                        <input type="number" step="0.1" id="DAY_TEMP" class="compact-input">
+                        <button type="button" onclick="step('DAY_TEMP',0.1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Tag Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_TEMP_TOL',-0.1)">−</button>
+                        <input type="number" step="0.1" id="DAY_TEMP_TOL" class="compact-input">
+                        <button type="button" onclick="step('DAY_TEMP_TOL',0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Nacht Soll °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_TEMP',-0.1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_TEMP" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_TEMP',0.1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Nacht Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_TEMP_TOL',-0.1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_TEMP_TOL" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_TEMP_TOL',0.1)">+</button>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Alarm ± °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('TEMP_ALERT_TOL',-0.5)">−</button>
+                        <input type="number" step="any" id="TEMP_ALERT_TOL" class="compact-input">
+                        <button type="button" onclick="step('TEMP_ALERT_TOL',0.5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MIN_TEMP °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MIN_TEMP',-0.5)">−</button>
+                        <input type="number" step="any" id="MIN_TEMP" class="compact-input">
+                        <button type="button" onclick="step('MIN_TEMP',0.5)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MAX_TEMP °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MAX_TEMP',-0.5)">−</button>
+                        <input type="number" step="any" id="MAX_TEMP" class="compact-input">
+                        <button type="button" onclick="step('MAX_TEMP',0.5)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info warning">
+                MIN_TEMP/MAX_TEMP sind bestehende Temperatur-Schutzgrenzen und
+                beeinflussen auch den Heiz-/Lüfter-Schutz. Die Alarm-Toleranz
+                schaltet dagegen keine Hardware.
+            </div>
+            <div id="temp-preview" class="preview"></div>
+        </div>
+
+        <div class="card" data-settings-panel="classic">
+            <h2>💧 Luftfeuchtigkeit</h2>
+
+            <div id="humidity-vpd-lock-note" class="info vpd-lock-note" hidden>
+                <strong>🔒 VPD-Automatik aktiv:</strong> Die klassischen Tag-/Nacht-Sollwerte
+                und Regel-Toleranzen sind gesperrt. Alarm- und Schutzgrenzen bleiben einstellbar.
+            </div>
+
+            <div id="classic-humidity-controls" class="classic-control-fields" data-classic-control>
+            <div class="row-inline">
+                <div class="field">
+                    <label>Tag Soll %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_HUM',-1)">−</button>
+                        <input type="number" step="0.1" id="DAY_HUM" class="compact-input">
+                        <button type="button" onclick="step('DAY_HUM',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Tag Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('DAY_HUM_TOL',-1)">−</button>
+                        <input type="number" step="0.1" id="DAY_HUM_TOL" class="compact-input">
+                        <button type="button" onclick="step('DAY_HUM_TOL',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Nacht Soll %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_HUM',-1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_HUM" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_HUM',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Nacht Regel ±</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('NIGHT_HUM_TOL',-1)">−</button>
+                        <input type="number" step="0.1" id="NIGHT_HUM_TOL" class="compact-input">
+                        <button type="button" onclick="step('NIGHT_HUM_TOL',1)">+</button>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Alarm ± %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('HUM_ALERT_TOL',-1)">−</button>
+                        <input type="number" step="any" id="HUM_ALERT_TOL" class="compact-input">
+                        <button type="button" onclick="step('HUM_ALERT_TOL',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MIN_HUM %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MIN_HUM',-1)">−</button>
+                        <input type="number" step="any" id="MIN_HUM" class="compact-input">
+                        <button type="button" onclick="step('MIN_HUM',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>MAX_HUM %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('MAX_HUM',-1)">−</button>
+                        <input type="number" step="any" id="MAX_HUM" class="compact-input">
+                        <button type="button" onclick="step('MAX_HUM',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info">
+                MIN_HUM/MAX_HUM sind absolute Alarmgrenzen. Die normale
+                Feuchteregelung arbeitet weiterhin mit Sollwert ± Regel-Toleranz.
+            </div>
+            <div id="hum-preview" class="preview"></div>
+        </div>
+
+        <div class="card" id="vpd-control-card" data-settings-panel="vpd" hidden>
+            <h2>🧠 Intelligente VPD-Steuerung</h2>
+
+            <div class="info">
+                <strong>Beobachten</strong> berechnet Stufen und Wirkung, greift aber nicht ein.
+                <strong>Automatisch</strong> übernimmt nur Aktoren, die ausdrücklich im Modus
+                <strong>Umgebung</strong> stehen. OFF/ON/Zeit/Intervall bleiben immer autoritativ.
+            </div>
+
+            <div class="info">
+                <strong>Temperatur min/max</strong> sind die verbindlichen Grenzen des
+                Heiz- und Kühlwegs. <strong>Feuchte min/max</strong> bilden das bevorzugte
+                Arbeitsfenster für Abluft, Be- und Entfeuchtung. Bei zu niedrigem VPD darf
+                Growstar nach ausgeschöpfter Abluft trotzdem bis zur Temperatur-Obergrenze
+                heizen; beendet wird der Heizweg sofort am VPD-Zielband.
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label for="VPD_CONTROL_MODE">Betriebsart</label>
+                    <select id="VPD_CONTROL_MODE" class="mode-select">
+                        <option value="OFF">Aus · klassische Regelung</option>
+                        <option value="MONITOR">Beobachten · keine Eingriffe</option>
+                        <option value="AUTO">Automatisch · ENV-Aktoren</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="vpd-phase-grid">
+                <section class="vpd-phase day" aria-labelledby="vpd-day-heading">
+                    <h3 id="vpd-day-heading">☀️ Tag</h3>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label>VPD-Ziel kPa</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TARGET_DAY',-0.05)">−</button>
+                                <input type="number" step="any" id="VPD_TARGET_DAY" class="compact-input">
+                                <button type="button" onclick="step('VPD_TARGET_DAY',0.05)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>VPD-Toleranz ±</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TOLERANCE_DAY',-0.01)">−</button>
+                                <input type="number" step="any" id="VPD_TOLERANCE_DAY" class="compact-input">
+                                <button type="button" onclick="step('VPD_TOLERANCE_DAY',0.01)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label>Temperatur min °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TEMP_MIN_DAY',-0.5)">−</button>
+                                <input type="number" step="any" id="VPD_TEMP_MIN_DAY" class="compact-input">
+                                <button type="button" onclick="step('VPD_TEMP_MIN_DAY',0.5)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Temperatur max °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TEMP_MAX_DAY',-0.5)">−</button>
+                                <input type="number" step="any" id="VPD_TEMP_MAX_DAY" class="compact-input">
+                                <button type="button" onclick="step('VPD_TEMP_MAX_DAY',0.5)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label>Feuchte min %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_HUM_MIN_DAY',-1)">−</button>
+                                <input type="number" step="any" id="VPD_HUM_MIN_DAY" class="compact-input">
+                                <button type="button" onclick="step('VPD_HUM_MIN_DAY',1)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Feuchte max %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_HUM_MAX_DAY',-1)">−</button>
+                                <input type="number" step="any" id="VPD_HUM_MAX_DAY" class="compact-input">
+                                <button type="button" onclick="step('VPD_HUM_MAX_DAY',1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="vpd-phase night" aria-labelledby="vpd-night-heading">
+                    <h3 id="vpd-night-heading">🌙 Nacht</h3>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label>VPD-Ziel kPa</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TARGET_NIGHT',-0.05)">−</button>
+                                <input type="number" step="any" id="VPD_TARGET_NIGHT" class="compact-input">
+                                <button type="button" onclick="step('VPD_TARGET_NIGHT',0.05)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>VPD-Toleranz ±</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TOLERANCE_NIGHT',-0.01)">−</button>
+                                <input type="number" step="any" id="VPD_TOLERANCE_NIGHT" class="compact-input">
+                                <button type="button" onclick="step('VPD_TOLERANCE_NIGHT',0.01)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label>Temperatur min °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TEMP_MIN_NIGHT',-0.5)">−</button>
+                                <input type="number" step="any" id="VPD_TEMP_MIN_NIGHT" class="compact-input">
+                                <button type="button" onclick="step('VPD_TEMP_MIN_NIGHT',0.5)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Temperatur max °C</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_TEMP_MAX_NIGHT',-0.5)">−</button>
+                                <input type="number" step="any" id="VPD_TEMP_MAX_NIGHT" class="compact-input">
+                                <button type="button" onclick="step('VPD_TEMP_MAX_NIGHT',0.5)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label>Feuchte min %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_HUM_MIN_NIGHT',-1)">−</button>
+                                <input type="number" step="any" id="VPD_HUM_MIN_NIGHT" class="compact-input">
+                                <button type="button" onclick="step('VPD_HUM_MIN_NIGHT',1)">+</button>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label>Feuchte max %</label>
+                            <div class="num-control">
+                                <button type="button" onclick="step('VPD_HUM_MAX_NIGHT',-1)">−</button>
+                                <input type="number" step="any" id="VPD_HUM_MAX_NIGHT" class="compact-input">
+                                <button type="button" onclick="step('VPD_HUM_MAX_NIGHT',1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Stabilprüfung max. (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('VPD_EFFECT_WINDOW_MIN',-1)">−</button>
+                        <input type="number" step="1" id="VPD_EFFECT_WINDOW_MIN" class="compact-input">
+                        <button type="button" onclick="step('VPD_EFFECT_WINDOW_MIN',1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Min. Wirkung kPa</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('VPD_MIN_EFFECT_KPA',-0.01)">−</button>
+                        <input type="number" step="0.005" id="VPD_MIN_EFFECT_KPA" class="compact-input">
+                        <button type="button" onclick="step('VPD_MIN_EFFECT_KPA',0.01)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Temperatur-Schritt °C</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('VPD_TEMP_STEP',-0.1)">−</button>
+                        <input type="number" step="0.1" id="VPD_TEMP_STEP" class="compact-input">
+                        <button type="button" onclick="step('VPD_TEMP_STEP',0.1)">+</button>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Abluft-Schritt Prozentpunkte</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('VPD_FAN_STEP',-1)">−</button>
+                        <input type="number" step="1" id="VPD_FAN_STEP" class="compact-input">
+                        <button type="button" onclick="step('VPD_FAN_STEP',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info">
+                <strong>Adaptive Wirkungsprüfung:</strong> Neue Regelstufen und
+                deutliche Abweichungen werden nach 60 Sekunden bewertet. In der
+                Beruhigungsphase gelten 120 Sekunden. Nach zehn stabilen Minuten
+                steigt das Fenster bis zum hier eingestellten Maximum. Das
+                VPD-Zielband und alle Sicherheitsgrenzen werden unabhängig davon
+                fortlaufend geprüft.
+            </div>
+
+            <div class="vpd-sequence">
+                <div class="vpd-step"><strong>1 · VPD-Ziel rampen</strong><span>Tag-/Nachtziel sowie die erlaubten Klima-Fenster wechseln gleitend.</span></div>
+                <div class="vpd-step"><strong>2 · Zu hoher VPD</strong><span>Temperatur innerhalb Min/Max zuerst absenken; geeignete kühlere Außenluft darf unterstützen.</span></div>
+                <div class="vpd-step"><strong>3 · Zu niedriger VPD</strong><span>Trockene Außenluft stufenweise bis zur sicheren Controllergrenze nutzen, danach Temperatur bis zum erlaubten Phasenmaximum anheben.</span></div>
+                <div class="vpd-step"><strong>4 · Be-/Entfeuchter</strong><span>Erst wenn Abluft- und Temperaturweg vollständig geprüft oder technisch ohne Reaktion sind.</span></div>
+            </div>
+
+            <div id="vpd-sensor-note" class="info warning"></div>
+            <div id="vpd-preview" class="preview"></div>
+        </div>
+
+        <div class="card" id="light-sun-card" data-settings-panel="classic">
+            <h2>☀️ Sonnenaufgang & Sonnenuntergang</h2>
+
+            <div class="info">
+                Funktion für <strong>Beleuchtung im Modus Umgebung</strong>.
+                Der bereits eingestellte ENV-Lichtlevel bleibt die maximale Tagesleistung.
+                Power / AUS bleibt weiterhin beim Shelly.
+            </div>
+
+            <div class="row-inline">
+                <div class="field">
+                    <label>Aktiv</label>
+                    <input type="checkbox" id="LIGHT_SUN_ENABLED">
+                </div>
+
+                <div class="field">
+                    <label>Sonnenaufgang (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('LIGHT_SUNRISE_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="5" id="LIGHT_SUNRISE_DURATION_MIN" class="compact-input">
+                        <button type="button" onclick="step('LIGHT_SUNRISE_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Sonnenuntergang (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('LIGHT_SUNSET_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="5" id="LIGHT_SUNSET_DURATION_MIN" class="compact-input">
+                        <button type="button" onclick="step('LIGHT_SUNSET_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label>Start-/Endleistung %</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('LIGHT_SUN_MIN_LEVEL',-1)">−</button>
+                        <input type="number" step="1" id="LIGHT_SUN_MIN_LEVEL" class="compact-input">
+                        <button type="button" onclick="step('LIGHT_SUN_MIN_LEVEL',1)">+</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="light-sun-preview" class="preview"></div>
+
+            <div id="light-sun-controller-note" class="info warning" style="display:none;"></div>
+
+            <div class="info warning">
+                Tag Start = Beginn Sonnenaufgang. Nacht Start = Ende Sonnenuntergang / Licht AUS.
+                Bei deaktivierter Funktion arbeitet das Licht exakt wie bisher.
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card settings-actions">
+        <div class="action-row">
+            <button id="save-settings-button" type="button" class="save-button" onclick="save()" disabled>
+                Einstellungen speichern
+            </button>
+            <button id="discard-settings-button" type="button" class="discard-button" onclick="discardChanges()" disabled>
+                Änderungen verwerfen
+            </button>
+        </div>
+        <div id="save-feedback" class="feedback"></div>
+        <div class="hint">
+            Plus/Minus, Eingaben und Schalter verändern bis zum Speichern ausschließlich diesen Entwurf.
+        </div>
+    </div>
+</div>
+
+<script>
+const TENT_ID = {{ tent_id|tojson }};
+const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
+
+let lightSunAvailable = false;
+let lightSunUnavailableReason = "";
+let settingsDirty = false;
+let saveInFlight = false;
+let loadInFlight = false;
+let configLoaded = false;
+let settingsSection = "classic";
+let settingsSectionChosen = false;
+
+const PROFILE_LABELS = {
+    veg: "Vegetation",
+    bloom: "Blüte",
+    dry: "Trocknung"
+};
+
+const ids = [
+    "DAY_TEMP","DAY_TEMP_TOL","NIGHT_TEMP","NIGHT_TEMP_TOL",
+    "DAY_HUM","DAY_HUM_TOL","NIGHT_HUM","NIGHT_HUM_TOL",
+    "TEMP_ALERT_TOL","HUM_ALERT_TOL",
+    "MIN_TEMP","MAX_TEMP","MIN_HUM","MAX_HUM",
+    "RAMP_DURATION_MIN",
+    "LIGHT_SUNRISE_DURATION_MIN","LIGHT_SUNSET_DURATION_MIN",
+    "LIGHT_SUN_MIN_LEVEL",
+    "VPD_TARGET_DAY","VPD_TOLERANCE_DAY",
+    "VPD_TEMP_MIN_DAY","VPD_TEMP_MAX_DAY","VPD_HUM_MIN_DAY","VPD_HUM_MAX_DAY",
+    "VPD_TARGET_NIGHT","VPD_TOLERANCE_NIGHT",
+    "VPD_TEMP_MIN_NIGHT","VPD_TEMP_MAX_NIGHT","VPD_HUM_MIN_NIGHT","VPD_HUM_MAX_NIGHT",
+    "VPD_EFFECT_WINDOW_MIN","VPD_MIN_EFFECT_KPA","VPD_TEMP_STEP","VPD_FAN_STEP"
+];
+
+const CLASSIC_CONTROL_BLOCK_IDS = [
+    "classic-temperature-controls",
+    "classic-humidity-controls"
+];
+const CLASSIC_LOCK_NOTE_IDS = [
+    "temperature-vpd-lock-note",
+    "humidity-vpd-lock-note"
+];
+
+let loadedConfig = {};
+
+function el(id){ return document.getElementById(id); }
+function num(id){ return Number(el(id)?.value); }
+
+function feedback(text, cls=""){
+    const box = el("save-feedback");
+    box.className = `feedback ${cls}`;
+    box.textContent = text || "";
+}
+
+function syncSaveActions(){
+    const busy = saveInFlight || loadInFlight;
+    el("save-settings-button").disabled = busy || !configLoaded || !settingsDirty;
+    el("discard-settings-button").disabled = busy || !configLoaded || !settingsDirty;
+}
+
+function setDirty(value=true){
+    settingsDirty = !!value;
+    syncSaveActions();
+
+    if(settingsDirty){
+        feedback("Ungespeicherte Änderungen.","dirty");
+    }
+}
+
+function selectSettingsSection(section,{remember=true}={}){
+    if(!["classic","vpd"].includes(section)) return;
+    settingsSection = section;
+    if(remember) settingsSectionChosen = true;
+
+    document.querySelectorAll("[data-settings-panel]").forEach(panel=>{
+        panel.hidden = panel.dataset.settingsPanel !== section;
+    });
+    document.querySelectorAll("[data-settings-tab]").forEach(button=>{
+        const selected = button.dataset.settingsTab === section;
+        button.classList.toggle("active",selected);
+        button.setAttribute("aria-selected",selected ? "true" : "false");
+        button.tabIndex = selected ? 0 : -1;
+    });
+}
+
+function updateSettingsModeSummary(){
+    const mode = String(el("VPD_CONTROL_MODE")?.value || "OFF").toUpperCase();
+    const savedMode = String(loadedConfig.VPD_CONTROL_MODE || "OFF").toUpperCase();
+    const draftSuffix = mode !== savedMode ? " · Entwurf" : "";
+    const classicState = el("classic-mode-state");
+    const vpdState = el("vpd-mode-state");
+    const logLink = el("settings-vpd-log-link");
+
+    if(classicState){
+        classicState.textContent = (mode === "AUTO"
+            ? "Fallback · Sollwerte gesperrt"
+            : "regelt weiterhin") + draftSuffix;
+    }
+    if(vpdState){
+        const modeLabel = mode === "AUTO"
+            ? (mode === savedMode ? "Automatisch aktiv" : "Automatik vorgesehen")
+            : mode === "MONITOR"
+                ? (mode === savedMode ? "Beobachten aktiv" : "Beobachten vorgesehen")
+                : (mode === savedMode ? "Aus" : "Ausschalten vorgesehen");
+        vpdState.textContent = modeLabel + draftSuffix;
+    }
+    if(logLink) logLink.hidden = savedMode === "OFF";
+}
+
+function syncFormControls(){
+    const busy = saveInFlight || loadInFlight;
+    const vpdAutomatic = el("VPD_CONTROL_MODE")?.value === "AUTO";
+
+    document.querySelectorAll("input,select,.num-control button").forEach(control=>{
+        if(
+            !lightSunAvailable &&
+            (
+                control.id?.startsWith("LIGHT_SUN") ||
+                control.closest?.("#light-sun-card")
+            )
+        ){
+            control.disabled = true;
+        }else if(
+            vpdAutomatic &&
+            control.closest?.("[data-classic-control]")
+        ){
+            control.disabled = true;
+        }else{
+            control.disabled = busy || !configLoaded;
+        }
+    });
+    syncSaveActions();
+}
+
+function updateVpdModeUi(){
+    const mode = el("VPD_CONTROL_MODE")?.value || "OFF";
+    const automatic = mode === "AUTO";
+
+    CLASSIC_CONTROL_BLOCK_IDS.forEach(id=>{
+        const block = el(id);
+        if(!block) return;
+        block.classList.toggle("vpd-locked",automatic);
+        block.setAttribute("aria-disabled",automatic ? "true" : "false");
+    });
+
+    CLASSIC_LOCK_NOTE_IDS.forEach(id=>{
+        const note = el(id);
+        if(note) note.hidden = !automatic;
+    });
+
+    const rampLabel = el("ramp-enabled-label");
+    if(rampLabel){
+        rampLabel.textContent = mode === "OFF"
+            ? "Temperatur-Rampe aktiv"
+            : mode === "MONITOR"
+                ? "VPD-Rampe beobachten"
+                : "VPD-Rampe aktiv";
+    }
+
+    const rampHeading = el("vpd-ramp-heading");
+    if(rampHeading){
+        rampHeading.textContent = mode === "OFF"
+            ? "⏱️ Klassische Temperatur-Rampe"
+            : mode === "MONITOR"
+                ? "⏱️ VPD-Rampe beobachten"
+                : "⏱️ Eigene VPD-Rampe";
+    }
+
+    updateSettingsModeSummary();
+    syncFormControls();
+}
+
+function setSaveInFlight(value){
+    saveInFlight = !!value;
+    syncFormControls();
+}
+
+function setLoadInFlight(value){
+    loadInFlight = !!value;
+    syncFormControls();
+}
+
+function profileLabel(name){
+    return PROFILE_LABELS[name] || String(name || "Kein Profil aktiv");
+}
+
+function renderActiveProfile(name){
+    el("active-profile-name").textContent = profileLabel(name);
+}
+
+function minToTime(m){
+    const h = String(Math.floor(Number(m)/60)).padStart(2,"0");
+    const min = String(Number(m)%60).padStart(2,"0");
+    return `${h}:${min}`;
+}
+function timeToMin(t){
+    const [h,m] = String(t).split(":").map(Number);
+    return h*60+m;
+}
+
+function shiftClock(value,deltaMinutes){
+    if(!value) return "--:--";
+    const minute = timeToMin(value);
+    if(!Number.isFinite(minute)) return "--:--";
+    return minToTime((minute + Number(deltaMinutes) + 1440) % 1440);
+}
+
+function formatLightingDuration(totalMinutes){
+    const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
+    const hours = Math.floor(minutes / 60);
+    const rest = minutes % 60;
+
+    if(rest === 0){
+        return `${hours} ${hours === 1 ? "Stunde" : "Stunden"}`;
+    }
+
+    return `${hours} Std. ${rest} Min.`;
+}
+
+function updateLightingDuration(){
+    const dayValue = el("DAY_START_TIME")?.value;
+    const nightValue = el("NIGHT_START_TIME")?.value;
+    const target = el("lighting-duration");
+
+    if(!target || !dayValue || !nightValue){
+        if(target) target.innerHTML = "💡 Beleuchtungsdauer: <strong>--</strong>";
+        return;
+    }
+
+    const dayStart = timeToMin(dayValue);
+    const nightStart = timeToMin(nightValue);
+
+    // Tagesphase kann über Mitternacht laufen.
+    const durationMinutes = (nightStart - dayStart + 1440) % 1440;
+
+    target.innerHTML =
+        `💡 Beleuchtungsdauer: <strong>${formatLightingDuration(durationMinutes)}</strong>`;
+}
+
+function band(base,tol,unit){
+    if(!Number.isFinite(base) || !Number.isFinite(tol)) return "--";
+    return `${(base-tol).toFixed(1)} bis ${(base+tol).toFixed(1)} ${unit}`;
+}
+
+function calculateVpd(temp,hum){
+    const t = Number(temp);
+    const h = Number(hum);
+    if(!Number.isFinite(t) || !Number.isFinite(h)) return NaN;
+    const svp = 0.6108 * Math.exp((17.27*t)/(t+237.3));
+    return svp * (1-h/100);
+}
+
+function withVpdPhaseCompatibility(raw){
+    const config = {...(raw || {})};
+    const aliases = {
+        VPD_TOLERANCE_DAY:"VPD_TOLERANCE",
+        VPD_TOLERANCE_NIGHT:"VPD_TOLERANCE",
+        VPD_TEMP_MIN_DAY:"VPD_TEMP_MIN",
+        VPD_TEMP_MAX_DAY:"VPD_TEMP_MAX",
+        VPD_HUM_MIN_DAY:"VPD_HUM_MIN",
+        VPD_HUM_MAX_DAY:"VPD_HUM_MAX",
+        VPD_TEMP_MIN_NIGHT:"VPD_TEMP_MIN",
+        VPD_TEMP_MAX_NIGHT:"VPD_TEMP_MAX",
+        VPD_HUM_MIN_NIGHT:"VPD_HUM_MIN",
+        VPD_HUM_MAX_NIGHT:"VPD_HUM_MAX"
+    };
+    Object.entries(aliases).forEach(([phaseKey,legacyKey])=>{
+        if(config[phaseKey] === undefined && config[legacyKey] !== undefined){
+            config[phaseKey] = config[legacyKey];
+        }
+    });
+    return config;
+}
+
+function renderVpdSensorNote(config){
+    const assignments = config?.SENSOR_ASSIGNMENTS || {};
+    const outsideTemp = assignments.outside_temperature || {};
+    const outsideHum = assignments.outside_humidity || {};
+    const insideIds = new Set([
+        assignments.temperature?.source_id,
+        assignments.humidity?.source_id
+    ].filter(Boolean));
+    const outsideIds = [outsideTemp.source_id,outsideHum.source_id].filter(Boolean);
+    const duplicate = outsideIds.some(id=>insideIds.has(id));
+    const note = el("vpd-sensor-note");
+
+    if(outsideTemp.source_id && outsideHum.source_id && !duplicate){
+        note.className = "info";
+        note.innerHTML = `<strong>Außenklima zugewiesen:</strong><br>
+            Temperatur: ${outsideTemp.label || outsideTemp.source_id}<br>
+            Feuchte: ${outsideHum.label || outsideHum.source_id}`;
+    }else if(duplicate){
+        note.className = "info warning";
+        note.innerHTML = "<strong>VPD-Fallback:</strong> Innen- und Außenklima verwenden dieselbe Sensorquelle. Bitte unter Grow Control → Sensoren getrennte Quellen zuweisen.";
+    }else{
+        note.className = "info warning";
+        note.innerHTML = "<strong>Für Beobachten/Automatisch fehlt das Außenklima.</strong> Bitte unter Grow Control → Sensoren Außen-Temperatur und Außen-Feuchte zuweisen. Bis dahin bleibt die klassische Regelung aktiv.";
+    }
+}
+
+function updatePreview(){
+    el("temp-preview").innerHTML = `
+        <strong>Temperatur</strong><br>
+        Tag Regelbereich: ${band(num("DAY_TEMP"),num("DAY_TEMP_TOL"),"°C")}<br>
+        Tag Alarm ab: ≤ ${(num("DAY_TEMP")-num("TEMP_ALERT_TOL")).toFixed(1)} °C
+        oder ≥ ${(num("DAY_TEMP")+num("TEMP_ALERT_TOL")).toFixed(1)} °C<br>
+        Nacht Regelbereich: ${band(num("NIGHT_TEMP"),num("NIGHT_TEMP_TOL"),"°C")}<br>
+        Nacht Alarm ab: ≤ ${(num("NIGHT_TEMP")-num("TEMP_ALERT_TOL")).toFixed(1)} °C
+        oder ≥ ${(num("NIGHT_TEMP")+num("TEMP_ALERT_TOL")).toFixed(1)} °C<br>
+        Absolute Schutzgrenze: ${num("MIN_TEMP").toFixed(1)} bis ${num("MAX_TEMP").toFixed(1)} °C
+    `;
+
+    el("hum-preview").innerHTML = `
+        <strong>Luftfeuchtigkeit</strong><br>
+        Tag Regelbereich: ${band(num("DAY_HUM"),num("DAY_HUM_TOL"),"%")}<br>
+        Tag Alarm ab: ≤ ${(num("DAY_HUM")-num("HUM_ALERT_TOL")).toFixed(1)} %
+        oder ≥ ${(num("DAY_HUM")+num("HUM_ALERT_TOL")).toFixed(1)} %<br>
+        Nacht Regelbereich: ${band(num("NIGHT_HUM"),num("NIGHT_HUM_TOL"),"%")}<br>
+        Nacht Alarm ab: ≤ ${(num("NIGHT_HUM")-num("HUM_ALERT_TOL")).toFixed(1)} %
+        oder ≥ ${(num("NIGHT_HUM")+num("HUM_ALERT_TOL")).toFixed(1)} %<br>
+        Absolute Alarmgrenze: ${num("MIN_HUM").toFixed(1)} bis ${num("MAX_HUM").toFixed(1)} %
+    `;
+
+    const sunBox = el("light-sun-preview");
+    if(sunBox){
+        const active = !!el("LIGHT_SUN_ENABLED")?.checked;
+        const dayStart = el("DAY_START_TIME")?.value || "--:--";
+        const nightStart = el("NIGHT_START_TIME")?.value || "--:--";
+        const rise = num("LIGHT_SUNRISE_DURATION_MIN");
+        const sunset = num("LIGHT_SUNSET_DURATION_MIN");
+        const minimum = num("LIGHT_SUN_MIN_LEVEL");
+
+        sunBox.innerHTML = active
+            ? `<strong>Sonnenverlauf aktiv</strong><br>
+               ${dayStart}: EIN bei ${minimum.toFixed(0)} % · Hochdimmen ${rise.toFixed(0)} Min.<br>
+               Tagesleistung: vorhandener ENV-Lichtlevel<br>
+               Herunterdimmen ${sunset.toFixed(0)} Min. vor ${nightStart}<br>
+               ${nightStart}: Licht AUS`
+            : `<strong>Sonnenverlauf deaktiviert</strong><br>
+               Bisherige Profil-EIN/AUS-Steuerung bleibt aktiv.`;
+    }
+
+    const dayAttainableMin = calculateVpd(num("VPD_TEMP_MIN_DAY"),num("VPD_HUM_MAX_DAY"));
+    const dayAttainableMax = calculateVpd(num("VPD_TEMP_MAX_DAY"),num("VPD_HUM_MIN_DAY"));
+    const nightAttainableMin = calculateVpd(num("VPD_TEMP_MIN_NIGHT"),num("VPD_HUM_MAX_NIGHT"));
+    const nightAttainableMax = calculateVpd(num("VPD_TEMP_MAX_NIGHT"),num("VPD_HUM_MIN_NIGHT"));
+    const mode = el("VPD_CONTROL_MODE")?.value || "OFF";
+    const modeLabel = {
+        OFF:"Aus · klassische Regelung",
+        MONITOR:"Beobachten · keine Aktorübernahme",
+        AUTO:"Automatisch · nur ENV-Aktoren"
+    }[mode] || mode;
+    const rampEnabled = !!el("RAMP_ENABLED")?.checked;
+    const rampMinutes = num("RAMP_DURATION_MIN");
+    const rampText = !rampEnabled
+        ? "⏱️ Rampe deaktiviert"
+        : mode === "AUTO"
+            ? `⏱️ ${rampMinutes.toFixed(0)} Min. VPD-Rampe · Ziel und Klima-Fenster gleiten zwischen Tag und Nacht`
+            : mode === "MONITOR"
+                ? `⏱️ ${rampMinutes.toFixed(0)} Min. VPD-Rampe wird beobachtet · klassische Temperatur-Rampe bleibt autoritativ`
+                : `⏱️ ${rampMinutes.toFixed(0)} Min. klassische Temperatur-Rampe`;
+
+    const rampBox = el("vpd-ramp-preview");
+    if(rampBox){
+        const dayStart = el("DAY_START_TIME")?.value || "--:--";
+        const nightStart = el("NIGHT_START_TIME")?.value || "--:--";
+        const morningEnd = shiftClock(dayStart,rampMinutes);
+        const eveningStart = shiftClock(nightStart,-rampMinutes);
+        const behavior = mode === "AUTO"
+            ? "VPD-Ziel, Toleranz sowie Temperatur-/Feuchtefenster werden gleitend überführt."
+            : mode === "MONITOR"
+                ? "Der VPD-Verlauf wird nur berechnet; die klassische Regelung bleibt aktiv."
+                : "Im Modus Aus wird weiterhin nur der klassische Temperatur-Sollwert gerampt.";
+
+        rampBox.innerHTML = rampEnabled
+            ? `<strong>${rampMinutes.toFixed(0)} Minuten · ${mode === "OFF" ? "Temperatur" : "VPD"}</strong><br>
+               Morgen: ${dayStart} bis ${morningEnd}<br>
+               Abend: ${eveningStart} bis ${nightStart}<br>
+               ${behavior}<br>
+               Unabhängig von Licht-Dimmung und Helligkeitssensor.`
+            : `<strong>Rampe deaktiviert</strong><br>
+               Tag/Nacht wechselt ohne gleitenden Übergang. Sonnenverlauf und Lichtsteuerung bleiben davon unabhängig.`;
+    }
+
+    el("vpd-preview").innerHTML = `
+        <strong>${modeLabel}</strong><br>
+        ${rampText}<br>
+        ☀️ Tag: ${(num("VPD_TARGET_DAY")-num("VPD_TOLERANCE_DAY")).toFixed(2)} bis ${(num("VPD_TARGET_DAY")+num("VPD_TOLERANCE_DAY")).toFixed(2)} kPa ·
+        ${num("VPD_TEMP_MIN_DAY").toFixed(1)}–${num("VPD_TEMP_MAX_DAY").toFixed(1)} °C ·
+        ${num("VPD_HUM_MIN_DAY").toFixed(1)}–${num("VPD_HUM_MAX_DAY").toFixed(1)} %<br>
+        Physikalisch erreichbar: ${Number.isFinite(dayAttainableMin) ? dayAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(dayAttainableMax) ? dayAttainableMax.toFixed(2) : "--"} kPa<br>
+        🌙 Nacht: ${(num("VPD_TARGET_NIGHT")-num("VPD_TOLERANCE_NIGHT")).toFixed(2)} bis ${(num("VPD_TARGET_NIGHT")+num("VPD_TOLERANCE_NIGHT")).toFixed(2)} kPa ·
+        ${num("VPD_TEMP_MIN_NIGHT").toFixed(1)}–${num("VPD_TEMP_MAX_NIGHT").toFixed(1)} °C ·
+        ${num("VPD_HUM_MIN_NIGHT").toFixed(1)}–${num("VPD_HUM_MAX_NIGHT").toFixed(1)} %<br>
+        Physikalisch erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa<br>
+        Adaptive Wirkungsprüfung: 60 Sekunden bei neuen Stufen, 120 Sekunden in der Beruhigungsphase und nach zehn stabilen Minuten maximal ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten.
+        Das VPD-Zielband gibt die Regelrichtung vor. Bleibt der VPD nach maximaler Abluft zu niedrig, wird die Temperaturreserve bis zur eingestellten Obergrenze schrittweise genutzt.
+        Ab ${num("VPD_MIN_EFFECT_KPA").toFixed(3)} kPa gilt eine Stufe als messbar wirksam; eine schwächere Einzelmessung beendet den Stufenweg nicht vorzeitig.
+    `;
+}
+
+function applyLimits(c){
+    el("DAY_TEMP").min = c.MIN_TEMP;
+    el("DAY_TEMP").max = c.MAX_TEMP;
+    el("NIGHT_TEMP").min = c.MIN_TEMP;
+    el("NIGHT_TEMP").max = c.MAX_TEMP;
+
+    el("DAY_TEMP_TOL").min = 0;
+    el("DAY_TEMP_TOL").max = 10;
+    el("NIGHT_TEMP_TOL").min = 0;
+    el("NIGHT_TEMP_TOL").max = 10;
+
+    el("DAY_HUM").min = c.MIN_HUM;
+    el("DAY_HUM").max = c.MAX_HUM;
+    el("NIGHT_HUM").min = c.MIN_HUM;
+    el("NIGHT_HUM").max = c.MAX_HUM;
+
+    el("DAY_HUM_TOL").min = 0;
+    el("DAY_HUM_TOL").max = 30;
+    el("NIGHT_HUM_TOL").min = 0;
+    el("NIGHT_HUM_TOL").max = 30;
+
+    el("TEMP_ALERT_TOL").min = 0.1;
+    el("TEMP_ALERT_TOL").max = 30;
+    el("HUM_ALERT_TOL").min = 0.1;
+    el("HUM_ALERT_TOL").max = 100;
+
+    el("MIN_HUM").min = 0;
+    el("MIN_HUM").max = 99.9;
+    el("MAX_HUM").min = 0.1;
+    el("MAX_HUM").max = 100;
+
+    // 0 bleibt für ältere Konfigurationen bei ausgeschalteter Rampe gültig.
+    // Sobald der Schalter aktiv ist, erzwingt save() mindestens 5 Minuten.
+    el("RAMP_DURATION_MIN").min = 0;
+    el("RAMP_DURATION_MIN").max = 240;
+
+    el("LIGHT_SUNRISE_DURATION_MIN").min = 0;
+    el("LIGHT_SUNRISE_DURATION_MIN").max = 240;
+    el("LIGHT_SUNSET_DURATION_MIN").min = 0;
+    el("LIGHT_SUNSET_DURATION_MIN").max = 240;
+    el("LIGHT_SUN_MIN_LEVEL").min = 11;
+    el("LIGHT_SUN_MIN_LEVEL").max = 100;
+
+    el("VPD_TARGET_DAY").min = 0.1; el("VPD_TARGET_DAY").max = 3.5;
+    el("VPD_TARGET_NIGHT").min = 0.1; el("VPD_TARGET_NIGHT").max = 3.5;
+    ["DAY","NIGHT"].forEach(suffix=>{
+        el(`VPD_TOLERANCE_${suffix}`).min = 0.01;
+        el(`VPD_TOLERANCE_${suffix}`).max = 0.5;
+        el(`VPD_TEMP_MIN_${suffix}`).min = c.MIN_TEMP;
+        el(`VPD_TEMP_MIN_${suffix}`).max = c.MAX_TEMP;
+        el(`VPD_TEMP_MAX_${suffix}`).min = c.MIN_TEMP;
+        el(`VPD_TEMP_MAX_${suffix}`).max = c.MAX_TEMP;
+        el(`VPD_HUM_MIN_${suffix}`).min = Math.max(1,Number(c.MIN_HUM));
+        el(`VPD_HUM_MIN_${suffix}`).max = Math.min(99,Number(c.MAX_HUM));
+        el(`VPD_HUM_MAX_${suffix}`).min = Math.max(1,Number(c.MIN_HUM));
+        el(`VPD_HUM_MAX_${suffix}`).max = Math.min(99,Number(c.MAX_HUM));
+    });
+    el("VPD_EFFECT_WINDOW_MIN").min = 1; el("VPD_EFFECT_WINDOW_MIN").max = 30;
+    el("VPD_MIN_EFFECT_KPA").min = 0.005; el("VPD_MIN_EFFECT_KPA").max = 0.5;
+    el("VPD_TEMP_STEP").min = 0.1; el("VPD_TEMP_STEP").max = 2;
+    el("VPD_FAN_STEP").min = 1; el("VPD_FAN_STEP").max = 25;
+}
+
+function applyLightSunAvailability(payload){
+    lightSunAvailable = !!payload.light_sun_available;
+
+    lightSunUnavailableReason =
+        payload.light_sun_unavailable_reason ||
+        "Kein Licht-Controller zugewiesen.";
+
+    const card = el("light-sun-card");
+    const note = el("light-sun-controller-note");
+
+    const fieldIds = [
+        "LIGHT_SUN_ENABLED",
+        "LIGHT_SUNRISE_DURATION_MIN",
+        "LIGHT_SUNSET_DURATION_MIN",
+        "LIGHT_SUN_MIN_LEVEL"
+    ];
+
+    if(card){
+        card.classList.toggle(
+            "feature-unavailable",
+            !lightSunAvailable
+        );
+
+        card.querySelectorAll(".num-control button").forEach(button=>{
+            button.disabled = !lightSunAvailable;
+        });
+    }
+
+    fieldIds.forEach(id=>{
+        const input = el(id);
+
+        if(input){
+            input.disabled = !lightSunAvailable;
+        }
+    });
+
+    if(note){
+        if(lightSunAvailable){
+            note.style.display = "none";
+            note.textContent = "";
+        }else{
+            note.style.display = "block";
+            note.innerHTML =
+                "<strong>Nicht verfügbar:</strong> " +
+                lightSunUnavailableReason;
+        }
+    }
+
+    if(!lightSunAvailable){
+        const toggle = el("LIGHT_SUN_ENABLED");
+
+        if(toggle){
+            toggle.checked = false;
+        }
+    }
+
+    syncFormControls();
+}
+
+
+async function load({successMessage=""}={}){
+    if(loadInFlight || saveInFlight) return;
+    setLoadInFlight(true);
+
+    try{
+        const response = await fetch(CONFIG_URL,{cache:"no-store"});
+        const payload = await response.json().catch(()=>({}));
+        if(!response.ok){
+            feedback(payload.error || "Konfiguration konnte nicht geladen werden.","err");
+            return;
+        }
+        const c = withVpdPhaseCompatibility(payload.config || payload);
+        loadedConfig = c;
+
+        applyLightSunAvailability(payload);
+
+        for(const id of ids){
+            if(el(id) && c[id] !== undefined) el(id).value = c[id];
+        }
+
+        el("DAY_START_TIME").value = minToTime(c.DAY_START_MIN);
+        el("NIGHT_START_TIME").value = minToTime(c.NIGHT_START_MIN);
+        el("RAMP_ENABLED").checked = !!c.RAMP_ENABLED;
+        el("LIGHT_SUN_ENABLED").checked =
+            lightSunAvailable && !!c.LIGHT_SUN_ENABLED;
+        el("VPD_CONTROL_MODE").value = String(c.VPD_CONTROL_MODE || "OFF").toUpperCase();
+        updateVpdModeUi();
+        if(!settingsSectionChosen){
+            selectSettingsSection(
+                el("VPD_CONTROL_MODE").value === "OFF" ? "classic" : "vpd",
+                {remember:false}
+            );
+        }
+        updateLightingDuration();
+
+        renderActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
+        applyLimits(c);
+        renderVpdSensorNote(c);
+        updatePreview();
+        configLoaded = true;
+        settingsDirty = false;
+        syncSaveActions();
+        feedback(successMessage, successMessage ? "ok" : "");
+    }catch(error){
+        feedback("Konfiguration konnte nicht geladen werden: Growstar ist nicht erreichbar.","err");
+    }finally{
+        setLoadInFlight(false);
+    }
+}
+
+async function save(){
+    if(saveInFlight || !settingsDirty) return;
+
+    const missing = ids
+        .map(id=>el(id))
+        .filter(input=>input && !input.disabled)
+        .find(input=>{
+            return input.value === "" || !Number.isFinite(Number(input.value));
+        });
+
+    if(missing){
+        missing.focus();
+        feedback("Bitte alle Klima- und Grenzwerte vollständig ausfüllen.","err");
+        return;
+    }
+
+    if(!el("DAY_START_TIME").value || !el("NIGHT_START_TIME").value){
+        feedback("Tag Start und Nacht Start müssen vollständig gesetzt sein.","err");
+        return;
+    }
+
+    if(el("RAMP_ENABLED").checked && num("RAMP_DURATION_MIN") < 5){
+        el("RAMP_DURATION_MIN").focus();
+        feedback("Bei aktiver Rampe muss die Rampenzeit mindestens 5 Minuten betragen.","err");
+        return;
+    }
+
+    const invalid = Array.from(
+        document.querySelectorAll("input:not(:disabled)")
+    ).find(input=>!input.checkValidity());
+
+    if(invalid){
+        invalid.reportValidity();
+        feedback("Bitte alle markierten Werte korrigieren.","err");
+        return;
+    }
+
+    updatePreview();
+    updateLightingDuration();
+    feedback("Speichere …");
+
+    const body = {
+        DAY_TEMP:num("DAY_TEMP"),
+        DAY_TEMP_TOL:num("DAY_TEMP_TOL"),
+        NIGHT_TEMP:num("NIGHT_TEMP"),
+        NIGHT_TEMP_TOL:num("NIGHT_TEMP_TOL"),
+        DAY_HUM:num("DAY_HUM"),
+        DAY_HUM_TOL:num("DAY_HUM_TOL"),
+        NIGHT_HUM:num("NIGHT_HUM"),
+        NIGHT_HUM_TOL:num("NIGHT_HUM_TOL"),
+        TEMP_ALERT_TOL:num("TEMP_ALERT_TOL"),
+        HUM_ALERT_TOL:num("HUM_ALERT_TOL"),
+        MIN_TEMP:num("MIN_TEMP"),
+        MAX_TEMP:num("MAX_TEMP"),
+        MIN_HUM:num("MIN_HUM"),
+        MAX_HUM:num("MAX_HUM"),
+        DAY_START_MIN:timeToMin(el("DAY_START_TIME").value),
+        NIGHT_START_MIN:timeToMin(el("NIGHT_START_TIME").value),
+        RAMP_ENABLED:el("RAMP_ENABLED").checked ? 1 : 0,
+        RAMP_DURATION_MIN:num("RAMP_DURATION_MIN"),
+        VPD_CONTROL_MODE:el("VPD_CONTROL_MODE").value,
+        VPD_TARGET_DAY:num("VPD_TARGET_DAY"),
+        VPD_TOLERANCE_DAY:num("VPD_TOLERANCE_DAY"),
+        VPD_TEMP_MIN_DAY:num("VPD_TEMP_MIN_DAY"),
+        VPD_TEMP_MAX_DAY:num("VPD_TEMP_MAX_DAY"),
+        VPD_HUM_MIN_DAY:num("VPD_HUM_MIN_DAY"),
+        VPD_HUM_MAX_DAY:num("VPD_HUM_MAX_DAY"),
+        VPD_TARGET_NIGHT:num("VPD_TARGET_NIGHT"),
+        VPD_TOLERANCE_NIGHT:num("VPD_TOLERANCE_NIGHT"),
+        VPD_TEMP_MIN_NIGHT:num("VPD_TEMP_MIN_NIGHT"),
+        VPD_TEMP_MAX_NIGHT:num("VPD_TEMP_MAX_NIGHT"),
+        VPD_HUM_MIN_NIGHT:num("VPD_HUM_MIN_NIGHT"),
+        VPD_HUM_MAX_NIGHT:num("VPD_HUM_MAX_NIGHT"),
+        VPD_EFFECT_WINDOW_MIN:num("VPD_EFFECT_WINDOW_MIN"),
+        VPD_MIN_EFFECT_KPA:num("VPD_MIN_EFFECT_KPA"),
+        VPD_TEMP_STEP:num("VPD_TEMP_STEP"),
+        VPD_FAN_STEP:num("VPD_FAN_STEP")
+    };
+
+    const previousVpdMode = String(loadedConfig.VPD_CONTROL_MODE || "OFF").toUpperCase();
+    if(
+        body.VPD_CONTROL_MODE === "AUTO" &&
+        previousVpdMode !== "AUTO" &&
+        !confirm(
+            "Intelligente VPD-Steuerung aktivieren?\n\n" +
+            "• Nur Geräte im Modus Umgebung werden übernommen.\n" +
+            "• Innen- und Außensensor müssen frisch und getrennt sein.\n" +
+            "• Ohne vollständige Sensorbasis bleibt die klassische Regelung aktiv."
+        )
+    ){
+        feedback("Automatische VPD-Steuerung wurde nicht aktiviert.");
+        return;
+    }
+
+    // Nicht verfügbare Sonnensteuerung wird bei einem Klima-Speichervorgang
+    // nicht versehentlich überschrieben.
+    if(lightSunAvailable){
+        Object.assign(body,{
+            LIGHT_SUN_ENABLED:el("LIGHT_SUN_ENABLED").checked ? 1 : 0,
+            LIGHT_SUNRISE_DURATION_MIN:num("LIGHT_SUNRISE_DURATION_MIN"),
+            LIGHT_SUNSET_DURATION_MIN:num("LIGHT_SUNSET_DURATION_MIN"),
+            LIGHT_SUN_MIN_LEVEL:num("LIGHT_SUN_MIN_LEVEL")
+        });
+    }
+
+    setSaveInFlight(true);
+
+    try{
+        const response = await fetch(CONFIG_URL,{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify(body)
+        });
+        const payload = await response.json().catch(()=>({}));
+
+        if(!response.ok || payload.success === false){
+            feedback(payload.message || payload.error || "Speichern fehlgeschlagen.","err");
+            return;
+        }
+
+        const c = payload.config || body;
+        loadedConfig = c;
+        applyLightSunAvailability(payload);
+        applyLimits(c);
+        renderVpdSensorNote(c);
+        updatePreview();
+        updateSettingsModeSummary();
+        settingsDirty = false;
+        syncSaveActions();
+        feedback("Einstellungen gespeichert.","ok");
+    }catch(error){
+        feedback("Speichern fehlgeschlagen: Growstar ist nicht erreichbar.","err");
+    }finally{
+        setSaveInFlight(false);
+    }
+}
+
+async function discardChanges(){
+    if(saveInFlight || !settingsDirty) return;
+    await load({successMessage:"Ungespeicherte Änderungen wurden verworfen."});
+}
+
+function step(id,delta){
+    const input = el(id);
+    if(!input || input.disabled) return;
+
+    if(
+        !lightSunAvailable &&
+        id.startsWith("LIGHT_SUN")
+    ){
+        return;
+    }
+
+    let value = Number(input.value);
+    if(!Number.isFinite(value)) value = 0;
+
+    const min = input.min !== "" ? Number(input.min) : -Infinity;
+    const max = input.max !== "" ? Number(input.max) : Infinity;
+
+    const precision = Math.abs(delta) <= 0.01 ? 1000 : Math.abs(delta) < 0.1 ? 100 : 10;
+    value = Math.round((value + delta) * precision) / precision;
+    value = Math.min(max,Math.max(min,value));
+    input.value = value;
+    updateLightingDuration();
+    updatePreview();
+    setDirty(true);
+}
+
+document.querySelectorAll("input,select").forEach(input=>{
+    const updateDraft = ()=>{
+        if(input.id === "VPD_CONTROL_MODE") updateVpdModeUi();
+        updateLightingDuration();
+        updatePreview();
+        setDirty(true);
+    };
+
+    input.addEventListener("input",updateDraft);
+    if(input.type === "checkbox" || input.tagName === "SELECT"){
+        input.addEventListener("change",updateDraft);
+    }
+});
+
+document.querySelectorAll("[data-settings-tab]").forEach(button=>{
+    button.addEventListener("click",()=>{
+        selectSettingsSection(button.dataset.settingsTab);
+    });
+});
+
+window.addEventListener("beforeunload",event=>{
+    if(!settingsDirty) return;
+    event.preventDefault();
+    event.returnValue = "";
+});
+
+selectSettingsSection("classic",{remember:false});
+load();
+</script>
+</body>
+</html>
