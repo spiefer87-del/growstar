@@ -13,7 +13,7 @@ for path in (ROOT, REGRESSION):
 
 
 from check_vpd_intelligent_control import runtime_for, set_inside
-from core.vpd_control import update_vpd_control
+from core.vpd_control import _temperature_for_vpd_exact, update_vpd_control
 
 
 def require(condition, message):
@@ -81,12 +81,14 @@ def main():
         and heat["effective_temp_target"] == 24.4
         and heat["actions"]["heating"]["power"] is True
         and heat["actions"]["fan"]["controller"]["level"] == 100,
-        "Nach erfolgloser Maximalabluft beginnt die Heizung trotz Feuchte-Arbeitsfenster und klassischer Toleranz",
+        "Nach erfolgloser Maximalabluft beginnt die Heizung bei weiterhin zu niedrigem VPD innerhalb der Temperaturgrenze",
     )
     require(
-        abs(fan_plans[0]["effective_hum_target"] - 62.91) < 0.02
-        and abs(heat["effective_hum_target"] - 64.01) < 0.02,
-        "Der mathematische Feuchtesollwert folgt jeder freigegebenen Temperaturstufe live",
+        fan_plans[0]["effective_hum_target"] == 60.0
+        and heat["effective_hum_target"] == 60.0
+        and abs(fan_plans[0]["setpoints"]["calculated_hum"] - 62.91) < 0.02
+        and abs(heat["setpoints"]["calculated_hum"] - 64.01) < 0.02,
+        "Der veröffentlichte Feuchtesollwert bleibt bei jeder Temperaturstufe hart auf 60 Prozent begrenzt",
     )
 
     targets = []
@@ -113,8 +115,9 @@ def main():
         and exhausted["effective_temp_target"] == 26.0
         and exhausted["strategy_progress"]["temperature"]["complete"] is True
         and exhausted["actions"]["fan"]["controller"]["level"] == 100
-        and abs(exhausted["effective_hum_target"] - 67.28) < 0.02,
-        "Erst die reale Temperatur-Obergrenze beendet den Heizweg; Abluft 100 und der passende Feuchterechenwert bleiben sichtbar",
+        and exhausted["effective_hum_target"] == 60.0
+        and abs(exhausted["setpoints"]["calculated_hum"] - 67.28) < 0.02,
+        "Erst die reale Temperatur-Obergrenze beendet den Heizweg; der Feuchtesollwert bleibt begrenzt und der Rechenwert sichtbar",
     )
 
     recovered = screenshot_runtime()
@@ -123,12 +126,13 @@ def main():
         recovered_heat["stage"] == "heat",
         "Der zweite Prüflauf erreicht die aktive Heizstufe",
     )
-    set_inside(recovered, temp=25.0, hum=65.0)
+    recovered_temp = _temperature_for_vpd_exact(1.10, 60.0)
+    set_inside(recovered, temp=recovered_temp, hum=60.0)
     in_band = update_vpd_control(recovered, now=recovered_now + 10)
     require(
         in_band["stage"] == "in_band"
         and in_band["direction"] is None
-        and in_band["effective_temp_target"] == 25.0
+        and abs(in_band["effective_temp_target"] - recovered_temp) < 0.02
         and in_band["actions"]["heating"]["power"] is False,
         "Sobald der gemessene VPD das Zielband erreicht, stoppt Growstar die Heizung sofort statt bis 26 Grad zu überschwingen",
     )
@@ -141,8 +145,8 @@ def main():
     )
     require(
         "Feuchte min/max" in settings_page
-        and "verkürzt keine noch erlaubte Temperaturreserve" in profile_page,
-        "Einstellungs- und Profilseite erklären Temperaturgrenze und Feuchte-Arbeitsfenster eindeutig",
+        and "verbindliche Grenzen" in profile_page,
+        "Einstellungs- und Profilseite erklären die verbindlichen Klimagrenzen eindeutig",
     )
 
     print("✅ Growstar 3.16.11 / VPD.CONTROL.5 vollständig geprüft")

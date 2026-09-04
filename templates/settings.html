@@ -514,11 +514,12 @@ button:disabled{opacity:.48;cursor:not-allowed}
             </div>
 
             <div class="info">
-                <strong>Temperatur min/max</strong> sind die verbindlichen Grenzen des
-                Heiz- und Kühlwegs. <strong>Feuchte min/max</strong> bilden das bevorzugte
-                Arbeitsfenster für Abluft, Be- und Entfeuchtung. Bei zu niedrigem VPD darf
-                Growstar nach ausgeschöpfter Abluft trotzdem bis zur Temperatur-Obergrenze
-                heizen; beendet wird der Heizweg sofort am VPD-Zielband.
+                <strong>Temperatur min/max</strong> und <strong>Feuchte min/max</strong>
+                sind verbindliche Grenzen der jeweiligen Tag-/Nachtphase. Ein aus
+                Temperatur und VPD errechneter Feuchtewert wird niemals außerhalb dieser
+                Spanne als Sollwert übernommen. Bei einer Grenzverletzung führt Growstar
+                die zulässigen Abluft-, Heiz- oder Feuchteaktoren weiter, bis VPD und
+                Feuchtigkeit wieder gemeinsam innerhalb ihrer Grenzen liegen.
             </div>
 
             <div class="row-inline">
@@ -1174,7 +1175,8 @@ function updatePreview(){
         ${num("VPD_HUM_MIN_NIGHT").toFixed(1)}–${num("VPD_HUM_MAX_NIGHT").toFixed(1)} %<br>
         Physikalisch erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa<br>
         Adaptive Wirkungsprüfung: 60 Sekunden bei neuen Stufen, 120 Sekunden in der Beruhigungsphase und nach zehn stabilen Minuten maximal ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten.
-        Das VPD-Zielband gibt die Regelrichtung vor. Bleibt der VPD nach maximaler Abluft zu niedrig, wird die Temperaturreserve bis zur eingestellten Obergrenze schrittweise genutzt.
+        Innerhalb der verbindlichen Feuchtegrenzen gibt das VPD-Zielband die Regelrichtung vor. Eine Feuchteverletzung hat Vorrang und kein veröffentlichter Feuchtesollwert darf Min/Max überschreiten.
+        Bleibt der VPD nach maximaler Abluft zu niedrig, wird die Temperaturreserve nur so lange schrittweise genutzt, wie sie nicht zu einer widersprüchlichen VPD-Richtung führt.
         Ab ${num("VPD_MIN_EFFECT_KPA").toFixed(3)} kPa gilt eine Stufe als messbar wirksam; eine schwächere Einzelmessung beendet den Stufenweg nicht vorzeitig.
     `;
 }

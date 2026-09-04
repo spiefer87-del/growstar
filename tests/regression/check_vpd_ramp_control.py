@@ -218,12 +218,14 @@ def main():
         automatic = runtime_for(mode="AUTO")
         auto_plan = update_vpd_control(automatic, now=1000)
         require(
-            auto_plan["stage"] == "cool"
+            auto_plan["stage"] == "humidify"
             and auto_plan["preferred_temp_target"] == 21.0
-            and auto_plan["effective_temp_target"] == 23.5
-            and automatic.state.live_state["temp_target"] == 23.5
+            and auto_plan["effective_temp_target"] == 24.0
+            and automatic.state.live_state["temp_target"] == 24.0
+            and 45.0 <= auto_plan["effective_hum_target"] <= 80.0
+            and auto_plan["actions"]["humidifier"]["power"] is True
             and auto_plan["actions"]["heating"]["power"] is False,
-            "AUTO senkt bei fallendem VPD-Ziel bevorzugt die Temperatur in kleinen Schritten",
+            "AUTO behandelt während der Rampe zuerst die verbindliche Feuchte-Untergrenze",
         )
         require(
             auto_plan["range"] == {
@@ -238,7 +240,8 @@ def main():
         automatic.state.live_state["climate_temp_target"] = 28.0
         second_auto_plan = update_vpd_control(automatic, now=1001)
         require(
-            second_auto_plan["effective_temp_target"] == 23.5,
+            second_auto_plan["effective_temp_target"]
+            == auto_plan["effective_temp_target"],
             "Eine klassische Temperatur-Rampe kann den VPD-Sollwert nicht mehr verschieben",
         )
 

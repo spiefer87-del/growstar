@@ -62,15 +62,17 @@ def main():
     setpoints = first["setpoints"]
 
     require(
-        abs(setpoints["at_temp_max"]["hum"] - 67.28) < 0.02
+        setpoints["at_temp_max"]["hum"] == 60.0
+        and abs(setpoints["at_temp_max"]["calculated_hum"] - 67.28) < 0.02
         and setpoints["at_temp_max"]["within_humidity_range"] is False,
-        "Bei 26 Grad wird der rechnerische Feuchtebedarf für 1,10 kPa korrekt mit rund 67,3 Prozent ausgewiesen",
+        "Auch bei 26 Grad bleibt der Sollwert auf 60 Prozent begrenzt und der höhere Rechenwert nur Diagnose",
     )
     require(
         abs(setpoints["temp"] - 23.9) < 0.02
-        and abs(setpoints["hum"] - 62.91) < 0.02
+        and setpoints["hum"] == 60.0
+        and abs(setpoints["calculated_hum"] - 62.91) < 0.02
         and abs(setpoints["vpd"] - 1.10) < 0.001,
-        "Der Live-Feuchtesollwert wird aus dem aktuellen VPD-Temperaturziel berechnet, ohne dessen Reserve zu verkürzen",
+        "Der Live-Feuchtesollwert überschreitet trotz höherem VPD-Rechenwert niemals die konfigurierte Obergrenze",
     )
     require(
         abs(automatic.state.live_state["temp_target"] - setpoints["temp"]) < 0.01
@@ -79,12 +81,12 @@ def main():
         "VPD-AUTO veröffentlicht Temperatur- und Feuchtesollwert gemeinsam im Live-State",
     )
     require(
-        "VPD ist zu niedrig" in first["reason"]
-        and "Arbeitsfenster" in first["reason"]
+        "VPD ist gleichzeitig zu niedrig" in first["reason"]
+        and "verbindlichen Obergrenze" in first["reason"]
         and "26.0 °C" in setpoints["explanation"]
         and "67.3 %" in setpoints["explanation"]
-        and "sperrt die sichere Temperaturreserve nicht" in setpoints["explanation"],
-        "Regellog erklärt die Feuchteabweichung, ohne daraus einen falschen Temperaturdeckel abzuleiten",
+        and "überschreibt die konfigurierte Feuchtegrenze nicht" in setpoints["explanation"],
+        "Regellog trennt den mathematischen Rechenwert eindeutig vom verbindlichen Feuchtesollwert",
     )
 
     dynamic = runtime_for(mode="AUTO", temp=24.0, hum=75.0)
@@ -144,9 +146,10 @@ def main():
     monitor = coupled_runtime(mode="MONITOR")
     monitor_plan = update_vpd_control(monitor, now=1000)
     require(
-        abs(monitor_plan["setpoints"]["hum"] - 62.91) < 0.02
+        monitor_plan["setpoints"]["hum"] == 60.0
+        and abs(monitor_plan["setpoints"]["calculated_hum"] - 62.91) < 0.02
         and monitor.state.live_state["hum_target"] == 65.0,
-        "Beobachten zeigt das gekoppelte Zielpaar, ersetzt aber keinen klassischen Live-Sollwert",
+        "Beobachten zeigt den begrenzten VPD-Sollwert, ersetzt aber keinen klassischen Live-Sollwert",
     )
 
     fallback = coupled_runtime()

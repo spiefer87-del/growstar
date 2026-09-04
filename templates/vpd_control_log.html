@@ -66,7 +66,7 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
                 <span id="vpd-log-setpoints" class="vpd-log-value emphasis">--</span>
             </div>
             <div class="vpd-log-metric">
-                <span class="vpd-log-label">Temperaturgrenzen · Feuchte-Arbeitsfenster</span>
+                <span class="vpd-log-label">Verbindliche Temperatur- und Feuchtegrenzen</span>
                 <span id="vpd-log-range" class="vpd-log-value">--</span>
             </div>
             <div class="vpd-log-metric">
@@ -269,6 +269,9 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
         if(number(setpoints.vpd) !== null) setpointParts.push(`${fixed(setpoints.vpd,2)} kPa`);
         if(number(setpoints.hum_band_min) !== null && number(setpoints.hum_band_max) !== null){
             setpointParts.push(`Feuchte-Zielband ${fixed(setpoints.hum_band_min,1)}–${fixed(setpoints.hum_band_max,1)} %`);
+        }
+        if(setpoints.constrained && number(setpoints.calculated_hum) !== null){
+            setpointParts.push(`VPD-Rechenwert ${fixed(setpoints.calculated_hum,1)} % begrenzt`);
         }
         text("vpd-log-setpoints",setpointParts.join(" · ") || "--");
         text("vpd-log-coupling",setpoints.explanation || "Temperatur- und Feuchteziel werden gemeinsam berechnet.");

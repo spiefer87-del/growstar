@@ -596,20 +596,23 @@ def main():
     })
     humidity_guard_plan = update_vpd_control(humidity_guard, now=1000)
     require(
-        humidity_guard_plan["direction"] == "lower"
-        and humidity_guard_plan["stage"] == "cool",
-        "Das VPD-Ziel verhindert eine widersprüchliche weitere Erwärmung trotz überschrittenem Feuchte-Arbeitsfenster",
+        humidity_guard_plan["direction"] == "raise"
+        and humidity_guard_plan["stage"] == "exhaust"
+        and humidity_guard_plan["effective_hum_target"] == 65.0
+        and humidity_guard_plan["actions"]["heating"]["power"] is False
+        and humidity_guard_plan["actions"]["humidifier"]["power"] is False,
+        "Die harte Feuchte-Obergrenze bleibt aktiv und sperrt bei bereits hohem VPD Heizung und Befeuchter",
     )
 
     high = runtime_for(hum=40.0)
     high_first = update_vpd_control(high, now=1000)
     high_second = update_vpd_control(high, now=1301)
     require(
-        high_first["stage"] == "cool"
+        high_first["stage"] == "humidify"
         and high_first["actions"]["heating"]["power"] is False
         and high_second["stage"] == "humidify"
         and high_second["actions"]["humidifier"]["power"] is True,
-        "Zu hoher VPD senkt zuerst das Temperaturziel und nutzt danach den Befeuchter",
+        "Eine verletzte Feuchte-Untergrenze fordert sofort den Befeuchter an und sperrt weiteres Heizen",
     )
 
     off_devices = runtime_for(device_modes={
