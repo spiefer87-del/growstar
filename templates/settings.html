@@ -83,6 +83,42 @@ button:disabled{opacity:.48;cursor:not-allowed}
 }
 .lighting-duration strong{color:#facc15}
 .mode-select{min-width:210px;height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--border);background:#0f172a;color:var(--text);font-weight:700;text-align:center}
+.classic-control-fields{
+    margin:0 -7px 12px;
+    padding:7px 7px 1px;
+    border:1px solid transparent;
+    border-radius:13px;
+    transition:opacity .18s ease,filter .18s ease,background .18s ease,border-color .18s ease;
+}
+.classic-control-fields.vpd-locked{
+    opacity:.42;
+    filter:grayscale(.7) saturate(.4);
+    background:rgba(15,23,42,.42);
+    border-color:rgba(148,163,184,.16);
+}
+.classic-control-fields.vpd-locked input,
+.classic-control-fields.vpd-locked button{cursor:not-allowed !important}
+.vpd-lock-note[hidden]{display:none}
+.vpd-lock-note{
+    margin:0 0 12px;
+    background:rgba(167,139,250,.09);
+    border-color:rgba(167,139,250,.28);
+    color:#ddd6fe;
+}
+.vpd-ramp-settings{
+    margin:14px 0;
+    padding:14px 12px 2px;
+    border-radius:14px;
+    background:linear-gradient(145deg,rgba(14,116,144,.13),rgba(15,23,42,.82));
+    border:1px solid rgba(56,189,248,.28);
+}
+.vpd-ramp-settings h3{
+    margin:0 0 8px;
+    text-align:center;
+    color:#bae6fd;
+    font-size:.88rem;
+}
+.vpd-ramp-settings .info{margin:8px 0 12px}
 .vpd-phase-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
 .vpd-phase{padding:13px 9px 5px;border-radius:13px;background:linear-gradient(145deg,rgba(15,23,42,.88),rgba(30,41,59,.72));border:1px solid var(--border)}
 .vpd-phase.day{border-color:rgba(250,204,21,.25)}
@@ -167,6 +203,12 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 <strong>Alarm ±</strong> beeinflusst nur Alarm & Benachrichtigungen.
             </div>
 
+            <div id="temperature-vpd-lock-note" class="info vpd-lock-note" hidden>
+                <strong>🔒 VPD-Automatik aktiv:</strong> Die klassischen Tag-/Nacht-Sollwerte
+                und Regel-Toleranzen sind gesperrt. Alarm- und Schutzgrenzen bleiben einstellbar.
+            </div>
+
+            <div id="classic-temperature-controls" class="classic-control-fields" data-classic-control>
             <div class="row-inline">
                 <div class="field">
                     <label>Tag Soll °C</label>
@@ -203,6 +245,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                         <button type="button" onclick="step('NIGHT_TEMP_TOL',0.1)">+</button>
                     </div>
                 </div>
+            </div>
             </div>
 
             <div class="divider"></div>
@@ -245,6 +288,12 @@ button:disabled{opacity:.48;cursor:not-allowed}
         <div class="card">
             <h2>💧 Luftfeuchtigkeit</h2>
 
+            <div id="humidity-vpd-lock-note" class="info vpd-lock-note" hidden>
+                <strong>🔒 VPD-Automatik aktiv:</strong> Die klassischen Tag-/Nacht-Sollwerte
+                und Regel-Toleranzen sind gesperrt. Alarm- und Schutzgrenzen bleiben einstellbar.
+            </div>
+
+            <div id="classic-humidity-controls" class="classic-control-fields" data-classic-control>
             <div class="row-inline">
                 <div class="field">
                     <label>Tag Soll %</label>
@@ -281,6 +330,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                         <button type="button" onclick="step('NIGHT_HUM_TOL',1)">+</button>
                     </div>
                 </div>
+            </div>
             </div>
 
             <div class="divider"></div>
@@ -338,6 +388,31 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     </select>
                 </div>
             </div>
+
+            <section id="vpd-ramp-settings" class="vpd-ramp-settings" aria-labelledby="vpd-ramp-heading">
+                <h3 id="vpd-ramp-heading">⏱️ Eigene VPD-Rampe</h3>
+                <div class="info">
+                    Diese Rampe ist vollständig von Helligkeitssensor und Sonnenverlauf
+                    unabhängig. Morgens startet sie bei <strong>Tag Start</strong>, abends
+                    endet sie bei <strong>Nacht Start</strong>. Die Lichtfunktion besitzt
+                    weiterhin ihren eigenen Schalter und eigene Dimmzeiten.
+                </div>
+                <div class="row-inline">
+                    <div class="field">
+                        <label id="ramp-enabled-label" for="RAMP_ENABLED">VPD-Rampe aktiv</label>
+                        <input type="checkbox" id="RAMP_ENABLED">
+                    </div>
+                    <div class="field">
+                        <label for="RAMP_DURATION_MIN">Rampenzeit (min)</label>
+                        <div class="num-control">
+                            <button type="button" onclick="step('RAMP_DURATION_MIN',-5)">−</button>
+                            <input type="number" step="5" id="RAMP_DURATION_MIN" class="compact-input">
+                            <button type="button" onclick="step('RAMP_DURATION_MIN',5)">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="vpd-ramp-preview" class="preview"></div>
+            </section>
 
             <div class="vpd-phase-grid">
                 <section class="vpd-phase day" aria-labelledby="vpd-day-heading">
@@ -505,29 +580,6 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <div id="vpd-preview" class="preview"></div>
         </div>
 
-        <div class="card">
-            <h2>⏱️ Klima- / VPD-Rampe</h2>
-            <div class="info">
-                <strong>Aus:</strong> klassische Temperatur-Rampe zwischen Tag und Nacht.<br>
-                <strong>Beobachten:</strong> VPD-Rampe wird parallel simuliert, ohne den klassischen Regler zu verändern.<br>
-                <strong>Automatisch:</strong> nur VPD-Ziel, Toleranz und Min-/Max-Fenster werden gerampt; DAY_TEMP/NIGHT_TEMP bleiben ausschließlich Fallback.
-            </div>
-            <div class="row-inline">
-                <div class="field">
-                    <label>Aktiv</label>
-                    <input type="checkbox" id="RAMP_ENABLED">
-                </div>
-                <div class="field">
-                    <label>Dauer (min)</label>
-                    <div class="num-control">
-                        <button type="button" onclick="step('RAMP_DURATION_MIN',-5)">−</button>
-                        <input type="number" step="5" id="RAMP_DURATION_MIN" class="compact-input">
-                        <button type="button" onclick="step('RAMP_DURATION_MIN',5)">+</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <div class="card" id="light-sun-card">
             <h2>☀️ Sonnenaufgang & Sonnenuntergang</h2>
 
@@ -631,6 +683,15 @@ const ids = [
     "VPD_EFFECT_WINDOW_MIN","VPD_MIN_EFFECT_KPA","VPD_TEMP_STEP","VPD_FAN_STEP"
 ];
 
+const CLASSIC_CONTROL_BLOCK_IDS = [
+    "classic-temperature-controls",
+    "classic-humidity-controls"
+];
+const CLASSIC_LOCK_NOTE_IDS = [
+    "temperature-vpd-lock-note",
+    "humidity-vpd-lock-note"
+];
+
 let loadedConfig = {};
 
 function el(id){ return document.getElementById(id); }
@@ -659,6 +720,7 @@ function setDirty(value=true){
 
 function syncFormControls(){
     const busy = saveInFlight || loadInFlight;
+    const vpdAutomatic = el("VPD_CONTROL_MODE")?.value === "AUTO";
 
     document.querySelectorAll("input,select,.num-control button").forEach(control=>{
         if(
@@ -669,11 +731,53 @@ function syncFormControls(){
             )
         ){
             control.disabled = true;
+        }else if(
+            vpdAutomatic &&
+            control.closest?.("[data-classic-control]")
+        ){
+            control.disabled = true;
         }else{
             control.disabled = busy || !configLoaded;
         }
     });
     syncSaveActions();
+}
+
+function updateVpdModeUi(){
+    const mode = el("VPD_CONTROL_MODE")?.value || "OFF";
+    const automatic = mode === "AUTO";
+
+    CLASSIC_CONTROL_BLOCK_IDS.forEach(id=>{
+        const block = el(id);
+        if(!block) return;
+        block.classList.toggle("vpd-locked",automatic);
+        block.setAttribute("aria-disabled",automatic ? "true" : "false");
+    });
+
+    CLASSIC_LOCK_NOTE_IDS.forEach(id=>{
+        const note = el(id);
+        if(note) note.hidden = !automatic;
+    });
+
+    const rampLabel = el("ramp-enabled-label");
+    if(rampLabel){
+        rampLabel.textContent = mode === "OFF"
+            ? "Temperatur-Rampe aktiv"
+            : mode === "MONITOR"
+                ? "VPD-Rampe beobachten"
+                : "VPD-Rampe aktiv";
+    }
+
+    const rampHeading = el("vpd-ramp-heading");
+    if(rampHeading){
+        rampHeading.textContent = mode === "OFF"
+            ? "⏱️ Klassische Temperatur-Rampe"
+            : mode === "MONITOR"
+                ? "⏱️ VPD-Rampe beobachten"
+                : "⏱️ Eigene VPD-Rampe";
+    }
+
+    syncFormControls();
 }
 
 function setSaveInFlight(value){
@@ -702,6 +806,13 @@ function minToTime(m){
 function timeToMin(t){
     const [h,m] = String(t).split(":").map(Number);
     return h*60+m;
+}
+
+function shiftClock(value,deltaMinutes){
+    if(!value) return "--:--";
+    const minute = timeToMin(value);
+    if(!Number.isFinite(minute)) return "--:--";
+    return minToTime((minute + Number(deltaMinutes) + 1440) % 1440);
 }
 
 function formatLightingDuration(totalMinutes){
@@ -858,6 +969,29 @@ function updatePreview(){
             : mode === "MONITOR"
                 ? `⏱️ ${rampMinutes.toFixed(0)} Min. VPD-Rampe wird beobachtet · klassische Temperatur-Rampe bleibt autoritativ`
                 : `⏱️ ${rampMinutes.toFixed(0)} Min. klassische Temperatur-Rampe`;
+
+    const rampBox = el("vpd-ramp-preview");
+    if(rampBox){
+        const dayStart = el("DAY_START_TIME")?.value || "--:--";
+        const nightStart = el("NIGHT_START_TIME")?.value || "--:--";
+        const morningEnd = shiftClock(dayStart,rampMinutes);
+        const eveningStart = shiftClock(nightStart,-rampMinutes);
+        const behavior = mode === "AUTO"
+            ? "VPD-Ziel, Toleranz sowie Temperatur-/Feuchtefenster werden gleitend überführt."
+            : mode === "MONITOR"
+                ? "Der VPD-Verlauf wird nur berechnet; die klassische Regelung bleibt aktiv."
+                : "Im Modus Aus wird weiterhin nur der klassische Temperatur-Sollwert gerampt.";
+
+        rampBox.innerHTML = rampEnabled
+            ? `<strong>${rampMinutes.toFixed(0)} Minuten · ${mode === "OFF" ? "Temperatur" : "VPD"}</strong><br>
+               Morgen: ${dayStart} bis ${morningEnd}<br>
+               Abend: ${eveningStart} bis ${nightStart}<br>
+               ${behavior}<br>
+               Unabhängig von Licht-Dimmung und Helligkeitssensor.`
+            : `<strong>Rampe deaktiviert</strong><br>
+               Tag/Nacht wechselt ohne gleitenden Übergang. Sonnenverlauf und Lichtsteuerung bleiben davon unabhängig.`;
+    }
+
     el("vpd-preview").innerHTML = `
         <strong>${modeLabel}</strong><br>
         ${rampText}<br>
@@ -904,7 +1038,9 @@ function applyLimits(c){
     el("MAX_HUM").min = 0.1;
     el("MAX_HUM").max = 100;
 
-    el("RAMP_DURATION_MIN").min = 5;
+    // 0 bleibt für ältere Konfigurationen bei ausgeschalteter Rampe gültig.
+    // Sobald der Schalter aktiv ist, erzwingt save() mindestens 5 Minuten.
+    el("RAMP_DURATION_MIN").min = 0;
     el("RAMP_DURATION_MIN").max = 240;
 
     el("LIGHT_SUNRISE_DURATION_MIN").min = 0;
@@ -1020,6 +1156,7 @@ async function load({successMessage=""}={}){
         el("LIGHT_SUN_ENABLED").checked =
             lightSunAvailable && !!c.LIGHT_SUN_ENABLED;
         el("VPD_CONTROL_MODE").value = String(c.VPD_CONTROL_MODE || "OFF").toUpperCase();
+        updateVpdModeUi();
         updateLightingDuration();
 
         renderActiveProfile(payload.active_profile ?? c.ACTIVE_PROFILE);
@@ -1055,6 +1192,12 @@ async function save(){
 
     if(!el("DAY_START_TIME").value || !el("NIGHT_START_TIME").value){
         feedback("Tag Start und Nacht Start müssen vollständig gesetzt sein.","err");
+        return;
+    }
+
+    if(el("RAMP_ENABLED").checked && num("RAMP_DURATION_MIN") < 5){
+        el("RAMP_DURATION_MIN").focus();
+        feedback("Bei aktiver Rampe muss die Rampenzeit mindestens 5 Minuten betragen.","err");
         return;
     }
 
@@ -1174,7 +1317,7 @@ async function discardChanges(){
 
 function step(id,delta){
     const input = el(id);
-    if(!input) return;
+    if(!input || input.disabled) return;
 
     if(
         !lightSunAvailable &&
@@ -1200,6 +1343,7 @@ function step(id,delta){
 
 document.querySelectorAll("input,select").forEach(input=>{
     const updateDraft = ()=>{
+        if(input.id === "VPD_CONTROL_MODE") updateVpdModeUi();
         updateLightingDuration();
         updatePreview();
         setDirty(true);

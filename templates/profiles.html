@@ -55,6 +55,9 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .vpd-phase.day{border-color:rgba(250,204,21,.25)}
 .vpd-phase.night{border-color:rgba(129,140,248,.28)}
 .vpd-phase h3{margin:0 0 11px;text-align:center;font-size:.82rem;letter-spacing:.04em;color:#e2e8f0}
+.vpd-ramp-settings{margin:14px 0;padding:14px 12px 2px;border-radius:14px;background:linear-gradient(145deg,rgba(14,116,144,.13),rgba(15,23,42,.82));border:1px solid rgba(56,189,248,.28)}
+.vpd-ramp-settings h3{margin:0 0 8px;text-align:center;color:#bae6fd;font-size:.88rem}
+.vpd-ramp-settings .info{margin:8px 0 12px}
 .lighting-duration{margin:4px auto 0;padding:10px 12px;max-width:360px;text-align:center;border-radius:11px;background:rgba(250,204,21,.07);border:1px solid rgba(250,204,21,.22);color:#fde68a;font-size:.8rem}
 .feedback{min-height:20px;margin:10px 0 0;text-align:center;font-size:.78rem;color:var(--muted)}
 .feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.feedback.dirty{color:#fde68a}
@@ -340,31 +343,31 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     </div>
                 </section>
             </div>
-            <div id="vpd-profile-preview" class="preview"></div>
-        </div>
-
-        <div class="card">
-            <h2>⏱️ Klima- / VPD-Rampe</h2>
-            <div class="row-inline">
-                <div class="field">
-                    <label for="RAMP_ENABLED">Aktiv</label>
-                    <input type="checkbox" id="RAMP_ENABLED">
+            <section id="profile-vpd-ramp-settings" class="vpd-ramp-settings" aria-labelledby="profile-vpd-ramp-heading">
+                <h3 id="profile-vpd-ramp-heading">⏱️ Eigene VPD-Rampe</h3>
+                <div class="info">
+                    Funktioniert unabhängig von Helligkeitssensor und Sonnenverlauf.
+                    Sie beginnt morgens bei <strong>Tag Start</strong> und endet abends
+                    bei <strong>Nacht Start</strong>. Im VPD-Automatikmodus werden Ziel,
+                    Toleranz und Klima-Fenster gerampt.
                 </div>
-                <div class="field">
-                    <label for="RAMP_DURATION_MIN">Dauer (min)</label>
-                    <div class="num-control">
-                        <button type="button" onclick="stepValue('RAMP_DURATION_MIN',-5)">−</button>
-                        <input type="number" step="1" min="0" max="240" id="RAMP_DURATION_MIN" class="compact-input" required>
-                        <button type="button" onclick="stepValue('RAMP_DURATION_MIN',5)">+</button>
+                <div class="row-inline">
+                    <div class="field">
+                        <label for="RAMP_ENABLED">Rampe aktiv</label>
+                        <input type="checkbox" id="RAMP_ENABLED">
+                    </div>
+                    <div class="field">
+                        <label for="RAMP_DURATION_MIN">Rampenzeit (min)</label>
+                        <div class="num-control">
+                            <button type="button" onclick="stepValue('RAMP_DURATION_MIN',-5)">−</button>
+                            <input type="number" step="1" min="0" max="240" id="RAMP_DURATION_MIN" class="compact-input" required>
+                            <button type="button" onclick="stepValue('RAMP_DURATION_MIN',5)">+</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="hint">
-                Im automatischen VPD-Modus gilt diese Dauer für den gleitenden
-                Wechsel von VPD-Ziel, Toleranz und Min-/Max-Fenstern. Ohne
-                AUTO bleibt sie die klassische Temperatur-Rampe. Bei aktiver
-                Rampe sind mindestens 5 Minuten erforderlich.
-            </div>
+                <div id="profile-vpd-ramp-preview" class="preview"></div>
+            </section>
+            <div id="vpd-profile-preview" class="preview"></div>
         </div>
 
         <div class="card" id="profile-light-sun-card">
@@ -498,6 +501,12 @@ function timeToMin(value){
     return parts[0] * 60 + parts[1];
 }
 
+function shiftClock(value,deltaMinutes){
+    const minute = timeToMin(value);
+    if(!Number.isFinite(minute)) return "--:--";
+    return minToTime((minute + Number(deltaMinutes) + 1440) % 1440);
+}
+
 function formatLightingDuration(totalMinutes){
     const minutes = Math.max(0, Math.round(Number(totalMinutes) || 0));
     const hours = Math.floor(minutes / 60);
@@ -583,6 +592,20 @@ function updatePreview(){
     const rampText = el("RAMP_ENABLED")?.checked
         ? `⏱️ ${num("RAMP_DURATION_MIN").toFixed(0)} Min. gleitender Tag-/Nachtwechsel (in AUTO über VPD und Klima-Fenster)`
         : "⏱️ Rampe deaktiviert";
+    const rampMinutes = num("RAMP_DURATION_MIN");
+    const rampActive = !!el("RAMP_ENABLED")?.checked;
+    const rampPreview = el("profile-vpd-ramp-preview");
+    if(rampPreview){
+        const dayStartTime = el("DAY_START_TIME")?.value || "--:--";
+        const nightStartTime = el("NIGHT_START_TIME")?.value || "--:--";
+        rampPreview.innerHTML = rampActive
+            ? `<strong>${rampMinutes.toFixed(0)} Minuten</strong><br>
+               Morgen: ${dayStartTime} bis ${shiftClock(dayStartTime,rampMinutes)}<br>
+               Abend: ${shiftClock(nightStartTime,-rampMinutes)} bis ${nightStartTime}<br>
+               Unabhängig von Licht-Dimmung und Helligkeitssensor.`
+            : `<strong>Rampe deaktiviert</strong><br>
+               Der Profilwechsel erfolgt ohne gleitenden Übergang; die Lichtfunktion bleibt davon unabhängig.`;
+    }
     el("vpd-profile-preview").innerHTML = `
         <strong>VPD-Profil</strong><br>
         ${rampText}<br>

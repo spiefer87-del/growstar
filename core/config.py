@@ -93,6 +93,8 @@ DEFAULT_CONFIG = {
 
     # Ohne VPD-AUTO: klassische Temperatur-Rampe. Im intelligenten Modus:
     # gleitender VPD-Ziel-/Betriebsfensterwechsel; MONITOR simuliert ihn nur.
+    # Schalter und Dauer sind absichtlich vollständig von LIGHT_SUN_* sowie
+    # dem Vorhandensein eines Licht-/Helligkeitssensors entkoppelt.
     "RAMP_DURATION_MIN": 60,
     "RAMP_ENABLED": 0,
 

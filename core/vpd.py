@@ -207,7 +207,10 @@ def calculate_vpd_schedule(settings, cfg, profile, *, now_min=None):
     Die vorhandene Rampendauer bleibt die gemeinsame Profilvorgabe. Im
     intelligenten Modus interpoliert sie jedoch VPD-Ziel, Toleranz und
     Betriebsfenster statt eines festen Temperatur-Sollwerts. Die Funktion ist
-    rein und verändert weder Runtime- noch Aktorzustand.
+    rein und verändert weder Runtime- noch Aktorzustand. Ihre Zeitfenster sind
+    ausschließlich an DAY_START_MIN/NIGHT_START_MIN gebunden; LIGHT_SUN_*, ein
+    Lichtcontroller oder ein Helligkeitssensor sind ausdrücklich keine
+    Voraussetzung.
     """
 
     phases = settings.get("phases") or {}
