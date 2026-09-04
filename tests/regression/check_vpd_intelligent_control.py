@@ -425,8 +425,9 @@ def main():
         and first_night_stage["profile"] == "NACHT"
         and first_night_stage["stage"] == "exhaust"
         and first_night_stage["fan_level"] == 25
-        and first_night_stage["effect"]["next_evaluation_sec"] == 300,
-        "Der Tag-/Nachtwechsel startet die Wirkungsprüfung mit dem neuen Fenster frisch",
+        and first_night_stage["effect"]["next_evaluation_sec"] == 60
+        and first_night_stage["effect"]["cadence"]["phase"] == "fast",
+        "Der Tag-/Nachtwechsel startet die adaptive Wirkungsprüfung im Schnellmodus frisch",
     )
 
     missing = runtime_for(outside=False)

@@ -30,6 +30,12 @@ Arbeitsbereich und die Wahl der Feuchteaktoren, darf eine zum Erreichen des
 VPD-Ziels noch vorhandene Temperaturreserve aber nicht abschneiden.
 
 Der MONITOR-Modus berechnet exakt denselben Plan, übernimmt aber keine Aktoren.
+
+Die Sensor-, Zielband- und Sicherheitsprüfung läuft bei jedem Hauptzyklus.
+Lediglich der nächste Aktorschritt wird adaptiv freigegeben: neue Strategien
+starten mit 60 Sekunden, träge oder bereits beruhigte Situationen werden über
+120 Sekunden bewertet und erst nach zehn stabilen Minuten darf das bestehende
+konfigurierbare Wirkungsfenster als längerer Prüftakt genutzt werden.
 """
 
 from __future__ import annotations
@@ -55,6 +61,11 @@ from core.vpd import (
     reset_vpd_control,
     validate_vpd_environment_alignment,
 )
+
+
+_FAST_EFFECT_WINDOW_SEC = 60
+_SETTLING_EFFECT_WINDOW_SEC = 120
+_STABLE_AFTER_SEC = 600
 
 
 def _saturation_vapor_pressure(temp_c):
@@ -275,10 +286,115 @@ def _set_stage(engine, *, direction, stage, now, vpd, temp=None, note=None):
         engine["stage_start_temp"] = float(temp)
     engine["last_transition_note"] = note
 
+    try:
+        fan_signature = int(engine.get("fan_level"))
+    except (TypeError, ValueError):
+        fan_signature = None
+    try:
+        temp_signature = round(float(engine.get("temp_target")), 3)
+    except (TypeError, ValueError):
+        temp_signature = None
+    signature = f"{direction}|{stage}|{fan_signature}|{temp_signature}"
+    if signature != engine.get("_cadence_signature"):
+        engine["_cadence_signature"] = signature
+        engine["_cadence_force_fast"] = True
+        engine.pop("_cadence_window_sec", None)
+        engine.pop("_cadence_phase", None)
+
 
 def _remember_evaluation(engine, *, now, improvement):
     engine["last_evaluation_at"] = float(now)
     engine["last_evaluation_improvement"] = float(improvement)
+
+
+def _adaptive_effect_window(
+    engine,
+    *,
+    now,
+    direction,
+    error,
+    tolerance,
+    max_window_sec,
+):
+    """Wählt das Wirkungsfenster, ohne die laufende Sicherheitsprüfung zu drosseln."""
+
+    maximum = max(
+        _FAST_EFFECT_WINDOW_SEC,
+        int(round(float(max_window_sec))),
+    )
+    fast = min(_FAST_EFFECT_WINDOW_SEC, maximum)
+    settling = min(_SETTLING_EFFECT_WINDOW_SEC, maximum)
+
+    if direction is None:
+        try:
+            stable_since = float(engine.get("stable_since"))
+        except (TypeError, ValueError):
+            stable_since = float(now)
+            engine["stable_since"] = stable_since
+
+        stable_elapsed = max(0.0, float(now) - stable_since)
+        engine.pop("_cadence_window_sec", None)
+        engine.pop("_cadence_phase", None)
+        engine.pop("_cadence_force_fast", None)
+
+        if stable_elapsed < fast:
+            phase = "fast"
+            label = "Schnellprüfung"
+            interval = fast
+        elif stable_elapsed < _STABLE_AFTER_SEC:
+            phase = "settling"
+            label = "Beruhigungsphase"
+            interval = settling
+        else:
+            phase = "stable"
+            label = "Stabilbetrieb"
+            interval = maximum
+    else:
+        engine.pop("stable_since", None)
+        stable_elapsed = 0.0
+
+        interval = engine.get("_cadence_window_sec")
+        phase = engine.get("_cadence_phase")
+        try:
+            interval = int(interval)
+        except (TypeError, ValueError):
+            interval = None
+
+        if interval is None or interval <= 0:
+            force_fast = bool(engine.pop("_cadence_force_fast", False))
+            deviation = abs(float(error))
+            near_target = deviation <= max(0.001, float(tolerance) * 2.0)
+            heat_is_stalling = (
+                engine.get("stage") == "heat"
+                and int(engine.get("heat_stall_windows") or 0) > 0
+            )
+
+            if force_fast or (not near_target and not heat_is_stalling):
+                phase = "fast"
+                interval = fast
+            else:
+                phase = "settling"
+                interval = settling
+
+            engine["_cadence_window_sec"] = interval
+            engine["_cadence_phase"] = phase
+
+        label = (
+            "Schnellprüfung"
+            if phase == "fast"
+            else "Beruhigungsphase"
+        )
+
+    return {
+        "adaptive": True,
+        "phase": phase,
+        "label": label,
+        "interval_sec": int(interval),
+        "max_interval_sec": int(maximum),
+        "stable_after_sec": _STABLE_AFTER_SEC,
+        "stable_elapsed_sec": round(stable_elapsed, 1),
+        "continuous_guard": True,
+    }
 
 
 def _temperature_response(engine, temp, settings):
@@ -1344,7 +1460,8 @@ def update_vpd_control(runtime=None, *, now=None):
 
     direction = "raise" if low_needed else "lower" if high_needed else None
 
-    if direction != engine.get("direction"):
+    direction_changed = direction != engine.get("direction")
+    if direction_changed:
         engine["temp_target"] = base_target
         engine["fan_level"] = fan_limits["minimum"]
         engine["fan_sweep_complete"] = False
@@ -1422,8 +1539,16 @@ def update_vpd_control(runtime=None, *, now=None):
                 temp=temp,
                 note=direction_note,
             )
-    else:
-        _append_sample(engine, now, vpd, settings["effect_window_sec"])
+    cadence = _adaptive_effect_window(
+        engine,
+        now=now,
+        direction=direction,
+        error=error,
+        tolerance=settings["tolerance"],
+        max_window_sec=settings["effect_window_sec"],
+    )
+    if not direction_changed:
+        _append_sample(engine, now, vpd, cadence["interval_sec"])
 
     if direction is None:
         # Sobald der reale Messwert das VPD-Zielband erreicht, wird ein noch
@@ -1438,7 +1563,12 @@ def update_vpd_control(runtime=None, *, now=None):
     elapsed = max(0.0, now - float(engine.get("stage_started_at") or now))
     improvement = _stage_effect(engine, direction) if direction else 0.0
 
-    if direction and elapsed >= settings["effect_window_sec"]:
+    if direction and elapsed >= cadence["interval_sec"]:
+        # Das nächste Fenster wird nach der Entscheidung frisch gewählt. Eine
+        # neue Aktorstufe erzwingt dabei über _set_stage wieder 60 Sekunden;
+        # eine unveränderte, träge Stufe kann auf 120 Sekunden wechseln.
+        engine.pop("_cadence_window_sec", None)
+        engine.pop("_cadence_phase", None)
         if direction == "raise":
             _advance_raise_stage(
                 rt,
@@ -1462,7 +1592,18 @@ def update_vpd_control(runtime=None, *, now=None):
                 outside_humidifying=outside_humidifying,
                 preferred_temp=preferred_temp,
             )
-        elapsed = 0.0
+        cadence = _adaptive_effect_window(
+            engine,
+            now=now,
+            direction=direction,
+            error=error,
+            tolerance=settings["tolerance"],
+            max_window_sec=settings["effect_window_sec"],
+        )
+        elapsed = max(
+            0.0,
+            now - float(engine.get("stage_started_at") or now),
+        )
         improvement = 0.0
 
     engine["last_temp"] = temp
@@ -1658,7 +1799,9 @@ def update_vpd_control(runtime=None, *, now=None):
             "projected_exchange_vpd": round(projected_exchange_vpd, 3),
         },
         "effect": {
-            "window_sec": settings["effect_window_sec"],
+            "window_sec": cadence["interval_sec"],
+            "max_window_sec": cadence["max_interval_sec"],
+            "cadence": deepcopy(cadence),
             "elapsed_sec": round(elapsed, 1),
             "improvement_kpa": round(improvement, 3),
             "last_improvement_kpa": (
@@ -1669,7 +1812,7 @@ def update_vpd_control(runtime=None, *, now=None):
             "minimum_kpa": settings["min_effect"],
             "next_evaluation_sec": max(
                 0,
-                int(round(settings["effect_window_sec"] - elapsed)),
+                int(round(cadence["interval_sec"] - elapsed)),
             ) if direction and stage != "in_band" else None,
         },
         "fan_level": engine.get("fan_level"),

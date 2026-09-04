@@ -654,7 +654,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 
             <div class="row-inline">
                 <div class="field">
-                    <label>Wirkung prüfen (min)</label>
+                    <label>Stabilprüfung max. (min)</label>
                     <div class="num-control">
                         <button type="button" onclick="step('VPD_EFFECT_WINDOW_MIN',-1)">−</button>
                         <input type="number" step="1" id="VPD_EFFECT_WINDOW_MIN" class="compact-input">
@@ -685,6 +685,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
                         <button type="button" onclick="step('VPD_FAN_STEP',1)">+</button>
                     </div>
                 </div>
+            </div>
+
+            <div class="info">
+                <strong>Adaptive Wirkungsprüfung:</strong> Neue Regelstufen und
+                deutliche Abweichungen werden nach 60 Sekunden bewertet. In der
+                Beruhigungsphase gelten 120 Sekunden. Nach zehn stabilen Minuten
+                steigt das Fenster bis zum hier eingestellten Maximum. Das
+                VPD-Zielband und alle Sicherheitsgrenzen werden unabhängig davon
+                fortlaufend geprüft.
             </div>
 
             <div class="vpd-sequence">
@@ -1164,7 +1173,7 @@ function updatePreview(){
         ${num("VPD_TEMP_MIN_NIGHT").toFixed(1)}–${num("VPD_TEMP_MAX_NIGHT").toFixed(1)} °C ·
         ${num("VPD_HUM_MIN_NIGHT").toFixed(1)}–${num("VPD_HUM_MAX_NIGHT").toFixed(1)} %<br>
         Physikalisch erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa<br>
-        Jede Abluft- und Temperaturstufe wird ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten geprüft.
+        Adaptive Wirkungsprüfung: 60 Sekunden bei neuen Stufen, 120 Sekunden in der Beruhigungsphase und nach zehn stabilen Minuten maximal ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten.
         Das VPD-Zielband gibt die Regelrichtung vor. Bleibt der VPD nach maximaler Abluft zu niedrig, wird die Temperaturreserve bis zur eingestellten Obergrenze schrittweise genutzt.
         Ab ${num("VPD_MIN_EFFECT_KPA").toFixed(3)} kPa gilt eine Stufe als messbar wirksam; eine schwächere Einzelmessung beendet den Stufenweg nicht vorzeitig.
     `;

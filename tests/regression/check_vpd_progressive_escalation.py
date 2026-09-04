@@ -122,7 +122,8 @@ def main():
     rechecked = update_vpd_control(no_dehumidifier, now=2204)
     require(
         limited["stage"] == "limited"
-        and limited["effect"]["next_evaluation_sec"] == 300
+        and limited["effect"]["next_evaluation_sec"] == 60
+        and limited["effect"]["cadence"]["phase"] == "fast"
         and rechecked["stage"] == "limited"
         and "ausgeschöpft" in rechecked["reason"],
         "Ohne letzte ENV-Stufe bleibt LIMITED sicher, aber wird regelmäßig neu bewertet statt einzufrieren",

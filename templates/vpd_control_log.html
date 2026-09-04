@@ -274,11 +274,23 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
         text("vpd-log-coupling",setpoints.explanation || "Temperatur- und Feuchteziel werden gemeinsam berechnet.");
 
         const effect = control.effect || {};
+        const cadence = effect.cadence || {};
         const remaining = number(effect.next_evaluation_sec);
         const last = number(effect.last_improvement_kpa);
         const current = number(effect.improvement_kpa);
         const minimum = number(effect.minimum_kpa);
-        let effectText = remaining !== null ? `Nächste Prüfung in ${countdown(remaining)}` : (waiting ? "Prüfung pausiert" : "Laufende Bewertung");
+        const interval = number(cadence.interval_sec ?? effect.window_sec);
+        const maximum = number(cadence.max_interval_sec ?? effect.max_window_sec);
+        let effectText = cadence.label || (waiting ? "Prüfung pausiert" : "Adaptive Prüfung");
+        if(remaining !== null){
+            effectText += ` · nächste Stufenprüfung in ${countdown(remaining)}`;
+        }else if(!waiting){
+            effectText += " · Messwert wird fortlaufend überwacht";
+        }
+        if(interval !== null) effectText += ` · Wirkungsfenster ${countdown(interval)}`;
+        if(maximum !== null && interval !== null && maximum > interval){
+            effectText += ` · stabil maximal ${countdown(maximum)}`;
+        }
         const shown = last !== null ? last : current;
         if(shown !== null && minimum !== null) effectText += ` · ${last !== null ? "zuletzt" : "Wirkung"} ${shown >= 0 ? "+" : ""}${shown.toFixed(3)} / ${minimum.toFixed(3)} kPa`;
         text("vpd-log-effect",effectText);
