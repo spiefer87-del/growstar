@@ -41,6 +41,12 @@ def update_humidity_setpoint(runtime=None):
         base, tol = cfg["NIGHT_HUM"], cfg["NIGHT_HUM_TOL"]
 
     st.live_state["hum_target"] = base
+    # Unveränderter Sollwert der klassischen Profilregelung. VPD-AUTO darf
+    # den sichtbaren Live-Sollwert später im selben Zyklus durch das gekoppelte
+    # Temperatur-/Feuchteziel ersetzen. Für Fallback und Reset bleibt das
+    # klassische Original dadurch jederzeit eindeutig verfügbar.
+    st.live_state["climate_hum_target"] = base
+    st.live_state["climate_hum_tol"] = tol
     st.live_state["hum_tol"] = tol
 
 

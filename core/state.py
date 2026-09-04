@@ -46,6 +46,11 @@ _LIVE_STATE_TEMPLATE = {
     "temp_tol": None,
     "hum_target": None,
     "hum_tol": None,
+    # Klassische Profilwerte bleiben getrennt erhalten, wenn VPD-AUTO die
+    # sichtbaren Live-Sollwerte stationsbezogen übernimmt.
+    "climate_temp_target": None,
+    "climate_hum_target": None,
+    "climate_hum_tol": None,
 
     "heating": False,
     "fan": False,

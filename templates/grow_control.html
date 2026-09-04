@@ -529,7 +529,7 @@ h3 {
         <div class="card env" id="temp-card">
             <h2>Temperatur</h2>
             <div class="value"><span id="temp-ist">--.-</span> °C</div>
-            <div class="sub">Soll: <strong><span id="temp-soll">--.-</span> °C</strong> <span id="temp-ramp"></span></div>
+            <div class="sub" id="temp-target-row">Soll: <strong><span id="temp-soll">--.-</span> °C</strong> <span id="temp-ramp"></span></div>
         </div>
     </a>
 
@@ -537,7 +537,7 @@ h3 {
         <div class="card env" id="hum-card">
             <h2>Luftfeuchtigkeit</h2>
             <div class="value"><span id="hum-ist">--.-</span> %</div>
-            <div class="sub">Soll: <strong><span id="hum-soll">--.-</span> %</strong></div>
+            <div class="sub" id="hum-target-row">Soll: <strong><span id="hum-soll">--.-</span> %</strong></div>
         </div>
     </a>
 
@@ -1064,6 +1064,18 @@ h3 {
                     ? String(Math.round(Number(state.light_ppfd)))
                     : "---"
             );
+
+            const liveSetpoints = state.vpd_control?.setpoints || {};
+            const vpdOwnsTargets = String(state.vpd_control?.mode || "").toUpperCase() === "AUTO"
+                && Boolean(state.vpd_control?.takeover)
+                && Boolean(state.vpd_control?.ready);
+            ["temp-target-row","hum-target-row"].forEach(id => {
+                const row = document.getElementById(id);
+                if(!row) return;
+                row.title = vpdOwnsTargets
+                    ? (liveSetpoints.explanation || "VPD-AUTO berechnet diesen Sollwert live.")
+                    : "Klassischer Profil-Sollwert";
+            });
 
             const ramp = document.getElementById("temp-ramp");
             if (ramp) {

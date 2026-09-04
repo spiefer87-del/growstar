@@ -22,6 +22,12 @@ Eine aktivierte Profilrampe interpoliert im intelligenten Modus VPD-Ziel,
 Toleranz und Klimafenster. Klassische DAY_TEMP/NIGHT_TEMP-Werte sind keine
 Regelbasis des VPD-Koordinators mehr.
 
+Temperatur und Luftfeuchtigkeit werden dabei nicht als zwei unabhängige
+Sollwerte behandelt. Der Koordinator berechnet zu jedem VPD-Temperaturziel den
+passenden Feuchtesollwert. Ist eine Kombination durch das konfigurierte
+Feuchtefenster ausgeschlossen, wird das wirksame Temperaturziel automatisch
+auf den erreichbaren Teil der VPD-Kurve begrenzt.
+
 Der MONITOR-Modus berechnet exakt denselben Plan, übernimmt aber keine Aktoren.
 """
 
@@ -351,6 +357,37 @@ def _readiness(runtime, values):
     return blockers
 
 
+def _restore_classic_live_targets(state):
+    """Entfernt VPD-Sollwerte und stellt vorhandene Profilwerte wieder her."""
+
+    live = state.live_state
+    for target_key, climate_key in (
+        ("temp_target", "climate_temp_target"),
+        ("hum_target", "climate_hum_target"),
+    ):
+        try:
+            value = float(live.get(climate_key))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(value):
+            live[target_key] = value
+
+    try:
+        climate_hum_tol = float(live.get("climate_hum_tol"))
+    except (TypeError, ValueError):
+        climate_hum_tol = None
+    if climate_hum_tol is not None and math.isfinite(climate_hum_tol):
+        live["hum_tol"] = climate_hum_tol
+
+    for key in (
+        "vpd_temp_target",
+        "vpd_base_temp_target",
+        "vpd_hum_target",
+        "vpd_effective_target",
+    ):
+        live.pop(key, None)
+
+
 def _base_temp_target(runtime, settings, current_temp=None):
     """Temperaturreferenz des VPD-Reglers ohne klassische Sollwertkopplung."""
 
@@ -378,25 +415,177 @@ def _base_temp_target(runtime, settings, current_temp=None):
     return (float(settings["temp_min"]) + float(settings["temp_max"])) / 2.0
 
 
-def _temperature_for_vpd(target_vpd, humidity, temp_min, temp_max):
-    """Temperatur, die beim aktuellen RH rechnerisch den Ziel-VPD ergibt."""
+def _temperature_for_vpd_exact(target_vpd, humidity):
+    """Unbegrenzte Temperatur, die bei ``humidity`` den Ziel-VPD ergibt."""
 
     humidity = _clip(humidity, 0.0, 99.9)
     vapor_fraction = 1.0 - humidity / 100.0
     if vapor_fraction <= 0.0:
-        return float(temp_max)
+        return float("inf")
 
     saturation_target = float(target_vpd) / vapor_fraction
     if saturation_target <= 0.0:
-        return float(temp_min)
+        return float("-inf")
 
     logarithm = math.log(saturation_target / 0.6108)
     denominator = 17.27 - logarithm
     if abs(denominator) < 1e-9:
-        return float(temp_max)
+        return float("inf")
 
-    temperature = 237.3 * logarithm / denominator
-    return _clip(temperature, temp_min, temp_max)
+    return 237.3 * logarithm / denominator
+
+
+def _temperature_for_vpd(target_vpd, humidity, temp_min, temp_max):
+    """Temperatur, die beim aktuellen RH rechnerisch den Ziel-VPD ergibt."""
+
+    return _clip(
+        _temperature_for_vpd_exact(target_vpd, humidity),
+        temp_min,
+        temp_max,
+    )
+
+
+def _humidity_for_vpd(target_vpd, temperature):
+    """Relative Feuchte für einen VPD-Zielwert bei gegebener Temperatur."""
+
+    saturation = _saturation_vapor_pressure(temperature)
+    if saturation <= 0.0:
+        return 0.0
+    return _clip(100.0 * (1.0 - float(target_vpd) / saturation), 0.0, 100.0)
+
+
+def _coupled_target_curve(settings):
+    """Erreichbarer Abschnitt der Ziel-VPD-Kurve im harten Klimafenster."""
+
+    attainable_min = float(
+        calculate_vpd(settings["temp_min"], settings["hum_max"])
+    )
+    attainable_max = float(
+        calculate_vpd(settings["temp_max"], settings["hum_min"])
+    )
+    effective_vpd = _clip(
+        settings["target"],
+        attainable_min,
+        attainable_max,
+    )
+
+    temperature_at_hum_min = _temperature_for_vpd_exact(
+        effective_vpd,
+        settings["hum_min"],
+    )
+    temperature_at_hum_max = _temperature_for_vpd_exact(
+        effective_vpd,
+        settings["hum_max"],
+    )
+    curve_min = max(
+        float(settings["temp_min"]),
+        min(temperature_at_hum_min, temperature_at_hum_max),
+    )
+    curve_max = min(
+        float(settings["temp_max"]),
+        max(temperature_at_hum_min, temperature_at_hum_max),
+    )
+
+    # An einem exakt erreichbaren Eckpunkt können Rundungsreste die beiden
+    # Grenzen um wenige Femtograd vertauschen. Dieser Fall bleibt ein einzelner
+    # gültiger Zielpunkt und darf nicht zu einem leeren Regelband werden.
+    if curve_min > curve_max:
+        midpoint = _clip(
+            (curve_min + curve_max) / 2.0,
+            settings["temp_min"],
+            settings["temp_max"],
+        )
+        curve_min = curve_max = midpoint
+
+    return {
+        "vpd": effective_vpd,
+        "requested_vpd": float(settings["target"]),
+        "temp_min": curve_min,
+        "temp_max": curve_max,
+        "attainable_min": attainable_min,
+        "attainable_max": attainable_max,
+    }
+
+
+def _coupled_setpoints(settings, curve, temperature):
+    """Gemeinsames Live-Zielpaar und verständliche Grenzprojektion."""
+
+    target_temp = _clip(
+        temperature,
+        curve["temp_min"],
+        curve["temp_max"],
+    )
+    target_hum = _clip(
+        _humidity_for_vpd(curve["vpd"], target_temp),
+        settings["hum_min"],
+        settings["hum_max"],
+    )
+
+    lower_vpd = max(
+        0.001,
+        float(settings["target"]) - float(settings["tolerance"]),
+    )
+    upper_vpd = float(settings["target"]) + float(settings["tolerance"])
+    band_hum_min = max(
+        float(settings["hum_min"]),
+        _humidity_for_vpd(upper_vpd, target_temp),
+    )
+    band_hum_max = min(
+        float(settings["hum_max"]),
+        _humidity_for_vpd(lower_vpd, target_temp),
+    )
+    if band_hum_min > band_hum_max:
+        band_hum_min = band_hum_max = target_hum
+
+    max_temp_hum = _humidity_for_vpd(
+        settings["target"],
+        settings["temp_max"],
+    )
+    max_temp_compatible = (
+        float(settings["hum_min"]) - 1e-9
+        <= max_temp_hum
+        <= float(settings["hum_max"]) + 1e-9
+    )
+
+    explanations = []
+    if abs(curve["vpd"] - float(settings["target"])) > 1e-9:
+        explanations.append(
+            f"Die Zielmitte {float(settings['target']):.2f} kPa ist im "
+            f"Klimafenster nicht exakt erreichbar; verwendet werden "
+            f"{curve['vpd']:.2f} kPa innerhalb der Toleranz."
+        )
+    if not max_temp_compatible:
+        explanations.append(
+            f"Bei {float(settings['temp_max']):.1f} °C wären für "
+            f"{float(settings['target']):.2f} kPa {max_temp_hum:.1f} % nötig; "
+            f"das Feuchtefenster begrenzt das gekoppelte Temperaturziel auf "
+            f"{curve['temp_max']:.1f} °C."
+        )
+    if not explanations:
+        explanations.append(
+            "Temperatur und Luftfeuchtigkeit werden gemeinsam innerhalb "
+            "des VPD-Klimafensters nachgeführt."
+        )
+
+    return {
+        "vpd": float(curve["vpd"]),
+        "temp": target_temp,
+        "hum": target_hum,
+        "hum_band_min": band_hum_min,
+        "hum_band_max": band_hum_max,
+        "curve_temp_min": float(curve["temp_min"]),
+        "curve_temp_max": float(curve["temp_max"]),
+        "at_temp_max": {
+            "temp": float(settings["temp_max"]),
+            "hum": max_temp_hum,
+            "within_humidity_range": max_temp_compatible,
+        },
+        "constrained": bool(
+            not max_temp_compatible
+            or abs(curve["vpd"] - float(settings["target"])) > 1e-9
+        ),
+        "explanation": " ".join(explanations),
+    }
 
 
 def _step_temperature(current, destination, step):
@@ -641,6 +830,11 @@ def _advance_raise_stage(
                 ),
             )
         elif availability["dehumidifier"]:
+            if (
+                float(engine.get("temp_target") or settings["temp_min"])
+                >= settings["temp_max"]
+            ):
+                engine["heat_sweep_complete"] = True
             _set_stage(
                 engine,
                 direction="raise",
@@ -651,6 +845,11 @@ def _advance_raise_stage(
                 note="Abluftweg ausgeschöpft und keine Temperaturreserve; Entfeuchter angefordert",
             )
         else:
+            if (
+                float(engine.get("temp_target") or settings["temp_min"])
+                >= settings["temp_max"]
+            ):
+                engine["heat_sweep_complete"] = True
             _set_stage(
                 engine,
                 direction="raise",
@@ -940,6 +1139,7 @@ def update_vpd_control(runtime=None, *, now=None):
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
             st.live_state.pop(_ENGINE_KEY, None)
+            _restore_classic_live_targets(st)
         return public
 
     if settings["mode"] == "OFF":
@@ -959,8 +1159,7 @@ def update_vpd_control(runtime=None, *, now=None):
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
             st.live_state.pop(_ENGINE_KEY, None)
-            st.live_state.pop("vpd_temp_target", None)
-            st.live_state.pop("vpd_base_temp_target", None)
+            _restore_classic_live_targets(st)
         return public
 
     try:
@@ -982,6 +1181,7 @@ def update_vpd_control(runtime=None, *, now=None):
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
             st.live_state.pop(_ENGINE_KEY, None)
+            _restore_classic_live_targets(st)
         return public
 
     with rt.state_lock:
@@ -1010,8 +1210,7 @@ def update_vpd_control(runtime=None, *, now=None):
         with rt.state_lock:
             st.live_state[_PUBLIC_KEY] = public
             st.live_state.pop(_ENGINE_KEY, None)
-            st.live_state.pop("vpd_temp_target", None)
-            st.live_state.pop("vpd_base_temp_target", None)
+            _restore_classic_live_targets(st)
         return public
 
     temp = float(values["temp"])
@@ -1021,6 +1220,11 @@ def update_vpd_control(runtime=None, *, now=None):
     vpd = float(calculate_vpd(temp, hum))
     target = settings["target"]
     error = vpd - target
+    target_curve = _coupled_target_curve(settings)
+    regulation_settings = dict(settings)
+    regulation_settings["target"] = target_curve["vpd"]
+    regulation_settings["temp_min"] = target_curve["temp_min"]
+    regulation_settings["temp_max"] = target_curve["temp_max"]
 
     inside_ah = _absolute_humidity(temp, hum)
     outside_ah = _absolute_humidity(outside_temp, outside_hum)
@@ -1049,12 +1253,16 @@ def update_vpd_control(runtime=None, *, now=None):
     }
     managed_devices = [device for device, available in availability.items() if available]
 
-    base_target = _base_temp_target(rt, settings, current_temp=temp)
+    base_target = _clip(
+        _base_temp_target(rt, settings, current_temp=temp),
+        target_curve["temp_min"],
+        target_curve["temp_max"],
+    )
     preferred_temp = _temperature_for_vpd(
-        target,
+        target_curve["vpd"],
         hum,
-        settings["temp_min"],
-        settings["temp_max"],
+        target_curve["temp_min"],
+        target_curve["temp_max"],
     )
 
     with rt.state_lock:
@@ -1078,8 +1286,8 @@ def update_vpd_control(runtime=None, *, now=None):
     engine["base_temp_target"] = base_target
     engine["temp_target"] = _clip(
         engine.get("temp_target", base_target),
-        settings["temp_min"],
-        settings["temp_max"],
+        target_curve["temp_min"],
+        target_curve["temp_max"],
     )
 
     fan_limits = _fan_limits(rt)
@@ -1108,8 +1316,22 @@ def update_vpd_control(runtime=None, *, now=None):
     # innerhalb entscheidet wieder ausschließlich das VPD-Zielband.
     if hum > settings["hum_max"]:
         low_needed, high_needed = True, False
+        direction_note = (
+            f"Luftfeuchtigkeit {hum:.1f} % liegt über der "
+            f"VPD-Feuchteobergrenze {settings['hum_max']:.1f} %"
+        )
     elif hum < settings["hum_min"]:
         low_needed, high_needed = False, True
+        direction_note = (
+            f"Luftfeuchtigkeit {hum:.1f} % liegt unter der "
+            f"VPD-Feuchteuntergrenze {settings['hum_min']:.1f} %"
+        )
+    elif low_needed:
+        direction_note = "VPD ist zu niedrig"
+    elif high_needed:
+        direction_note = "VPD ist zu hoch"
+    else:
+        direction_note = "VPD und Betriebsfenster sind im Ziel"
 
     direction = "raise" if low_needed else "lower" if high_needed else None
 
@@ -1125,10 +1347,13 @@ def update_vpd_control(runtime=None, *, now=None):
         if direction == "raise":
             if availability["fan"] and outside_drying:
                 initial_stage = "exhaust"
-            elif availability["heating"] and temp < settings["temp_max"]:
+            elif (
+                availability["heating"]
+                and temp < regulation_settings["temp_max"]
+            ):
                 initial_stage = "heat"
                 engine["temp_target"] = min(
-                    settings["temp_max"],
+                    regulation_settings["temp_max"],
                     max(base_target, temp) + settings["temp_step"],
                 )
             elif availability["dehumidifier"]:
@@ -1142,7 +1367,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 now=now,
                 vpd=vpd,
                 temp=temp,
-                note="VPD ist zu niedrig",
+                note=direction_note,
             )
         elif direction == "lower":
             temperature_path_available = bool(
@@ -1159,7 +1384,7 @@ def update_vpd_control(runtime=None, *, now=None):
                     settings["temp_step"],
                 )
                 initial_stage = "cool"
-                note = "VPD ist zu hoch; Temperatur wird bevorzugt abgesenkt"
+                note = f"{direction_note}; Temperatur wird bevorzugt abgesenkt"
             elif availability["humidifier"]:
                 initial_stage = "humidify"
                 note = "Temperaturgrenze erreicht; Luftbefeuchter angefordert"
@@ -1186,7 +1411,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 now=now,
                 vpd=vpd,
                 temp=temp,
-                note="VPD und Betriebsfenster sind im Ziel",
+                note=direction_note,
             )
     else:
         _append_sample(engine, now, vpd, settings["effect_window_sec"])
@@ -1206,7 +1431,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 vpd=vpd,
                 temp=temp,
                 improvement=improvement,
-                settings=settings,
+                settings=regulation_settings,
                 availability=availability,
                 outside_drying=outside_drying,
             )
@@ -1216,7 +1441,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 now=now,
                 vpd=vpd,
                 improvement=improvement,
-                settings=settings,
+                settings=regulation_settings,
                 availability=availability,
                 outside_humidifying=outside_humidifying,
                 preferred_temp=preferred_temp,
@@ -1229,8 +1454,8 @@ def update_vpd_control(runtime=None, *, now=None):
     stage = engine.get("stage") or "in_band"
     effective_target = _clip(
         engine.get("temp_target", base_target),
-        settings["temp_min"],
-        settings["temp_max"],
+        target_curve["temp_min"],
+        target_curve["temp_max"],
     )
 
     actions = {
@@ -1248,11 +1473,23 @@ def update_vpd_control(runtime=None, *, now=None):
         "dehumidifier": _off_action(rt, "dehumidifier", "(VPD keine Entfeuchtung)"),
     }
 
-    if stage in {"exhaust", "heat", "dehumidify"} and availability["fan"] and outside_drying:
+    hold_exhaust_limit = bool(
+        direction == "raise"
+        and stage == "limited"
+        and engine.get("fan_sweep_complete")
+    )
+    if (
+        stage in {"exhaust", "heat", "dehumidify"}
+        or hold_exhaust_limit
+    ) and availability["fan"] and outside_drying:
         actions["fan"] = _fan_regulation_action(
             rt,
             engine.get("fan_level"),
-            "(VPD Außenluft trockener)",
+            (
+                "(VPD Abluft-Maximum halten)"
+                if hold_exhaust_limit
+                else "(VPD Außenluft trockener)"
+            ),
         )
 
     if stage == "dehumidify" and availability["dehumidifier"]:
@@ -1306,6 +1543,13 @@ def update_vpd_control(runtime=None, *, now=None):
                 "(VPD Außenluft kühlt)",
             )
 
+    setpoints = _coupled_setpoints(
+        settings,
+        target_curve,
+        effective_target,
+    )
+    engine["hum_target"] = setpoints["hum"]
+
     stage_labels = {
         "in_band": "Im Zielbereich",
         "exhaust": "Abluft prüfen",
@@ -1321,7 +1565,7 @@ def update_vpd_control(runtime=None, *, now=None):
 
     next_step_label = _next_step_label(
         engine,
-        settings=settings,
+        settings=regulation_settings,
         availability=availability,
         outside_drying=outside_drying,
         outside_humidifying=outside_humidifying,
@@ -1342,11 +1586,31 @@ def update_vpd_control(runtime=None, *, now=None):
         "next_step_label": next_step_label,
         "vpd": round(vpd, 3),
         "target": round(target, 3),
+        "effective_vpd_target": round(setpoints["vpd"], 3),
         "tolerance": settings["tolerance"],
         "error": round(error, 3),
         "base_temp_target": round(base_target, 2),
         "preferred_temp_target": round(preferred_temp, 2),
         "effective_temp_target": round(effective_target, 2),
+        "effective_hum_target": round(setpoints["hum"], 2),
+        "setpoints": {
+            "vpd": round(setpoints["vpd"], 3),
+            "temp": round(setpoints["temp"], 2),
+            "hum": round(setpoints["hum"], 2),
+            "hum_band_min": round(setpoints["hum_band_min"], 2),
+            "hum_band_max": round(setpoints["hum_band_max"], 2),
+            "curve_temp_min": round(setpoints["curve_temp_min"], 2),
+            "curve_temp_max": round(setpoints["curve_temp_max"], 2),
+            "at_temp_max": {
+                "temp": round(setpoints["at_temp_max"]["temp"], 2),
+                "hum": round(setpoints["at_temp_max"]["hum"], 2),
+                "within_humidity_range": bool(
+                    setpoints["at_temp_max"]["within_humidity_range"]
+                ),
+            },
+            "constrained": bool(setpoints["constrained"]),
+            "explanation": setpoints["explanation"],
+        },
         "ramp": deepcopy(ramp),
         "range": {
             "temp_min": settings["temp_min"],
@@ -1392,7 +1656,10 @@ def update_vpd_control(runtime=None, *, now=None):
             "temperature": {
                 "measured": round(temp, 2),
                 "target": round(effective_target, 2),
-                "maximum": settings["temp_max"],
+                "minimum": round(target_curve["temp_min"], 2),
+                "maximum": round(target_curve["temp_max"], 2),
+                "allowed_minimum": settings["temp_min"],
+                "allowed_maximum": settings["temp_max"],
                 "complete": bool(engine.get("heat_sweep_complete")),
                 "stall_windows": int(engine.get("heat_stall_windows") or 0),
             },
@@ -1417,8 +1684,11 @@ def update_vpd_control(runtime=None, *, now=None):
             st.live_state[_PUBLIC_KEY] = public
             st.live_state["vpd_base_temp_target"] = base_target
             st.live_state["vpd_temp_target"] = effective_target
-            if takeover and availability["heating"]:
+            st.live_state["vpd_hum_target"] = setpoints["hum"]
+            st.live_state["vpd_effective_target"] = setpoints["vpd"]
+            if takeover:
                 st.live_state["temp_target"] = effective_target
+                st.live_state["hum_target"] = setpoints["hum"]
 
     return public
 

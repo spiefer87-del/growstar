@@ -310,8 +310,24 @@ def reset_vpd_control(runtime=None, *, reason="zurückgesetzt"):
             climate_target = None
         if climate_target is not None and math.isfinite(climate_target):
             rt.state.live_state["temp_target"] = climate_target
+        climate_hum_target = rt.state.live_state.get("climate_hum_target")
+        try:
+            climate_hum_target = float(climate_hum_target)
+        except (TypeError, ValueError):
+            climate_hum_target = None
+        if climate_hum_target is not None and math.isfinite(climate_hum_target):
+            rt.state.live_state["hum_target"] = climate_hum_target
+        climate_hum_tol = rt.state.live_state.get("climate_hum_tol")
+        try:
+            climate_hum_tol = float(climate_hum_tol)
+        except (TypeError, ValueError):
+            climate_hum_tol = None
+        if climate_hum_tol is not None and math.isfinite(climate_hum_tol):
+            rt.state.live_state["hum_tol"] = climate_hum_tol
         rt.state.live_state.pop("vpd_temp_target", None)
         rt.state.live_state.pop("vpd_base_temp_target", None)
+        rt.state.live_state.pop("vpd_hum_target", None)
+        rt.state.live_state.pop("vpd_effective_target", None)
         rt.state.live_state[VPD_PUBLIC_KEY] = {
             "mode": str(rt.config.get("VPD_CONTROL_MODE", "OFF") or "OFF").upper(),
             "active": False,
