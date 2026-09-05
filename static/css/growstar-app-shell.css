@@ -340,12 +340,12 @@
     font-weight: 570;
 }
 
-/* SHELL.2: eigener, einklappbarer Pflanzenbereich. */
+/* SHELL.4: linkshändige Modulschalter für die mobile Navigation. */
 .growstar-nav-group { margin: 2px 0; }
 .growstar-nav-group-row {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 40px;
+    grid-template-columns: 46px minmax(0, 1fr);
     align-items: stretch;
     border: 1px solid transparent;
     border-radius: 11px;
@@ -374,7 +374,7 @@
     grid-template-columns: 34px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
-    padding: 7px 6px 7px 10px;
+    padding: 7px 8px 7px 2px;
     color: #cbd5e1;
     text-decoration: none;
 }
@@ -382,8 +382,8 @@
 .growstar-nav-group-main:focus-visible { color: #f8fafc; outline: none; }
 .growstar-nav-group-toggle {
     appearance: none;
-    width: 36px;
-    min-height: 40px;
+    width: 42px;
+    min-height: 44px;
     align-self: center;
     justify-self: center;
     border: 1px solid transparent;
@@ -394,6 +394,7 @@
     font: inherit;
     font-size: 17px;
     touch-action: manipulation;
+    z-index: 1;
 }
 .growstar-nav-group-toggle:hover,
 .growstar-nav-group-toggle:focus-visible { border-color: rgba(56,189,248,.35); outline: none; }
