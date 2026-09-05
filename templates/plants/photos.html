@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Foto-Manager – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <div>
+            <h1 class="pm-title">📷 Foto-Manager</h1>
+            <div class="pm-subtitle">Bildverlauf nach Pflanze, Datum und dokumentierter Phase</div>
+        </div>
+    </div>
+    {% if has_permission('plants.edit') %}
+    <a class="pm-button primary" href="{{ url_for('plant_photo_new', plant_id=selected_plant_id or '') }}">＋ Foto aufnehmen</a>
+    {% endif %}
+</header>
+
+{% set active_page = 'photos' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}<div class="pm-flashes">{% for category, message in messages %}<div class="pm-flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+
+<form class="pm-photo-filter" method="get">
+    <label class="pm-field">
+        <span class="pm-label">Pflanze auswählen</span>
+        <select class="pm-select" name="plant_id" onchange="this.form.submit()">
+            <option value="">Alle Pflanzen</option>
+            {% for plant in plants %}
+            <option value="{{ plant.id }}" {{ 'selected' if selected_plant_id|string == plant.id|string else '' }}>
+                {{ plant.code }} · {{ plant.display_name }} · {{ plant.cultivar_name or 'ohne Sorte' }}
+            </option>
+            {% endfor %}
+        </select>
+    </label>
+    <label class="pm-field">
+        <span class="pm-label">Phase</span>
+        <select class="pm-select" name="stage" onchange="this.form.submit()">
+            <option value="">Alle Phasen</option>
+            {% for code,label,color in stages %}
+            <option value="{{ code }}" {{ 'selected' if selected_stage == code else '' }}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <a class="pm-button" href="{{ url_for('plant_photo_manager') }}">Filter löschen</a>
+</form>
+
+{% if selected_plant %}
+<div class="pm-photo-context">
+    <div>
+        <strong>{{ selected_plant.display_name }}</strong>
+        <span>{{ selected_plant.code }} · {{ selected_plant.cultivar_name or 'ohne Sorte' }} · {{ photos|length }} Fotos</span>
+    </div>
+    <a class="pm-button" href="{{ url_for('plant_detail', plant_id=selected_plant.id) }}">Zur Pflanze</a>
+</div>
+{% endif %}
+
+{% if photos %}
+<section class="pm-photo-grid">
+{% for photo in photos %}
+<article class="pm-photo-manager-card">
+    <a class="pm-photo-image" href="{{ url_for('plant_photo_file', photo_id=photo.id) }}" target="_blank">
+        <img src="{{ url_for('plant_photo_file', photo_id=photo.id) }}" alt="Foto von {{ photo.plant_name }}" loading="lazy">
+    </a>
+    <div class="pm-photo-info">
+        <div class="pm-photo-info-head">
+            <div>
+                <a href="{{ url_for('plant_detail', plant_id=photo.plant_id) }}"><strong>{{ photo.plant_name }}</strong></a>
+                <div class="pm-code">{{ photo.plant_code }} · {{ photo.cultivar_name or 'ohne Sorte' }}</div>
+            </div>
+            <span class="pm-stage" style="--stage-color:{{ photo.stage_color }}"><span class="pm-stage-dot"></span>{{ photo.stage_label }}</span>
+        </div>
+        <div class="pm-photo-meta">{{ photo.captured_date }} · {{ photo.captured_time }} Uhr · {{ photo.width }}×{{ photo.height }} · {{ photo.size_kb }} KB</div>
+        {% if photo.note %}<p>{{ photo.note }}</p>{% endif %}
+        <div class="pm-actions">
+            {% if photo.journal_entry_id %}<a class="pm-button" href="{{ url_for('plant_journal_detail', entry_id=photo.journal_entry_id) }}">Journal</a>{% endif %}
+            {% if has_permission('plants.edit') %}
+            <form method="post" action="{{ url_for('plant_photo_remove', photo_id=photo.id) }}" onsubmit="return confirm('Dieses Foto wirklich entfernen?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="pm-button danger" type="submit">Entfernen</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</article>
+{% endfor %}
+</section>
+{% else %}
+<div class="pm-card"><div class="pm-empty">Für diese Auswahl sind noch keine Fotos vorhanden.{% if has_permission('plants.edit') %}<br><br><a class="pm-button primary" href="{{ url_for('plant_photo_new', plant_id=selected_plant_id or '') }}">Erstes Foto aufnehmen</a>{% endif %}</div></div>
+{% endif %}
+</main>
+{% endblock %}

@@ -2,6 +2,7 @@
     <a class="{{ 'active' if active_page == 'dashboard' else '' }}" href="{{ url_for('plant_management_dashboard') }}">Übersicht</a>
     <a class="{{ 'active' if active_page == 'plants' else '' }}" href="{{ url_for('plant_list') }}">Pflanzen</a>
     <a class="{{ 'active' if active_page == 'timeline' else '' }}" href="{{ url_for('plant_timeline') }}">Timeline</a>
+    <a class="{{ 'active' if active_page == 'photos' else '' }}" href="{{ url_for('plant_photo_manager') }}">Fotos</a>
     <a class="{{ 'active' if active_page == 'guide' else '' }}" href="{{ url_for('cultivation_guide') }}">Anbauhilfe</a>
     <a class="{{ 'active' if active_page == 'cultivars' else '' }}" href="{{ url_for('cultivar_list') }}">Sorten</a>
     <a class="{{ 'active' if active_page == 'genetics' else '' }}" href="{{ url_for('genetics_dashboard') }}">Genetik & Mütter</a>

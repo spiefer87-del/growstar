@@ -59,6 +59,14 @@ style="--left:{{ segment.left }}%;--width:{{ segment.width }}%;--segment-color:{
 data-label="{{ segment.stage_label }} · {{ segment.started_on }}{% if segment.ended_on %} → {{ segment.ended_on }}{% else %} → heute{% endif %}">
 </div>
 {% endfor %}
+{% for photo in row.photo_markers %}
+<a class="pm-photo-marker"
+href="{{ url_for('plant_photo_file', photo_id=photo.id) }}"
+target="_blank"
+style="--photo-left:{{ photo.left }}%"
+data-label="Foto · {{ photo.captured_date }} {{ photo.captured_time }} · {{ photo.stage_label }}"
+aria-label="Foto vom {{ photo.captured_date }} öffnen">📷</a>
+{% endfor %}
 </div>
 </div>
 {% endfor %}
@@ -69,6 +77,7 @@ data-label="{{ segment.stage_label }} · {{ segment.started_on }}{% if segment.e
 {% endfor %}
 <span class="pm-legend-item"><span class="pm-legend-plan"></span>Geplante Blütedauer</span>
 <span class="pm-legend-item"><span class="pm-legend-harvest">✂</span>Ernteprognose</span>
+<span class="pm-legend-item"><span class="pm-legend-photo">📷</span>Pflanzenfoto</span>
 </div>
 {% else %}
 <div class="pm-empty">Noch keine Lifecycle-Daten vorhanden.</div>

@@ -185,6 +185,35 @@
 {% if has_permission('diary.view') %}
 <article class="pm-card pm-span-12">
 <div class="pm-card-head">
+    <h2>📷 Fotodokumentation</h2>
+    <div class="pm-actions">
+        <a class="pm-button" href="{{ url_for('plant_photo_manager', plant_id=plant.id) }}">Alle Fotos</a>
+        {% if has_permission('plants.edit') %}
+        <a class="pm-button primary" href="{{ url_for('plant_photo_new', plant_id=plant.id) }}">＋ Foto aufnehmen</a>
+        {% endif %}
+    </div>
+</div>
+<div class="pm-card-body">
+{% if plant_photos %}
+<div class="pm-photo-grid compact">
+{% for photo in plant_photos %}
+<a class="pm-photo-card" href="{{ url_for('plant_photo_file', photo_id=photo.id) }}" target="_blank">
+    <img src="{{ url_for('plant_photo_file', photo_id=photo.id) }}" alt="Foto von {{ plant.display_name }}" loading="lazy">
+    <span class="pm-photo-overlay">
+        <strong>{{ photo.captured_date }}</strong>
+        <span>{{ photo.stage_label }}</span>
+    </span>
+</a>
+{% endfor %}
+</div>
+{% else %}
+<div class="pm-empty">Für diese Pflanze wurden noch keine Fotos gespeichert.</div>
+{% endif %}
+</div>
+</article>
+
+<article class="pm-card pm-span-12">
+<div class="pm-card-head">
     <h2>Betriebsjournal</h2>
     <div class="pm-actions">
         <a class="pm-button" href="{{ url_for('plant_journal', plant_id=plant.id) }}">Alle Einträge</a>

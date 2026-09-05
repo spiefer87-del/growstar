@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from flask import (
     abort,
@@ -100,6 +101,16 @@ from plant_management.journal import (
     get_attachment,
     remove_attachment,
     export_journal_xlsx,
+)
+from plant_management.photos import (
+    MAX_IMAGE_EDGE,
+    JPEG_QUALITY,
+    get_plant_photo,
+    link_photo_to_journal,
+    list_plant_photos,
+    photo_markers_for_timeline,
+    remove_plant_photo,
+    save_plant_photo,
 )
 
 
@@ -546,6 +557,7 @@ def register(app):
             ),
             plant_roles=PLANT_ROLES,
             genetic_lines=list_genetic_lines(include_inactive=False),
+            plant_photos=list_plant_photos(plant_id=plant_id, limit=6),
         )
 
 
@@ -665,14 +677,167 @@ def register(app):
 
 
     # ------------------------------------------------------------------
+    # Pflanzenfotos
+    # ------------------------------------------------------------------
+
+    @app.route("/pflanzenmanagement/fotos")
+    def plant_photo_manager():
+        selected_plant_id = request.args.get("plant_id", type=int)
+        selected_stage = request.args.get("stage") or None
+        if selected_stage not in {item[0] for item in STAGES}:
+            selected_stage = None
+        plants = list_plants()
+        selected_plant = (
+            get_plant(selected_plant_id)
+            if selected_plant_id
+            else None
+        )
+        return render_template(
+            "plants/photos.html",
+            photos=list_plant_photos(
+                plant_id=selected_plant_id,
+                stage=selected_stage,
+            ),
+            plants=plants,
+            selected_plant=selected_plant,
+            selected_plant_id=selected_plant_id,
+            selected_stage=selected_stage,
+            stages=STAGES,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/fotos/neu",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def plant_photo_new():
+        preselected_plant_id = request.args.get("plant_id") or None
+
+        if request.method == "POST":
+            photo = None
+            try:
+                user_id, user_name = _current_user_identity()
+                photo = save_plant_photo(
+                    request.form.get("plant_id"),
+                    request.files.get("photo"),
+                    captured_at=request.form.get("captured_at"),
+                    note=request.form.get("note"),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+
+                plant = photo["plant"]
+                note = request.form.get("note", "").strip()
+                entry_id = save_journal_entry(
+                    {
+                        "occurred_at": photo["captured_at"],
+                        "category": "observation",
+                        "severity": "info",
+                        "title": f"Pflanzenfoto: {plant['display_name']}",
+                        "body": note or (
+                            "Fotodokumentation in der Phase "
+                            f"{photo['stage_label']}."
+                        ),
+                        "tags": f"foto,{photo['stage']}",
+                    },
+                    plant_ids=[plant["id"]],
+                    batch_ids=[plant["batch_id"]] if plant.get("batch_id") else [],
+                    user_id=user_id,
+                    user_name=user_name,
+                    source="system",
+                )
+                link_photo_to_journal(photo["id"], entry_id)
+                _audit(
+                    "plants.photo_created",
+                    "plant_photo",
+                    photo["id"],
+                    {
+                        "plant_id": plant["id"],
+                        "stage": photo["stage"],
+                        "captured_at": photo["captured_at"],
+                        "journal_entry_id": entry_id,
+                    },
+                )
+                flash(
+                    "Foto wurde verkleinert, gespeichert und im "
+                    "Betriebsjournal dokumentiert.",
+                    "success",
+                )
+                return redirect(
+                    url_for("plant_photo_manager", plant_id=plant["id"])
+                )
+            except Exception as exc:
+                if photo:
+                    remove_plant_photo(photo["id"])
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/photo_form.html",
+            plants=list_plants(status="active"),
+            preselected_plant_id=(
+                request.form.get("plant_id")
+                if request.method == "POST"
+                else preselected_plant_id
+            ),
+            default_captured_at=datetime.now().strftime("%Y-%m-%dT%H:%M"),
+            max_image_edge=MAX_IMAGE_EDGE,
+            jpeg_quality=JPEG_QUALITY,
+        )
+
+
+    @app.route("/pflanzenmanagement/fotos/<int:photo_id>/datei")
+    def plant_photo_file(photo_id):
+        photo = get_plant_photo(photo_id)
+        if not photo or not os.path.isfile(photo["path"]):
+            abort(404)
+        return send_file(
+            photo["path"],
+            mimetype=photo["mime_type"],
+            conditional=True,
+            max_age=86400,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/fotos/<int:photo_id>/entfernen",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def plant_photo_remove(photo_id):
+        photo = get_plant_photo(photo_id)
+        if not photo:
+            abort(404)
+        user_id, user_name = _current_user_identity()
+        if remove_plant_photo(
+            photo_id,
+            user_id=user_id,
+            user_name=user_name,
+        ):
+            _audit(
+                "plants.photo_removed",
+                "plant_photo",
+                photo_id,
+                {"plant_id": photo["plant_id"]},
+            )
+            flash("Foto wurde aus dem Foto-Manager entfernt.", "success")
+        return redirect(
+            url_for("plant_photo_manager", plant_id=photo["plant_id"])
+        )
+
+
+    # ------------------------------------------------------------------
     # Timeline
     # ------------------------------------------------------------------
 
     @app.route("/pflanzenmanagement/timeline")
     def plant_timeline():
+        timeline = photo_markers_for_timeline(
+            get_timeline(active_only=True)
+        )
         return render_template(
             "plants/timeline.html",
-            timeline=get_timeline(active_only=True),
+            timeline=timeline,
             stages=STAGES,
         )
 
@@ -781,6 +946,7 @@ def register(app):
             "plants/journal_detail.html",
             entry=entry,
             revisions=get_revisions(entry_id),
+            photos=list_plant_photos(journal_entry_id=entry_id),
         )
 
 

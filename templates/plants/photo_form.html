@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Pflanzenfoto aufnehmen – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_photo_manager', plant_id=preselected_plant_id or '') }}">←</a>
+        <div>
+            <h1 class="pm-title">📷 Pflanzenfoto aufnehmen</h1>
+            <div class="pm-subtitle">Direkt fotografieren, Pflanze zuordnen und automatisch dokumentieren</div>
+        </div>
+    </div>
+</header>
+
+{% set active_page = 'photos' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}<div class="pm-flashes">{% for category, message in messages %}<div class="pm-flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+
+<form class="pm-form" id="plant-photo-form" method="post" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<section class="pm-grid">
+    <article class="pm-card pm-span-7">
+        <div class="pm-card-head"><h2>Foto</h2><span class="pm-guide-readonly">max. {{ max_image_edge }} px</span></div>
+        <div class="pm-card-body">
+            <label class="pm-camera-picker" for="plant-photo-input">
+                <span class="pm-camera-icon">📷</span>
+                <strong>Kamera öffnen oder Foto auswählen</strong>
+                <span>Das Bild wird beim Speichern automatisch verkleinert.</span>
+            </label>
+            <input id="plant-photo-input" class="pm-file-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+            <div id="plant-photo-preview" class="pm-photo-preview" hidden>
+                <img alt="Vorschau des ausgewählten Pflanzenfotos">
+                <span></span>
+            </div>
+        </div>
+    </article>
+
+    <article class="pm-card pm-span-5">
+        <div class="pm-card-head"><h2>Zuordnung</h2></div>
+        <div class="pm-card-body">
+            <div class="pm-form">
+                <label class="pm-field">
+                    <span class="pm-label">Pflanze *</span>
+                    <select class="pm-select" name="plant_id" required>
+                        <option value="">Pflanze auswählen …</option>
+                        {% for plant in plants %}
+                        <option value="{{ plant.id }}" {{ 'selected' if preselected_plant_id|string == plant.id|string else '' }}>
+                            {{ plant.code }} · {{ plant.display_name }} · {{ plant.cultivar_name or 'ohne Sorte' }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label class="pm-field">
+                    <span class="pm-label">Aufnahmezeit *</span>
+                    <input class="pm-input" type="datetime-local" name="captured_at" required value="{{ request.form.get('captured_at') or default_captured_at }}">
+                    <span class="pm-help">Die Pflanzenphase wird anhand dieses Datums automatisch ermittelt.</span>
+                </label>
+                <label class="pm-field">
+                    <span class="pm-label">Notiz</span>
+                    <textarea class="pm-textarea" name="note" placeholder="z. B. Gesamtansicht, Blattspitzen kontrollieren …">{{ request.form.get('note', '') }}</textarea>
+                </label>
+                <button class="pm-button primary" id="plant-photo-submit" type="submit">Foto speichern</button>
+                <span class="pm-help">Speicherformat: optimiertes JPEG mit {{ jpeg_quality }} % Qualität. EXIF- und Standortdaten werden entfernt.</span>
+            </div>
+        </div>
+    </article>
+</section>
+</form>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+    const input = document.getElementById("plant-photo-input");
+    const preview = document.getElementById("plant-photo-preview");
+    const image = preview.querySelector("img");
+    const info = preview.querySelector("span");
+    const form = document.getElementById("plant-photo-form");
+    const submit = document.getElementById("plant-photo-submit");
+    let objectUrl = null;
+
+    input.addEventListener("change", () => {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        const file = input.files && input.files[0];
+        if (!file) {
+            preview.hidden = true;
+            return;
+        }
+        objectUrl = URL.createObjectURL(file);
+        image.src = objectUrl;
+        info.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB vor Optimierung`;
+        preview.hidden = false;
+    });
+
+    form.addEventListener("submit", () => {
+        submit.disabled = true;
+        submit.textContent = "Foto wird optimiert …";
+    });
+})();
+</script>
+{% endblock %}

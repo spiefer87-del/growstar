@@ -198,6 +198,25 @@
 </article>
 {% endif %}
 
+{% if photos %}
+<article class="pm-card pm-span-12">
+    <div class="pm-card-head"><h2>📷 Pflanzenfotos</h2></div>
+    <div class="pm-card-body">
+        <div class="pm-photo-grid compact">
+        {% for photo in photos %}
+            <a class="pm-photo-card" href="{{ url_for('plant_photo_file', photo_id=photo.id) }}" target="_blank">
+                <img src="{{ url_for('plant_photo_file', photo_id=photo.id) }}" alt="{{ photo.plant_name }}" loading="lazy">
+                <span class="pm-photo-overlay">
+                    <strong>{{ photo.plant_name }}</strong>
+                    <span>{{ photo.captured_date }} · {{ photo.stage_label }}</span>
+                </span>
+            </a>
+        {% endfor %}
+        </div>
+    </div>
+</article>
+{% endif %}
+
 {% if revisions %}
 <article class="pm-card pm-span-8">
     <div class="pm-card-head"><h2>Revisionshistorie</h2></div>
