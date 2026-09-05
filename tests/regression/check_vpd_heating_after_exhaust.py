@@ -84,11 +84,11 @@ def main():
         "Nach erfolgloser Maximalabluft beginnt die Heizung bei weiterhin zu niedrigem VPD innerhalb der Temperaturgrenze",
     )
     require(
-        fan_plans[0]["effective_hum_target"] == 60.0
-        and heat["effective_hum_target"] == 60.0
+        abs(fan_plans[0]["effective_hum_target"] - 56.72) < 0.02
+        and abs(heat["effective_hum_target"] - 56.72) < 0.02
         and abs(fan_plans[0]["setpoints"]["calculated_hum"] - 62.91) < 0.02
         and abs(heat["setpoints"]["calculated_hum"] - 64.01) < 0.02,
-        "Der veröffentlichte Feuchtesollwert bleibt bei jeder Temperaturstufe hart auf 60 Prozent begrenzt",
+        "Der veröffentlichte Feuchtesollwert bleibt bei jeder Temperaturstufe am gekoppelten Wunschpunkt",
     )
 
     targets = []
@@ -115,7 +115,7 @@ def main():
         and exhausted["effective_temp_target"] == 26.0
         and exhausted["strategy_progress"]["temperature"]["complete"] is True
         and exhausted["actions"]["fan"]["controller"]["level"] == 100
-        and exhausted["effective_hum_target"] == 60.0
+        and abs(exhausted["effective_hum_target"] - 56.72) < 0.02
         and abs(exhausted["setpoints"]["calculated_hum"] - 67.28) < 0.02,
         "Erst die reale Temperatur-Obergrenze beendet den Heizweg; der Feuchtesollwert bleibt begrenzt und der Rechenwert sichtbar",
     )
@@ -126,8 +126,9 @@ def main():
         recovered_heat["stage"] == "heat",
         "Der zweite Prüflauf erreicht die aktive Heizstufe",
     )
-    recovered_temp = _temperature_for_vpd_exact(1.10, 60.0)
-    set_inside(recovered, temp=recovered_temp, hum=60.0)
+    recovered_temp = recovered_heat["setpoints"]["preferred"]["temp"]
+    recovered_hum = recovered_heat["setpoints"]["preferred"]["hum"]
+    set_inside(recovered, temp=recovered_temp, hum=recovered_hum)
     in_band = update_vpd_control(recovered, now=recovered_now + 10)
     require(
         in_band["stage"] == "in_band"
@@ -144,9 +145,10 @@ def main():
         encoding="utf-8"
     )
     require(
-        "Feuchte min/max" in settings_page
-        and "verbindliche Grenzen" in profile_page,
-        "Einstellungs- und Profilseite erklären die verbindlichen Klimagrenzen eindeutig",
+        "Feuchte-Ziel %" in settings_page
+        and "Feuchte-Ziel %" in profile_page
+        and "verbindlichen Grenzen" in profile_page,
+        "Einstellungs- und Profilseite erklären Klimaziel und verbindliche Range eindeutig",
     )
 
     print("✅ Growstar 3.16.11 / VPD.CONTROL.5 vollständig geprüft")

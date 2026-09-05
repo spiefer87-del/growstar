@@ -219,7 +219,8 @@ def main():
         auto_plan = update_vpd_control(automatic, now=1000)
         require(
             auto_plan["stage"] == "humidify"
-            and auto_plan["preferred_temp_target"] == 21.0
+            and abs(auto_plan["preferred_temp_target"] - 22.95) < 0.02
+            and abs(auto_plan["preferred_hum_target"] - 64.30) < 0.02
             and auto_plan["effective_temp_target"] == 24.0
             and automatic.state.live_state["temp_target"] == 24.0
             and 45.0 <= auto_plan["effective_hum_target"] <= 80.0

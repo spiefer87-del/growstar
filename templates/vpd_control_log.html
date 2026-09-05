@@ -66,7 +66,7 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
                 <span id="vpd-log-setpoints" class="vpd-log-value emphasis">--</span>
             </div>
             <div class="vpd-log-metric">
-                <span class="vpd-log-label">Verbindliche Temperatur- und Feuchtegrenzen</span>
+                <span class="vpd-log-label">Klimaziele und verbindliche Ranges</span>
                 <span id="vpd-log-range" class="vpd-log-value">--</span>
             </div>
             <div class="vpd-log-metric">
@@ -257,9 +257,18 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
         text("vpd-log-target",targetText);
 
         const range = control.range || {};
+        const preferred = control.setpoints?.preferred || {};
         const climate = [];
-        if(number(range.temp_min) !== null && number(range.temp_max) !== null) climate.push(`${fixed(range.temp_min,1)}–${fixed(range.temp_max,1)} °C`);
-        if(number(range.hum_min) !== null && number(range.hum_max) !== null) climate.push(`${fixed(range.hum_min,1)}–${fixed(range.hum_max,1)} %`);
+        if(number(preferred.temp_center) !== null && number(preferred.temp_range) !== null){
+            climate.push(`Temperatur ${fixed(preferred.temp_center,1)} °C ± ${fixed(preferred.temp_range,1)}`);
+        }else if(number(range.temp_min) !== null && number(range.temp_max) !== null){
+            climate.push(`${fixed(range.temp_min,1)}–${fixed(range.temp_max,1)} °C`);
+        }
+        if(number(preferred.hum_center) !== null && number(preferred.hum_range) !== null){
+            climate.push(`Feuchte ${fixed(preferred.hum_center,1)} % ± ${fixed(preferred.hum_range,1)}`);
+        }else if(number(range.hum_min) !== null && number(range.hum_max) !== null){
+            climate.push(`${fixed(range.hum_min,1)}–${fixed(range.hum_max,1)} %`);
+        }
         text("vpd-log-range",climate.join(" · ") || "--");
 
         const setpoints = control.setpoints || {};
@@ -271,7 +280,10 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
             setpointParts.push(`Feuchte-Zielband ${fixed(setpoints.hum_band_min,1)}–${fixed(setpoints.hum_band_max,1)} %`);
         }
         if(setpoints.constrained && number(setpoints.calculated_hum) !== null){
-            setpointParts.push(`VPD-Rechenwert ${fixed(setpoints.calculated_hum,1)} % begrenzt`);
+            const suffix = setpoints.within_humidity_range === false
+                ? "außerhalb der Range"
+                : "bei aktueller Temperaturstufe";
+            setpointParts.push(`VPD-Rechenwert ${fixed(setpoints.calculated_hum,1)} % ${suffix}`);
         }
         text("vpd-log-setpoints",setpointParts.join(" · ") || "--");
         text("vpd-log-coupling",setpoints.explanation || "Temperatur- und Feuchteziel werden gemeinsam berechnet.");

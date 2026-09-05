@@ -53,13 +53,13 @@ def main():
     plan = update_vpd_control(screenshot, now=1000)
     require(
         plan["profile"] == "NACHT"
-        and plan["effective_hum_target"] == 62.0
-        and plan["setpoints"]["hum"] == 62.0
+        and abs(plan["effective_hum_target"] - 58.09) < 0.02
+        and abs(plan["setpoints"]["hum"] - 58.09) < 0.02
         and plan["setpoints"]["calculated_hum"] > 62.0
         and plan["setpoints"]["constrained"] is True
-        and screenshot.state.live_state["hum_target"] == 62.0
-        and screenshot.state.live_state["vpd_hum_target"] == 62.0,
-        "Der konkrete Nachtfall begrenzt den veröffentlichten Feuchtesollwert verbindlich auf 62 Prozent",
+        and abs(screenshot.state.live_state["hum_target"] - 58.09) < 0.02
+        and abs(screenshot.state.live_state["vpd_hum_target"] - 58.09) < 0.02,
+        "Der konkrete Nachtfall strebt statt der Obergrenze den gekoppelten Feuchte-Zielpunkt an",
     )
     require(
         plan["humidity_limit"]["hard"] is True
@@ -78,7 +78,7 @@ def main():
         0.85 <= still_wet["vpd"] <= 0.95
         and still_wet["direction"] == "raise"
         and still_wet["stage"] != "in_band"
-        and still_wet["effective_hum_target"] == 62.0,
+        and abs(still_wet["effective_hum_target"] - 58.09) < 0.02,
         "Das Erreichen des VPD-Zielbands beendet die Regelung nicht, solange die harte Feuchte-Obergrenze verletzt ist",
     )
 
@@ -109,7 +109,7 @@ def main():
     dehumidify = update_vpd_control(transition, now=now - 59)
     require(
         dehumidify["stage"] == "dehumidify"
-        and dehumidify["effective_hum_target"] == 62.0
+        and abs(dehumidify["effective_hum_target"] - 58.09) < 0.02
         and dehumidify["actions"]["heating"]["power"] is False
         and dehumidify["actions"]["dehumidifier"]["power"] is True,
         "Am VPD-Ziel endet die Heizhilfe sofort; die verbleibende Feuchteüberschreitung geht an den Entfeuchter",
@@ -137,10 +137,10 @@ def main():
         encoding="utf-8"
     )
     require(
-        "verbindliche Grenzen" in settings_page
-        and "verbindliche Grenzen" in profile_page
+        "verbindlichen Grenzen" in settings_page
+        and "verbindlichen Grenzen" in profile_page
         and "VPD-Rechenwert" in log_page
-        and "begrenzt" in log_page,
+        and "außerhalb der Range" in log_page,
         "Einstellungen, Profile und Regellog erklären die harten Feuchtegrenzen sichtbar",
     )
 

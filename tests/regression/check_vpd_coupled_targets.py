@@ -69,10 +69,10 @@ def main():
     )
     require(
         abs(setpoints["temp"] - 23.9) < 0.02
-        and setpoints["hum"] == 60.0
+        and abs(setpoints["hum"] - 56.72) < 0.02
         and abs(setpoints["calculated_hum"] - 62.91) < 0.02
         and abs(setpoints["vpd"] - 1.10) < 0.001,
-        "Der Live-Feuchtesollwert überschreitet trotz höherem VPD-Rechenwert niemals die konfigurierte Obergrenze",
+        "Der Live-Feuchtesollwert folgt dem gekoppelten Wunschpunkt und bleibt innerhalb der konfigurierten Range",
     )
     require(
         abs(automatic.state.live_state["temp_target"] - setpoints["temp"]) < 0.01
@@ -97,10 +97,11 @@ def main():
     dynamic_second = update_vpd_control(dynamic, now=1301)
     require(
         dynamic_first["setpoints"]["temp"] == 24.0
-        and abs(dynamic_first["setpoints"]["hum"] - 63.14) < 0.02
+        and abs(dynamic_first["setpoints"]["hum"] - 63.28) < 0.02
         and dynamic_second["setpoints"]["temp"] == 24.5
-        and abs(dynamic_second["setpoints"]["hum"] - 64.24) < 0.02,
-        "Jede neue VPD-Temperaturstufe berechnet den zugehörigen Feuchtesollwert live neu",
+        and abs(dynamic_second["setpoints"]["hum"] - 63.28) < 0.02
+        and abs(dynamic_second["setpoints"]["calculated_hum"] - 64.22) < 0.02,
+        "Der gekoppelte Wunschwert bleibt stabil, während der Rechenwert der aktuellen Temperaturstufe live folgt",
     )
 
     plans = [first]
@@ -146,7 +147,7 @@ def main():
     monitor = coupled_runtime(mode="MONITOR")
     monitor_plan = update_vpd_control(monitor, now=1000)
     require(
-        monitor_plan["setpoints"]["hum"] == 60.0
+        abs(monitor_plan["setpoints"]["hum"] - 56.72) < 0.02
         and abs(monitor_plan["setpoints"]["calculated_hum"] - 62.91) < 0.02
         and monitor.state.live_state["hum_target"] == 65.0,
         "Beobachten zeigt den begrenzten VPD-Sollwert, ersetzt aber keinen klassischen Live-Sollwert",

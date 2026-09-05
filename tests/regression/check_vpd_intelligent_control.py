@@ -394,8 +394,9 @@ def main():
     require(
         day_tolerance_plan["direction"] == "lower"
         and day_tolerance_plan["tolerance"] == 0.05
-        and night_tolerance_plan["stage"] == "in_band"
+        and night_tolerance_plan["stage"] == "humidify"
         and night_tolerance_plan["tolerance"] == 0.20
+        and abs(night_tolerance_plan["preferred_hum_target"] - 60.60) < 0.02
         and night_tolerance_plan["range"] == {
             "temp_min": 19.0,
             "temp_max": 25.0,
