@@ -61,6 +61,10 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
                 <span class="vpd-log-label">Zielband</span>
                 <span id="vpd-log-target" class="vpd-log-value">--</span>
             </div>
+            <div class="vpd-log-metric">
+                <span class="vpd-log-label">Prioritäten</span>
+                <span id="vpd-log-priority" class="vpd-log-value">VPD → --</span>
+            </div>
             <div class="vpd-log-metric wide">
                 <span class="vpd-log-label">Gekoppelte Live-Sollwerte</span>
                 <span id="vpd-log-setpoints" class="vpd-log-value emphasis">--</span>
@@ -255,6 +259,10 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
         const rampProgress = number(control.ramp?.progress);
         if(control.ramp?.active && rampProgress !== null) targetText += ` · VPD-Rampe ${Math.round(rampProgress*100)} %`;
         text("vpd-log-target",targetText);
+        const priorityLabel = control.secondary_priority_label || (
+            control.secondary_priority === "TEMPERATURE" ? "Temperatur" : "Feuchtigkeit"
+        );
+        text("vpd-log-priority",`1 · VPD → 2 · ${priorityLabel}`);
 
         const range = control.range || {};
         const preferred = control.setpoints?.preferred || {};
@@ -308,6 +316,11 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
         }
         const shown = last !== null ? last : current;
         if(shown !== null && minimum !== null) effectText += ` · ${last !== null ? "zuletzt" : "Wirkung"} ${shown >= 0 ? "+" : ""}${shown.toFixed(3)} / ${minimum.toFixed(3)} kPa`;
+        const humidityDrop = number(effect.humidity_drop_percent_points);
+        if(humidityDrop !== null){
+            effectText += ` · Feuchteabnahme ${humidityDrop >= 0 ? "+" : ""}${humidityDrop.toFixed(1)} %-Punkte`;
+            if(effect.humidity_responded === false) effectText += " · ohne ausreichende Feuchtewirkung";
+        }
         text("vpd-log-effect",effectText);
 
         const outside = control.outside || {};
@@ -329,6 +342,13 @@ body{margin:0;background:radial-gradient(circle at 100% 0,rgba(56,189,248,.08),t
                 temperatureText += ` · konfiguriert bis ${fixed(temperature.allowed_maximum,1)} °C`;
             }
             progress.push(temperatureText);
+        }
+        if(temperature.humidity_effect_checked){
+            progress.push(
+                temperature.humidity_responded
+                    ? "Heizprobe senkt Feuchte ✓"
+                    : "Heizprobe ohne Feuchteabnahme → Entfeuchter früher"
+            );
         }
         text("vpd-log-progress",progress.join(" · ") || (waiting ? "wartet" : "--"));
         text("vpd-log-action-label",mode === "AUTO" ? "Aktiver Aktorplan" : "Simulierter Aktorplan");

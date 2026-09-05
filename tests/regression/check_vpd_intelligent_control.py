@@ -79,6 +79,11 @@ def runtime_for(
         "VPD_TARGET_NIGHT": 0.90,
         "VPD_TOLERANCE_DAY": 0.05,
         "VPD_TOLERANCE_NIGHT": 0.05,
+        # Bestehende Progressionsprüfungen bilden den bisherigen
+        # temperaturgeführten Zweitpfad explizit ab. Neue Feuchte-Prioritäts-
+        # Szenarien überschreiben diesen Wert gezielt.
+        "VPD_SECONDARY_PRIORITY_DAY": "TEMPERATURE",
+        "VPD_SECONDARY_PRIORITY_NIGHT": "TEMPERATURE",
         "VPD_TEMP_MIN_DAY": 22.0,
         "VPD_TEMP_MAX_DAY": 26.0,
         "VPD_HUM_MIN_DAY": 50.0,
@@ -394,9 +399,10 @@ def main():
     require(
         day_tolerance_plan["direction"] == "lower"
         and day_tolerance_plan["tolerance"] == 0.05
-        and night_tolerance_plan["stage"] == "humidify"
+        and night_tolerance_plan["stage"] == "cool"
         and night_tolerance_plan["tolerance"] == 0.20
-        and abs(night_tolerance_plan["preferred_hum_target"] - 60.60) < 0.02
+        and abs(night_tolerance_plan["preferred_hum_target"] - 58.40) < 0.02
+        and night_tolerance_plan["secondary_priority"] == "TEMPERATURE"
         and night_tolerance_plan["range"] == {
             "temp_min": 19.0,
             "temp_max": 25.0,

@@ -55,12 +55,14 @@ PROFILE_FILE = "profiles.json"
 VPD_PROFILE_SETTING_KEYS = (
     "VPD_TARGET_DAY",
     "VPD_TOLERANCE_DAY",
+    "VPD_SECONDARY_PRIORITY_DAY",
     "VPD_TEMP_MIN_DAY",
     "VPD_TEMP_MAX_DAY",
     "VPD_HUM_MIN_DAY",
     "VPD_HUM_MAX_DAY",
     "VPD_TARGET_NIGHT",
     "VPD_TOLERANCE_NIGHT",
+    "VPD_SECONDARY_PRIORITY_NIGHT",
     "VPD_TEMP_MIN_NIGHT",
     "VPD_TEMP_MAX_NIGHT",
     "VPD_HUM_MIN_NIGHT",
@@ -322,6 +324,7 @@ def normalize_profile_settings(data):
         temp_max_key = f"VPD_TEMP_MAX_{suffix}"
         hum_min_key = f"VPD_HUM_MIN_{suffix}"
         hum_max_key = f"VPD_HUM_MAX_{suffix}"
+        priority_key = f"VPD_SECONDARY_PRIORITY_{suffix}"
 
         result.update({
             target_key: _bounded(
@@ -343,6 +346,12 @@ def normalize_profile_settings(data):
                 _finite_number(data, hum_max_key), hum_max_key, 1, 99
             ),
         })
+        priority = str(data.get(priority_key, "HUMIDITY") or "HUMIDITY").strip().upper()
+        if priority not in {"HUMIDITY", "TEMPERATURE"}:
+            raise ValueError(
+                f"{priority_key} muss HUMIDITY oder TEMPERATURE sein"
+            )
+        result[priority_key] = priority
 
     # Dieselbe Erreichbarkeitsprüfung wie bei einer Stationskonfiguration.
     from core.vpd import validate_vpd_config

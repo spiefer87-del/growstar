@@ -36,10 +36,10 @@ def main():
         "Bestehende Min/Max-Werte werden verlustfrei als Zielwert plus Range interpretiert",
     )
     require(
-        abs(preferred["temp"] - 18.63) < 0.02
-        and abs(preferred["hum"] - 58.09) < 0.02
+        abs(preferred["temp"] - 17.86) < 0.02
+        and abs(preferred["hum"] - 56.0) < 0.02
         and abs(preferred["vpd"] - 0.90) < 0.001,
-        "Growstar wählt innerhalb beider Ranges den VPD-kompatiblen Punkt mit dem kleinsten Zielabstand",
+        "Growstar trifft bei Feuchte-Priorität den Feuchte-Zielwert auf der VPD-Zielkurve",
     )
 
     former_limit = night_runtime()
@@ -50,7 +50,7 @@ def main():
         0.85 <= former_limit_plan["vpd"] <= 0.95
         and former_limit_plan["direction"] == "raise"
         and former_limit_plan["stage"] == "exhaust"
-        and abs(former_limit_plan["effective_hum_target"] - 58.09) < 0.02,
+        and abs(former_limit_plan["effective_hum_target"] - 56.0) < 0.02,
         "62 Prozent ist nur noch die Obergrenze; im VPD-Band regelt Growstar weiter zum gekoppelten Feuchteziel",
     )
 

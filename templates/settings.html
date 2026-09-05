@@ -516,9 +516,10 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <div class="info">
                 <strong>Temperatur-Ziel ± Range</strong> und <strong>Feuchte-Ziel ± Range</strong>
                 bestimmen den bevorzugten Klimapunkt und zugleich die verbindlichen Grenzen
-                der jeweiligen Tag-/Nachtphase. Growstar sucht innerhalb beider Ranges den
-                zum VPD-Ziel passenden Punkt, der den eingestellten Zielwerten am nächsten
-                liegt. Die Range-Grenzen werden dabei niemals überschritten.
+                der jeweiligen Tag-/Nachtphase. <strong>VPD bleibt immer Priorität 1.</strong>
+                Mit Priorität 2 wählst du, ob Growstar auf der VPD-Zielkurve bevorzugt den
+                Feuchte- oder Temperatur-Zielwert trifft. Die Range-Grenzen werden dabei
+                niemals überschritten.
             </div>
 
             <div class="row-inline">
@@ -551,6 +552,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
                                 <input type="number" step="any" id="VPD_TOLERANCE_DAY" class="compact-input">
                                 <button type="button" onclick="step('VPD_TOLERANCE_DAY',0.01)">+</button>
                             </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_SECONDARY_PRIORITY_DAY">Priorität 2</label>
+                            <select id="VPD_SECONDARY_PRIORITY_DAY" class="mode-select">
+                                <option value="HUMIDITY">Feuchtigkeit bevorzugen</option>
+                                <option value="TEMPERATURE">Temperatur bevorzugen</option>
+                            </select>
                         </div>
                     </div>
                     <div class="row-inline">
@@ -613,6 +623,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
                                 <input type="number" step="any" id="VPD_TOLERANCE_NIGHT" class="compact-input">
                                 <button type="button" onclick="step('VPD_TOLERANCE_NIGHT',0.01)">+</button>
                             </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_SECONDARY_PRIORITY_NIGHT">Priorität 2</label>
+                            <select id="VPD_SECONDARY_PRIORITY_NIGHT" class="mode-select">
+                                <option value="HUMIDITY">Feuchtigkeit bevorzugen</option>
+                                <option value="TEMPERATURE">Temperatur bevorzugen</option>
+                            </select>
                         </div>
                     </div>
                     <div class="row-inline">
@@ -706,9 +725,9 @@ button:disabled{opacity:.48;cursor:not-allowed}
 
             <div class="vpd-sequence">
                 <div class="vpd-step"><strong>1 · VPD-Ziel rampen</strong><span>Tag-/Nachtziel sowie Klimaziele und Ranges wechseln gleitend.</span></div>
-                <div class="vpd-step"><strong>2 · Zu hoher VPD</strong><span>Temperatur innerhalb der Range zuerst absenken; geeignete kühlere Außenluft darf unterstützen.</span></div>
-                <div class="vpd-step"><strong>3 · Zu niedriger VPD</strong><span>Trockene Außenluft stufenweise bis zur sicheren Controllergrenze nutzen, danach Temperatur bis zum erlaubten Phasenmaximum anheben.</span></div>
-                <div class="vpd-step"><strong>4 · Be-/Entfeuchter</strong><span>Erst wenn Abluft- und Temperaturweg vollständig geprüft oder technisch ohne Reaktion sind.</span></div>
+                <div class="vpd-step"><strong>2 · Priorität 2</strong><span>Innerhalb des VPD-Zielbands wird nur der ausgewählte Feuchte- oder Temperaturwert bevorzugt nachgeführt.</span></div>
+                <div class="vpd-step"><strong>3 · Aktorweg</strong><span>Die Reihenfolge von Abluft, Temperatur und Be-/Entfeuchtung richtet sich nach VPD-Richtung und gewählter Priorität.</span></div>
+                <div class="vpd-step"><strong>4 · Doppelprüfung</strong><span>Beim Heizen mit Feuchte-Priorität werden Temperatur- und Feuchtewirkung parallel geprüft; ohne Feuchteabnahme startet der Entfeuchter früher.</span></div>
             </div>
 
             <div id="vpd-sensor-note" class="info warning"></div>
@@ -818,6 +837,10 @@ const ids = [
     "VPD_TARGET_NIGHT","VPD_TOLERANCE_NIGHT",
     "VPD_TEMP_MIN_NIGHT","VPD_TEMP_MAX_NIGHT","VPD_HUM_MIN_NIGHT","VPD_HUM_MAX_NIGHT",
     "VPD_EFFECT_WINDOW_MIN","VPD_MIN_EFFECT_KPA","VPD_TEMP_STEP","VPD_FAN_STEP"
+];
+const choiceIds = [
+    "VPD_SECONDARY_PRIORITY_DAY",
+    "VPD_SECONDARY_PRIORITY_NIGHT"
 ];
 
 const CLASSIC_CONTROL_BLOCK_IDS = [
@@ -1057,6 +1080,10 @@ function withVpdPhaseCompatibility(raw){
             config[phaseKey] = config[legacyKey];
         }
     });
+    ["DAY","NIGHT"].forEach(suffix=>{
+        const key = `VPD_SECONDARY_PRIORITY_${suffix}`;
+        if(config[key] === undefined) config[key] = "HUMIDITY";
+    });
     return config;
 }
 
@@ -1232,16 +1259,18 @@ function updatePreview(){
         <strong>${modeLabel}</strong><br>
         ${rampText}<br>
         ☀️ Tag: ${(num("VPD_TARGET_DAY")-num("VPD_TOLERANCE_DAY")).toFixed(2)} bis ${(num("VPD_TARGET_DAY")+num("VPD_TOLERANCE_DAY")).toFixed(2)} kPa ·
+        Priorität 2: ${el("VPD_SECONDARY_PRIORITY_DAY").value === "TEMPERATURE" ? "Temperatur" : "Feuchtigkeit"} ·
         Temperatur ${num("VPD_TEMP_CENTER_DAY").toFixed(1)} °C ± ${num("VPD_TEMP_RANGE_DAY").toFixed(1)} ·
         Feuchte ${num("VPD_HUM_CENTER_DAY").toFixed(1)} % ± ${num("VPD_HUM_RANGE_DAY").toFixed(1)}<br>
         Physikalisch erreichbar: ${Number.isFinite(dayAttainableMin) ? dayAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(dayAttainableMax) ? dayAttainableMax.toFixed(2) : "--"} kPa<br>
         🌙 Nacht: ${(num("VPD_TARGET_NIGHT")-num("VPD_TOLERANCE_NIGHT")).toFixed(2)} bis ${(num("VPD_TARGET_NIGHT")+num("VPD_TOLERANCE_NIGHT")).toFixed(2)} kPa ·
+        Priorität 2: ${el("VPD_SECONDARY_PRIORITY_NIGHT").value === "TEMPERATURE" ? "Temperatur" : "Feuchtigkeit"} ·
         Temperatur ${num("VPD_TEMP_CENTER_NIGHT").toFixed(1)} °C ± ${num("VPD_TEMP_RANGE_NIGHT").toFixed(1)} ·
         Feuchte ${num("VPD_HUM_CENTER_NIGHT").toFixed(1)} % ± ${num("VPD_HUM_RANGE_NIGHT").toFixed(1)}<br>
         Physikalisch erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa<br>
         Adaptive Wirkungsprüfung: 60 Sekunden bei neuen Stufen, 120 Sekunden in der Beruhigungsphase und nach zehn stabilen Minuten maximal ${num("VPD_EFFECT_WINDOW_MIN").toFixed(0)} Minuten.
-        Innerhalb der verbindlichen Ranges strebt Growstar einen gekoppelten VPD-Klimapunkt möglichst nahe an beiden Zielwerten an. Eine Range-Verletzung hat Vorrang und kein veröffentlichter Sollwert darf die daraus abgeleiteten Grenzen überschreiten.
-        Bleibt der VPD nach maximaler Abluft zu niedrig, wird die Temperaturreserve nur so lange schrittweise genutzt, wie sie nicht zu einer widersprüchlichen VPD-Richtung führt.
+        VPD ist immer Priorität 1. Auf der VPD-Zielkurve wird der gewählte zweite Zielwert bevorzugt; die andere Klimagröße ist nachrangig. Eine Range-Verletzung hat Vorrang und kein veröffentlichter Sollwert darf die daraus abgeleiteten Grenzen überschreiten.
+        Bei Feuchte-Priorität prüft Growstar beim Heizen parallel, ob die Feuchte messbar sinkt, und schaltet andernfalls einen verfügbaren Entfeuchter früher zu.
         Ab ${num("VPD_MIN_EFFECT_KPA").toFixed(3)} kPa gilt eine Stufe als messbar wirksam; eine schwächere Einzelmessung beendet den Stufenweg nicht vorzeitig.
     `;
 }
@@ -1397,6 +1426,9 @@ async function load({successMessage=""}={}){
         for(const id of ids){
             if(el(id) && c[id] !== undefined) el(id).value = c[id];
         }
+        choiceIds.forEach(id=>{
+            if(el(id) && c[id] !== undefined) el(id).value = c[id];
+        });
         syncVpdWindowEditorsFromBounds();
 
         el("DAY_START_TIME").value = minToTime(c.DAY_START_MIN);
@@ -1502,6 +1534,8 @@ async function save(){
         RAMP_ENABLED:el("RAMP_ENABLED").checked ? 1 : 0,
         RAMP_DURATION_MIN:num("RAMP_DURATION_MIN"),
         VPD_CONTROL_MODE:el("VPD_CONTROL_MODE").value,
+        VPD_SECONDARY_PRIORITY_DAY:el("VPD_SECONDARY_PRIORITY_DAY").value,
+        VPD_SECONDARY_PRIORITY_NIGHT:el("VPD_SECONDARY_PRIORITY_NIGHT").value,
         VPD_TARGET_DAY:num("VPD_TARGET_DAY"),
         VPD_TOLERANCE_DAY:num("VPD_TOLERANCE_DAY"),
         VPD_TEMP_MIN_DAY:num("VPD_TEMP_MIN_DAY"),
@@ -1566,6 +1600,9 @@ async function save(){
         for(const id of ids){
             if(el(id) && c[id] !== undefined) el(id).value = c[id];
         }
+        choiceIds.forEach(id=>{
+            if(el(id) && c[id] !== undefined) el(id).value = c[id];
+        });
         syncVpdWindowEditorsFromBounds();
         applyLightSunAvailability(payload);
         applyLimits(c);

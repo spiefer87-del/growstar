@@ -84,8 +84,8 @@ def main():
         "Nach erfolgloser Maximalabluft beginnt die Heizung bei weiterhin zu niedrigem VPD innerhalb der Temperaturgrenze",
     )
     require(
-        abs(fan_plans[0]["effective_hum_target"] - 56.72) < 0.02
-        and abs(heat["effective_hum_target"] - 56.72) < 0.02
+        fan_plans[0]["effective_hum_target"] == 60.0
+        and heat["effective_hum_target"] == 60.0
         and abs(fan_plans[0]["setpoints"]["calculated_hum"] - 62.91) < 0.02
         and abs(heat["setpoints"]["calculated_hum"] - 64.01) < 0.02,
         "Der veröffentlichte Feuchtesollwert bleibt bei jeder Temperaturstufe am gekoppelten Wunschpunkt",
@@ -115,7 +115,7 @@ def main():
         and exhausted["effective_temp_target"] == 26.0
         and exhausted["strategy_progress"]["temperature"]["complete"] is True
         and exhausted["actions"]["fan"]["controller"]["level"] == 100
-        and abs(exhausted["effective_hum_target"] - 56.72) < 0.02
+        and exhausted["effective_hum_target"] == 60.0
         and abs(exhausted["setpoints"]["calculated_hum"] - 67.28) < 0.02,
         "Erst die reale Temperatur-Obergrenze beendet den Heizweg; der Feuchtesollwert bleibt begrenzt und der Rechenwert sichtbar",
     )

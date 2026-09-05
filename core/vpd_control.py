@@ -9,10 +9,10 @@ Regelstrategie bei zu niedrigem VPD / zu hoher Feuchte:
 
 1. Abluft nur einsetzen, wenn die Außenluft tatsächlich trockener ist.
 2. Jede erlaubte Abluftstufe über ein konfigurierbares Zeitfenster prüfen.
-3. Anschließend den Temperatur-Sollwert schrittweise bis zur Phasengrenze
-   anheben; eine einzelne schwache VPD-Reaktion beendet diesen Weg nicht.
-4. Erst wenn Abluft- und Temperaturweg ausgeschöpft oder technisch ohne
-   Reaktion sind, den Entfeuchter anfordern.
+3. Die pro Phase gewählte zweite Priorität (Feuchte oder Temperatur) bestimmt,
+   ob Entfeuchtung oder Temperatur zuerst am gekoppelten Ziel nachgeführt wird.
+4. Bei Feuchte-Priorität wird während einer Heizprobe gleichzeitig die
+   Feuchtewirkung gemessen. Bleibt sie aus, übernimmt der Entfeuchter frühzeitig.
 
 Bei zu hohem VPD wird dagegen zuerst das Temperaturziel innerhalb des
 phasenbezogenen Min-/Max-Fensters abgesenkt. Geeignete kühlere Außenluft darf
@@ -24,10 +24,10 @@ Regelbasis des VPD-Koordinators mehr.
 
 Temperatur und Luftfeuchtigkeit werden dabei nicht als zwei unabhängige
 Sollwerte behandelt. Die Oberfläche erfasst für beide Größen einen Wunschwert
-plus frei einstellbare Range. Der Koordinator wählt innerhalb der daraus
-abgeleiteten harten Grenzen den Punkt auf der VPD-Zielkurve, der beiden
-Wunschwerten am nächsten liegt. Ein mathematischer VPD-Feuchtewert außerhalb
-dieser Spanne bleibt reine Diagnose und wird niemals als Sollwert veröffentlicht.
+plus frei einstellbare Range und eine zweite Priorität. VPD bleibt stets
+Priorität 1; der ausgewählte Temperatur- oder Feuchtewert bestimmt den Punkt auf
+der VPD-Zielkurve. Ein mathematischer VPD-Feuchtewert außerhalb dieser Spanne
+bleibt reine Diagnose und wird niemals als Sollwert veröffentlicht.
 
 Der MONITOR-Modus berechnet exakt denselben Plan, übernimmt aber keine Aktoren.
 
@@ -68,6 +68,7 @@ _SETTLING_EFFECT_WINDOW_SEC = 120
 _STABLE_AFTER_SEC = 600
 _HUM_TARGET_HYSTERESIS = 0.5
 _TEMP_TARGET_HYSTERESIS = 0.2
+_HUM_RESPONSE_THRESHOLD = 0.3
 
 
 def _saturation_vapor_pressure(temp_c):
@@ -254,7 +255,17 @@ def _stage_effect(engine, direction):
     return float(median(early) - median(recent))
 
 
-def _set_stage(engine, *, direction, stage, now, vpd, temp=None, note=None):
+def _set_stage(
+    engine,
+    *,
+    direction,
+    stage,
+    now,
+    vpd,
+    temp=None,
+    hum=None,
+    note=None,
+):
     recorded_temp = temp if temp is not None else engine.get("last_temp")
     event = {
         "at": float(now),
@@ -267,6 +278,10 @@ def _set_stage(engine, *, direction, stage, now, vpd, temp=None, note=None):
         event["temp"] = round(float(recorded_temp), 2)
     except (TypeError, ValueError):
         event["temp"] = None
+    try:
+        event["hum"] = round(float(hum), 2)
+    except (TypeError, ValueError):
+        event["hum"] = None
     try:
         event["fan_level"] = int(engine.get("fan_level"))
     except (TypeError, ValueError):
@@ -286,6 +301,9 @@ def _set_stage(engine, *, direction, stage, now, vpd, temp=None, note=None):
     engine["samples"] = [(float(now), float(vpd))]
     if temp is not None:
         engine["stage_start_temp"] = float(temp)
+    if hum is not None:
+        engine["stage_start_hum"] = float(hum)
+        engine["humidity_samples"] = [(float(now), float(hum))]
     engine["last_transition_note"] = note
 
     try:
@@ -413,11 +431,37 @@ def _temperature_response(engine, temp, settings):
     return change, change >= threshold
 
 
-def _append_sample(engine, now, vpd, effect_window_sec):
+def _humidity_response(engine, hum):
+    """Liefert die relative Feuchteabnahme seit Beginn der Aktorstufe."""
+
+    samples = list(engine.get("humidity_samples") or [])
+    if samples:
+        first_ts = samples[0][0]
+        last_ts = samples[-1][0]
+        early = [value for ts, value in samples if ts <= first_ts + 30.0]
+        recent = [value for ts, value in samples if ts >= last_ts - 30.0]
+        if early and recent:
+            drop = float(median(early) - median(recent))
+            return drop, drop >= _HUM_RESPONSE_THRESHOLD
+
+    try:
+        start_hum = float(engine.get("stage_start_hum"))
+    except (TypeError, ValueError):
+        start_hum = float(hum)
+    drop = start_hum - float(hum)
+    return drop, drop >= _HUM_RESPONSE_THRESHOLD
+
+
+def _append_sample(engine, now, vpd, hum, effect_window_sec):
     samples = engine.setdefault("samples", [])
     samples.append((float(now), float(vpd)))
     cutoff = float(now) - max(900.0, float(effect_window_sec) * 2.0)
     engine["samples"] = [item for item in samples if item[0] >= cutoff][-900:]
+    humidity_samples = engine.setdefault("humidity_samples", [])
+    humidity_samples.append((float(now), float(hum)))
+    engine["humidity_samples"] = [
+        item for item in humidity_samples if item[0] >= cutoff
+    ][-900:]
 
 
 def _assignment_source_ids(cfg):
@@ -627,7 +671,7 @@ def _coupled_target_curve(settings):
 
 
 def _preferred_coupled_point(settings, curve):
-    """Findet auf der VPD-Kurve den nächsten Punkt zu beiden Fenstermitten."""
+    """Findet den VPD-Punkt passend zur gewählten zweiten Priorität."""
 
     temp_center = (
         float(settings["temp_min"]) + float(settings["temp_max"])
@@ -644,31 +688,29 @@ def _preferred_coupled_point(settings, curve):
         (float(settings["hum_max"]) - float(settings["hum_min"])) / 2.0,
     )
     target_vpd = float(curve["vpd"])
-    left = float(curve["temp_min"])
-    right = float(curve["temp_max"])
+    curve_min = float(curve["temp_min"])
+    curve_max = float(curve["temp_max"])
+    secondary_priority = str(
+        settings.get("secondary_priority", "HUMIDITY") or "HUMIDITY"
+    ).upper()
 
-    def candidate(temp):
-        hum = _humidity_for_vpd(target_vpd, temp)
-        score = (
-            ((float(temp) - temp_center) / temp_range) ** 2
-            + ((float(hum) - hum_center) / hum_range) ** 2
+    if secondary_priority == "TEMPERATURE":
+        temperature = _clip(temp_center, curve_min, curve_max)
+    else:
+        # Auf einer festen VPD-Kurve steigt die relative Feuchte monoton mit
+        # der Temperatur. Daher liefert die zum Feuchte-Ziel gehörende
+        # Temperatur direkt den exakten Priorität-2-Punkt, sofern die harten
+        # Ranges ihn erlauben.
+        temperature = _clip(
+            _temperature_for_vpd_exact(target_vpd, hum_center),
+            curve_min,
+            curve_max,
         )
-        return score, float(hum)
-
-    # Der Abschnitt ist glatt und für die kleinen Klimafenster praktisch
-    # konvex. Eine feste ternäre Suche bleibt deterministisch und benötigt
-    # keine zusätzliche numerische Abhängigkeit.
-    if right > left:
-        for _ in range(48):
-            third = (right - left) / 3.0
-            first = left + third
-            second = right - third
-            if candidate(first)[0] <= candidate(second)[0]:
-                right = second
-            else:
-                left = first
-    temperature = (left + right) / 2.0
-    score, humidity = candidate(temperature)
+    humidity = _humidity_for_vpd(target_vpd, temperature)
+    score = (
+        ((float(temperature) - temp_center) / temp_range) ** 2
+        + ((float(humidity) - hum_center) / hum_range) ** 2
+    )
 
     return {
         "temp": _clip(
@@ -686,6 +728,12 @@ def _preferred_coupled_point(settings, curve):
         "temp_range": temp_range,
         "hum_center": hum_center,
         "hum_range": hum_range,
+        "secondary_priority": secondary_priority,
+        "secondary_target_reached": (
+            abs(float(temperature) - temp_center) <= 0.01
+            if secondary_priority == "TEMPERATURE"
+            else abs(float(humidity) - hum_center) <= 0.01
+        ),
         "score": score,
     }
 
@@ -743,12 +791,23 @@ def _coupled_setpoints(settings, curve, preferred, temperature):
         <= float(settings["hum_max"]) + 1e-9
     )
 
+    priority_label = (
+        "Temperatur"
+        if preferred["secondary_priority"] == "TEMPERATURE"
+        else "Feuchtigkeit"
+    )
     explanations = [
-        f"Aus den Wunschwerten {preferred['temp_center']:.1f} °C und "
-        f"{preferred['hum_center']:.1f} % wählt Growstar innerhalb der "
-        f"Ranges den gekoppelten Zielpunkt {preferred['temp']:.1f} °C / "
-        f"{preferred['hum']:.1f} % für {target_vpd:.2f} kPa."
+        f"VPD ist Priorität 1, {priority_label} Priorität 2. Innerhalb der "
+        f"Ranges ergibt sich der gekoppelte Zielpunkt "
+        f"{preferred['temp']:.1f} °C / {preferred['hum']:.1f} % für "
+        f"{target_vpd:.2f} kPa."
     ]
+    if not preferred["secondary_target_reached"]:
+        explanations.append(
+            f"Der gewünschte {priority_label}-Zielwert ist zusammen mit dem "
+            "VPD-Ziel innerhalb der eingestellten Ranges nicht exakt "
+            "erreichbar; deshalb gilt der nächstgelegene sichere Randpunkt."
+        )
     if abs(calculated_hum - target_hum) > 0.05:
         explanations.append(
             f"Zur aktuellen Temperaturstufe {target_temp:.1f} °C gehören "
@@ -816,6 +875,9 @@ def _settings_for_schedule(runtime, settings):
 
 
 def _public_waiting_state(settings, profile, values, blockers, ramp):
+    secondary_priority = str(
+        settings.get("secondary_priority", "HUMIDITY") or "HUMIDITY"
+    ).upper()
     return {
         "mode": settings["mode"],
         "active": False,
@@ -831,6 +893,12 @@ def _public_waiting_state(settings, profile, values, blockers, ramp):
         "profile": profile,
         "target": settings["target"],
         "tolerance": settings["tolerance"],
+        "secondary_priority": secondary_priority,
+        "secondary_priority_label": (
+            "Temperatur"
+            if secondary_priority == "TEMPERATURE"
+            else "Feuchtigkeit"
+        ),
         "ramp": ramp,
         "range": {
             "temp_min": settings["temp_min"],
@@ -955,10 +1023,12 @@ def _advance_raise_stage(
     now,
     vpd,
     temp,
+    hum,
     improvement,
     settings,
     availability,
     outside_drying,
+    preferred_hum,
 ):
     stage = engine.get("stage")
     min_effect = settings["min_effect"]
@@ -998,6 +1068,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=(
                     f"Abluft {effect_text}; Stufe {int(next_level)} von "
                     f"maximal {int(maximum)} wird jetzt geprüft"
@@ -1027,6 +1098,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=(
                     "Abluftweg ausgeschöpft; Temperaturziel wird auf "
                     f"{engine['temp_target']:.1f} °C angehoben"
@@ -1045,6 +1117,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Abluftweg ausgeschöpft und keine Temperaturreserve; Entfeuchter angefordert",
             )
         else:
@@ -1060,6 +1133,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Abluftweg ausgeschöpft; keine weitere sichere VPD-Stufe verfügbar",
             )
         return
@@ -1071,6 +1145,40 @@ def _advance_raise_stage(
             temp,
             settings,
         )
+        humidity_drop, humidity_responded = _humidity_response(engine, hum)
+        engine["last_heat_humidity_drop"] = float(humidity_drop)
+        engine["last_heat_humidity_responded"] = bool(humidity_responded)
+        humidity_priority = settings["secondary_priority"] == "HUMIDITY"
+        humidity_still_high = (
+            float(hum) > float(preferred_hum) + _HUM_TARGET_HYSTERESIS
+        )
+
+        # Bei Feuchte-Priorität erhält die Heizung ein echtes Prüfintervall.
+        # Senkt sie die gemessene relative Feuchte dabei nicht messbar, wird
+        # nicht bis zum Temperatur-Maximum weitergeheizt. Ein verfügbarer
+        # Entfeuchter übernimmt sofort die nächste Stufe.
+        if (
+            humidity_priority
+            and humidity_still_high
+            and availability["dehumidifier"]
+            and not humidity_responded
+        ):
+            engine["heat_humidity_ineffective"] = True
+            _set_stage(
+                engine,
+                direction="raise",
+                stage="dehumidify",
+                now=now,
+                vpd=vpd,
+                temp=temp,
+                hum=hum,
+                note=(
+                    "Heizung verändert die Feuchte nicht ausreichend "
+                    f"({humidity_drop:+.1f} %-Punkte); Entfeuchter wird bei "
+                    "Feuchte-Priorität früh zugeschaltet"
+                ),
+            )
+            return
         reach_tolerance = min(
             0.30,
             max(0.15, float(settings["temp_step"]) / 2.0),
@@ -1090,6 +1198,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=(
                     f"Temperaturstufe {current_target:.1f} °C erreicht; "
                     f"{engine['temp_target']:.1f} °C wird jetzt geprüft"
@@ -1122,6 +1231,7 @@ def _advance_raise_stage(
                             now=now,
                             vpd=vpd,
                             temp=temp,
+                            hum=hum,
                             note=(
                                 "Heizung reagiert über zwei Prüfintervalle nicht; "
                                 "Entfeuchter angefordert"
@@ -1135,6 +1245,7 @@ def _advance_raise_stage(
                             now=now,
                             vpd=vpd,
                             temp=temp,
+                            hum=hum,
                             note=(
                                 "Heizung reagiert über zwei Prüfintervalle nicht; "
                                 "kein Entfeuchter im ENV-Modus"
@@ -1149,6 +1260,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=note,
             )
             return
@@ -1164,6 +1276,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Temperatur-Maximum ausgeschöpft; Entfeuchter angefordert",
             )
         else:
@@ -1174,6 +1287,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Temperatur-Maximum ausgeschöpft; kein Entfeuchter im ENV-Modus",
             )
         return
@@ -1189,6 +1303,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Entfeuchterwirkung wird weiter beobachtet",
             )
         else:
@@ -1199,6 +1314,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Entfeuchter ist nicht mehr im ENV-Modus; sichere Grenzen werden gehalten",
             )
         return
@@ -1218,6 +1334,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Trockene Außenluft ist wieder nutzbar; Abluftweg wird erneut geprüft",
             )
         elif (
@@ -1241,6 +1358,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=f"Temperaturweg ist wieder verfügbar; {engine['temp_target']:.1f} °C wird geprüft",
             )
         elif availability["dehumidifier"]:
@@ -1251,6 +1369,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Entfeuchter ist jetzt verfügbar und wird angefordert",
             )
         else:
@@ -1261,6 +1380,7 @@ def _advance_raise_stage(
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note="Sichere Abluft- und Temperaturgrenzen bleiben ausgeschöpft",
             )
 
@@ -1515,6 +1635,12 @@ def update_vpd_control(runtime=None, *, now=None):
     humidity_below_target = hum < preferred_hum - _HUM_TARGET_HYSTERESIS
     temperature_above_target = temp > preferred_temp + _TEMP_TARGET_HYSTERESIS
     temperature_below_target = temp < preferred_temp - _TEMP_TARGET_HYSTERESIS
+    secondary_priority = str(settings["secondary_priority"]).upper()
+    humidity_priority = secondary_priority == "HUMIDITY"
+    temperature_priority = secondary_priority == "TEMPERATURE"
+    secondary_priority_label = (
+        "Temperatur" if temperature_priority else "Feuchtigkeit"
+    )
     temp_low = temp < settings["temp_min"]
     temp_high = temp > settings["temp_max"]
 
@@ -1554,28 +1680,30 @@ def update_vpd_control(runtime=None, *, now=None):
                 f"; Feuchte liegt ebenfalls über dem gekoppelten Ziel von "
                 f"{preferred_hum:.1f} %, daher wird nicht zusätzlich befeuchtet"
             )
-    elif humidity_above_target:
+    elif humidity_priority and humidity_above_target:
         direction_note = (
-            f"Luftfeuchtigkeit {hum:.1f} % liegt über dem angestrebten "
-            f"VPD-Zielwert von {preferred_hum:.1f} %"
+            f"Priorität 2 Feuchtigkeit: {hum:.1f} % liegt über dem "
+            f"gekoppelten Ziel von {preferred_hum:.1f} %"
         )
-    elif humidity_below_target:
+    elif humidity_priority and humidity_below_target:
         direction_note = (
-            f"Luftfeuchtigkeit {hum:.1f} % liegt unter dem angestrebten "
-            f"VPD-Zielwert von {preferred_hum:.1f} %"
+            f"Priorität 2 Feuchtigkeit: {hum:.1f} % liegt unter dem "
+            f"gekoppelten Ziel von {preferred_hum:.1f} %"
         )
-    elif temperature_above_target:
+    elif temperature_priority and temperature_above_target:
         direction_note = (
-            f"Temperatur {temp:.1f} °C liegt über dem gekoppelten "
+            f"Priorität 2 Temperatur: {temp:.1f} °C liegt über dem gekoppelten "
             f"Ziel von {preferred_temp:.1f} °C"
         )
-    elif temperature_below_target:
+    elif temperature_priority and temperature_below_target:
         direction_note = (
-            f"Temperatur {temp:.1f} °C liegt unter dem gekoppelten "
+            f"Priorität 2 Temperatur: {temp:.1f} °C liegt unter dem gekoppelten "
             f"Ziel von {preferred_temp:.1f} °C"
         )
     else:
-        direction_note = "VPD und Feuchtigkeit sind im Zielbereich"
+        direction_note = (
+            f"VPD und Priorität 2 ({secondary_priority_label}) sind im Zielbereich"
+        )
 
     if humidity_too_high:
         direction = "raise"
@@ -1589,16 +1717,16 @@ def update_vpd_control(runtime=None, *, now=None):
     elif high_needed:
         direction = "lower"
         control_goal = "vpd_lower"
-    elif humidity_above_target:
+    elif humidity_priority and humidity_above_target:
         direction = "raise"
         control_goal = "humidity_target_high"
-    elif humidity_below_target:
+    elif humidity_priority and humidity_below_target:
         direction = "lower"
         control_goal = "humidity_target_low"
-    elif temperature_above_target:
+    elif temperature_priority and temperature_above_target:
         direction = "lower"
         control_goal = "temperature_target_high"
-    elif temperature_below_target:
+    elif temperature_priority and temperature_below_target:
         direction = "raise"
         control_goal = "temperature_target_low"
     else:
@@ -1611,17 +1739,35 @@ def update_vpd_control(runtime=None, *, now=None):
     raise_availability = dict(availability)
     raise_availability["heating"] = bool(
         availability["heating"]
-        and (low_needed or temperature_below_target)
+        and (
+            low_needed
+            or (temperature_priority and temperature_below_target)
+        )
     )
     # Ist die Feuchte bereits unter dem gekoppelten Wunschwert, dürfen Abluft
     # und Entfeuchter eine VPD-Unterdeckung nicht durch weiteres Trocknen
     # behandeln. Dann bleibt als korrekter Weg ausschließlich Temperatur.
-    if humidity_below_target and not humidity_too_high:
+    if (
+        (humidity_too_low or (humidity_priority and humidity_below_target))
+        and not humidity_too_high
+    ):
         raise_availability["fan"] = False
         raise_availability["dehumidifier"] = False
 
     lower_availability = dict(availability)
-    needs_more_humidity = bool(humidity_too_low or humidity_below_target)
+    needs_more_humidity = bool(
+        humidity_too_low or (humidity_priority and humidity_below_target)
+    )
+    if (
+        temperature_priority
+        and high_needed
+        and not temperature_above_target
+        and hum < settings["hum_max"] - _HUM_TARGET_HYSTERESIS
+    ):
+        # Ist Temperatur Priorität 2, darf die Feuchte innerhalb ihrer harten
+        # Range als dritte Größe nachgeführt werden, sobald weiteres Kühlen den
+        # priorisierten Temperaturwert verschlechtern würde.
+        needs_more_humidity = True
     lower_availability["humidifier"] = bool(
         availability["humidifier"] and needs_more_humidity
     )
@@ -1639,12 +1785,30 @@ def update_vpd_control(runtime=None, *, now=None):
         engine["fan_sweep_complete"] = False
         engine["heat_sweep_complete"] = False
         engine["heat_stall_windows"] = 0
+        engine.pop("last_heat_humidity_drop", None)
+        engine.pop("last_heat_humidity_responded", None)
+        engine.pop("heat_humidity_ineffective", None)
         engine.pop("last_evaluation_at", None)
         engine.pop("last_evaluation_improvement", None)
         engine["control_goal"] = control_goal
 
         if direction == "raise":
-            if raise_availability["fan"] and outside_drying:
+            if (
+                temperature_priority
+                and temperature_below_target
+                and (
+                    low_needed
+                    or control_goal == "temperature_target_low"
+                )
+                and raise_availability["heating"]
+                and temp < regulation_settings["temp_max"]
+            ):
+                initial_stage = "heat"
+                engine["temp_target"] = min(
+                    regulation_settings["temp_max"],
+                    max(base_target, temp) + settings["temp_step"],
+                )
+            elif raise_availability["fan"] and outside_drying:
                 initial_stage = "exhaust"
             elif (
                 raise_availability["heating"]
@@ -1666,6 +1830,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=direction_note,
             )
         elif direction == "lower":
@@ -1706,6 +1871,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=note,
             )
         else:
@@ -1716,6 +1882,7 @@ def update_vpd_control(runtime=None, *, now=None):
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 note=direction_note,
             )
     else:
@@ -1751,6 +1918,7 @@ def update_vpd_control(runtime=None, *, now=None):
             now=now,
             vpd=vpd,
             temp=temp,
+            hum=hum,
             note=note,
         )
     cadence = _adaptive_effect_window(
@@ -1762,7 +1930,7 @@ def update_vpd_control(runtime=None, *, now=None):
         max_window_sec=settings["effect_window_sec"],
     )
     if not direction_changed:
-        _append_sample(engine, now, vpd, cadence["interval_sec"])
+        _append_sample(engine, now, vpd, hum, cadence["interval_sec"])
 
     if direction is None:
         # Sobald der reale Messwert das VPD-Zielband erreicht, wird ein noch
@@ -1790,10 +1958,12 @@ def update_vpd_control(runtime=None, *, now=None):
                 now=now,
                 vpd=vpd,
                 temp=temp,
+                hum=hum,
                 improvement=improvement,
                 settings=regulation_settings,
                 availability=raise_availability,
                 outside_drying=outside_drying,
+                preferred_hum=preferred_hum,
             )
         else:
             _advance_lower_stage(
@@ -1998,6 +2168,11 @@ def update_vpd_control(runtime=None, *, now=None):
         "base_temp_target": round(base_target, 2),
         "preferred_temp_target": round(preferred_temp, 2),
         "preferred_hum_target": round(preferred_hum, 2),
+        "secondary_priority": secondary_priority,
+        "secondary_priority_label": secondary_priority_label,
+        "secondary_target_reached": bool(
+            preferred_point["secondary_target_reached"]
+        ),
         "effective_temp_target": round(effective_target, 2),
         "effective_hum_target": round(setpoints["hum"], 2),
         "setpoints": {
@@ -2034,6 +2209,12 @@ def update_vpd_control(runtime=None, *, now=None):
                 "hum_range": round(
                     setpoints["preferred"]["hum_range"],
                     2,
+                ),
+                "secondary_priority": setpoints["preferred"][
+                    "secondary_priority"
+                ],
+                "secondary_target_reached": bool(
+                    setpoints["preferred"]["secondary_target_reached"]
                 ),
             },
             "curve_temp_min": round(setpoints["curve_temp_min"], 2),
@@ -2095,6 +2276,17 @@ def update_vpd_control(runtime=None, *, now=None):
                 else None
             ),
             "minimum_kpa": settings["min_effect"],
+            "humidity_drop_percent_points": (
+                round(float(engine["last_heat_humidity_drop"]), 2)
+                if engine.get("last_heat_humidity_drop") is not None
+                else None
+            ),
+            "humidity_responded": (
+                bool(engine["last_heat_humidity_responded"])
+                if engine.get("last_heat_humidity_responded") is not None
+                else None
+            ),
+            "humidity_minimum_drop_percent_points": _HUM_RESPONSE_THRESHOLD,
             "next_evaluation_sec": max(
                 0,
                 int(round(cadence["interval_sec"] - elapsed)),
@@ -2120,6 +2312,22 @@ def update_vpd_control(runtime=None, *, now=None):
                 "hysteresis": round(vpd_temp_hysteresis, 2),
                 "complete": bool(engine.get("heat_sweep_complete")),
                 "stall_windows": int(engine.get("heat_stall_windows") or 0),
+                "humidity_effect_checked": (
+                    engine.get("last_heat_humidity_drop") is not None
+                ),
+                "humidity_drop_percent_points": (
+                    round(float(engine["last_heat_humidity_drop"]), 2)
+                    if engine.get("last_heat_humidity_drop") is not None
+                    else None
+                ),
+                "humidity_responded": (
+                    bool(engine["last_heat_humidity_responded"])
+                    if engine.get("last_heat_humidity_responded") is not None
+                    else None
+                ),
+                "humidity_ineffective": bool(
+                    engine.get("heat_humidity_ineffective")
+                ),
             },
         },
         "managed_devices": managed_devices,

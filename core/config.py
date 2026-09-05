@@ -113,6 +113,10 @@ DEFAULT_CONFIG = {
     "VPD_TARGET_NIGHT": 0.90,
     "VPD_TOLERANCE_DAY": 0.05,
     "VPD_TOLERANCE_NIGHT": 0.05,
+    # VPD bleibt immer Priorität 1. Dieser Wert entscheidet, welcher
+    # Klimawunsch auf der VPD-Zielkurve als Priorität 2 möglichst exakt gilt.
+    "VPD_SECONDARY_PRIORITY_DAY": "HUMIDITY",
+    "VPD_SECONDARY_PRIORITY_NIGHT": "HUMIDITY",
 
     # Tag und Nacht besitzen jeweils ein eigenes erlaubtes Betriebsfenster.
     # Die bestehenden MIN_/MAX_-Werte bleiben davon getrennte, übergeordnete

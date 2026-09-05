@@ -16,6 +16,7 @@ from core.runtime import resolve_runtime
 
 
 VPD_CONTROL_MODES = {"OFF", "MONITOR", "AUTO"}
+VPD_SECONDARY_PRIORITIES = {"HUMIDITY", "TEMPERATURE"}
 VPD_MANAGED_DEVICES = ("fan", "heating", "humidifier", "dehumidifier")
 VPD_ENGINE_KEY = "_vpd_control_engine"
 VPD_GENERATION_KEY = "_vpd_control_generation"
@@ -74,6 +75,7 @@ def validate_vpd_config(cfg):
         temp_max_key = f"VPD_TEMP_MAX_{suffix}"
         hum_min_key = f"VPD_HUM_MIN_{suffix}"
         hum_max_key = f"VPD_HUM_MAX_{suffix}"
+        priority_key = f"VPD_SECONDARY_PRIORITY_{suffix}"
 
         target = _bounded(effective, target_key, 0.1, 3.5)
         tolerance = _bounded(effective, tolerance_key, 0.01, 0.5)
@@ -81,6 +83,13 @@ def validate_vpd_config(cfg):
         temp_max = _bounded(effective, temp_max_key, -10.0, 50.0)
         hum_min = _bounded(effective, hum_min_key, 1.0, 99.0)
         hum_max = _bounded(effective, hum_max_key, 1.0, 99.0)
+        secondary_priority = str(
+            effective.get(priority_key, "HUMIDITY") or "HUMIDITY"
+        ).strip().upper()
+        if secondary_priority not in VPD_SECONDARY_PRIORITIES:
+            raise ValueError(
+                f"{priority_key} muss HUMIDITY oder TEMPERATURE sein"
+            )
 
         if temp_min >= temp_max:
             raise ValueError(
@@ -109,6 +118,7 @@ def validate_vpd_config(cfg):
             "temp_max": temp_max,
             "hum_min": hum_min,
             "hum_max": hum_max,
+            "secondary_priority": secondary_priority,
             "attainable_min": attainable_min,
             "attainable_max": attainable_max,
         }
@@ -198,6 +208,13 @@ def _interpolate_phase(source, destination, progress):
     )
     effective["attainable_max"] = float(
         calculate_vpd(effective["temp_max"], effective["hum_min"])
+    )
+    # Eine Priorität ist kategorial und kann nicht mathematisch interpoliert
+    # werden. Bis zur Rampenmitte gilt die Ausgangs-, danach die Zielphase.
+    effective["secondary_priority"] = (
+        destination["secondary_priority"]
+        if float(progress) >= 0.5
+        else source["secondary_priority"]
     )
     return effective
 
@@ -419,6 +436,7 @@ def vpd_device_context(device, runtime=None):
 
 __all__ = (
     "VPD_CONTROL_MODES",
+    "VPD_SECONDARY_PRIORITIES",
     "VPD_ENGINE_KEY",
     "VPD_GENERATION_KEY",
     "VPD_MANAGED_DEVICES",

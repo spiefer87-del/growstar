@@ -25,6 +25,7 @@ h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
 .field{display:flex;flex-direction:column;align-items:center;min-width:118px}
 .field label{font-size:.74rem;color:var(--muted);margin-bottom:5px;text-align:center}
 .compact-input{width:96px;height:36px;padding:4px 7px;font-size:.92rem;text-align:center;border-radius:9px;border:1px solid var(--border);background:#0f172a;color:var(--text)}
+.mode-select{min-width:210px;height:40px;padding:6px 10px;border-radius:10px;border:1px solid var(--border);background:#0f172a;color:var(--text);font-weight:700;text-align:center}
 .compact-input:out-of-range,.compact-input:invalid{outline:2px solid var(--red)}
 .num-control{display:flex;align-items:center;gap:5px}
 .num-control button{display:inline-flex;width:28px;height:28px;border-radius:50%;border:0;background:#334155;color:var(--text);font-size:1rem;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
@@ -229,8 +230,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <div class="info">
                 Temperatur-Ziel ± Range und Feuchte-Ziel ± Range definieren den
                 bevorzugten Klimapunkt und zugleich seine verbindlichen Grenzen.
-                Growstar sucht darin den zum VPD-Ziel passenden Punkt, der beiden
-                Zielwerten möglichst nahe kommt.
+                VPD bleibt immer Priorität 1. Mit Priorität 2 legst du fest, welcher
+                Klimazielwert auf der VPD-Zielkurve bevorzugt getroffen wird.
             </div>
             <div class="vpd-phase-grid">
                 <section class="vpd-phase day" aria-labelledby="profile-vpd-day-heading">
@@ -251,6 +252,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
                                 <input type="number" step="any" min="0.01" max="0.5" id="VPD_TOLERANCE_DAY" class="compact-input" required>
                                 <button type="button" onclick="stepValue('VPD_TOLERANCE_DAY',0.01)">+</button>
                             </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_SECONDARY_PRIORITY_DAY">Priorität 2</label>
+                            <select id="VPD_SECONDARY_PRIORITY_DAY" class="mode-select">
+                                <option value="HUMIDITY">Feuchtigkeit bevorzugen</option>
+                                <option value="TEMPERATURE">Temperatur bevorzugen</option>
+                            </select>
                         </div>
                     </div>
                     <div class="row-inline">
@@ -313,6 +323,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
                                 <input type="number" step="any" min="0.01" max="0.5" id="VPD_TOLERANCE_NIGHT" class="compact-input" required>
                                 <button type="button" onclick="stepValue('VPD_TOLERANCE_NIGHT',0.01)">+</button>
                             </div>
+                        </div>
+                    </div>
+                    <div class="row-inline">
+                        <div class="field">
+                            <label for="VPD_SECONDARY_PRIORITY_NIGHT">Priorität 2</label>
+                            <select id="VPD_SECONDARY_PRIORITY_NIGHT" class="mode-select">
+                                <option value="HUMIDITY">Feuchtigkeit bevorzugen</option>
+                                <option value="TEMPERATURE">Temperatur bevorzugen</option>
+                            </select>
                         </div>
                     </div>
                     <div class="row-inline">
@@ -472,6 +491,10 @@ const NUMBER_IDS = [
     "VPD_TARGET_NIGHT","VPD_TOLERANCE_NIGHT",
     "VPD_TEMP_MIN_NIGHT","VPD_TEMP_MAX_NIGHT","VPD_HUM_MIN_NIGHT","VPD_HUM_MAX_NIGHT"
 ];
+const CHOICE_IDS = [
+    "VPD_SECONDARY_PRIORITY_DAY",
+    "VPD_SECONDARY_PRIORITY_NIGHT"
+];
 
 let catalog = {};
 let activeProfile = null;
@@ -555,6 +578,10 @@ function withVpdPhaseCompatibility(raw){
         if(profile[phaseKey] === undefined && profile[legacyKey] !== undefined){
             profile[phaseKey] = profile[legacyKey];
         }
+    });
+    ["DAY","NIGHT"].forEach(suffix=>{
+        const key = `VPD_SECONDARY_PRIORITY_${suffix}`;
+        if(profile[key] === undefined) profile[key] = "HUMIDITY";
     });
     return profile;
 }
@@ -677,10 +704,12 @@ function updatePreview(){
         <strong>VPD-Profil</strong><br>
         ${rampText}<br>
         ☀️ Tag: ${num("VPD_TARGET_DAY").toFixed(2)} kPa ± ${num("VPD_TOLERANCE_DAY").toFixed(2)} ·
+        Priorität 2: ${el("VPD_SECONDARY_PRIORITY_DAY").value === "TEMPERATURE" ? "Temperatur" : "Feuchtigkeit"} ·
         Temperatur ${num("VPD_TEMP_CENTER_DAY").toFixed(1)} °C ± ${num("VPD_TEMP_RANGE_DAY").toFixed(1)} ·
         Feuchte ${num("VPD_HUM_CENTER_DAY").toFixed(1)} % ± ${num("VPD_HUM_RANGE_DAY").toFixed(1)}<br>
         Erreichbar: ${Number.isFinite(dayAttainableMin) ? dayAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(dayAttainableMax) ? dayAttainableMax.toFixed(2) : "--"} kPa<br>
         🌙 Nacht: ${num("VPD_TARGET_NIGHT").toFixed(2)} kPa ± ${num("VPD_TOLERANCE_NIGHT").toFixed(2)} ·
+        Priorität 2: ${el("VPD_SECONDARY_PRIORITY_NIGHT").value === "TEMPERATURE" ? "Temperatur" : "Feuchtigkeit"} ·
         Temperatur ${num("VPD_TEMP_CENTER_NIGHT").toFixed(1)} °C ± ${num("VPD_TEMP_RANGE_NIGHT").toFixed(1)} ·
         Feuchte ${num("VPD_HUM_CENTER_NIGHT").toFixed(1)} % ± ${num("VPD_HUM_RANGE_NIGHT").toFixed(1)}<br>
         Erreichbar: ${Number.isFinite(nightAttainableMin) ? nightAttainableMin.toFixed(2) : "--"} bis ${Number.isFinite(nightAttainableMax) ? nightAttainableMax.toFixed(2) : "--"} kPa
@@ -762,6 +791,9 @@ function fillEditor(profile,{markDirty=false}={}){
     profile = withVpdPhaseCompatibility(profile);
 
     NUMBER_IDS.forEach(id=>{
+        if(profile[id] !== undefined) el(id).value = profile[id];
+    });
+    CHOICE_IDS.forEach(id=>{
         if(profile[id] !== undefined) el(id).value = profile[id];
     });
     syncVpdWindowEditorsFromBounds();
@@ -879,6 +911,13 @@ function collectProfile(){
         if(!Number.isFinite(value)) throw new Error(`${id} muss numerisch sein.`);
         result[id] = value;
     });
+    CHOICE_IDS.forEach(id=>{
+        const value = String(el(id)?.value || "").toUpperCase();
+        if(!["HUMIDITY","TEMPERATURE"].includes(value)){
+            throw new Error(`${id} enthält keine gültige zweite Priorität.`);
+        }
+        result[id] = value;
+    });
 
     result.DAY_START_MIN = timeToMin(el("DAY_START_TIME").value);
     result.NIGHT_START_MIN = timeToMin(el("NIGHT_START_TIME").value);
@@ -898,7 +937,7 @@ function collectProfile(){
 
 function setRequestInFlight(value){
     requestInFlight = !!value;
-    document.querySelectorAll("input,.num-control button").forEach(control=>{
+    document.querySelectorAll("input,select,.num-control button").forEach(control=>{
         control.disabled = requestInFlight || !selectedProfile;
     });
     document.querySelectorAll(".profile-btn").forEach(control=>{
@@ -974,7 +1013,7 @@ async function activateProfile(){
         `${profileLabel(selectedProfile)} ${reapply ? "erneut anwenden" : "aktivieren"}?\n\n` +
         "• Die gespeicherten Profilwerte werden in diese Station übernommen.\n" +
         "• Temperatur-Rampe und Sonnenverlauf werden mit übernommen.\n" +
-        "• Getrennte VPD- und Klimaziele mit ihren Ranges für Tag/Nacht werden mit übernommen.\n" +
+        "• VPD-Ziele, Klimaziele, Ranges und Priorität 2 für Tag/Nacht werden mit übernommen.\n" +
         "• Eine laufende Rampe wird beendet.\n" +
         "• Die Profilvorlage selbst wird dabei nicht verändert."
     );
@@ -1041,8 +1080,8 @@ async function loadProfiles(){
     }
 }
 
-document.querySelectorAll("input").forEach(input=>{
-    const eventName = input.type === "checkbox" ? "change" : "input";
+document.querySelectorAll("input,select").forEach(input=>{
+    const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
     input.addEventListener(eventName,()=>{
         syncVpdBoundsFromWindowEditors();
         updatePreview();

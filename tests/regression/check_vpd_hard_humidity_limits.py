@@ -37,6 +37,7 @@ def night_runtime(*, temp=22.4, hum=70.9):
         "MIN_TEMP": 15.0,
         "VPD_TARGET_NIGHT": 0.90,
         "VPD_TOLERANCE_NIGHT": 0.05,
+        "VPD_SECONDARY_PRIORITY_NIGHT": "HUMIDITY",
         "VPD_TEMP_MIN_NIGHT": 17.0,
         "VPD_TEMP_MAX_NIGHT": 23.0,
         "VPD_HUM_MIN_NIGHT": 50.0,
@@ -53,12 +54,12 @@ def main():
     plan = update_vpd_control(screenshot, now=1000)
     require(
         plan["profile"] == "NACHT"
-        and abs(plan["effective_hum_target"] - 58.09) < 0.02
-        and abs(plan["setpoints"]["hum"] - 58.09) < 0.02
+        and abs(plan["effective_hum_target"] - 56.0) < 0.02
+        and abs(plan["setpoints"]["hum"] - 56.0) < 0.02
         and plan["setpoints"]["calculated_hum"] > 62.0
         and plan["setpoints"]["constrained"] is True
-        and abs(screenshot.state.live_state["hum_target"] - 58.09) < 0.02
-        and abs(screenshot.state.live_state["vpd_hum_target"] - 58.09) < 0.02,
+        and abs(screenshot.state.live_state["hum_target"] - 56.0) < 0.02
+        and abs(screenshot.state.live_state["vpd_hum_target"] - 56.0) < 0.02,
         "Der konkrete Nachtfall strebt statt der Obergrenze den gekoppelten Feuchte-Zielpunkt an",
     )
     require(
@@ -78,7 +79,7 @@ def main():
         0.85 <= still_wet["vpd"] <= 0.95
         and still_wet["direction"] == "raise"
         and still_wet["stage"] != "in_band"
-        and abs(still_wet["effective_hum_target"] - 58.09) < 0.02,
+        and abs(still_wet["effective_hum_target"] - 56.0) < 0.02,
         "Das Erreichen des VPD-Zielbands beendet die Regelung nicht, solange die harte Feuchte-Obergrenze verletzt ist",
     )
 
@@ -109,7 +110,7 @@ def main():
     dehumidify = update_vpd_control(transition, now=now - 59)
     require(
         dehumidify["stage"] == "dehumidify"
-        and abs(dehumidify["effective_hum_target"] - 58.09) < 0.02
+        and abs(dehumidify["effective_hum_target"] - 56.0) < 0.02
         and dehumidify["actions"]["heating"]["power"] is False
         and dehumidify["actions"]["dehumidifier"]["power"] is True,
         "Am VPD-Ziel endet die Heizhilfe sofort; die verbleibende Feuchteüberschreitung geht an den Entfeuchter",

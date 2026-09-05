@@ -219,14 +219,15 @@ def main():
         auto_plan = update_vpd_control(automatic, now=1000)
         require(
             auto_plan["stage"] == "humidify"
-            and abs(auto_plan["preferred_temp_target"] - 22.95) < 0.02
-            and abs(auto_plan["preferred_hum_target"] - 64.30) < 0.02
+            and abs(auto_plan["preferred_temp_target"] - 22.14) < 0.02
+            and abs(auto_plan["preferred_hum_target"] - 62.50) < 0.02
+            and auto_plan["secondary_priority"] == "HUMIDITY"
             and auto_plan["effective_temp_target"] == 24.0
             and automatic.state.live_state["temp_target"] == 24.0
             and 45.0 <= auto_plan["effective_hum_target"] <= 80.0
             and auto_plan["actions"]["humidifier"]["power"] is True
             and auto_plan["actions"]["heating"]["power"] is False,
-            "AUTO behandelt während der Rampe zuerst die verbindliche Feuchte-Untergrenze",
+            "AUTO behandelt während der Rampe zuerst die verbindliche Feuchte-Untergrenze und folgt der Feuchte-Priorität",
         )
         require(
             auto_plan["range"] == {
