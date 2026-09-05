@@ -3,7 +3,7 @@
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
 {% block page %}
 <main class="pm-shell">
-<header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('batch_list') }}">←</a><div><h1 class="pm-title">{{ 'Durchgang bearbeiten' if batch else 'Neuer Durchgang' }}</h1><div class="pm-subtitle">{{ batch.code if batch else 'Neue Charge / neuer Grow-Durchgang' }}</div></div></div></header>
+<header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('batch_detail', batch_id=batch.id) if batch else url_for('batch_list') }}">←</a><div><h1 class="pm-title">{{ 'Durchgang bearbeiten' if batch else 'Neuer Durchgang' }}</h1><div class="pm-subtitle">{{ batch.code if batch else 'Neue Charge / neuer Grow-Durchgang' }}</div></div></div></header>
 {% set active_page = 'batches' %}
 
 {% include "plants/_nav.html" %}

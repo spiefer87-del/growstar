@@ -22,22 +22,37 @@
 {% endwith %}
 
 <div class="pm-card"><div class="pm-table-wrap"><table class="pm-table">
-<thead><tr><th>Code</th><th>Durchgang</th><th>Start</th><th>Standort</th><th>Status</th><th>Pflanzen</th><th>Aktiv</th></tr></thead>
+<thead><tr><th>Code</th><th>Durchgang</th><th>Start</th><th>Standort</th><th>Status</th><th>Pflanzen</th><th>Aktiv</th><th></th></tr></thead>
 <tbody>
 {% for item in batches %}
-<tr>
-<td class="pm-code">{{ item.code }}</td>
+<tr class="pm-clickable-row" data-batch-href="{{ url_for('batch_detail', batch_id=item.id) }}" tabindex="0" aria-label="Durchgang {{ item.name }} öffnen">
+<td class="pm-code"><a href="{{ url_for('batch_detail', batch_id=item.id) }}">{{ item.code }}</a></td>
 <td>
-    {% if has_permission('plants.edit') %}
-        <a href="{{ url_for('batch_edit', batch_id=item.id) }}"><strong>{{ item.name }}</strong></a>
-    {% else %}
-        <strong>{{ item.name }}</strong>
-    {% endif %}
+    <a href="{{ url_for('batch_detail', batch_id=item.id) }}"><strong>{{ item.name }}</strong></a>
     </td>
 <td>{{ item.started_on or '—' }}</td><td>{{ item.location or '—' }}</td>
 <td>{{ item.status_label }}</td><td>{{ item.plant_count or 0 }}</td><td>{{ item.active_count or 0 }}</td>
+<td><a class="pm-row-open" href="{{ url_for('batch_detail', batch_id=item.id) }}" aria-label="{{ item.name }} anzeigen">Öffnen →</a></td>
 </tr>
-{% else %}<tr><td colspan="7"><div class="pm-empty">Noch keine Durchgänge.</div></td></tr>{% endfor %}
+{% else %}<tr><td colspan="8"><div class="pm-empty">Noch keine Durchgänge.</div></td></tr>{% endfor %}
 </tbody></table></div></div>
 </main>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+    document.querySelectorAll("[data-batch-href]").forEach(row => {
+        const open = () => window.location.assign(row.dataset.batchHref);
+        row.addEventListener("click", event => {
+            if (!event.target.closest("a, button")) open();
+        });
+        row.addEventListener("keydown", event => {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                open();
+            }
+        });
+    });
+})();
+</script>
 {% endblock %}

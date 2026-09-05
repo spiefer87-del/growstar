@@ -172,7 +172,7 @@
             {% endfor %}
 
             {% for batch in entry.batches %}
-            <span class="pm-chip">🗂️ {{ batch.code }} · {{ batch.name }}</span>
+            <a class="pm-chip" href="{{ url_for('batch_detail', batch_id=batch.id) }}">🗂️ {{ batch.code }} · {{ batch.name }}</a>
             {% endfor %}
 
             {% if entry.attachments %}

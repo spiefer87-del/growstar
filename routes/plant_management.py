@@ -355,6 +355,20 @@ def register(app):
         )
 
 
+    @app.route("/pflanzenmanagement/durchgaenge/<int:batch_id>")
+    def batch_detail(batch_id):
+        batch = get_batch(batch_id)
+        if not batch:
+            abort(404)
+
+        return render_template(
+            "plants/batch_detail.html",
+            batch=batch,
+            plants=list_plants(batch_id=batch_id),
+            journal_entries=list_journal_entries(batch_id=batch_id, limit=8),
+        )
+
+
     @app.route(
         "/pflanzenmanagement/durchgaenge/neu",
         methods=["GET", "POST"],
@@ -367,7 +381,7 @@ def register(app):
                 _audit("plants.batch_created", "batch", batch_id)
                 flash("Durchgang wurde angelegt.", "success")
                 return redirect(
-                    url_for("batch_edit", batch_id=batch_id)
+                    url_for("batch_detail", batch_id=batch_id)
                 )
             except Exception as exc:
                 flash(str(exc), "error")
@@ -380,7 +394,7 @@ def register(app):
 
 
     @app.route(
-        "/pflanzenmanagement/durchgaenge/<int:batch_id>",
+        "/pflanzenmanagement/durchgaenge/<int:batch_id>/bearbeiten",
         methods=["GET", "POST"],
     )
     @permission_required("plants.edit")
@@ -395,7 +409,7 @@ def register(app):
                 _audit("plants.batch_updated", "batch", batch_id)
                 flash("Durchgang wurde gespeichert.", "success")
                 return redirect(
-                    url_for("batch_edit", batch_id=batch_id)
+                    url_for("batch_detail", batch_id=batch_id)
                 )
             except Exception as exc:
                 flash(str(exc), "error")

@@ -409,10 +409,25 @@ def get_batch(batch_id):
     db = _db()
     try:
         row = db.execute(
-            "SELECT * FROM pm_batches WHERE id = ?",
+            """
+            SELECT b.*,
+                   COUNT(p.id) AS plant_count,
+                   SUM(CASE WHEN p.status = 'active' THEN 1 ELSE 0 END) AS active_count
+            FROM pm_batches b
+            LEFT JOIN pm_plants p ON p.batch_id = b.id
+            WHERE b.id = ?
+            GROUP BY b.id
+            """,
             (batch_id,),
         ).fetchone()
-        return dict(row) if row else None
+        if not row:
+            return None
+
+        item = dict(row)
+        item["status_label"] = BATCH_STATUS_LABELS.get(
+            item["status"], item["status"]
+        )
+        return item
     finally:
         db.close()
 

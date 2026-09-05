@@ -119,20 +119,20 @@
 
             <label class="pm-field">
                 <span class="pm-label">Pflanzen</span>
-                <select class="pm-select pm-multi" name="plant_ids" multiple>
+                <select class="pm-select pm-multi" id="journal-plant-select" name="plant_ids" multiple>
                     {% for plant in plants %}
                     {% set selected = (entry and plant.id in entry.plant_ids) or (not entry and preselected_plant_id|string == plant.id|string) %}
-                    <option value="{{ plant.id }}" {{ 'selected' if selected else '' }}>
+                    <option value="{{ plant.id }}" data-batch-id="{{ plant.batch_id or '' }}" {{ 'selected' if selected else '' }}>
                         {{ plant.code }} · {{ plant.display_name }} · {{ plant.cultivar_name or 'ohne Sorte' }}
                     </option>
                     {% endfor %}
                 </select>
-                <span class="pm-help">Mehrfachauswahl ist möglich.</span>
+                <span class="pm-help">Mehrfachauswahl ist möglich; zusätzliche Pflanzen können manuell ergänzt werden.</span>
             </label>
 
             <label class="pm-field">
                 <span class="pm-label">Durchgänge</span>
-                <select class="pm-select pm-multi" name="batch_ids" multiple>
+                <select class="pm-select pm-multi" id="journal-batch-select" name="batch_ids" multiple>
                     {% for batch in batches %}
                     {% set selected = (entry and batch.id in entry.batch_ids) or (not entry and preselected_batch_id|string == batch.id|string) %}
                     <option value="{{ batch.id }}" {{ 'selected' if selected else '' }}>
@@ -140,6 +140,7 @@
                     </option>
                     {% endfor %}
                 </select>
+                <span class="pm-help" id="journal-batch-sync-status" aria-live="polite">Ausgewählte Durchgänge markieren ihre zugeordneten Pflanzen automatisch.</span>
             </label>
 
         </div>
@@ -261,6 +262,68 @@
         now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
         input.value = now.toISOString().slice(0, 16);
     }
+
+    const plantSelect = document.getElementById("journal-plant-select");
+    const batchSelect = document.getElementById("journal-batch-select");
+    const syncStatus = document.getElementById("journal-batch-sync-status");
+    if (!plantSelect || !batchSelect) return;
+
+    const manualPlantIds = new Set(
+        Array.from(plantSelect.options)
+            .filter(option => option.selected)
+            .map(option => option.value)
+    );
+    let automaticPlantIds = new Set();
+    const excludedAutomaticIds = new Set();
+
+    function syncBatchPlants() {
+        const selectedBatchIds = new Set(
+            Array.from(batchSelect.selectedOptions).map(option => option.value)
+        );
+        const nextAutomaticIds = new Set(
+            Array.from(plantSelect.options)
+                .filter(option => selectedBatchIds.has(option.dataset.batchId))
+                .map(option => option.value)
+        );
+
+        Array.from(excludedAutomaticIds).forEach(plantId => {
+            if (!nextAutomaticIds.has(plantId)) excludedAutomaticIds.delete(plantId);
+        });
+
+        Array.from(plantSelect.options).forEach(option => {
+            option.selected = manualPlantIds.has(option.value)
+                || (nextAutomaticIds.has(option.value)
+                    && !excludedAutomaticIds.has(option.value));
+        });
+        automaticPlantIds = nextAutomaticIds;
+
+        if (syncStatus) {
+            const selectedAutomaticCount = Array.from(automaticPlantIds)
+                .filter(plantId => !excludedAutomaticIds.has(plantId)).length;
+            syncStatus.textContent = selectedBatchIds.size
+                ? `${selectedAutomaticCount} Pflanze${selectedAutomaticCount === 1 ? "" : "n"} aus ${selectedBatchIds.size} ${selectedBatchIds.size === 1 ? "Durchgang" : "Durchgängen"} automatisch ausgewählt.`
+                : "Ausgewählte Durchgänge markieren ihre zugeordneten Pflanzen automatisch.";
+        }
+    }
+
+    plantSelect.addEventListener("change", () => {
+        Array.from(plantSelect.options).forEach(option => {
+            if (automaticPlantIds.has(option.value)) {
+                if (option.selected) {
+                    excludedAutomaticIds.delete(option.value);
+                } else {
+                    manualPlantIds.delete(option.value);
+                    excludedAutomaticIds.add(option.value);
+                }
+            } else if (option.selected) {
+                manualPlantIds.add(option.value);
+            } else {
+                manualPlantIds.delete(option.value);
+            }
+        });
+    });
+    batchSelect.addEventListener("change", syncBatchPlants);
+    syncBatchPlants();
 })();
 </script>
 

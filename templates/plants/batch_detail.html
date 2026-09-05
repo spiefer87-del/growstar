@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}{{ batch.name }} – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('batch_list') }}">←</a>
+        <div>
+            <h1 class="pm-title">🗂️ {{ batch.name }}</h1>
+            <div class="pm-subtitle">{{ batch.code }} · Durchgangsdetail und aktueller Pflanzenbestand</div>
+        </div>
+    </div>
+    <div class="pm-actions">
+        {% if has_permission('diary.edit') %}
+        <a class="pm-button" href="{{ url_for('plant_journal_new', batch_id=batch.id) }}">＋ Betriebsereignis</a>
+        {% endif %}
+        {% if has_permission('plants.edit') %}
+        <a class="pm-button primary" href="{{ url_for('batch_edit', batch_id=batch.id) }}">Bearbeiten</a>
+        {% endif %}
+    </div>
+</header>
+
+{% set active_page = 'batches' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="pm-flashes">
+    {% for category, message in messages %}
+    <div class="pm-flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<section class="pm-grid">
+    <article class="pm-card pm-span-12">
+        <div class="pm-card-body">
+            <div class="pm-detail-grid">
+                <div class="pm-detail"><div class="pm-detail-label">Code</div><div class="pm-detail-value pm-code">{{ batch.code }}</div></div>
+                <div class="pm-detail"><div class="pm-detail-label">Status</div><div class="pm-detail-value"><span class="pm-status {{ '' if batch.status == 'active' else 'inactive' }}">{{ batch.status_label }}</span></div></div>
+                <div class="pm-detail"><div class="pm-detail-label">Startdatum</div><div class="pm-detail-value">{{ batch.started_on or '—' }}</div></div>
+                <div class="pm-detail"><div class="pm-detail-label">Standort</div><div class="pm-detail-value">{{ batch.location or '—' }}</div></div>
+                <div class="pm-detail"><div class="pm-detail-label">Pflanzen gesamt</div><div class="pm-detail-value">{{ batch.plant_count or 0 }}</div></div>
+                <div class="pm-detail"><div class="pm-detail-label">Davon aktiv</div><div class="pm-detail-value">{{ batch.active_count or 0 }}</div></div>
+            </div>
+            {% if batch.notes %}
+            <div class="pm-batch-notes"><strong>Notizen</strong><p>{{ batch.notes }}</p></div>
+            {% endif %}
+        </div>
+    </article>
+
+    <article class="pm-card pm-span-12">
+        <div class="pm-card-head">
+            <h2>Pflanzen in diesem Durchgang</h2>
+            <a class="pm-button" href="{{ url_for('plant_list', batch_id=batch.id) }}">Gefilterte Pflanzenliste</a>
+        </div>
+        <div class="pm-table-wrap">
+            <table class="pm-table">
+                <thead>
+                    <tr><th>Pflanze</th><th>Sorte</th><th>Phase</th><th>Rolle</th><th>Status</th><th>Phase seit</th><th>Standort</th></tr>
+                </thead>
+                <tbody>
+                {% for plant in plants %}
+                    <tr>
+                        <td><a href="{{ url_for('plant_detail', plant_id=plant.id) }}"><strong>{{ plant.display_name }}</strong><span class="pm-code">{{ plant.code }}</span></a></td>
+                        <td>{{ plant.cultivar_name or '—' }}</td>
+                        <td><span class="pm-stage" style="--stage-color:{{ plant.stage_color }}"><span class="pm-stage-dot"></span>{{ plant.stage_label }}</span></td>
+                        <td><span class="pm-chip">{{ plant.role_label }}</span></td>
+                        <td><span class="pm-status {{ '' if plant.status == 'active' else 'inactive' }}">{{ plant.status_label }}</span></td>
+                        <td>{{ plant.stage_days if plant.stage_days is not none else '—' }} Tage</td>
+                        <td>{{ plant.location or '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="7"><div class="pm-empty">Diesem Durchgang sind noch keine Pflanzen zugeordnet.</div></td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    {% if has_permission('diary.view') %}
+    <article class="pm-card pm-span-12">
+        <div class="pm-card-head">
+            <h2>Letzte Betriebsereignisse</h2>
+            <a class="pm-button" href="{{ url_for('plant_journal', batch_id=batch.id) }}">Alle anzeigen</a>
+        </div>
+        <div class="pm-card-body">
+            <div class="pm-record-list">
+            {% for entry in journal_entries %}
+                <a class="pm-record" href="{{ url_for('plant_journal_detail', entry_id=entry.id) }}">
+                    <span>{{ entry.category_icon }} <strong>{{ entry.title }}</strong><small>{{ entry.category_label }} · {{ entry.created_by_name or 'System' }}</small></span>
+                    <span class="pm-muted">{{ entry.occurred_date }} · {{ entry.occurred_time }}</span>
+                </a>
+            {% else %}
+                <div class="pm-empty">Für diesen Durchgang wurden noch keine Betriebsereignisse erfasst.</div>
+            {% endfor %}
+            </div>
+        </div>
+    </article>
+    {% endif %}
+</section>
+</main>
+{% endblock %}
