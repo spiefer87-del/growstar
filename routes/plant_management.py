@@ -44,6 +44,7 @@ from plant_management.database import (
     set_plant_stage,
     set_plant_status,
     get_stage_events,
+    correct_current_stage_start,
 )
 from plant_management.excel_io import (
     export_cultivars_xlsx,
@@ -565,6 +566,59 @@ def register(app):
             return redirect(url_for("plant_detail", plant_id=plant_id))
 
         user = getattr(g, "current_user", None)
+        requested_start = str(request.form.get("started_on") or "")[:10]
+        current_start = str(plant.get("current_stage_started_on") or "")[:10]
+
+        if stage == plant.get("current_stage") and requested_start != current_start:
+            if request.form.get("confirm_stage_date_correction") != "1":
+                flash(
+                    "Die Pflanze befindet sich bereits in dieser Phase. "
+                    "Eine Änderung des Startdatums muss ausdrücklich bestätigt werden.",
+                    "error",
+                )
+                return redirect(url_for("plant_detail", plant_id=plant_id))
+
+            try:
+                correction = correct_current_stage_start(
+                    plant_id,
+                    requested_start,
+                    note=request.form.get("note"),
+                )
+                if not correction:
+                    flash("Das Startdatum war bereits so gespeichert.", "info")
+                    return redirect(url_for("plant_detail", plant_id=plant_id))
+
+                stage_label = STAGE_LABELS.get(stage, stage)
+                _audit(
+                    "plants.stage_start_corrected",
+                    "plant",
+                    plant_id,
+                    correction,
+                )
+                _system_journal(
+                    f"Phasenstart korrigiert: {stage_label}",
+                    body=(
+                        f"Startdatum von {correction['old_started_on']} auf "
+                        f"{correction['new_started_on']} korrigiert."
+                        + (
+                            f"\nGrund: {request.form.get('note').strip()}"
+                            if request.form.get("note", "").strip()
+                            else ""
+                        )
+                    ),
+                    plant_ids=[plant_id],
+                    tags="phase,lifecycle,korrektur",
+                )
+                flash(
+                    f"Startdatum der Phase {stage_label} wurde von "
+                    f"{correction['old_started_on']} auf "
+                    f"{correction['new_started_on']} korrigiert.",
+                    "success",
+                )
+            except Exception as exc:
+                flash(str(exc), "error")
+            return redirect(url_for("plant_detail", plant_id=plant_id))
+
         changed = set_plant_stage(
             plant_id,
             stage,
