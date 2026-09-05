@@ -105,11 +105,16 @@ from plant_management.journal import (
 from plant_management.photos import (
     MAX_IMAGE_EDGE,
     JPEG_QUALITY,
+    get_batch_photo,
     get_plant_photo,
+    link_batch_photo_to_journal,
     link_photo_to_journal,
+    list_batch_photos,
     list_plant_photos,
     photo_markers_for_timeline,
+    remove_batch_photo,
     remove_plant_photo,
+    save_batch_photo,
     save_plant_photo,
 )
 
@@ -373,11 +378,18 @@ def register(app):
         if not batch:
             abort(404)
 
+        try:
+            batch_photos = list_batch_photos(batch_id=batch_id, limit=6)
+        except Exception:
+            app.logger.exception("Durchgangsfotos konnten nicht geladen werden")
+            batch_photos = []
+
         return render_template(
             "plants/batch_detail.html",
             batch=batch,
             plants=list_plants(batch_id=batch_id),
             journal_entries=list_journal_entries(batch_id=batch_id, limit=8),
+            batch_photos=batch_photos,
         )
 
 
@@ -688,24 +700,40 @@ def register(app):
 
     @app.route("/pflanzenmanagement/fotos")
     def plant_photo_manager():
+        scope = (
+            "batches"
+            if request.args.get("scope") == "batches"
+            else "plants"
+        )
         selected_plant_id = request.args.get("plant_id", type=int)
+        selected_batch_id = request.args.get("batch_id", type=int)
         selected_stage = request.args.get("stage") or None
         if selected_stage not in {item[0] for item in STAGES}:
             selected_stage = None
         plants = list_plants()
+        batches = list_batches(include_archived=True)
         selected_plant = (
             get_plant(selected_plant_id)
             if selected_plant_id
             else None
         )
+        selected_batch = (
+            get_batch(selected_batch_id)
+            if selected_batch_id
+            else None
+        )
+        photos = []
+        batch_photos = []
         try:
-            photos = list_plant_photos(
-                plant_id=selected_plant_id,
-                stage=selected_stage,
-            )
-        except Exception as exc:
+            if scope == "batches":
+                batch_photos = list_batch_photos(batch_id=selected_batch_id)
+            else:
+                photos = list_plant_photos(
+                    plant_id=selected_plant_id,
+                    stage=selected_stage,
+                )
+        except Exception:
             app.logger.exception("Foto-Manager konnte Fotos nicht laden")
-            photos = []
             flash(
                 "Die Fotoliste konnte nicht geladen werden. "
                 "Die Seite bleibt verfügbar; Details stehen im Systemprotokoll.",
@@ -715,9 +743,14 @@ def register(app):
         return render_template(
             "plants/photos.html",
             photos=photos,
+            batch_photos=batch_photos,
             plants=plants,
+            batches=batches,
+            scope=scope,
             selected_plant=selected_plant,
             selected_plant_id=selected_plant_id,
+            selected_batch=selected_batch,
+            selected_batch_id=selected_batch_id,
             selected_stage=selected_stage,
             stages=STAGES,
         )
@@ -810,9 +843,111 @@ def register(app):
         )
 
 
+    @app.route(
+        "/pflanzenmanagement/fotos/durchgang/neu",
+        methods=["GET", "POST"],
+    )
+    @permission_required("plants.edit")
+    def batch_photo_new():
+        preselected_batch_id = request.args.get("batch_id") or None
+
+        if request.method == "POST":
+            photo = None
+            try:
+                user_id, user_name = _current_user_identity()
+                camera_upload = request.files.get("camera_photo")
+                file_upload = request.files.get("file_photo")
+                upload = (
+                    camera_upload
+                    if camera_upload and camera_upload.filename
+                    else file_upload
+                )
+                photo = save_batch_photo(
+                    request.form.get("batch_id"),
+                    upload,
+                    captured_at=request.form.get("captured_at"),
+                    note=request.form.get("note"),
+                    user_id=user_id,
+                    user_name=user_name,
+                )
+
+                batch = photo["batch"]
+                note = request.form.get("note", "").strip()
+                entry_id = save_journal_entry(
+                    {
+                        "occurred_at": photo["captured_at"],
+                        "category": "observation",
+                        "severity": "info",
+                        "title": f"Durchgangsfoto: {batch['name']}",
+                        "body": note or "Gesamtaufnahme des Durchgangs.",
+                        "tags": "foto,durchgang",
+                    },
+                    plant_ids=[],
+                    batch_ids=[batch["id"]],
+                    user_id=user_id,
+                    user_name=user_name,
+                    source="system",
+                )
+                link_batch_photo_to_journal(photo["id"], entry_id)
+                _audit(
+                    "plants.batch_photo_created",
+                    "batch_photo",
+                    photo["id"],
+                    {
+                        "batch_id": batch["id"],
+                        "captured_at": photo["captured_at"],
+                        "journal_entry_id": entry_id,
+                    },
+                )
+                flash(
+                    "Durchgangsfoto wurde verkleinert, gespeichert und im "
+                    "Betriebsjournal dokumentiert.",
+                    "success",
+                )
+                return redirect(
+                    url_for(
+                        "plant_photo_manager",
+                        scope="batches",
+                        batch_id=batch["id"],
+                    )
+                )
+            except Exception as exc:
+                if photo:
+                    remove_batch_photo(photo["id"])
+                flash(str(exc), "error")
+
+        return render_template(
+            "plants/batch_photo_form.html",
+            batches=list_batches(include_archived=False),
+            preselected_batch_id=(
+                request.form.get("batch_id")
+                if request.method == "POST"
+                else preselected_batch_id
+            ),
+            default_captured_at=datetime.now().strftime("%Y-%m-%dT%H:%M"),
+            max_image_edge=MAX_IMAGE_EDGE,
+            jpeg_quality=JPEG_QUALITY,
+        )
+
+
     @app.route("/pflanzenmanagement/fotos/<int:photo_id>/datei")
     def plant_photo_file(photo_id):
         photo = get_plant_photo(photo_id)
+        if not photo or not os.path.isfile(photo["path"]):
+            abort(404)
+        return send_file(
+            photo["path"],
+            mimetype=photo["mime_type"],
+            conditional=True,
+            max_age=86400,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/fotos/durchgang/<int:photo_id>/datei"
+    )
+    def batch_photo_file(photo_id):
+        photo = get_batch_photo(photo_id)
         if not photo or not os.path.isfile(photo["path"]):
             abort(404)
         return send_file(
@@ -847,6 +982,37 @@ def register(app):
             flash("Foto wurde aus dem Foto-Manager entfernt.", "success")
         return redirect(
             url_for("plant_photo_manager", plant_id=photo["plant_id"])
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/fotos/durchgang/<int:photo_id>/entfernen",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def batch_photo_remove(photo_id):
+        photo = get_batch_photo(photo_id)
+        if not photo:
+            abort(404)
+        user_id, user_name = _current_user_identity()
+        if remove_batch_photo(
+            photo_id,
+            user_id=user_id,
+            user_name=user_name,
+        ):
+            _audit(
+                "plants.batch_photo_removed",
+                "batch_photo",
+                photo_id,
+                {"batch_id": photo["batch_id"]},
+            )
+            flash("Durchgangsfoto wurde aus dem Foto-Manager entfernt.", "success")
+        return redirect(
+            url_for(
+                "plant_photo_manager",
+                scope="batches",
+                batch_id=photo["batch_id"],
+            )
         )
 
 
@@ -972,11 +1138,18 @@ def register(app):
             app.logger.exception("Journal-Fotos konnten nicht geladen werden")
             photos = []
 
+        try:
+            batch_photos = list_batch_photos(journal_entry_id=entry_id)
+        except Exception:
+            app.logger.exception("Journal-Durchgangsfotos konnten nicht geladen werden")
+            batch_photos = []
+
         return render_template(
             "plants/journal_detail.html",
             entry=entry,
             revisions=get_revisions(entry_id),
             photos=photos,
+            batch_photos=batch_photos,
         )
 
 

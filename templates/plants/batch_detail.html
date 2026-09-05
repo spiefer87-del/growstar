@@ -16,6 +16,7 @@
         <a class="pm-button" href="{{ url_for('plant_journal_new', batch_id=batch.id) }}">＋ Betriebsereignis</a>
         {% endif %}
         {% if has_permission('plants.edit') %}
+        <a class="pm-button" href="{{ url_for('batch_photo_new', batch_id=batch.id) }}">＋ Durchgangsfoto</a>
         <a class="pm-button primary" href="{{ url_for('batch_edit', batch_id=batch.id) }}">Bearbeiten</a>
         {% endif %}
     </div>
@@ -48,6 +49,35 @@
             {% if batch.notes %}
             <div class="pm-batch-notes"><strong>Notizen</strong><p>{{ batch.notes }}</p></div>
             {% endif %}
+        </div>
+    </article>
+
+    <article class="pm-card pm-span-12">
+        <div class="pm-card-head">
+            <h2>📷 Durchgangsfotos</h2>
+            <div class="pm-actions">
+                <a class="pm-button" href="{{ url_for('plant_photo_manager', scope='batches', batch_id=batch.id) }}">Alle Fotos</a>
+                {% if has_permission('plants.edit') %}
+                <a class="pm-button primary" href="{{ url_for('batch_photo_new', batch_id=batch.id) }}">＋ Foto aufnehmen</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="pm-card-body">
+        {% if batch_photos %}
+            <div class="pm-photo-grid compact">
+            {% for photo in batch_photos %}
+                <a class="pm-photo-card" href="{{ url_for('batch_photo_file', photo_id=photo.id) }}" target="_blank">
+                    <img src="{{ url_for('batch_photo_file', photo_id=photo.id) }}" alt="Gesamtaufnahme {{ batch.name }}" loading="lazy">
+                    <span class="pm-photo-overlay">
+                        <strong>{{ photo.captured_date }} · {{ photo.captured_time }} Uhr</strong>
+                        <span>{{ photo.note or 'Gesamtaufnahme des Durchgangs' }}</span>
+                    </span>
+                </a>
+            {% endfor %}
+            </div>
+        {% else %}
+            <div class="pm-empty">Für diesen Durchgang wurden noch keine Gesamtaufnahmen gespeichert.</div>
+        {% endif %}
         </div>
     </article>
 

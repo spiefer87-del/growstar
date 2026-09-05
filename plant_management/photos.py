@@ -1,4 +1,4 @@
-"""Speicheroptimierte Fotodokumentation für einzelne Pflanzen."""
+"""Speicheroptimierte Fotodokumentation für Pflanzen und Durchgänge."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def _photo_query(sql, params, *, one=False):
             cursor = db.execute(sql, params)
             return cursor.fetchone() if one else cursor.fetchall()
         except sqlite3.OperationalError as exc:
-            if attempt == 0 and "no such table: pm_plant_photos" in str(exc):
+            if attempt == 0 and "no such table: pm_" in str(exc):
                 db.close()
                 init_plant_photo_db()
                 continue
@@ -101,6 +101,34 @@ def init_plant_photo_db():
 
             CREATE INDEX IF NOT EXISTS idx_pm_plant_photos_journal
             ON pm_plant_photos(journal_entry_id);
+
+            CREATE TABLE IF NOT EXISTS pm_batch_photos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                batch_id INTEGER NOT NULL,
+                journal_entry_id INTEGER,
+                stored_name TEXT NOT NULL UNIQUE,
+                original_name TEXT NOT NULL,
+                mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
+                size_bytes INTEGER NOT NULL,
+                width INTEGER NOT NULL,
+                height INTEGER NOT NULL,
+                captured_at TEXT NOT NULL,
+                note TEXT,
+                created_by INTEGER,
+                created_by_name TEXT,
+                created_at INTEGER NOT NULL,
+                deleted_at INTEGER,
+                deleted_by INTEGER,
+                deleted_by_name TEXT,
+                FOREIGN KEY(batch_id) REFERENCES pm_batches(id) ON DELETE CASCADE,
+                FOREIGN KEY(journal_entry_id) REFERENCES pm_journal_entries(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_pm_batch_photos_batch_date
+            ON pm_batch_photos(batch_id, captured_at DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_pm_batch_photos_journal
+            ON pm_batch_photos(journal_entry_id);
             """
         )
         db.commit()
@@ -281,12 +309,123 @@ def link_photo_to_journal(photo_id, journal_entry_id):
         db.close()
 
 
+def save_batch_photo(
+    batch_id,
+    upload,
+    *,
+    captured_at=None,
+    note=None,
+    user_id=None,
+    user_name=None,
+):
+    """Speichert eine Gesamtaufnahme, die genau einem Durchgang gehört."""
+    try:
+        batch_id = int(batch_id)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Bitte einen gültigen Durchgang auswählen.") from exc
+
+    captured_at = _normalize_captured_at(captured_at)
+    content, width, height = _prepare_image(upload)
+    original_name = Path(upload.filename).name or "Durchgangsfoto"
+    stored_name = f"{uuid.uuid4().hex}.jpg"
+    target = PHOTO_DIR / stored_name
+
+    db = _db()
+    try:
+        batch = db.execute(
+            """
+            SELECT id, code, name, location, started_on, status
+            FROM pm_batches
+            WHERE id = ?
+            """,
+            (batch_id,),
+        ).fetchone()
+        if not batch:
+            raise ValueError("Der ausgewählte Durchgang wurde nicht gefunden.")
+        if batch["started_on"] and captured_at[:10] < str(batch["started_on"])[:10]:
+            raise ValueError(
+                "Das Aufnahmedatum darf nicht vor dem Startdatum des Durchgangs liegen."
+            )
+
+        target.write_bytes(content)
+        cur = db.execute(
+            """
+            INSERT INTO pm_batch_photos (
+                batch_id, stored_name, original_name, mime_type,
+                size_bytes, width, height, captured_at, note,
+                created_by, created_by_name, created_at
+            )
+            VALUES (?, ?, ?, 'image/jpeg', ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                batch_id,
+                stored_name,
+                original_name,
+                len(content),
+                width,
+                height,
+                captured_at,
+                str(note or "").strip() or None,
+                user_id,
+                user_name,
+                _now(),
+            ),
+        )
+        db.commit()
+        return {
+            "id": int(cur.lastrowid),
+            "batch": dict(batch),
+            "captured_at": captured_at,
+            "size_bytes": len(content),
+            "width": width,
+            "height": height,
+        }
+    except Exception:
+        db.rollback()
+        target.unlink(missing_ok=True)
+        raise
+    finally:
+        db.close()
+
+
+def link_batch_photo_to_journal(photo_id, journal_entry_id):
+    db = _db()
+    try:
+        db.execute(
+            """
+            UPDATE pm_batch_photos
+            SET journal_entry_id = ?
+            WHERE id = ? AND deleted_at IS NULL
+            """,
+            (int(journal_entry_id), int(photo_id)),
+        )
+        db.commit()
+    finally:
+        db.close()
+
+
 def _decorate(row):
     if not row:
         return None
     item = dict(row)
     item["stage_label"] = STAGE_LABELS.get(item["stage"], item["stage"])
     item["stage_color"] = STAGE_COLORS.get(item["stage"], "#64748b")
+    try:
+        captured = datetime.fromisoformat(item["captured_at"])
+        item["captured_date"] = captured.strftime("%d.%m.%Y")
+        item["captured_time"] = captured.strftime("%H:%M")
+    except (TypeError, ValueError):
+        item["captured_date"] = str(item.get("captured_at") or "")[:10]
+        item["captured_time"] = ""
+    item["size_kb"] = max(1, round(int(item["size_bytes"]) / 1024))
+    item["path"] = str(PHOTO_DIR / item["stored_name"])
+    return item
+
+
+def _decorate_batch(row):
+    if not row:
+        return None
+    item = dict(row)
     try:
         captured = datetime.fromisoformat(item["captured_at"])
         item["captured_date"] = captured.strftime("%d.%m.%Y")
@@ -347,6 +486,47 @@ def get_plant_photo(photo_id):
     return _decorate(row)
 
 
+def list_batch_photos(*, batch_id=None, journal_entry_id=None, limit=250):
+    where = ["ph.deleted_at IS NULL"]
+    params = []
+    if batch_id:
+        where.append("ph.batch_id = ?")
+        params.append(int(batch_id))
+    if journal_entry_id:
+        where.append("ph.journal_entry_id = ?")
+        params.append(int(journal_entry_id))
+
+    params.append(max(1, min(int(limit), 1000)))
+    rows = _photo_query(
+        f"""
+        SELECT ph.*, b.code AS batch_code, b.name AS batch_name,
+               b.location AS batch_location, b.status AS batch_status
+        FROM pm_batch_photos ph
+        JOIN pm_batches b ON b.id = ph.batch_id
+        WHERE {' AND '.join(where)}
+        ORDER BY ph.captured_at DESC, ph.id DESC
+        LIMIT ?
+        """,
+        params,
+    )
+    return [_decorate_batch(row) for row in rows]
+
+
+def get_batch_photo(photo_id):
+    row = _photo_query(
+        """
+        SELECT ph.*, b.code AS batch_code, b.name AS batch_name,
+               b.location AS batch_location, b.status AS batch_status
+        FROM pm_batch_photos ph
+        JOIN pm_batches b ON b.id = ph.batch_id
+        WHERE ph.id = ? AND ph.deleted_at IS NULL
+        """,
+        (int(photo_id),),
+        one=True,
+    )
+    return _decorate_batch(row)
+
+
 def remove_plant_photo(photo_id, *, user_id=None, user_name=None):
     db = _db()
     try:
@@ -363,6 +543,37 @@ def remove_plant_photo(photo_id, *, user_id=None, user_name=None):
         db.execute(
             """
             UPDATE pm_plant_photos
+            SET deleted_at = ?, deleted_by = ?, deleted_by_name = ?
+            WHERE id = ?
+            """,
+            (_now(), user_id, user_name, int(photo_id)),
+        )
+        db.commit()
+        try:
+            (PHOTO_DIR / row["stored_name"]).unlink(missing_ok=True)
+        except OSError:
+            pass
+        return True
+    finally:
+        db.close()
+
+
+def remove_batch_photo(photo_id, *, user_id=None, user_name=None):
+    db = _db()
+    try:
+        row = db.execute(
+            """
+            SELECT stored_name
+            FROM pm_batch_photos
+            WHERE id = ? AND deleted_at IS NULL
+            """,
+            (int(photo_id),),
+        ).fetchone()
+        if not row:
+            return False
+        db.execute(
+            """
+            UPDATE pm_batch_photos
             SET deleted_at = ?, deleted_by = ?, deleted_by_name = ?
             WHERE id = ?
             """,

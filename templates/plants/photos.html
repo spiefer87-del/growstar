@@ -8,11 +8,15 @@
         <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
         <div>
             <h1 class="pm-title">📷 Foto-Manager</h1>
-            <div class="pm-subtitle">Bildverlauf nach Pflanze, Datum und dokumentierter Phase</div>
+            <div class="pm-subtitle">Bildverlauf für einzelne Pflanzen und vollständige Durchgänge</div>
         </div>
     </div>
     {% if has_permission('plants.edit') %}
-    <a class="pm-button primary" href="{{ url_for('plant_photo_new', plant_id=selected_plant_id or '') }}">＋ Foto aufnehmen</a>
+    {% if scope == 'batches' %}
+    <a class="pm-button primary" href="{{ url_for('batch_photo_new', batch_id=selected_batch_id or '') }}">＋ Durchgangsfoto</a>
+    {% else %}
+    <a class="pm-button primary" href="{{ url_for('plant_photo_new', plant_id=selected_plant_id or '') }}">＋ Pflanzenfoto</a>
+    {% endif %}
     {% endif %}
 </header>
 
@@ -23,6 +27,73 @@
 {% if messages %}<div class="pm-flashes">{% for category, message in messages %}<div class="pm-flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
 {% endwith %}
 
+<nav class="pm-photo-scope" aria-label="Fototyp auswählen">
+    <a class="{{ 'active' if scope == 'plants' else '' }}" href="{{ url_for('plant_photo_manager') }}">🌱 Pflanzenfotos</a>
+    <a class="{{ 'active' if scope == 'batches' else '' }}" href="{{ url_for('plant_photo_manager', scope='batches') }}">🗂️ Durchgangsfotos</a>
+</nav>
+
+{% if scope == 'batches' %}
+<form class="pm-photo-filter batch" method="get">
+    <input type="hidden" name="scope" value="batches">
+    <label class="pm-field">
+        <span class="pm-label">Durchgang auswählen</span>
+        <select class="pm-select" name="batch_id" onchange="this.form.submit()">
+            <option value="">Alle Durchgänge</option>
+            {% for batch in batches %}
+            <option value="{{ batch.id }}" {{ 'selected' if selected_batch_id|string == batch.id|string else '' }}>
+                {{ batch.code }} · {{ batch.name }}{% if batch.location %} · {{ batch.location }}{% endif %}
+            </option>
+            {% endfor %}
+        </select>
+    </label>
+    <a class="pm-button" href="{{ url_for('plant_photo_manager', scope='batches') }}">Filter löschen</a>
+</form>
+
+{% if selected_batch %}
+<div class="pm-photo-context">
+    <div>
+        <strong>{{ selected_batch.name }}</strong>
+        <span>{{ selected_batch.code }} · {{ selected_batch.location or 'ohne Standort' }} · {{ batch_photos|length }} Fotos</span>
+    </div>
+    <a class="pm-button" href="{{ url_for('batch_detail', batch_id=selected_batch.id) }}">Zum Durchgang</a>
+</div>
+{% endif %}
+
+{% if batch_photos %}
+<section class="pm-photo-grid">
+{% for photo in batch_photos %}
+<article class="pm-photo-manager-card">
+    <a class="pm-photo-image" href="{{ url_for('batch_photo_file', photo_id=photo.id) }}" target="_blank">
+        <img src="{{ url_for('batch_photo_file', photo_id=photo.id) }}" alt="Gesamtaufnahme {{ photo.batch_name }}" loading="lazy">
+    </a>
+    <div class="pm-photo-info">
+        <div class="pm-photo-info-head">
+            <div>
+                <a href="{{ url_for('batch_detail', batch_id=photo.batch_id) }}"><strong>{{ photo.batch_name }}</strong></a>
+                <div class="pm-code">{{ photo.batch_code }} · {{ photo.batch_location or 'ohne Standort' }}</div>
+            </div>
+            <span class="pm-chip">Durchgang</span>
+        </div>
+        <div class="pm-photo-meta">{{ photo.captured_date }} · {{ photo.captured_time }} Uhr · {{ photo.width }}×{{ photo.height }} · {{ photo.size_kb }} KB</div>
+        {% if photo.note %}<p>{{ photo.note }}</p>{% endif %}
+        <div class="pm-actions">
+            {% if photo.journal_entry_id %}<a class="pm-button" href="{{ url_for('plant_journal_detail', entry_id=photo.journal_entry_id) }}">Journal</a>{% endif %}
+            {% if has_permission('plants.edit') %}
+            <form method="post" action="{{ url_for('batch_photo_remove', photo_id=photo.id) }}" onsubmit="return confirm('Dieses Durchgangsfoto wirklich entfernen?');">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="pm-button danger" type="submit">Entfernen</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+</article>
+{% endfor %}
+</section>
+{% else %}
+<div class="pm-card"><div class="pm-empty">Für diese Auswahl sind noch keine Durchgangsfotos vorhanden.{% if has_permission('plants.edit') %}<br><br><a class="pm-button primary" href="{{ url_for('batch_photo_new', batch_id=selected_batch_id or '') }}">Erstes Durchgangsfoto aufnehmen</a>{% endif %}</div></div>
+{% endif %}
+
+{% else %}
 <form class="pm-photo-filter" method="get">
     <label class="pm-field">
         <span class="pm-label">Pflanze auswählen</span>
@@ -89,6 +160,7 @@
 </section>
 {% else %}
 <div class="pm-card"><div class="pm-empty">Für diese Auswahl sind noch keine Fotos vorhanden.{% if has_permission('plants.edit') %}<br><br><a class="pm-button primary" href="{{ url_for('plant_photo_new', plant_id=selected_plant_id or '') }}">Erstes Foto aufnehmen</a>{% endif %}</div></div>
+{% endif %}
 {% endif %}
 </main>
 {% endblock %}

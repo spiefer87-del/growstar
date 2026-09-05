@@ -793,8 +793,34 @@ body {
 }
 
 /* ------------------------------------------------------------------ */
-/* Pflanzenfotos                                                      */
+/* Pflanzen- und Durchgangsfotos                                      */
 /* ------------------------------------------------------------------ */
+
+.pm-photo-scope {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 6px;
+    border: 1px solid var(--pm-line);
+    border-radius: 16px;
+    background: rgba(17,27,46,.78);
+}
+
+.pm-photo-scope a {
+    padding: 12px 14px;
+    border-radius: 11px;
+    color: var(--pm-muted);
+    font-weight: 750;
+    text-align: center;
+    text-decoration: none;
+}
+
+.pm-photo-scope a.active {
+    background: rgba(34,197,94,.13);
+    color: #bbf7d0;
+    box-shadow: inset 0 0 0 1px rgba(34,197,94,.3);
+}
 
 .pm-photo-filter {
     display: grid;
@@ -806,6 +832,10 @@ body {
     border: 1px solid var(--pm-line);
     border-radius: 16px;
     background: rgba(17,27,46,.78);
+}
+
+.pm-photo-filter.batch {
+    grid-template-columns: minmax(240px, 1fr) auto;
 }
 
 .pm-photo-context {
@@ -1021,6 +1051,10 @@ body {
     .pm-photo-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
+    }
+
+    .pm-photo-scope {
+        grid-template-columns: 1fr;
     }
 
     .pm-photo-info-head {
