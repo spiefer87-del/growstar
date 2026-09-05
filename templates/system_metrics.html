@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Systemdaten – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/system-metrics.css') }}">{% endblock %}
+
+{% block page %}
+<main class="sm-shell">
+    <header class="sm-header">
+        <div class="sm-heading">
+            <a class="sm-back" href="{{ url_for('grow_control_watchdog') }}" aria-label="Zurück zum Watchdog">←</a>
+            <div>
+                <h1 class="sm-title">🖥️ Systemdaten</h1>
+                <div class="sm-subtitle">Raspberry Pi · unabhängig von Pflanzen, Sensoren und Regelkreisen</div>
+            </div>
+        </div>
+        <div>
+            <a class="sm-button" href="{{ url_for('grow_control_watchdog') }}">🐶 Watchdog</a>
+            <div class="sm-update" id="sm-updated">Lade Systemdaten …</div>
+        </div>
+    </header>
+
+    <div class="sm-alert" id="sm-alert" hidden></div>
+
+    <section class="sm-grid" aria-live="polite">
+        <article class="sm-card">
+            <div class="sm-card-head"><h2>CPU-Auslastung</h2><span class="sm-icon">⚙️</span></div>
+            <div class="sm-value" id="sm-cpu">–</div>
+            <div class="sm-bar"><span id="sm-cpu-bar"></span></div>
+            <div class="sm-details">
+                <div class="sm-detail"><span>Temperatur</span><strong id="sm-temperature">–</strong></div>
+                <div class="sm-detail"><span>Kerne</span><strong id="sm-cores">–</strong></div>
+                <div class="sm-detail"><span>Last 1 Min</span><strong id="sm-load-1">–</strong></div>
+                <div class="sm-detail"><span>Last 5 / 15 Min</span><strong id="sm-load-long">–</strong></div>
+            </div>
+        </article>
+
+        <article class="sm-card">
+            <div class="sm-card-head"><h2>Arbeitsspeicher</h2><span class="sm-icon">🧠</span></div>
+            <div class="sm-value" id="sm-memory">–</div>
+            <div class="sm-bar"><span id="sm-memory-bar"></span></div>
+            <div class="sm-details">
+                <div class="sm-detail"><span>Belegt</span><strong id="sm-memory-used">–</strong></div>
+                <div class="sm-detail"><span>Verfügbar</span><strong id="sm-memory-free">–</strong></div>
+                <div class="sm-detail"><span>Gesamt</span><strong id="sm-memory-total">–</strong></div>
+                <div class="sm-detail"><span>Swap</span><strong id="sm-swap">–</strong></div>
+            </div>
+        </article>
+
+        <article class="sm-card">
+            <div class="sm-card-head"><h2>Datenträger</h2><span class="sm-icon">💾</span></div>
+            <div class="sm-value" id="sm-disk">–</div>
+            <div class="sm-bar"><span id="sm-disk-bar"></span></div>
+            <div class="sm-details">
+                <div class="sm-detail"><span>Belegt</span><strong id="sm-disk-used">–</strong></div>
+                <div class="sm-detail"><span>Frei</span><strong id="sm-disk-free">–</strong></div>
+                <div class="sm-detail"><span>Gesamt</span><strong id="sm-disk-total">–</strong></div>
+                <div class="sm-detail"><span>Mount</span><strong id="sm-disk-mount">/</strong></div>
+            </div>
+        </article>
+
+        <article class="sm-card wide">
+            <div class="sm-card-head">
+                <div><h2>System</h2><div class="sm-value" id="sm-uptime">–</div><div class="sm-muted">Laufzeit seit dem letzten Neustart</div></div>
+                <span class="sm-live">LIVE</span>
+            </div>
+            <div class="sm-system-grid">
+                <div class="sm-detail"><span>Hostname</span><strong id="sm-hostname">–</strong></div>
+                <div class="sm-detail"><span>Betriebssystem</span><strong id="sm-os">–</strong></div>
+                <div class="sm-detail"><span>Kernel</span><strong id="sm-kernel">–</strong></div>
+                <div class="sm-detail"><span>Architektur</span><strong id="sm-architecture">–</strong></div>
+                <div class="sm-detail"><span>Python</span><strong id="sm-python">–</strong></div>
+            </div>
+        </article>
+    </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const endpoint = "{{ url_for('api_watchdog_system_data') }}";
+    const byId = id => document.getElementById(id);
+    const text = (id, value) => { byId(id).textContent = value ?? "–"; };
+
+    function bytes(value) {
+        if (value === null || value === undefined || value === "") return "–";
+        const number = Number(value);
+        if (!Number.isFinite(number)) return "–";
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        let amount = number, index = 0;
+        while (amount >= 1024 && index < units.length - 1) {
+            amount /= 1024;
+            index += 1;
+        }
+        return `${amount.toFixed(index >= 3 ? 1 : 0)} ${units[index]}`;
+    }
+
+    function number(value, suffix = "") {
+        return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value))
+            ? `${Number(value).toFixed(1)}${suffix}`
+            : "–";
+    }
+
+    function level(value, warning, danger) {
+        const current = Number(value);
+        if (value === null || value === undefined || value === "" || !Number.isFinite(current)) return "";
+        if (current >= danger) return "danger";
+        if (current >= warning) return "warn";
+        return "ok";
+    }
+
+    function meter(name, value, warning, danger) {
+        const output = byId(`sm-${name}`);
+        const bar = byId(`sm-${name}-bar`);
+        const state = level(value, warning, danger);
+        const available = value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
+        output.className = `sm-value ${state}`;
+        output.textContent = available ? `${Number(value).toFixed(1)} %` : "wird ermittelt …";
+        bar.className = state;
+        bar.style.width = available ? `${Math.max(0, Math.min(100, Number(value)))}%` : "0%";
+    }
+
+    function render(data) {
+        const cpu = data.cpu || {};
+        const memory = data.memory || {};
+        const disk = data.disk || {};
+        const uptime = data.uptime || {};
+        const system = data.system || {};
+        const load = cpu.load || {};
+
+        meter("cpu", cpu.usage_percent, 80, 95);
+        meter("memory", memory.used_percent, 80, 92);
+        meter("disk", disk.used_percent, 80, 92);
+
+        text("sm-temperature", number(cpu.temperature_c, " °C"));
+        text("sm-cores", cpu.logical_cores);
+        text("sm-load-1", number(load.one_min));
+        text("sm-load-long", `${number(load.five_min)} / ${number(load.fifteen_min)}`);
+        text("sm-memory-used", bytes(memory.used_bytes));
+        text("sm-memory-free", bytes(memory.available_bytes));
+        text("sm-memory-total", bytes(memory.total_bytes));
+        text("sm-swap", `${bytes(memory.swap_used_bytes)} / ${bytes(memory.swap_total_bytes)}`);
+        text("sm-disk-used", bytes(disk.used_bytes));
+        text("sm-disk-free", bytes(disk.free_bytes));
+        text("sm-disk-total", bytes(disk.total_bytes));
+        text("sm-disk-mount", disk.mount);
+        text("sm-uptime", uptime.formatted);
+        text("sm-hostname", system.hostname);
+        text("sm-os", system.operating_system);
+        text("sm-kernel", system.kernel);
+        text("sm-architecture", system.architecture);
+        text("sm-python", system.python);
+
+        const alert = byId("sm-alert");
+        const errors = data.errors || [];
+        alert.hidden = errors.length === 0;
+        alert.textContent = errors.length
+            ? `Einzelne Systemwerte sind nicht verfügbar: ${errors.map(item => item.component).join(", ")}`
+            : "";
+        text("sm-updated", `Aktualisiert: ${new Date(data.time).toLocaleTimeString("de-DE")}`);
+    }
+
+    async function refresh() {
+        try {
+            const response = await fetch(endpoint, {cache: "no-store"});
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            render(await response.json());
+        } catch (error) {
+            const alert = byId("sm-alert");
+            alert.hidden = false;
+            alert.textContent = `Systemdaten konnten nicht geladen werden: ${error.message}`;
+            text("sm-updated", "Verbindung unterbrochen");
+        }
+    }
+
+    refresh();
+    const interval = window.setInterval(refresh, 3000);
+    window.addEventListener("pagehide", () => window.clearInterval(interval), {once: true});
+})();
+</script>
+{% endblock %}

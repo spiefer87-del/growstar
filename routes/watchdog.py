@@ -3,11 +3,12 @@
 import datetime
 import os
 
-from flask import jsonify, request, send_file
+from flask import jsonify, render_template, request, send_file
 
 import core.context as ctx
 
 from core.watchdog_health import build_watchdog_snapshot
+from core.system_metrics import build_system_metrics
 from services.watchdog import log_event
 
 
@@ -20,6 +21,10 @@ def _safe_int_arg(name, default, minimum=1, maximum=5000):
 
 
 def register(app):
+
+    @app.route("/grow-control/watchdog/systemdaten")
+    def watchdog_system_data():
+        return render_template("system_metrics.html")
 
     @app.route("/api/watchdog/log")
     def api_watchdog_log():
@@ -74,3 +79,7 @@ def register(app):
         snapshot = build_watchdog_snapshot()
         snapshot["time"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return jsonify(snapshot)
+
+    @app.route("/api/watchdog/systemdaten")
+    def api_watchdog_system_data():
+        return jsonify(build_system_metrics())

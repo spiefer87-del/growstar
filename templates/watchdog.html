@@ -31,6 +31,9 @@ header{display:flex;justify-content:space-between;align-items:center;gap:16px;ma
 h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .subtitle{margin:5px 0 0;color:var(--muted);font-size:.9rem}
 .status-time{color:var(--muted);font-size:.82rem;text-align:right}
+.header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.system-data-link{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:9px 13px;border:1px solid rgba(56,189,248,.28);border-radius:11px;background:rgba(56,189,248,.09);color:#bae6fd;font-size:.82rem;font-weight:750;text-decoration:none}
+.system-data-link:hover{background:rgba(56,189,248,.16);border-color:rgba(56,189,248,.5)}
 .section{margin-top:26px}
 .section h2{margin:0 0 5px;font-size:1.08rem}
 .section-intro{margin:0 0 14px;color:var(--muted);font-size:.87rem}
@@ -81,7 +84,7 @@ button{cursor:pointer}.logbox{margin-top:12px;white-space:pre-wrap;font-family:u
 .error-text{color:#fca5a5}
 @media(max-width:1050px){.summary-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.station-health{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:700px){.summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.station-health{grid-template-columns:repeat(2,minmax(0,1fr))}.diagnostic-body{grid-template-columns:1fr}}
-@media(max-width:520px){body{padding:16px}.summary-grid,.station-health{grid-template-columns:1fr}.endpoint-row{grid-template-columns:1fr auto}.endpoint-address{grid-column:1/-1}.status-time{display:none}}
+@media(max-width:520px){body{padding:16px}.summary-grid,.station-health{grid-template-columns:1fr}.endpoint-row{grid-template-columns:1fr auto}.endpoint-address{grid-column:1/-1}.status-time{display:none}.header-actions{justify-content:flex-end}.system-data-link{padding:8px 10px}}
 </style>
 {% endblock %}
 
@@ -95,7 +98,10 @@ button{cursor:pointer}.logbox{margin-top:12px;white-space:pre-wrap;font-family:u
             <p class="subtitle">Controller- und Stationszustand auf einem Raspberry Pi</p>
         </div>
     </div>
-    <div class="status-time" id="time">Lade Status…</div>
+    <div class="header-actions">
+        <a class="system-data-link" href="{{ url_for('watchdog_system_data') }}">🖥️ Systemdaten</a>
+        <div class="status-time" id="time">Lade Status…</div>
+    </div>
 </header>
 
 <section class="section">

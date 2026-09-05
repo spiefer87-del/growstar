@@ -43,6 +43,7 @@ READ_EXACT = {
     "/": require("dashboard.view"),
     "/grow-control": require("grow.view"),
     "/grow-control/watchdog": require("hardware.view"),
+    "/grow-control/watchdog/systemdaten": require("hardware.view"),
     "/pflanzenmanagement": require("plants.view"),
 
     # Release-/Patch-Informationen sind read-only und für alle normalen

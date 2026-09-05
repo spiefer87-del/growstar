@@ -87,7 +87,7 @@
                     <a class="{% if growstar_endpoint == 'grow_control_connections' %}active{% endif %}" href="{{ url_for('grow_control_connections') }}"><span>Verbindungen</span><small>Zuordnungen</small></a>
                     <a class="{% if growstar_endpoint == 'spiderfarmer_system_page' %}active{% endif %}" href="{{ url_for('spiderfarmer_system_page') }}"><span>Spider Farmer</span><small>Controller</small></a>
                     <a class="{% if growstar_endpoint == 'diagrams_page' %}active{% endif %}" href="{{ url_for('diagrams_page') }}"><span>Diagramme</span><small>Analyse</small></a>
-                    <a class="{% if growstar_endpoint == 'grow_control_watchdog' %}active{% endif %}" href="{{ url_for('grow_control_watchdog') }}"><span>Watchdog</span><small>Überwachung</small></a>
+                    <a class="{% if growstar_endpoint in ['grow_control_watchdog', 'watchdog_system_data'] %}active{% endif %}" href="{{ url_for('grow_control_watchdog') }}"><span>Watchdog</span><small>Überwachung</small></a>
                     <a class="{% if growstar_endpoint == 'grow_control_setup' %}active{% endif %}" href="{{ url_for('grow_control_setup') }}"><span>Setup</span><small>Konfiguration</small></a>
                     <a class="{% if growstar_endpoint == 'system_page' %}active{% endif %}" href="{{ url_for('system_page') }}"><span>Systemstatus</span><small>Growstar</small></a>
                 </div>
