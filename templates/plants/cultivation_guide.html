@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}VPD-Anbauhilfe – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <div>
+            <h1 class="pm-title">🌿 VPD-Anbauhilfe</h1>
+            <div class="pm-subtitle">Phasenbezogene Leitwerte · schreibgeschützter Vergleich mit den Grow-Control-Messwerten</div>
+        </div>
+    </div>
+</header>
+
+{% set active_page = 'guide' %}
+{% include "plants/_nav.html" %}
+
+<section class="pm-guide-intro" aria-label="Einordnung">
+    <strong>Orientierung statt Zwangswert:</strong>
+    <span>Die Zielwerte bilden einen praxistauglichen Startpunkt ohne zusätzliche CO₂-Düngung. Die Regelung wird auf dieser Seite nicht verändert.</span>
+</section>
+
+<section class="pm-guide-controls" aria-label="Live-Vergleich auswählen">
+    <label class="pm-field">
+        <span class="pm-label">Pflanzenphase</span>
+        <select class="pm-select" id="guide-phase-select">
+            {% for phase in guide.phases %}
+            <option value="{{ phase.id }}" {{ 'selected' if phase.id == guide.initial_phase_id else '' }}>{{ phase.label }}{% if phase.active_count %} · {{ phase.active_count }} aktiv{% endif %}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label class="pm-field">
+        <span class="pm-label">Grow-Control-Station</span>
+        <select class="pm-select" id="guide-tent-select" disabled>
+            <option value="">Stationen werden geladen …</option>
+        </select>
+    </label>
+    <a class="pm-button" id="guide-settings-link" href="{{ url_for('grow_control_live') }}">Regelwerte öffnen</a>
+</section>
+
+<section class="pm-guide-live-grid" aria-live="polite">
+    <article class="pm-card pm-guide-recommendation">
+        <div class="pm-card-head"><h2 id="guide-selected-label">Empfehlung</h2><span class="pm-guide-readonly">Nur Anzeige</span></div>
+        <div class="pm-card-body">
+            <div class="pm-guide-targets">
+                <div><span>Tag</span><strong id="guide-day-target">--</strong><small id="guide-day-band">--</small></div>
+                <div><span>Nacht</span><strong id="guide-night-target">--</strong><small id="guide-night-band">--</small></div>
+            </div>
+            <p class="pm-muted" id="guide-selected-note"></p>
+        </div>
+    </article>
+
+    <article class="pm-card pm-guide-station">
+        <div class="pm-card-head"><h2>Live-Vergleich</h2><span class="pm-guide-live-dot" id="guide-live-dot">●</span></div>
+        <div class="pm-card-body">
+            <div class="pm-guide-measurements">
+                <div><span>Temperatur</span><strong id="guide-live-temp">--</strong></div>
+                <div><span>Feuchte</span><strong id="guide-live-hum">--</strong></div>
+                <div><span>VPD</span><strong id="guide-live-vpd">--</strong></div>
+            </div>
+            <div class="pm-guide-assessment waiting" id="guide-assessment">Station auswählen oder Messwerte abwarten.</div>
+        </div>
+    </article>
+</section>
+
+<section class="pm-card">
+    <div class="pm-card-head">
+        <h2>VPD-Leitfaden nach Pflanzenphase</h2>
+        <span class="pm-muted">Toleranzband jeweils ±0,10 kPa</span>
+    </div>
+    <div class="pm-table-wrap">
+        <table class="pm-table pm-guide-table">
+            <thead>
+                <tr>
+                    <th>Phase</th>
+                    <th>Tag · VPD</th>
+                    <th>Tag · Beispielklima</th>
+                    <th>Nacht · VPD</th>
+                    <th>Nacht · Beispielklima</th>
+                    <th>Hinweis</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for phase in guide.phases %}
+                <tr data-guide-row="{{ phase.id }}" class="{{ 'has-active-plants' if phase.active_count else '' }}">
+                    <td>
+                        <strong>{{ phase.label }}</strong>
+                        <span class="pm-guide-period">{{ phase.period }}</span>
+                        {% if phase.active_count %}
+                        <span class="pm-guide-active-count">{{ phase.active_count }} aktive {{ 'Pflanze' if phase.active_count == 1 else 'Pflanzen' }}</span>
+                        <span class="pm-guide-active-list">{% for plant in phase.active_plants %}{{ plant.name }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+                        {% endif %}
+                    </td>
+                    <td><strong>{{ '%.2f'|format(phase.day.target) }} kPa</strong><span>{{ '%.2f'|format(phase.day.min) }}–{{ '%.2f'|format(phase.day.max) }}</span></td>
+                    <td>{{ '%.0f'|format(phase.day.temp) }} °C · {{ '%.0f'|format(phase.day.hum) }} %<span>ergibt {{ '%.2f'|format(phase.day.calculated) }} kPa</span></td>
+                    <td><strong>{{ '%.2f'|format(phase.night.target) }} kPa</strong><span>{{ '%.2f'|format(phase.night.min) }}–{{ '%.2f'|format(phase.night.max) }}</span></td>
+                    <td>{{ '%.0f'|format(phase.night.temp) }} °C · {{ '%.0f'|format(phase.night.hum) }} %<span>ergibt {{ '%.2f'|format(phase.night.calculated) }} kPa</span></td>
+                    <td>{{ phase.note }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="pm-guide-notes">
+    <article class="pm-card">
+        <div class="pm-card-head"><h2>🌡️ Luft-VPD und Blatt-VPD</h2></div>
+        <div class="pm-card-body"><p>{{ guide.disclaimer }}</p></div>
+    </article>
+    <article class="pm-card">
+        <div class="pm-card-head"><h2>⚠️ Späte Blüte</h2></div>
+        <div class="pm-card-body"><p>Eine pauschale Feuchte unter 40 % ist kein universelles Ziel. Bei 24 °C und 40 % läge der Luft-VPD bereits bei rund 1,79 kPa. Growstar bewertet deshalb Temperatur, Feuchte und VPD gemeinsam.</p></div>
+    </article>
+</section>
+
+{% if guide.unmapped_plants %}
+<section class="pm-guide-unmapped">
+    <strong>Ohne VPD-Zuordnung:</strong>
+    {% for plant in guide.unmapped_plants %}{{ plant.name }} ({{ plant.stage_label }}){% if not loop.last %}, {% endif %}{% endfor %}
+</section>
+{% endif %}
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const phases = {{ guide.phases|tojson }};
+    const initialPhaseId = {{ guide.initial_phase_id|tojson }};
+    const phaseById = new Map(phases.map(phase => [phase.id, phase]));
+    const phaseSelect = document.getElementById("guide-phase-select");
+    const tentSelect = document.getElementById("guide-tent-select");
+    const settingsLink = document.getElementById("guide-settings-link");
+    const settingsTemplate = {{ url_for('grow_control_tent_settings', tent_id='__TENT_ID__')|tojson }};
+    let lastState = null;
+
+    const setText = (id, value) => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = value;
+    };
+    const number = value => {
+        if (value === null || value === undefined || value === "") return NaN;
+        return Number(value);
+    };
+    const format = (value, digits, unit) => {
+        const parsed = number(value);
+        return Number.isFinite(parsed) ? `${parsed.toFixed(digits)} ${unit}` : "--";
+    };
+
+    function selectedPhase() {
+        return phaseById.get(phaseSelect.value) || phaseById.get(initialPhaseId) || phases[0];
+    }
+
+    function renderPhase() {
+        const phase = selectedPhase();
+        if (!phase) return;
+        setText("guide-selected-label", phase.label);
+        setText("guide-day-target", `${Number(phase.day.target).toFixed(2)} kPa`);
+        setText("guide-day-band", `${Number(phase.day.min).toFixed(2)}–${Number(phase.day.max).toFixed(2)} kPa`);
+        setText("guide-night-target", `${Number(phase.night.target).toFixed(2)} kPa`);
+        setText("guide-night-band", `${Number(phase.night.min).toFixed(2)}–${Number(phase.night.max).toFixed(2)} kPa`);
+        setText("guide-selected-note", `${phase.period} · ${phase.note}`);
+        document.querySelectorAll("[data-guide-row]").forEach(row => {
+            row.classList.toggle("is-selected", row.dataset.guideRow === phase.id);
+        });
+        renderState(lastState);
+    }
+
+    function renderState(state) {
+        const assessment = document.getElementById("guide-assessment");
+        const liveDot = document.getElementById("guide-live-dot");
+        if (!assessment || !liveDot) return;
+        if (!state) {
+            setText("guide-live-temp", "--");
+            setText("guide-live-hum", "--");
+            setText("guide-live-vpd", "--");
+            assessment.textContent = "Station auswählen oder Messwerte abwarten.";
+            assessment.className = "pm-guide-assessment waiting";
+            liveDot.className = "pm-guide-live-dot";
+            return;
+        }
+
+        setText("guide-live-temp", format(state.temp, 1, "°C"));
+        setText("guide-live-hum", format(state.hum, 1, "%"));
+        setText("guide-live-vpd", format(state.vpd, 2, "kPa"));
+        const phase = selectedPhase();
+        const profile = String(state.profile || "TAG").toUpperCase();
+        const period = profile === "NACHT" ? phase.night : phase.day;
+        const periodLabel = profile === "NACHT" ? "Nacht" : "Tag";
+        const current = number(state.vpd);
+        if (!Number.isFinite(current)) {
+            assessment.textContent = "VPD-Messwert ist noch nicht verfügbar.";
+            assessment.className = "pm-guide-assessment waiting";
+            liveDot.className = "pm-guide-live-dot";
+        } else if (current < Number(period.min)) {
+            assessment.textContent = `${periodLabel}: ${current.toFixed(2)} kPa liegt unter dem Empfehlungsband ${Number(period.min).toFixed(2)}–${Number(period.max).toFixed(2)} kPa.`;
+            assessment.className = "pm-guide-assessment low";
+            liveDot.className = "pm-guide-live-dot warning";
+        } else if (current > Number(period.max)) {
+            assessment.textContent = `${periodLabel}: ${current.toFixed(2)} kPa liegt über dem Empfehlungsband ${Number(period.min).toFixed(2)}–${Number(period.max).toFixed(2)} kPa.`;
+            assessment.className = "pm-guide-assessment high";
+            liveDot.className = "pm-guide-live-dot warning";
+        } else {
+            assessment.textContent = `${periodLabel}: Der aktuelle VPD liegt im Empfehlungsband ${Number(period.min).toFixed(2)}–${Number(period.max).toFixed(2)} kPa.`;
+            assessment.className = "pm-guide-assessment good";
+            liveDot.className = "pm-guide-live-dot good";
+        }
+    }
+
+    async function loadTentState() {
+        const tentId = tentSelect.value;
+        if (!tentId) {
+            lastState = null;
+            renderState(null);
+            return;
+        }
+        settingsLink.href = settingsTemplate.replace("__TENT_ID__", encodeURIComponent(tentId));
+        try {
+            const response = await fetch(`/api/tents/${encodeURIComponent(tentId)}/state`, {cache: "no-store"});
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            lastState = await response.json();
+            renderState(lastState);
+        } catch (error) {
+            console.error("VPD-Anbauhilfe konnte Stationswerte nicht laden:", error);
+            lastState = null;
+            renderState(null);
+        }
+    }
+
+    async function loadTents() {
+        try {
+            const response = await fetch("/api/tents", {cache: "no-store"});
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json();
+            const tents = (payload.tents || []).filter(tent => tent.runtime_loaded);
+            tentSelect.replaceChildren();
+            tents.forEach(tent => {
+                const option = document.createElement("option");
+                option.value = tent.id;
+                option.textContent = tent.name || tent.id;
+                tentSelect.appendChild(option);
+            });
+            tentSelect.disabled = tents.length === 0;
+            if (tents.length) {
+                tentSelect.value = tents.some(tent => tent.id === payload.default_tent_id)
+                    ? payload.default_tent_id
+                    : tents[0].id;
+                await loadTentState();
+            } else {
+                const option = document.createElement("option");
+                option.value = "";
+                option.textContent = "Keine geladene Station";
+                tentSelect.appendChild(option);
+                renderState(null);
+            }
+        } catch (error) {
+            console.error("VPD-Anbauhilfe konnte Stationen nicht laden:", error);
+            tentSelect.replaceChildren();
+            const option = document.createElement("option");
+            option.value = "";
+            option.textContent = "Stationen nicht verfügbar";
+            tentSelect.appendChild(option);
+            tentSelect.disabled = true;
+            renderState(null);
+        }
+    }
+
+    phaseSelect.addEventListener("change", renderPhase);
+    tentSelect.addEventListener("change", loadTentState);
+    renderPhase();
+    loadTents();
+    window.setInterval(loadTentState, 15000);
+})();
+</script>
+{% endblock %}

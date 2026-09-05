@@ -50,6 +50,7 @@ from plant_management.excel_io import (
     template_xlsx,
     import_cultivars_xlsx,
 )
+from plant_management.grow_guides import build_vpd_guide
 
 
 from plant_management.propagation import (
@@ -187,6 +188,14 @@ def register(app):
             journal_stats=journal_stats(),
             recent_journal=list_journal_entries(limit=6),
             propagation_stats=propagation_dashboard(),
+        )
+
+
+    @app.route("/pflanzenmanagement/anbauhilfe")
+    def cultivation_guide():
+        return render_template(
+            "plants/cultivation_guide.html",
+            guide=build_vpd_guide(list_plants(status="active")),
         )
 
 

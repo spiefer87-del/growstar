@@ -22,6 +22,7 @@
     or growstar_endpoint.startswith('propagation_')
     or growstar_endpoint.startswith('seed_')
     or growstar_endpoint.startswith('genetic_')
+    or growstar_endpoint == 'cultivation_guide'
     or growstar_endpoint in ['genetics_dashboard', 'propagation_dashboard_page']
 %}
 {% set growstar_grow_active =
@@ -106,6 +107,7 @@
                     <a class="{% if growstar_endpoint == 'plant_management_dashboard' %}active{% endif %}" href="{{ url_for('plant_management_dashboard') }}"><span>Übersicht</span><small>Board</small></a>
                     <a class="{% if growstar_endpoint.startswith('plant_') and growstar_endpoint not in ['plant_management_dashboard', 'plant_timeline', 'plant_journal', 'plant_journal_detail'] %}active{% endif %}" href="{{ url_for('plant_list') }}"><span>Pflanzen</span><small>Bestand</small></a>
                     <a class="{% if growstar_endpoint == 'plant_timeline' %}active{% endif %}" href="{{ url_for('plant_timeline') }}"><span>Timeline</span><small>Lifecycle</small></a>
+                    <a class="{% if growstar_endpoint == 'cultivation_guide' %}active{% endif %}" href="{{ url_for('cultivation_guide') }}"><span>Anbauhilfe</span><small>VPD-Leitfaden</small></a>
                     <a class="{% if growstar_endpoint.startswith('cultivar_') %}active{% endif %}" href="{{ url_for('cultivar_list') }}"><span>Sorten</span><small>Sortenstamm</small></a>
                     <a class="{% if growstar_endpoint == 'genetics_dashboard' or growstar_endpoint.startswith('genetic_') %}active{% endif %}" href="{{ url_for('genetics_dashboard') }}"><span>Genetik & Mütter</span><small>Linien</small></a>
                     <a class="{% if growstar_endpoint == 'propagation_dashboard_page' or growstar_endpoint.startswith('propagation_') or growstar_endpoint.startswith('seed_') %}active{% endif %}" href="{{ url_for('propagation_dashboard_page') }}"><span>Vermehrung</span><small>Saatgut & Runs</small></a>

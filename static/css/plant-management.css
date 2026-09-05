@@ -1120,3 +1120,219 @@ a.pm-trace-node:hover {
         width: 100%;
     }
 }
+
+/* ------------------------------------------------------------------ */
+/* VPD-Anbauhilfe                                                     */
+/* ------------------------------------------------------------------ */
+
+.pm-guide-intro,
+.pm-guide-unmapped {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid rgba(56,189,248,.3);
+    border-radius: 14px;
+    background: rgba(14,116,144,.09);
+    color: #cbd5e1;
+}
+
+.pm-guide-intro strong {
+    color: #bae6fd;
+}
+
+.pm-guide-controls {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+    gap: 14px;
+    align-items: end;
+}
+
+.pm-guide-controls .pm-button {
+    min-height: 42px;
+}
+
+.pm-guide-live-grid,
+.pm-guide-notes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.pm-guide-readonly {
+    display: inline-flex;
+    padding: 5px 9px;
+    border: 1px solid rgba(56,189,248,.28);
+    border-radius: 999px;
+    background: rgba(56,189,248,.09);
+    color: #bae6fd;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+
+.pm-guide-targets,
+.pm-guide-measurements {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.pm-guide-measurements {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pm-guide-targets > div,
+.pm-guide-measurements > div {
+    display: grid;
+    gap: 5px;
+    padding: 13px;
+    border: 1px solid var(--pm-line);
+    border-radius: 12px;
+    background: rgba(11,18,32,.42);
+}
+
+.pm-guide-targets span,
+.pm-guide-measurements span {
+    color: var(--pm-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.pm-guide-targets strong,
+.pm-guide-measurements strong {
+    color: #f8fafc;
+    font-size: 1.3rem;
+}
+
+.pm-guide-targets small {
+    color: #94a3b8;
+}
+
+.pm-guide-live-dot {
+    color: #64748b;
+}
+
+.pm-guide-live-dot.warning {
+    color: #f59e0b;
+    text-shadow: 0 0 12px rgba(245,158,11,.55);
+}
+
+.pm-guide-live-dot.good {
+    color: #22c55e;
+    text-shadow: 0 0 12px rgba(34,197,94,.55);
+}
+
+.pm-guide-assessment {
+    margin-top: 13px;
+    padding: 12px 13px;
+    border: 1px solid var(--pm-line);
+    border-radius: 11px;
+    line-height: 1.45;
+}
+
+.pm-guide-assessment.waiting {
+    color: #cbd5e1;
+    background: rgba(100,116,139,.08);
+}
+
+.pm-guide-assessment.low,
+.pm-guide-assessment.high {
+    color: #fde68a;
+    border-color: rgba(245,158,11,.3);
+    background: rgba(245,158,11,.08);
+}
+
+.pm-guide-assessment.good {
+    color: #bbf7d0;
+    border-color: rgba(34,197,94,.3);
+    background: rgba(34,197,94,.08);
+}
+
+.pm-guide-table td {
+    min-width: 125px;
+    line-height: 1.4;
+}
+
+.pm-guide-table td:first-child {
+    min-width: 210px;
+}
+
+.pm-guide-table td:last-child {
+    min-width: 230px;
+}
+
+.pm-guide-table td > span,
+.pm-guide-period,
+.pm-guide-active-list {
+    display: block;
+    margin-top: 4px;
+    color: var(--pm-muted);
+    font-size: .8rem;
+}
+
+.pm-guide-table tr.has-active-plants {
+    background: rgba(34,197,94,.035);
+}
+
+.pm-guide-table tr.is-selected {
+    background: rgba(56,189,248,.08);
+    box-shadow: inset 3px 0 0 #38bdf8;
+}
+
+.pm-guide-active-count {
+    display: inline-flex !important;
+    margin-top: 8px !important;
+    padding: 4px 7px;
+    border-radius: 999px;
+    background: rgba(34,197,94,.12);
+    color: #bbf7d0 !important;
+    font-weight: 750;
+}
+
+.pm-guide-notes p {
+    margin: 0;
+    color: #cbd5e1;
+    line-height: 1.55;
+}
+
+.pm-guide-unmapped {
+    border-color: rgba(245,158,11,.3);
+    background: rgba(245,158,11,.07);
+    color: #fed7aa;
+}
+
+@media (max-width: 900px) {
+    .pm-guide-controls {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .pm-guide-controls .pm-button {
+        grid-column: 1 / -1;
+    }
+}
+
+@media (max-width: 640px) {
+    .pm-guide-controls,
+    .pm-guide-live-grid,
+    .pm-guide-notes {
+        grid-template-columns: 1fr;
+    }
+
+    .pm-guide-measurements {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+    }
+
+    .pm-guide-targets > div,
+    .pm-guide-measurements > div {
+        padding: 10px;
+    }
+
+    .pm-guide-measurements strong {
+        font-size: 1rem;
+    }
+}
