@@ -720,6 +720,52 @@ body {
     gap: 12px;
 }
 
+.pm-history-content {
+    min-width: 0;
+}
+
+.pm-history-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.pm-stage-date-editor {
+    flex: 0 0 auto;
+}
+
+.pm-stage-date-editor[open] {
+    flex-basis: 100%;
+}
+
+.pm-stage-date-editor > summary {
+    list-style: none;
+}
+
+.pm-stage-date-editor > summary::-webkit-details-marker {
+    display: none;
+}
+
+.pm-button.small,
+.pm-stage-date-editor > summary.pm-button {
+    min-height: 32px;
+    padding: 6px 10px;
+    font-size: .76rem;
+    cursor: pointer;
+}
+
+.pm-stage-date-form {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 12px;
+    border: 1px solid var(--pm-line);
+    border-radius: 12px;
+    background: rgba(15,23,42,.72);
+}
+
 .pm-history-line {
     position: relative;
 }

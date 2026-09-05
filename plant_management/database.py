@@ -805,13 +805,13 @@ def set_plant_stage(plant_id, stage, started_on=None, note=None, created_by=None
         db.close()
 
 
-def correct_current_stage_start(plant_id, started_on, note=None):
-    """Korrigiert die Grenze der aktuell offenen Pflanzenphase.
+def correct_stage_event_start(plant_id, event_id, started_on, note=None):
+    """Korrigiert den Start eines beliebigen gespeicherten Phasenereignisses.
 
-    Die Korrektur erzeugt bewusst keine zweite Phase mit demselben Namen. Der
-    offene Eintrag und das Ende seines direkten Vorgängers werden atomar auf
-    dieselbe Datumsgrenze gesetzt. Dadurch bleiben Timeline und Blüteprognose
-    widerspruchsfrei.
+    Die gemeinsame Grenze zum direkten Vorgänger wird atomar mitverschoben.
+    Bei der ersten Phase folgt außerdem das Startdatum der Pflanze. Die Grenze
+    zur nachfolgenden Phase bleibt unverändert und begrenzt den zulässigen
+    Korrekturbereich.
     """
 
     try:
@@ -820,7 +820,7 @@ def correct_current_stage_start(plant_id, started_on, note=None):
         raise ValueError("Bitte ein gültiges Startdatum angeben.")
 
     if corrected_date > date.today():
-        raise ValueError("Das Startdatum einer laufenden Phase darf nicht in der Zukunft liegen.")
+        raise ValueError("Das Startdatum einer Phase darf nicht in der Zukunft liegen.")
 
     db = _db()
     try:
@@ -835,16 +835,12 @@ def correct_current_stage_start(plant_id, started_on, note=None):
             """
             SELECT *
             FROM pm_stage_events
-            WHERE plant_id = ? AND ended_on IS NULL
-            ORDER BY id DESC
-            LIMIT 1
+            WHERE id = ? AND plant_id = ?
             """,
-            (int(plant_id),),
+            (int(event_id), int(plant_id)),
         ).fetchone()
         if not current:
-            raise ValueError("Für die aktuelle Phase fehlt ein offener Verlaufseintrag.")
-        if current["stage"] != plant["current_stage"]:
-            raise ValueError("Aktuelle Phase und Phasenverlauf sind nicht synchron.")
+            raise ValueError("Die ausgewählte Phase wurde im Verlauf nicht gefunden.")
 
         old_date = date.fromisoformat(str(current["started_on"])[:10])
         if corrected_date == old_date:
@@ -867,6 +863,30 @@ def correct_current_stage_start(plant_id, started_on, note=None):
                     "Das korrigierte Startdatum darf nicht vor dem Beginn der vorherigen Phase liegen."
                 )
 
+        following = db.execute(
+            """
+            SELECT *
+            FROM pm_stage_events
+            WHERE plant_id = ? AND id > ?
+            ORDER BY id ASC
+            LIMIT 1
+            """,
+            (int(plant_id), int(current["id"])),
+        ).fetchone()
+        upper_boundary = (
+            date.fromisoformat(str(following["started_on"])[:10])
+            if following
+            else (
+                date.fromisoformat(str(current["ended_on"])[:10])
+                if current["ended_on"]
+                else None
+            )
+        )
+        if upper_boundary and corrected_date > upper_boundary:
+            raise ValueError(
+                "Das korrigierte Startdatum darf nicht nach dem Beginn der nächsten Phase liegen."
+            )
+
         correction_note = (note or "").strip()
         event_note = current["note"]
         if correction_note:
@@ -882,7 +902,7 @@ def correct_current_stage_start(plant_id, started_on, note=None):
                 "UPDATE pm_stage_events SET ended_on = ? WHERE id = ?",
                 (corrected_date.isoformat(), int(previous["id"])),
             )
-        elif str(plant["started_on"] or "")[:10] == old_date.isoformat():
+        else:
             db.execute(
                 "UPDATE pm_plants SET started_on = ? WHERE id = ?",
                 (corrected_date.isoformat(), int(plant_id)),
@@ -894,16 +914,44 @@ def correct_current_stage_start(plant_id, started_on, note=None):
         )
         db.commit()
         return {
+            "event_id": int(current["id"]),
             "stage": current["stage"],
             "old_started_on": old_date.isoformat(),
             "new_started_on": corrected_date.isoformat(),
             "previous_stage": previous["stage"] if previous else None,
+            "following_stage": following["stage"] if following else None,
         }
     except Exception:
         db.rollback()
         raise
     finally:
         db.close()
+
+
+def correct_current_stage_start(plant_id, started_on, note=None):
+    """Kompatibilitätshelfer für die Korrektur der aktuell offenen Phase."""
+    db = _db()
+    try:
+        current = db.execute(
+            """
+            SELECT id
+            FROM pm_stage_events
+            WHERE plant_id = ? AND ended_on IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (int(plant_id),),
+        ).fetchone()
+    finally:
+        db.close()
+    if not current:
+        raise ValueError("Für die aktuelle Phase fehlt ein offener Verlaufseintrag.")
+    return correct_stage_event_start(
+        plant_id,
+        current["id"],
+        started_on,
+        note=note,
+    )
 
 
 def set_plant_status(plant_id, status):

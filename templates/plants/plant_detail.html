@@ -118,10 +118,24 @@
 <div class="pm-card-body">
 <div class="pm-history">
 {% for event in events %}
-<div class="pm-history-item">
+<div class="pm-history-item" id="phase-{{ event.id }}">
 <div class="pm-history-line"><div class="pm-history-dot" style="--history-color:{{ event.stage_color }}"></div></div>
-<div>
+<div class="pm-history-content">
+<div class="pm-history-heading">
 <strong>{{ event.stage_label }}</strong>
+{% if has_permission('plants.edit') %}
+<details class="pm-stage-date-editor">
+<summary class="pm-button small">Ändern</summary>
+<form class="pm-stage-date-form" method="post" action="{{ url_for('plant_stage_start_correct', plant_id=plant.id, event_id=event.id) }}" onsubmit="return confirm('Startdatum der Phase {{ event.stage_label }} wirklich ändern? Angrenzende Phasengrenzen, Timeline und Prognosen werden entsprechend angepasst.');">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<input type="hidden" name="confirm_stage_date_correction" value="1">
+<label class="pm-field"><span class="pm-label">Startdatum</span><input class="pm-input" type="date" name="started_on" required value="{{ event.started_on }}"></label>
+<label class="pm-field"><span class="pm-label">Grund / Notiz</span><input class="pm-input" name="note" placeholder="optional"></label>
+<button class="pm-button primary" type="submit">Datum speichern</button>
+</form>
+</details>
+{% endif %}
+</div>
 <div class="pm-muted">{{ event.started_on }}{% if event.ended_on %} → {{ event.ended_on }}{% else %} → heute{% endif %} · {{ event.days }} Tage</div>
 {% if event.note %}<div style="margin-top:5px;">{{ event.note }}</div>{% endif %}
 </div>
@@ -139,13 +153,12 @@
 <div class="pm-card-body">
 <div class="pm-form">
 
-<form class="pm-form" id="plant-stage-form" method="post" action="{{ url_for('plant_stage_change', plant_id=plant.id) }}" data-current-stage="{{ plant.current_stage }}" data-current-start="{{ plant.current_stage_started_on or '' }}">
+<form class="pm-form" id="plant-stage-form" method="post" action="{{ url_for('plant_stage_change', plant_id=plant.id) }}">
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-<input type="hidden" name="confirm_stage_date_correction" value="0">
-<label class="pm-field"><span class="pm-label">Phase wechseln oder korrigieren</span><select class="pm-select" name="stage">{% for code,label,color in stages %}<option value="{{ code }}" {{ 'selected' if plant.current_stage == code else '' }}>{{ label }}</option>{% endfor %}</select></label>
-<label class="pm-field"><span class="pm-label">Startdatum</span><input class="pm-input" type="date" name="started_on" value="{{ plant.current_stage_started_on or '' }}"><span class="pm-help">Bei der aktuellen Phase kann das gespeicherte Startdatum nach Bestätigung korrigiert werden.</span></label>
+<label class="pm-field"><span class="pm-label">Phase wechseln</span><select class="pm-select" name="stage">{% for code,label,color in stages %}<option value="{{ code }}" {{ 'selected' if plant.current_stage == code else '' }}>{{ label }}</option>{% endfor %}</select></label>
+<label class="pm-field"><span class="pm-label">Startdatum der neuen Phase</span><input class="pm-input" type="date" name="started_on"><span class="pm-help">Bereits gespeicherte Startdaten werden direkt oben im Phasenverlauf geändert.</span></label>
 <label class="pm-field"><span class="pm-label">Notiz</span><input class="pm-input" name="note"></label>
-<button class="pm-button" id="plant-stage-submit" type="submit">Phase übernehmen</button>
+<button class="pm-button" type="submit">Phase übernehmen</button>
 </form>
 
 <hr class="pm-separator">
@@ -250,67 +263,4 @@
 
 </section>
 </main>
-{% endblock %}
-{% block scripts %}
-<script>
-(() => {
-    const form = document.getElementById("plant-stage-form");
-    if (!form) return;
-
-    const stageSelect = form.querySelector('select[name="stage"]');
-    const dateInput = form.querySelector('input[name="started_on"]');
-    const confirmationInput = form.querySelector('input[name="confirm_stage_date_correction"]');
-    const submitButton = document.getElementById("plant-stage-submit");
-    const currentStage = form.dataset.currentStage || "";
-    const currentStart = form.dataset.currentStart || "";
-    const today = new Date();
-    today.setMinutes(today.getMinutes() - today.getTimezoneOffset());
-    const todayValue = today.toISOString().slice(0, 10);
-
-    function isCorrection() {
-        return stageSelect.value === currentStage;
-    }
-
-    function updateMode(previousStage) {
-        if (isCorrection()) {
-            if (previousStage !== currentStage || !dateInput.value) {
-                dateInput.value = currentStart;
-            }
-            submitButton.textContent = "Startdatum prüfen";
-        } else {
-            if (previousStage === currentStage || !dateInput.value) {
-                dateInput.value = todayValue;
-            }
-            submitButton.textContent = "Phase übernehmen";
-        }
-        confirmationInput.value = "0";
-    }
-
-    let previousStage = stageSelect.value;
-    stageSelect.addEventListener("change", () => {
-        updateMode(previousStage);
-        previousStage = stageSelect.value;
-    });
-
-    form.addEventListener("submit", event => {
-        confirmationInput.value = "0";
-        if (!isCorrection() || dateInput.value === currentStart) return;
-
-        const stageLabel = stageSelect.options[stageSelect.selectedIndex]?.textContent.trim() || stageSelect.value;
-        const oldDate = currentStart || "unbekannt";
-        const newDate = dateInput.value || "heute";
-        const confirmed = window.confirm(
-            `Startdatum der Phase ${stageLabel} wirklich von ${oldDate} auf ${newDate} ändern? `
-            + "Die vorherige Phase, Timeline und Ernteprognose werden entsprechend angepasst."
-        );
-        if (!confirmed) {
-            event.preventDefault();
-            return;
-        }
-        confirmationInput.value = "1";
-    });
-
-    updateMode(previousStage);
-})();
-</script>
 {% endblock %}
