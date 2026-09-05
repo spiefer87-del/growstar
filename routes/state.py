@@ -6,6 +6,7 @@ import core.context as ctx
 
 from core.config import config
 from core.devices import get_device_mode
+from core.helpers import calculate_target_vpd
 
 
 def register(app):
@@ -26,6 +27,10 @@ def register(app):
             "hum_tol": state.live_state.get("hum_tol"),
 
             "vpd": state.live_state.get("vpd"),
+            "classic_vpd_target": calculate_target_vpd(
+                state.live_state.get("temp_target"),
+                state.live_state.get("hum_target"),
+            ),
             "vpd_control": state.live_state.get("vpd_control"),
             "outside_temp_raw": state.live_state.get("outside_temp_raw"),
             "outside_temp": state.live_state.get("outside_temp"),

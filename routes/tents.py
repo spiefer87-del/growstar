@@ -8,6 +8,7 @@ from core.controller_setpoints import stored_controller_setpoints
 from core.controller_states import resolve_control_state
 from core.devices import DEVICE_NAMES, get_device_mode
 from core.hardware.actuator_health import get_endpoint_health
+from core.helpers import calculate_target_vpd
 from core.hardware_assignments import (
     HardwareAssignmentActiveModeError,
     HardwareAssignmentNotSafeOffError,
@@ -320,6 +321,10 @@ def _state_snapshot(runtime):
         "hum_raw": live.get("hum_raw"),
         "hum": live.get("hum"),
         "vpd": live.get("vpd"),
+        "classic_vpd_target": calculate_target_vpd(
+            live.get("temp_target"),
+            live.get("hum_target"),
+        ),
         "light_ppfd": light_ppfd,
         "light_ppfd_source": light_ppfd_source,
         "temp_target": live.get("temp_target"),

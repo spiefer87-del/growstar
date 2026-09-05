@@ -1,6 +1,6 @@
 import sqlite3
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from .constants import (
@@ -56,6 +56,64 @@ def _days_between(start, end=None):
         return max(0, (end_d - start_d).days)
     except Exception:
         return None
+
+
+def calculate_harvest_forecast(
+    flowering_started_on,
+    expected_flower_days,
+    *,
+    today=None,
+):
+    """Ermittelt die dynamische Ernteprognose aus Blütestart und Sortenwert.
+
+    Der Sortenwert beschreibt die geplante Dauer der Blüte. Die Prognose wird
+    bewusst nicht aus dem Anlagedatum der Pflanze geraten: Ohne dokumentierten
+    Blütebeginn fehlt der verlässliche Startpunkt und es wird ``None`` geliefert.
+    """
+
+    if not flowering_started_on:
+        return None
+
+    try:
+        flower_start = date.fromisoformat(str(flowering_started_on)[:10])
+        flower_days = int(expected_flower_days)
+        reference = today or date.today()
+        if isinstance(reference, datetime):
+            reference = reference.date()
+        elif not isinstance(reference, date):
+            reference = date.fromisoformat(str(reference)[:10])
+    except (TypeError, ValueError):
+        return None
+
+    if flower_days <= 0:
+        return None
+
+    harvest_on = flower_start + timedelta(days=flower_days)
+    days_remaining = (harvest_on - reference).days
+    elapsed_days = max(0, (reference - flower_start).days)
+    flower_day = elapsed_days + 1 if reference >= flower_start else 0
+    progress = max(0.0, min(1.0, elapsed_days / flower_days))
+
+    if days_remaining > 0:
+        status_text = f"noch {days_remaining} Tage"
+    elif days_remaining == 0:
+        status_text = "heute"
+    else:
+        status_text = f"seit {abs(days_remaining)} Tagen fällig"
+
+    return {
+        "flowering_started_on": flower_start.isoformat(),
+        "flowering_started_label": flower_start.strftime("%d.%m.%Y"),
+        "harvest_on": harvest_on.isoformat(),
+        "harvest_label": harvest_on.strftime("%d.%m.%Y"),
+        "expected_flower_days": flower_days,
+        "days_remaining": days_remaining,
+        "flower_day": flower_day,
+        "progress": round(progress, 4),
+        "progress_percent": round(progress * 100.0, 1),
+        "overdue": days_remaining < 0,
+        "status_text": status_text,
+    }
 
 
 def init_plant_management_db():
@@ -433,7 +491,14 @@ PLANT_SELECT = """
             WHERE e.plant_id = p.id AND e.ended_on IS NULL
             ORDER BY e.started_on DESC, e.id DESC
             LIMIT 1
-        ) AS current_stage_started_on
+        ) AS current_stage_started_on,
+        (
+            SELECT e.started_on
+            FROM pm_stage_events e
+            WHERE e.plant_id = p.id AND e.stage = 'flowering'
+            ORDER BY e.started_on DESC, e.id DESC
+            LIMIT 1
+        ) AS flowering_started_on
     FROM pm_plants p
     LEFT JOIN pm_cultivars c ON c.id = p.cultivar_id
     LEFT JOIN pm_batches b ON b.id = p.batch_id
@@ -454,6 +519,10 @@ def _decorate_plant(item):
     item["role_label"] = PLANT_ROLE_LABELS.get(role, role)
     item["age_days"] = _days_between(item.get("started_on"))
     item["stage_days"] = _days_between(item.get("current_stage_started_on"))
+    item["harvest_forecast"] = calculate_harvest_forecast(
+        item.get("flowering_started_on"),
+        item.get("expected_flower_days"),
+    )
     return item
 
 
@@ -806,6 +875,13 @@ def get_timeline(active_only=True):
         if not events:
             continue
 
+        forecast = plant.get("harvest_forecast")
+        if forecast:
+            try:
+                all_dates.append(date.fromisoformat(forecast["harvest_on"]))
+            except (TypeError, ValueError):
+                pass
+
         for event in events:
             try:
                 all_dates.append(date.fromisoformat(event["started_on"][:10]))
@@ -815,7 +891,11 @@ def get_timeline(active_only=True):
             except Exception:
                 pass
 
-        rows.append({"plant": plant, "events": events})
+        rows.append({
+            "plant": plant,
+            "events": events,
+            "harvest_forecast": forecast,
+        })
 
     if not all_dates:
         today = date.today()
@@ -823,6 +903,8 @@ def get_timeline(active_only=True):
             "rows": [],
             "start": today.isoformat(),
             "end": today.isoformat(),
+            "start_label": today.strftime("%d.%m.%Y"),
+            "end_label": today.strftime("%d.%m.%Y"),
             "total_days": 1,
             "ticks": [],
         }
@@ -863,10 +945,34 @@ def get_timeline(active_only=True):
             )
         row["segments"] = segments
 
+        forecast = row.get("harvest_forecast")
+        if forecast:
+            flower_start = date.fromisoformat(
+                forecast["flowering_started_on"]
+            )
+            harvest_on = date.fromisoformat(forecast["harvest_on"])
+            planned_left = ((flower_start - start).days / total_days) * 100
+            planned_width = max(
+                1.2,
+                ((harvest_on - flower_start).days + 1)
+                / total_days
+                * 100,
+            )
+            forecast.update({
+                "left": round(planned_left, 3),
+                "width": round(planned_width, 3),
+                "harvest_left": round(
+                    ((harvest_on - start).days / total_days) * 100,
+                    3,
+                ),
+            })
+
     return {
         "rows": rows,
         "start": start.isoformat(),
         "end": end.isoformat(),
+        "start_label": start.strftime("%d.%m.%Y"),
+        "end_label": end.strftime("%d.%m.%Y"),
         "total_days": total_days,
         "ticks": ticks,
     }

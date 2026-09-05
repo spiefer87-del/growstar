@@ -4,7 +4,7 @@
 {% block page %}
 <main class="pm-shell">
 <header class="pm-header">
-<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a><div><h1 class="pm-title">Lifecycle Timeline</h1><div class="pm-subtitle">Ist-Verlauf aller aktiven Pflanzen · {{ timeline.start }} bis {{ timeline.end }}</div></div></div>
+<div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a><div><h1 class="pm-title">Lifecycle Timeline</h1><div class="pm-subtitle">Ist-Verlauf und Ernteprognose aller aktiven Pflanzen · {{ timeline.start_label }} bis {{ timeline.end_label }}</div></div></div>
 </header>
 {% set active_page = 'timeline' %}
 
@@ -23,6 +23,7 @@
 <div class="pm-card">
 <div class="pm-card-body" style="overflow-x:auto;">
 {% if timeline.rows %}
+<div class="pm-timeline-note">🌸 Die Ernteprognose wird aus dem dokumentierten Blütebeginn plus dem Blüte-Planwert der zugeordneten Sorte berechnet.</div>
 <div class="pm-timeline">
 <div class="pm-timeline-head">
 {% for tick in timeline.ticks %}<span class="pm-tick" style="left:{{ tick.left }}%">{{ tick.label }}</span>{% endfor %}
@@ -32,8 +33,26 @@
 <div class="pm-timeline-label">
 <a href="{{ url_for('plant_detail', plant_id=row.plant.id) }}" style="color:inherit;text-decoration:none;"><strong>{{ row.plant.display_name }}</strong></a>
 <span class="pm-code">{{ row.plant.code }} · {{ row.plant.cultivar_name or '—' }}</span>
+{% if row.harvest_forecast %}
+<span class="pm-harvest-date {{ 'overdue' if row.harvest_forecast.overdue else '' }}">Ernte: {{ row.harvest_forecast.harvest_label }} · {{ row.harvest_forecast.status_text }}</span>
+{% elif row.plant.expected_flower_days %}
+<span class="pm-harvest-date muted">Ernteprognose ab Blütebeginn</span>
+{% else %}
+<span class="pm-harvest-date muted">Kein Blüte-Planwert hinterlegt</span>
+{% endif %}
 </div>
 <div class="pm-timeline-track">
+{% if row.harvest_forecast %}
+<div class="pm-flower-plan"
+style="--left:{{ row.harvest_forecast.left }}%;--width:{{ row.harvest_forecast.width }}%"
+data-label="Blüteplan · {{ row.harvest_forecast.flowering_started_label }} → {{ row.harvest_forecast.harvest_label }} · {{ row.harvest_forecast.expected_flower_days }} Tage">
+</div>
+<div class="pm-harvest-marker {{ 'overdue' if row.harvest_forecast.overdue else '' }}"
+style="--harvest-left:{{ row.harvest_forecast.harvest_left }}%"
+data-label="Ernteprognose {{ row.harvest_forecast.harvest_label }} · {{ row.harvest_forecast.status_text }}">
+<span aria-hidden="true">✂</span>
+</div>
+{% endif %}
 {% for segment in row.segments %}
 <div class="pm-segment"
 style="--left:{{ segment.left }}%;--width:{{ segment.width }}%;--segment-color:{{ segment.stage_color }}"
@@ -48,6 +67,8 @@ data-label="{{ segment.stage_label }} · {{ segment.started_on }}{% if segment.e
 {% for code,label,color in stages %}
 <span class="pm-legend-item"><span class="pm-legend-dot" style="--legend-color:{{ color }}"></span>{{ label }}</span>
 {% endfor %}
+<span class="pm-legend-item"><span class="pm-legend-plan"></span>Geplante Blütedauer</span>
+<span class="pm-legend-item"><span class="pm-legend-harvest">✂</span>Ernteprognose</span>
 </div>
 {% else %}
 <div class="pm-empty">Noch keine Lifecycle-Daten vorhanden.</div>

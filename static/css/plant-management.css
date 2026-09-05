@@ -400,13 +400,24 @@ body {
 
 .pm-timeline {
     position: relative;
-    min-width: 900px;
+    min-width: 980px;
+}
+
+.pm-timeline-note {
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    border: 1px solid rgba(168,85,247,.28);
+    border-radius: 10px;
+    background: rgba(168,85,247,.08);
+    color: #d8b4fe;
+    font-size: .82rem;
+    line-height: 1.45;
 }
 
 .pm-timeline-head {
     position: relative;
     height: 38px;
-    margin-left: 230px;
+    margin-left: 270px;
     border-bottom: 1px solid var(--pm-line);
 }
 
@@ -420,8 +431,8 @@ body {
 
 .pm-timeline-row {
     display: grid;
-    grid-template-columns: 230px 1fr;
-    min-height: 58px;
+    grid-template-columns: 270px 1fr;
+    min-height: 72px;
     border-bottom: 1px solid var(--pm-line);
 }
 
@@ -430,6 +441,22 @@ body {
     flex-direction: column;
     justify-content: center;
     padding: 8px 12px 8px 0;
+}
+
+.pm-harvest-date {
+    margin-top: 4px;
+    color: #fdba74;
+    font-size: .72rem;
+    font-weight: 700;
+}
+
+.pm-harvest-date.overdue {
+    color: #fca5a5;
+}
+
+.pm-harvest-date.muted {
+    color: var(--pm-muted);
+    font-weight: 500;
 }
 
 .pm-timeline-track {
@@ -451,6 +478,64 @@ body {
     border-radius: 7px;
     background: var(--segment-color);
     box-shadow: 0 4px 12px color-mix(in srgb, var(--segment-color) 25%, transparent);
+}
+
+.pm-flower-plan {
+    position: absolute;
+    z-index: 1;
+    top: 3px;
+    height: 30px;
+    left: var(--left);
+    width: var(--width);
+    min-width: 8px;
+    border: 2px dashed rgba(216,180,254,.78);
+    border-radius: 9px;
+    background: rgba(168,85,247,.12);
+}
+
+.pm-segment {
+    z-index: 2;
+}
+
+.pm-harvest-marker {
+    position: absolute;
+    z-index: 3;
+    top: -2px;
+    bottom: -2px;
+    left: var(--harvest-left);
+    width: 2px;
+    background: #fb923c;
+    box-shadow: 0 0 9px rgba(251,146,60,.55);
+}
+
+.pm-harvest-marker > span {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #fdba74;
+    font-size: .82rem;
+}
+
+.pm-harvest-marker.overdue {
+    background: #ef4444;
+}
+
+.pm-flower-plan:hover::after,
+.pm-harvest-marker:hover::after {
+    content: attr(data-label);
+    position: absolute;
+    z-index: 10;
+    left: 50%;
+    bottom: calc(100% + 7px);
+    transform: translateX(-50%);
+    padding: 6px 8px;
+    border-radius: 7px;
+    white-space: nowrap;
+    color: var(--pm-text);
+    background: #020617;
+    border: 1px solid var(--pm-line);
+    font-size: .72rem;
 }
 
 .pm-segment:hover::after {
@@ -489,6 +574,24 @@ body {
     height: 10px;
     border-radius: 3px;
     background: var(--legend-color);
+}
+
+.pm-legend-plan {
+    width: 18px;
+    height: 10px;
+    border: 2px dashed #d8b4fe;
+    border-radius: 3px;
+    background: rgba(168,85,247,.12);
+}
+
+.pm-legend-harvest {
+    color: #fb923c;
+    font-weight: 800;
+}
+
+.pm-harvest-detail {
+    border-color: rgba(251,146,60,.28);
+    background: rgba(251,146,60,.06);
 }
 
 .pm-detail-grid {

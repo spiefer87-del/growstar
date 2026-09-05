@@ -546,7 +546,7 @@ h3 {
             <div class="card env" id="vpd-card">
                 <h2>VPD</h2>
                 <div class="value"><span id="vpd">--.-</span> kPa</div>
-                <div class="sub" id="vpd-control-summary">berechnet</div>
+                <div class="sub" id="vpd-control-summary">Soll: -- kPa</div>
             </div>
         </a>
         <a
@@ -740,8 +740,13 @@ h3 {
         if(logLink) logLink.hidden = !showLog;
         if(cardSlot) cardSlot.classList.toggle("has-vpd-log",showLog);
         if(mode === "OFF"){
-            summary.textContent = "berechnet";
-            summary.title = "Intelligente VPD-Steuerung ist aus";
+            const classicTarget = optionalNumber(state.classic_vpd_target);
+            summary.textContent = Number.isFinite(classicTarget)
+                ? `Soll: ${classicTarget.toFixed(2)} kPa`
+                : "Soll: -- kPa";
+            summary.title = Number.isFinite(classicTarget)
+                ? "Aus dem aktiven Temperatur- und Feuchte-Sollwert berechnet"
+                : "Temperatur- oder Feuchte-Sollwert ist noch nicht verfügbar";
             return;
         }
 

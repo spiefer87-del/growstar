@@ -51,6 +51,8 @@
 <div class="pm-detail"><div class="pm-detail-label">Genetische Linie</div><div class="pm-detail-value">{% if genetic_line %}<a href="{{ url_for('genetic_line_detail', line_id=genetic_line.id) }}">{{ genetic_line.code }} · {{ genetic_line.name }}</a>{% else %}—{% endif %}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Durchgang</div><div class="pm-detail-value">{{ plant.batch_name or '—' }}</div></div>
 <div class="pm-detail"><div class="pm-detail-label">Standort</div><div class="pm-detail-value">{{ plant.location or '—' }}</div></div>
+<div class="pm-detail"><div class="pm-detail-label">Blüteplan</div><div class="pm-detail-value">{% if plant.expected_flower_days %}{{ plant.expected_flower_days }} Tage{% else %}—{% endif %}</div></div>
+<div class="pm-detail pm-harvest-detail"><div class="pm-detail-label">Ernteprognose</div><div class="pm-detail-value">{% if plant.harvest_forecast %}{{ plant.harvest_forecast.harvest_label }}{% elif plant.expected_flower_days %}ab dokumentiertem Blütebeginn{% else %}—{% endif %}</div>{% if plant.harvest_forecast %}<div class="pm-muted">Blütetag {{ plant.harvest_forecast.flower_day }} · {{ plant.harvest_forecast.status_text }}</div>{% endif %}</div>
 </div>
 </div>
 </article>

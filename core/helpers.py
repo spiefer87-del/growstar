@@ -12,6 +12,36 @@ def calculate_vpd(temp_c, humidity):
     avp = svp * (humidity / 100.0)
     return round(svp - avp, 3)
 
+
+def calculate_target_vpd(temp_target, humidity_target):
+    """Berechnet einen sicheren VPD-Sollwert aus zwei Klima-Sollwerten.
+
+    Die Live-State-API darf während des Starts kurz unvollständige Werte sehen.
+    Statt daraus einen HTTP-Fehler oder ``NaN`` zu erzeugen, liefert diese
+    Anzeigehilfe in diesem Fall ``None``. Die eigentliche VPD-Messwertformel
+    bleibt unverändert zentral in :func:`calculate_vpd`.
+    """
+
+    try:
+        temperature = float(temp_target)
+        humidity = float(humidity_target)
+    except (TypeError, ValueError):
+        return None
+
+    if (
+        not math.isfinite(temperature)
+        or not math.isfinite(humidity)
+        or temperature <= -237.3
+        or humidity < 0.0
+        or humidity > 100.0
+    ):
+        return None
+
+    try:
+        return calculate_vpd(temperature, humidity)
+    except (OverflowError, ZeroDivisionError, ValueError):
+        return None
+
 def minutes_now():
     now = datetime.datetime.now()
     return now.hour * 60 + now.minute
