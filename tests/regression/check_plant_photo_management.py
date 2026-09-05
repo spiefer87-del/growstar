@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression für Growstar 3.16.21 / PLANT.PHOTO.1."""
+"""Regression für Growstar 3.16.22 / PLANT.PHOTO.2."""
 
 from datetime import date, timedelta
 from io import BytesIO
@@ -57,7 +57,10 @@ def main():
         try:
             database.init_plant_management_db()
             journal.init_plant_journal_db()
-            photos.init_plant_photo_db()
+            require(
+                photos.list_plant_photos() == [],
+                "Der Foto-Lesepfad legt eine nach dem Upgrade fehlende Tabelle selbst an",
+            )
 
             cultivar_id = database.save_cultivar({
                 "code": "PHOTO-CULTIVAR",
@@ -161,15 +164,20 @@ def main():
             dashboard_source = (ROOT / "templates/plants/dashboard.html").read_text(encoding="utf-8")
             timeline_source = (ROOT / "templates/plants/timeline.html").read_text(encoding="utf-8")
             require(
-                'capture="environment"' in (
-                    ROOT / "templates/plants/photo_form.html"
-                ).read_text(encoding="utf-8")
+                'name="camera_photo"' in (
+                    photo_form_source := (
+                        ROOT / "templates/plants/photo_form.html"
+                    ).read_text(encoding="utf-8")
+                )
+                and 'capture="environment"' in photo_form_source
+                and 'name="file_photo"' in photo_form_source
+                and 'Datei oder Galerie auswählen' in photo_form_source
                 and "＋ Fotos" in dashboard_source
                 and "pm-photo-marker" in timeline_source
                 and "plant_photo_manager" in routes_source,
                 "Dashboard, Kameraaufnahme, Foto-Manager und Timeline sind verdrahtet",
             )
-            print("✅ Growstar 3.16.21 / PLANT.PHOTO.1 vollständig geprüft")
+            print("✅ Growstar 3.16.22 / PLANT.PHOTO.2 vollständig geprüft")
         finally:
             database.DB_FILE = original_database_file
             journal.DB_FILE = original_journal_file

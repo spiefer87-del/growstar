@@ -31,6 +31,27 @@ def _now():
     return int(time.time())
 
 
+def _photo_query(sql, params, *, one=False):
+    """Liest Fotos und repariert nur bei tatsächlich fehlender Tabelle."""
+    for attempt in range(2):
+        db = _db()
+        try:
+            cursor = db.execute(sql, params)
+            return cursor.fetchone() if one else cursor.fetchall()
+        except sqlite3.OperationalError as exc:
+            if attempt == 0 and "no such table: pm_plant_photos" in str(exc):
+                db.close()
+                init_plant_photo_db()
+                continue
+            raise
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+    return None if one else []
+
+
 def _normalize_captured_at(value=None):
     if not value:
         captured = datetime.now()
@@ -292,45 +313,38 @@ def list_plant_photos(*, plant_id=None, journal_entry_id=None, stage=None, limit
         params.append(str(stage))
 
     params.append(max(1, min(int(limit), 1000)))
-    db = _db()
-    try:
-        rows = db.execute(
-            f"""
-            SELECT ph.*, p.code AS plant_code,
-                   p.display_name AS plant_name,
-                   c.name AS cultivar_name
-            FROM pm_plant_photos ph
-            JOIN pm_plants p ON p.id = ph.plant_id
-            LEFT JOIN pm_cultivars c ON c.id = p.cultivar_id
-            WHERE {' AND '.join(where)}
-            ORDER BY ph.captured_at DESC, ph.id DESC
-            LIMIT ?
-            """,
-            params,
-        ).fetchall()
-        return [_decorate(row) for row in rows]
-    finally:
-        db.close()
+    rows = _photo_query(
+        f"""
+        SELECT ph.*, p.code AS plant_code,
+               p.display_name AS plant_name,
+               c.name AS cultivar_name
+        FROM pm_plant_photos ph
+        JOIN pm_plants p ON p.id = ph.plant_id
+        LEFT JOIN pm_cultivars c ON c.id = p.cultivar_id
+        WHERE {' AND '.join(where)}
+        ORDER BY ph.captured_at DESC, ph.id DESC
+        LIMIT ?
+        """,
+        params,
+    )
+    return [_decorate(row) for row in rows]
 
 
 def get_plant_photo(photo_id):
-    db = _db()
-    try:
-        row = db.execute(
-            """
-            SELECT ph.*, p.code AS plant_code,
-                   p.display_name AS plant_name,
-                   c.name AS cultivar_name
-            FROM pm_plant_photos ph
-            JOIN pm_plants p ON p.id = ph.plant_id
-            LEFT JOIN pm_cultivars c ON c.id = p.cultivar_id
-            WHERE ph.id = ? AND ph.deleted_at IS NULL
-            """,
-            (int(photo_id),),
-        ).fetchone()
-        return _decorate(row)
-    finally:
-        db.close()
+    row = _photo_query(
+        """
+        SELECT ph.*, p.code AS plant_code,
+               p.display_name AS plant_name,
+               c.name AS cultivar_name
+        FROM pm_plant_photos ph
+        JOIN pm_plants p ON p.id = ph.plant_id
+        LEFT JOIN pm_cultivars c ON c.id = p.cultivar_id
+        WHERE ph.id = ? AND ph.deleted_at IS NULL
+        """,
+        (int(photo_id),),
+        one=True,
+    )
+    return _decorate(row)
 
 
 def remove_plant_photo(photo_id, *, user_id=None, user_name=None):
@@ -365,11 +379,18 @@ def remove_plant_photo(photo_id, *, user_id=None, user_name=None):
 
 
 def photo_markers_for_timeline(timeline):
+    for row in timeline.get("rows") or []:
+        row["photo_markers"] = []
     if not timeline.get("rows"):
         return timeline
     start = date.fromisoformat(timeline["start"])
     total_days = max(1, int(timeline["total_days"]))
-    photos = list_plant_photos(limit=1000)
+    try:
+        photos = list_plant_photos(limit=1000)
+    except Exception:
+        # Die Lifecycle-Timeline ist eine Kernansicht. Ein defekter oder noch
+        # nicht angelegter Foto-Nebenpfad darf sie niemals komplett blockieren.
+        return timeline
     by_plant = {}
     for photo in photos:
         by_plant.setdefault(photo["plant_id"], []).append(photo)

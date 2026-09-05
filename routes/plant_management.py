@@ -532,6 +532,12 @@ def register(app):
         if not plant:
             abort(404)
 
+        try:
+            plant_photos = list_plant_photos(plant_id=plant_id, limit=6)
+        except Exception:
+            app.logger.exception("Pflanzenfotos konnten nicht geladen werden")
+            plant_photos = []
+
         return render_template(
             "plants/plant_detail.html",
             plant=plant,
@@ -557,7 +563,7 @@ def register(app):
             ),
             plant_roles=PLANT_ROLES,
             genetic_lines=list_genetic_lines(include_inactive=False),
-            plant_photos=list_plant_photos(plant_id=plant_id, limit=6),
+            plant_photos=plant_photos,
         )
 
 
@@ -692,12 +698,23 @@ def register(app):
             if selected_plant_id
             else None
         )
-        return render_template(
-            "plants/photos.html",
-            photos=list_plant_photos(
+        try:
+            photos = list_plant_photos(
                 plant_id=selected_plant_id,
                 stage=selected_stage,
-            ),
+            )
+        except Exception as exc:
+            app.logger.exception("Foto-Manager konnte Fotos nicht laden")
+            photos = []
+            flash(
+                "Die Fotoliste konnte nicht geladen werden. "
+                "Die Seite bleibt verfügbar; Details stehen im Systemprotokoll.",
+                "error",
+            )
+
+        return render_template(
+            "plants/photos.html",
+            photos=photos,
             plants=plants,
             selected_plant=selected_plant,
             selected_plant_id=selected_plant_id,
@@ -718,9 +735,16 @@ def register(app):
             photo = None
             try:
                 user_id, user_name = _current_user_identity()
+                camera_upload = request.files.get("camera_photo")
+                file_upload = request.files.get("file_photo")
+                upload = (
+                    camera_upload
+                    if camera_upload and camera_upload.filename
+                    else file_upload
+                )
                 photo = save_plant_photo(
                     request.form.get("plant_id"),
-                    request.files.get("photo"),
+                    upload,
                     captured_at=request.form.get("captured_at"),
                     note=request.form.get("note"),
                     user_id=user_id,
@@ -942,11 +966,17 @@ def register(app):
         if not entry:
             abort(404)
 
+        try:
+            photos = list_plant_photos(journal_entry_id=entry_id)
+        except Exception:
+            app.logger.exception("Journal-Fotos konnten nicht geladen werden")
+            photos = []
+
         return render_template(
             "plants/journal_detail.html",
             entry=entry,
             revisions=get_revisions(entry_id),
-            photos=list_plant_photos(journal_entry_id=entry_id),
+            photos=photos,
         )
 
 

@@ -953,6 +953,32 @@ body {
     font-size: .85rem;
 }
 
+.pm-photo-source-separator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 0;
+    color: var(--pm-muted);
+    font-size: .78rem;
+    text-transform: uppercase;
+}
+
+.pm-photo-source-separator::before,
+.pm-photo-source-separator::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--pm-line);
+}
+
+.pm-photo-file-button {
+    width: 100%;
+    min-height: 52px;
+    border-color: rgba(168,85,247,.38);
+    background: rgba(168,85,247,.08);
+    color: #e9d5ff;
+}
+
 .pm-camera-icon {
     font-size: 3rem;
 }

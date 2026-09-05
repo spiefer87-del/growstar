@@ -26,12 +26,15 @@
     <article class="pm-card pm-span-7">
         <div class="pm-card-head"><h2>Foto</h2><span class="pm-guide-readonly">max. {{ max_image_edge }} px</span></div>
         <div class="pm-card-body">
-            <label class="pm-camera-picker" for="plant-photo-input">
+            <label class="pm-camera-picker" for="plant-camera-input">
                 <span class="pm-camera-icon">📷</span>
-                <strong>Kamera öffnen oder Foto auswählen</strong>
-                <span>Das Bild wird beim Speichern automatisch verkleinert.</span>
+                <strong>Foto mit Kamera aufnehmen</strong>
+                <span>Öffnet direkt die rückseitige Kamera.</span>
             </label>
-            <input id="plant-photo-input" class="pm-file-input" type="file" name="photo" accept="image/jpeg,image/png,image/webp" capture="environment" required>
+            <input id="plant-camera-input" class="pm-file-input" type="file" name="camera_photo" accept="image/*" capture="environment">
+            <div class="pm-photo-source-separator"><span>oder</span></div>
+            <label class="pm-button pm-photo-file-button" for="plant-file-input">🖼️ Datei oder Galerie auswählen</label>
+            <input id="plant-file-input" class="pm-file-input" type="file" name="file_photo" accept="image/jpeg,image/png,image/webp">
             <div id="plant-photo-preview" class="pm-photo-preview" hidden>
                 <img alt="Vorschau des ausgewählten Pflanzenfotos">
                 <span></span>
@@ -75,7 +78,8 @@
 {% block scripts %}
 <script>
 (() => {
-    const input = document.getElementById("plant-photo-input");
+    const cameraInput = document.getElementById("plant-camera-input");
+    const fileInput = document.getElementById("plant-file-input");
     const preview = document.getElementById("plant-photo-preview");
     const image = preview.querySelector("img");
     const info = preview.querySelector("span");
@@ -83,18 +87,22 @@
     const submit = document.getElementById("plant-photo-submit");
     let objectUrl = null;
 
-    input.addEventListener("change", () => {
+    function showPreview(input, otherInput) {
         if (objectUrl) URL.revokeObjectURL(objectUrl);
         const file = input.files && input.files[0];
         if (!file) {
             preview.hidden = true;
             return;
         }
+        otherInput.value = "";
         objectUrl = URL.createObjectURL(file);
         image.src = objectUrl;
         info.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB vor Optimierung`;
         preview.hidden = false;
-    });
+    }
+
+    cameraInput.addEventListener("change", () => showPreview(cameraInput, fileInput));
+    fileInput.addEventListener("change", () => showPreview(fileInput, cameraInput));
 
     form.addEventListener("submit", () => {
         submit.disabled = true;
