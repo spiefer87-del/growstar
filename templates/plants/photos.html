@@ -63,7 +63,7 @@
 <section class="pm-photo-grid">
 {% for photo in batch_photos %}
 <article class="pm-photo-manager-card">
-    <a class="pm-photo-image" href="{{ url_for('batch_photo_file', photo_id=photo.id) }}" target="_blank">
+    <a class="pm-photo-image" href="{{ url_for('batch_photo_file', photo_id=photo.id) }}" data-lightbox-item data-lightbox-title="{{ photo.batch_name }}" data-lightbox-meta="{{ photo.captured_date }} · {{ photo.captured_time }} Uhr · Durchgang {{ photo.batch_code }}" data-lightbox-note="{{ photo.note or '' }}">
         <img src="{{ url_for('batch_photo_file', photo_id=photo.id) }}" alt="Gesamtaufnahme {{ photo.batch_name }}" loading="lazy">
     </a>
     <div class="pm-photo-info">
@@ -132,7 +132,7 @@
 <section class="pm-photo-grid">
 {% for photo in photos %}
 <article class="pm-photo-manager-card">
-    <a class="pm-photo-image" href="{{ url_for('plant_photo_file', photo_id=photo.id) }}" target="_blank">
+    <a class="pm-photo-image" href="{{ url_for('plant_photo_file', photo_id=photo.id) }}" data-lightbox-item data-lightbox-title="{{ photo.plant_name }} · {{ photo.stage_label }}" data-lightbox-meta="{{ photo.captured_date }} · {{ photo.captured_time }} Uhr · {{ photo.plant_code }}" data-lightbox-note="{{ photo.note or '' }}">
         <img src="{{ url_for('plant_photo_file', photo_id=photo.id) }}" alt="Foto von {{ photo.plant_name }}" loading="lazy">
     </a>
     <div class="pm-photo-info">
@@ -162,5 +162,124 @@
 <div class="pm-card"><div class="pm-empty">Für diese Auswahl sind noch keine Fotos vorhanden.{% if has_permission('plants.edit') %}<br><br><a class="pm-button primary" href="{{ url_for('plant_photo_new', plant_id=selected_plant_id or '') }}">Erstes Foto aufnehmen</a>{% endif %}</div></div>
 {% endif %}
 {% endif %}
+
+<div class="pm-photo-lightbox" id="pm-photo-lightbox" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="pm-lightbox-title">
+    <div class="pm-lightbox-top">
+        <span class="pm-lightbox-count" id="pm-lightbox-count"></span>
+        <button class="pm-lightbox-close" id="pm-lightbox-close" type="button" aria-label="Galerie schließen">×</button>
+    </div>
+    <button class="pm-lightbox-nav previous" id="pm-lightbox-previous" type="button" aria-label="Vorheriges Foto">‹</button>
+    <figure class="pm-lightbox-figure">
+        <div class="pm-lightbox-stage" id="pm-lightbox-stage">
+            <img id="pm-lightbox-image" alt="">
+        </div>
+        <figcaption class="pm-lightbox-caption">
+            <strong id="pm-lightbox-title"></strong>
+            <span id="pm-lightbox-meta"></span>
+            <span id="pm-lightbox-note"></span>
+        </figcaption>
+    </figure>
+    <button class="pm-lightbox-nav next" id="pm-lightbox-next" type="button" aria-label="Nächstes Foto">›</button>
+    <div class="pm-lightbox-help">Wischen oder ← → verwenden · Esc schließt</div>
+</div>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const items = Array.from(document.querySelectorAll("[data-lightbox-item]"));
+    const lightbox = document.getElementById("pm-photo-lightbox");
+    if (!items.length || !lightbox) return;
+
+    const image = document.getElementById("pm-lightbox-image");
+    const title = document.getElementById("pm-lightbox-title");
+    const meta = document.getElementById("pm-lightbox-meta");
+    const note = document.getElementById("pm-lightbox-note");
+    const count = document.getElementById("pm-lightbox-count");
+    const closeButton = document.getElementById("pm-lightbox-close");
+    const previousButton = document.getElementById("pm-lightbox-previous");
+    const nextButton = document.getElementById("pm-lightbox-next");
+    const stage = document.getElementById("pm-lightbox-stage");
+    let currentIndex = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let previousOverflow = "";
+    let opener = null;
+
+    function render(index) {
+        currentIndex = (index + items.length) % items.length;
+        const item = items[currentIndex];
+        image.src = item.href;
+        image.alt = item.querySelector("img")?.alt || item.dataset.lightboxTitle || "Foto";
+        title.textContent = item.dataset.lightboxTitle || "Foto";
+        meta.textContent = item.dataset.lightboxMeta || "";
+        note.textContent = item.dataset.lightboxNote || "";
+        note.hidden = !item.dataset.lightboxNote;
+        count.textContent = `${currentIndex + 1} / ${items.length}`;
+        previousButton.hidden = items.length < 2;
+        nextButton.hidden = items.length < 2;
+
+        if (items.length > 1) {
+            const preload = new Image();
+            preload.src = items[(currentIndex + 1) % items.length].href;
+        }
+    }
+
+    function open(index, source) {
+        opener = source;
+        render(index);
+        lightbox.hidden = false;
+        lightbox.setAttribute("aria-hidden", "false");
+        previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        closeButton.focus({preventScroll: true});
+    }
+
+    function close() {
+        if (lightbox.hidden) return;
+        lightbox.hidden = true;
+        lightbox.setAttribute("aria-hidden", "true");
+        image.removeAttribute("src");
+        document.body.style.overflow = previousOverflow;
+        opener?.focus({preventScroll: true});
+    }
+
+    items.forEach((item, index) => {
+        item.addEventListener("click", event => {
+            event.preventDefault();
+            open(index, item);
+        });
+    });
+
+    previousButton.addEventListener("click", () => render(currentIndex - 1));
+    nextButton.addEventListener("click", () => render(currentIndex + 1));
+    closeButton.addEventListener("click", close);
+    lightbox.addEventListener("click", event => {
+        if (event.target === lightbox) close();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (lightbox.hidden) return;
+        if (event.key === "Escape") close();
+        if (event.key === "ArrowLeft" && items.length > 1) render(currentIndex - 1);
+        if (event.key === "ArrowRight" && items.length > 1) render(currentIndex + 1);
+    });
+
+    stage.addEventListener("touchstart", event => {
+        const touch = event.changedTouches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+    }, {passive: true});
+
+    stage.addEventListener("touchend", event => {
+        if (items.length < 2) return;
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - touchStartX;
+        const deltaY = touch.clientY - touchStartY;
+        if (Math.abs(deltaX) < 45 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+        render(deltaX < 0 ? currentIndex + 1 : currentIndex - 1);
+    }, {passive: true});
+})();
+</script>
 {% endblock %}
