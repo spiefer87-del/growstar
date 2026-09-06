@@ -72,6 +72,7 @@ from plant_management.propagation import (
     create_propagation_run,
     list_propagation_runs,
     get_propagation_run,
+    delete_propagation_run,
     update_propagation_unit,
     create_plant_from_propagation_unit,
     get_plant_origin,
@@ -2009,6 +2010,77 @@ def register(app):
             "plants/propagation_run_detail.html",
             run=run,
             unit_status_labels=PROPAGATION_UNIT_STATUS_LABELS,
+        )
+
+
+    @app.route(
+        "/pflanzenmanagement/vermehrung/ansaetze/<int:run_id>/entfernen",
+        methods=["POST"],
+    )
+    @permission_required("plants.edit")
+    def propagation_run_remove(run_id):
+        run = get_propagation_run(run_id)
+        if not run:
+            abort(404)
+
+        if request.form.get("confirm_code") != run["code"]:
+            flash("Die Löschbestätigung ist ungültig.", "error")
+            return redirect(
+                url_for("propagation_run_detail", run_id=run_id)
+            )
+
+        try:
+            result = delete_propagation_run(run_id)
+            _audit(
+                "plants.propagation_removed",
+                "propagation_run",
+                run_id,
+                {
+                    "code": run["code"],
+                    "method": run["method"],
+                    "removed_units": result["removed_units"],
+                    "restored_seed_count": result["restored_seed_count"],
+                },
+            )
+            _system_journal(
+                f"Vermehrungsansatz entfernt: {run['code']}",
+                body=(
+                    f"Korrektur · {run['method_label']} · "
+                    f"{result['removed_units']} Einheiten entfernt"
+                    + (
+                        f" · {result['restored_seed_count']} Samen "
+                        "in den Bestand zurückgebucht"
+                        if result["restored_seed_count"]
+                        else ""
+                    )
+                ),
+                category="care",
+                plant_ids=(
+                    [run["mother_plant_id"]]
+                    if run.get("mother_plant_id")
+                    else []
+                ),
+                batch_ids=(
+                    [run["batch_id"]]
+                    if run.get("batch_id")
+                    else []
+                ),
+                tags="vermehrung,korrektur",
+            )
+
+            message = "Vermehrungsansatz wurde entfernt."
+            if result["restored_seed_count"]:
+                message += (
+                    f" {result['restored_seed_count']} Samen wurden dem "
+                    "Bestand wieder gutgeschrieben."
+                )
+            flash(message, "success")
+            return redirect(url_for("propagation_run_list"))
+        except Exception as exc:
+            flash(str(exc), "error")
+
+        return redirect(
+            url_for("propagation_run_detail", run_id=run_id)
         )
 
 

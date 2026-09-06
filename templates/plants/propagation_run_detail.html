@@ -2,7 +2,7 @@
 {% block title %}{{ run.code }} – Vermehrung – Growstar{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}">{% endblock %}
 {% block page %}
-<main class="pm-shell"><header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('propagation_run_list') }}">←</a><div><h1 class="pm-title">🌱 {{ run.name }}</h1><div class="pm-subtitle">{{ run.code }} · {{ run.method_label }} · {{ run.cultivar_name }}</div></div></div></header>
+<main class="pm-shell"><header class="pm-header"><div class="pm-heading-wrap"><a class="pm-back" href="{{ url_for('propagation_run_list') }}">←</a><div><h1 class="pm-title">🌱 {{ run.name }}</h1><div class="pm-subtitle">{{ run.code }} · {{ run.method_label }} · {{ run.cultivar_name }}</div></div></div>{% if has_permission('plants.edit') %}<div class="pm-actions">{% if run.created_plants == 0 %}<form method="post" action="{{ url_for('propagation_run_remove', run_id=run.id) }}" onsubmit="return confirm('Vermehrungsansatz {{ run.code }} mit {{ run.total_units }} Einheiten wirklich dauerhaft entfernen?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="confirm_code" value="{{ run.code }}"><button class="pm-button danger" type="submit">Ansatz entfernen</button></form>{% else %}<button class="pm-button danger" type="button" disabled title="Aus diesem Ansatz wurden bereits Pflanzen erzeugt.">Entfernen gesperrt</button>{% endif %}</div>{% endif %}</header>
 {% set active_page = 'propagation' %}{% include "plants/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}

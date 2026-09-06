@@ -1510,6 +1510,110 @@ def get_propagation_run(run_id):
         db.close()
 
 
+def delete_propagation_run(run_id):
+    """
+    Entfernt einen irrtuemlich angelegten Vermehrungsansatz atomar.
+
+    Bereits erzeugte Pflanzen sperren die Loeschung, damit ihre
+    Herkunftskette erhalten bleibt. Bei Samenansaetzen wird die automatisch
+    gebuchte Saatgutentnahme zusammen mit dem Ansatz entfernt und der Bestand
+    dadurch wiederhergestellt.
+    """
+    db = _db()
+    try:
+        run = db.execute(
+            """
+            SELECT id, code, name, method, seed_lot_id, target_count
+            FROM pm_propagation_runs
+            WHERE id = ?
+            """,
+            (int(run_id),),
+        ).fetchone()
+
+        if not run:
+            raise ValueError("Vermehrungsansatz wurde nicht gefunden.")
+
+        unit_stats = db.execute(
+            """
+            SELECT
+                COUNT(DISTINCT u.id) AS total_units,
+                COUNT(DISTINCT CASE
+                    WHEN u.plant_id IS NOT NULL
+                         OR u.status = 'plant_created'
+                         OR o.plant_id IS NOT NULL
+                    THEN u.id
+                END) AS linked_units
+            FROM pm_propagation_units u
+            LEFT JOIN pm_plant_origins o
+                ON o.propagation_unit_id = u.id
+            WHERE u.run_id = ?
+            """,
+            (int(run_id),),
+        ).fetchone()
+
+        linked_units = int(unit_stats["linked_units"] or 0)
+        if linked_units:
+            raise ValueError(
+                "Der Vermehrungsansatz kann nicht entfernt werden, weil "
+                "daraus bereits mindestens eine Pflanze erzeugt wurde. "
+                "Die Herkunftskette bleibt geschützt."
+            )
+
+        restored_seed_count = 0
+        if run["method"] == "seed" and run["seed_lot_id"]:
+            movement = db.execute(
+                """
+                SELECT COALESCE(SUM(quantity), 0) AS quantity
+                FROM pm_seed_movements
+                WHERE reference_type = 'propagation_run'
+                  AND reference_id = ?
+                  AND movement_type = 'propagation_issue'
+                """,
+                (int(run_id),),
+            ).fetchone()
+            restored_seed_count = max(0, -int(movement["quantity"] or 0))
+
+            db.execute(
+                """
+                DELETE FROM pm_seed_movements
+                WHERE reference_type = 'propagation_run'
+                  AND reference_id = ?
+                  AND movement_type = 'propagation_issue'
+                """,
+                (int(run_id),),
+            )
+
+        db.execute(
+            "DELETE FROM pm_propagation_runs WHERE id = ?",
+            (int(run_id),),
+        )
+
+        if run["seed_lot_id"]:
+            restored_stock = _seed_stock_tx(db, run["seed_lot_id"])
+            if restored_stock > 0:
+                db.execute(
+                    """
+                    UPDATE pm_seed_lots
+                    SET status = 'available', updated_at = ?
+                    WHERE id = ? AND status = 'depleted'
+                    """,
+                    (_now(), int(run["seed_lot_id"])),
+                )
+
+        db.commit()
+        return {
+            "id": int(run["id"]),
+            "code": run["code"],
+            "name": run["name"],
+            "method": run["method"],
+            "seed_lot_id": run["seed_lot_id"],
+            "removed_units": int(unit_stats["total_units"] or 0),
+            "restored_seed_count": restored_seed_count,
+        }
+    finally:
+        db.close()
+
+
 def update_propagation_unit(
     unit_id,
     *,
