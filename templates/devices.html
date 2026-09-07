@@ -1902,6 +1902,12 @@ function renderMqttDevices(devices){
                 <div class="device-meta">
                     <div class="sub">Geräte-ID ${escapeHtml(device.id || "--")}</div>
                     <div class="sub">Quelle ${escapeHtml(device.source_id || "--")}</div>
+                    ${Array.isArray(device.bridge_protocols) && device.bridge_protocols.includes("vivosun_thb1s")
+                        ? `<div class="sub">VIVOSUN-Brücke ${device.bridge_available ? "bereit" : "nicht verfügbar"} · ${escapeHtml(device.bridge_targets ?? 0)} Ziel(e)</div>`
+                        : ""}
+                    ${device.bridge_id
+                        ? `<div class="sub">BLE-Brücke ${escapeHtml(device.bridge_name || device.bridge_id)} · ${escapeHtml(device.ble_address || "--")}</div>`
+                        : ""}
                     <div class="sub">Temperatur ${device.temperature ?? "--"} °C · Feuchte ${device.humidity ?? "--"} %</div>
                     <div class="sub">RSSI ${device.rssi ?? "--"} dBm · Uptime ${formatUptime(device.uptime)}</div>
                     ${fields ? `<div class="sub">Sensoren ${escapeHtml(fields)}</div>` : ""}

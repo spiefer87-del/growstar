@@ -22,7 +22,7 @@ MQTT_PASSWORD = None
 DEVICE_ID = "pico_02"
 DEVICE_NAME = "Pico Sensor 2"
 DEVICE_MODEL = "Raspberry Pi Pico W"
-FIRMWARE_VERSION = "growstar-pico-mqtt-2"
+FIRMWARE_VERSION = "growstar-pico-mqtt-3"
 
 CLIENT_ID = ("growstar_" + DEVICE_ID).encode()
 TOPIC_STATE = ("growstar/sensors/%s/state" % DEVICE_ID).encode()
@@ -39,3 +39,20 @@ WIFI_CONNECT_TIMEOUT_SEC = 20
 WIFI_RETRY_SEC = 5
 MQTT_RETRY_SEC = 5
 DS_RESCAN_INTERVAL_SEC = 30
+
+# Optionale VIVOSUN VS-THB1S BLE-zu-WLAN-Bruecke.
+# Die Bluetooth-Adresse steht nach einem Growstar-/Handy-BLE-Scan fest.
+# Jeden VIVOSUN-Sensor nur EINEM Pico zuweisen, damit sich die beiden Picos
+# nicht gleichzeitig mit demselben Sensor verbinden.
+VIVOSUN_BRIDGE_TARGETS = (
+    # {
+    #     "address": "AA:BB:CC:DD:EE:FF",
+    #     "name": "VIVOSUN Zelt 1",
+    # },
+)
+
+# VIVOSUN wird bewusst langsamer als die lokalen Kabelsensoren abgefragt.
+VIVOSUN_BRIDGE_INTERVAL_SEC = 60
+VIVOSUN_BLE_SCAN_TIMEOUT_SEC = 6
+VIVOSUN_BLE_CONNECT_TIMEOUT_SEC = 12
+VIVOSUN_BLE_READ_TIMEOUT_SEC = 4

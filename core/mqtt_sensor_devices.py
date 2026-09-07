@@ -64,6 +64,28 @@ def _base_device(device_id, current=None):
     return current
 
 
+def _apply_payload_metadata(current, data):
+    """Keep bridge provenance visible without coupling it to a station."""
+    for key in (
+        "device_class",
+        "transport",
+        "protocol",
+        "bridge_id",
+        "bridge_name",
+        "ble_address",
+        "channel",
+        "bridge_protocols",
+        "bridge_targets",
+        "bridge_available",
+        "bridge_error",
+    ):
+        value = data.get(key)
+        if value not in (None, ""):
+            current[key] = value
+
+    return current
+
+
 def update_mqtt_sensor_state(device_id, data, *, topic=None, now=None):
     """Aktualisiert Telemetrie und markiert den Sensorcontroller online."""
     if not device_id or not isinstance(data, dict):
@@ -73,6 +95,7 @@ def update_mqtt_sensor_state(device_id, data, *, topic=None, now=None):
 
     with _lock:
         current = _base_device(device_id, _devices.get(device_id))
+        _apply_payload_metadata(current, data)
         current["name"] = str(
             data.get("name") or data.get("label") or current.get("name") or f"Pico {device_id}"
         )
@@ -107,6 +130,7 @@ def update_mqtt_sensor_status(device_id, data, *, topic=None, now=None):
 
     with _lock:
         current = _base_device(device_id, _devices.get(device_id))
+        _apply_payload_metadata(current, data)
         current["name"] = str(
             data.get("name") or data.get("label") or current.get("name") or f"Pico {device_id}"
         )
@@ -124,6 +148,23 @@ def update_mqtt_sensor_status(device_id, data, *, topic=None, now=None):
         current["raw_status"] = deepcopy(data)
 
         _devices[str(device_id)] = current
+
+        # Das Last-Will des physischen Pico markiert bei WLAN-/Stromausfall
+        # auch seine virtuellen BLE-Sensoren offline. Online werden diese erst
+        # wieder durch einen echten VIVOSUN-State beziehungsweise -Status.
+        if "online" in data and not bool(data.get("online")):
+            bridge_reason = data.get("reason") or "bridge_offline"
+            for child_id, child in _devices.items():
+                if str(child.get("bridge_id") or "") != str(device_id):
+                    continue
+                child["online"] = False
+                child["last_status"] = timestamp
+                child["reason"] = "Bridge %s: %s" % (
+                    device_id,
+                    bridge_reason,
+                )
+                _devices[child_id] = child
+
         return deepcopy(current)
 
 
