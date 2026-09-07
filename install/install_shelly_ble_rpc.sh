@@ -7,7 +7,7 @@ if [[ "${EUID}" -ne 0 ]]; then
     exit 1
 fi
 
-echo "Growstar Phase 4W.5 – Shelly BLE-RPC-Abhängigkeit"
+echo "Growstar BLE-Unterstützung – Shelly und VIVOSUN"
 
 if /usr/bin/python3 -c 'import bleak' >/dev/null 2>&1; then
     echo "✅ python3-bleak ist bereits installiert"

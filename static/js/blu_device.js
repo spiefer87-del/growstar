@@ -164,6 +164,18 @@ function renderBluetoothDevice(device){
     const props =
         device.properties || {};
 
+    const isVivosun =
+        props.protocol === "vivosun_thb1s";
+
+    const channels =
+        props.channels || {};
+
+    const mainChannel =
+        channels.main || {};
+
+    const externalChannel =
+        channels.external || {};
+
     setText(
         "device-name",
         device.name || "Bluetooth Gerät"
@@ -210,9 +222,9 @@ function renderBluetoothDevice(device){
 
     setText(
         "device-encrypted",
-        props.encrypted
-        ? "Ja"
-        : "Nein"
+        isVivosun
+        ? "Nicht erforderlich"
+        : (props.encrypted ? "Ja" : "Nein")
     );
 
     setText(
@@ -222,9 +234,13 @@ function renderBluetoothDevice(device){
 
     setText(
         "device-gateway",
-        props.gateway_ip ||
-        props.gateway_id ||
-        "--"
+        isVivosun
+        ? "Raspberry BLE (lokal)"
+        : (
+            props.gateway_ip ||
+            props.gateway_id ||
+            "--"
+        )
     );
 
     setText(
@@ -255,12 +271,119 @@ function renderBluetoothDevice(device){
         )
     );
 
+    setText(
+        "device-last-error",
+        props.last_error || "--"
+    );
+
+    setText(
+        "device-gateway-label",
+        isVivosun ? "Verbindung" : "Gateway"
+    );
+
+    setText(
+        "vivosun-main-temperature",
+        mainChannel.temperature !== undefined && mainChannel.temperature !== null
+        ? mainChannel.temperature + " °C"
+        : "--"
+    );
+
+    setText(
+        "vivosun-main-humidity",
+        mainChannel.humidity !== undefined && mainChannel.humidity !== null
+        ? mainChannel.humidity + " %"
+        : "--"
+    );
+
+    setText(
+        "vivosun-external-temperature",
+        externalChannel.temperature !== undefined && externalChannel.temperature !== null
+        ? externalChannel.temperature + " °C"
+        : "--"
+    );
+
+    setText(
+        "vivosun-external-humidity",
+        externalChannel.humidity !== undefined && externalChannel.humidity !== null
+        ? externalChannel.humidity + " %"
+        : "--"
+    );
+
+    const channelSection =
+        document.getElementById("vivosun-channel-section");
+
+    if(channelSection){
+        channelSection.hidden = !isVivosun;
+        channelSection.style.display = isVivosun ? "" : "none";
+    }
+
+    [
+        "pair-current-gateway-btn",
+        "unpair-current-gateway-btn",
+        "setup-sensors-btn",
+        "gateway-btn"
+    ].forEach(id=>{
+        const button = document.getElementById(id);
+        if(button){
+            button.hidden = isVivosun;
+            button.style.display = isVivosun ? "none" : "";
+        }
+    });
+
 }
 
 
 // ----------------------------------------------------
 // Aktionen
 // ----------------------------------------------------
+
+async function readSensorValues(){
+
+    const button =
+        document.getElementById("read-values-btn");
+
+    if(button){
+        button.disabled = true;
+        button.textContent = "Sensor wird ausgelesen …";
+    }
+
+    try{
+        const response = await fetch(
+            "/api/hardware/device/" +
+            encodeURIComponent(deviceId) +
+            "/read-values",
+            {method:"POST"}
+        );
+
+        const data = await response.json();
+
+        if(!response.ok || !data.success){
+            throw new Error(data.message || "Messwerte konnten nicht gelesen werden.");
+        }
+
+        currentDevice = data.device || currentDevice;
+        renderBluetoothDevice(currentDevice);
+        showDialog(
+            "Sensor ausgelesen",
+            "Die aktuellen Messwerte wurden übernommen."
+        );
+    }
+    catch(err){
+        console.error(err);
+        showDialog(
+            "Sensor konnte nicht gelesen werden",
+            err.message || String(err)
+        );
+        await loadBluetoothDevice(false);
+    }
+    finally{
+        if(button){
+            button.disabled = false;
+            button.textContent = "Jetzt auslesen";
+        }
+    }
+
+}
 
 async function setupSensors(){
 
@@ -548,6 +671,13 @@ function bindButtons(){
     ?.addEventListener(
         "click",
         openGateway
+    );
+
+    document
+    .getElementById("read-values-btn")
+    ?.addEventListener(
+        "click",
+        readSensorValues
     );
 
     document

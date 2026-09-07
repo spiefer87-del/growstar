@@ -32,9 +32,17 @@ def _expected_ble_device_ids():
             if not isinstance(assignment, dict):
                 continue
             source_id = str(assignment.get("source_id") or "").strip()
-            if not source_id.startswith("hardware:blu_"):
+            if not source_id.startswith("hardware:"):
                 continue
-            result.add(source_id.split("hardware:", 1)[1])
+
+            device_part = source_id.split("hardware:", 1)[1]
+            device_id = device_part.split(":", 1)[0]
+            if not (
+                device_id.startswith("blu_")
+                or device_id.startswith("vivosun_")
+            ):
+                continue
+            result.add(device_id)
 
     return sorted(result)
 

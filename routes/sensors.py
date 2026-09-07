@@ -6,6 +6,7 @@ from flask import jsonify, request
 
 from core.runtime import get_default_runtime, get_runtime
 from core.mqtt_sensor_devices import list_mqtt_sensor_devices
+from core.hardware.vivosun import PROTOCOL as VIVOSUN_PROTOCOL
 from core.sensor_sources import (
     apply_sensor_assignments,
     list_sensor_sources,
@@ -39,6 +40,51 @@ def _hardware_sources():
     for device in devices:
         props = device.properties or {}
         if device.type != "sensor":
+            continue
+
+        if props.get("protocol") == VIVOSUN_PROTOCOL:
+            channels = props.get("channels") or {}
+
+            for channel, suffix in (
+                ("main", "Interner Sensor"),
+                ("external", "Externer Fühler"),
+            ):
+                values = channels.get(channel) or {}
+                if not values.get("available"):
+                    continue
+
+                source_id = f"hardware:{device.id}:{channel}"
+                label = f"{device.name or device.model or device.id} · {suffix}"
+                observed_at = values.get("last_seen") or props.get("last_seen")
+
+                update_sensor_source(
+                    source_id,
+                    label=label,
+                    source_type="hardware",
+                    temperature=values.get("temperature"),
+                    humidity=values.get("humidity"),
+                    rssi=props.get("rssi"),
+                    observed_at=observed_at,
+                    raw={
+                        "device": device.to_dict(),
+                        "channel": channel,
+                    },
+                )
+
+                sources.append({
+                    "id": source_id,
+                    "label": label,
+                    "type": "hardware",
+                    "temperature": values.get("temperature"),
+                    "humidity": values.get("humidity"),
+                    "battery": props.get("battery"),
+                    "rssi": props.get("rssi"),
+                    "last_seen": observed_at,
+                    "online": bool(device.online),
+                    "device_id": device.id,
+                    "channel": channel,
+                })
+
             continue
 
         source_id = "hardware:" + device.id

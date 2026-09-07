@@ -65,10 +65,19 @@ class HardwareRecoveryCoordinator:
         )
 
     @staticmethod
+    def _is_vivosun_device(device):
+        props = getattr(device, "properties", None) or {}
+        return (
+            getattr(device, "type", None) == "sensor"
+            and props.get("protocol") == "vivosun_thb1s"
+        )
+
+    @staticmethod
     def _looks_paired(device):
         props = getattr(device, "properties", None) or {}
         return bool(
             props.get("paired")
+            or props.get("registered")
             or props.get("bthome_device_id")
             or props.get("bthome_device_key")
             or props.get("paired_gateways")
@@ -85,7 +94,13 @@ class HardwareRecoveryCoordinator:
 
         try:
             for device in self.manager.devices_list():
-                if self._is_bthome_device(device) and self._looks_paired(device):
+                if (
+                    (
+                        self._is_bthome_device(device)
+                        or self._is_vivosun_device(device)
+                    )
+                    and self._looks_paired(device)
+                ):
                     if getattr(device, "id", None):
                         expected.add(str(device.id))
         except Exception:
@@ -188,7 +203,16 @@ class HardwareRecoveryCoordinator:
         return online, missing
 
     def _ble_recovery_scan(self, gateways, missing_ids):
-        if not missing_ids:
+        bthome_missing = [
+            device_id
+            for device_id in missing_ids
+            if self._is_bthome_device(self._device(device_id))
+        ]
+
+        # VS-THB1S wird bereits im direkten Read ueber einen frischen lokalen
+        # BlueZ-Lookup wiedergefunden. Die Shelly-BTHome-Discovery waere dafuer
+        # wirkungslos und bleibt deshalb auf echte BTHome-Geraete begrenzt.
+        if not bthome_missing:
             return False
 
         candidates = [
@@ -289,7 +313,11 @@ class HardwareRecoveryCoordinator:
                 # maskieren, wird aber sichtbar gemeldet.
                 self.manager.last_inventory_error = str(exc)
 
-            gateway_required = bool(gateways or expected_ids)
+            gateway_bound_expected = any(
+                self._is_bthome_device(self._device(device_id))
+                for device_id in expected_ids
+            )
+            gateway_required = bool(gateways or gateway_bound_expected)
             gateway_ok = (not gateway_required) or bool(gateways and online_gateways > 0)
             ble_ok = not expected_ids or not missing
             healthy = bool(gateway_ok and ble_ok)

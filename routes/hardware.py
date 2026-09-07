@@ -356,6 +356,40 @@ def register(app):
         )
 
 
+    @app.get("/api/hardware/vivosun/status")
+    def hardware_vivosun_status():
+
+        return jsonify(
+            hardware.vivosun_status()
+        )
+
+
+    @app.post("/api/hardware/vivosun/scan")
+    def hardware_vivosun_scan():
+
+        data = request.get_json(silent=True) or {}
+        result = hardware.scan_vivosun_devices(
+            timeout=data.get("seconds", 8)
+        )
+
+        status = 200 if result.get("success") else 503
+        if result.get("available") and "laeuft bereits" in str(result.get("error") or ""):
+            status = 409
+
+        return jsonify(result), status
+
+
+    @app.post("/api/hardware/vivosun/register")
+    def hardware_vivosun_register():
+
+        data = request.get_json(silent=True) or {}
+        result = hardware.register_vivosun_device(
+            data.get("address")
+        )
+
+        return jsonify(result), (200 if result.get("success") else 409)
+
+
     @app.get("/api/hardware")
     def hardware_status():
 

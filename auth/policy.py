@@ -190,6 +190,7 @@ def _hardware_write_requirement(path):
         "/refresh",
         "/read-values",
         "/ble/scan",
+        "/vivosun/scan",
         "/log/clear",
     )
     if path == "/api/hardware/scan" or path.endswith(control_suffixes):

@@ -144,6 +144,72 @@
 
 
 
+<section
+    id="vivosun-channel-section"
+    class="sensor-grid"
+    style="display:none"
+    hidden>
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            Intern · Temperatur
+        </div>
+
+        <div
+            id="vivosun-main-temperature"
+            class="sensor-value">
+            --
+        </div>
+
+    </div>
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            Intern · Luftfeuchte
+        </div>
+
+        <div
+            id="vivosun-main-humidity"
+            class="sensor-value">
+            --
+        </div>
+
+    </div>
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            Externer Fühler · Temperatur
+        </div>
+
+        <div
+            id="vivosun-external-temperature"
+            class="sensor-value">
+            --
+        </div>
+
+    </div>
+
+    <div class="sensor-card">
+
+        <div class="sensor-label">
+            Externer Fühler · Luftfeuchte
+        </div>
+
+        <div
+            id="vivosun-external-humidity"
+            class="sensor-value">
+            --
+        </div>
+
+    </div>
+
+</section>
+
+
+
 <section class="grid">
 
     <div class="card">
@@ -272,7 +338,9 @@
 
         <div class="row">
 
-            <div class="label">
+            <div
+                id="device-gateway-label"
+                class="label">
                 Gateway
             </div>
 
@@ -282,6 +350,20 @@
 
                 --
 
+            </div>
+
+        </div>
+
+        <div class="row">
+
+            <div class="label">
+                Letzter BLE-Fehler
+            </div>
+
+            <div
+                id="device-last-error"
+                class="value">
+                --
             </div>
 
         </div>
@@ -300,6 +382,14 @@
 
         <button id="refresh-btn">
             Anzeige aktualisieren
+        </button>
+
+        <button
+            id="read-values-btn"
+            class="secondary">
+
+            Jetzt auslesen
+
         </button>
 
         <button

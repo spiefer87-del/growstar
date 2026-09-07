@@ -1,10 +1,19 @@
 import time
 
+from core.constants import SENSOR_TIMEOUT
 from core.hardware.device import HardwareDevice
 from core.hardware.manager import manager
 from core.hardware.scanner import scanner
 
 from core.hardware.shelly.discovery import ShellyDiscovery
+from core.hardware.vivosun import (
+    LOCAL_NAME as VIVOSUN_LOCAL_NAME,
+    MODEL as VIVOSUN_MODEL,
+    PROTOCOL as VIVOSUN_PROTOCOL,
+    device_id_from_address as vivosun_device_id,
+    normalize_address as normalize_vivosun_address,
+    vivosun_adapter,
+)
 from core.sensor_sources import update_sensor_source
 
 class HardwareService:
@@ -43,6 +52,54 @@ class HardwareService:
                 return device
     
         return None
+
+    @staticmethod
+    def _vivosun_source_id(device_id, channel):
+        return f"hardware:{device_id}:{channel}"
+
+    @staticmethod
+    def _vivosun_channel_label(device, channel):
+        base = device.name or device.model or VIVOSUN_MODEL
+        suffix = "Interner Sensor" if channel == "main" else "Externer Fuehler"
+        return f"{base} · {suffix}"
+
+    def _publish_vivosun_sensor_sources(self, device):
+        props = device.properties or {}
+        channels = props.get("channels") or {}
+        published = {}
+
+        for channel in ("main", "external"):
+            values = channels.get(channel) or {}
+            if not values.get("available"):
+                continue
+
+            observed_at = values.get("last_seen") or props.get("last_seen")
+            if not observed_at:
+                continue
+
+            source_id = self._vivosun_source_id(device.id, channel)
+            source = update_sensor_source(
+                source_id,
+                label=self._vivosun_channel_label(device, channel),
+                source_type="hardware",
+                temperature=values.get("temperature"),
+                humidity=values.get("humidity"),
+                rssi=props.get("rssi"),
+                observed_at=observed_at,
+                raw={
+                    "device": device.to_dict(),
+                    "channel": channel,
+                },
+            )
+            if source is not None:
+                published[channel] = source
+
+        props["sensor_source_ids"] = {
+            channel: self._vivosun_source_id(device.id, channel)
+            for channel in published
+        }
+        device.properties = props
+        return published
 
     def _device_for_bthome_component(self, gateway, component):
 
@@ -534,6 +591,15 @@ class HardwareService:
             return None
     
         props = device.properties or {}
+
+        if props.get("protocol") == VIVOSUN_PROTOCOL:
+            published = self._publish_vivosun_sensor_sources(device)
+            preferred = str(props.get("preferred_channel") or "external")
+            return (
+                published.get(preferred)
+                or published.get("external")
+                or published.get("main")
+            )
     
         source_id = (
             "hardware:" +
@@ -563,6 +629,166 @@ class HardwareService:
         device.properties = props
     
         return source
+
+    def vivosun_status(self):
+        return vivosun_adapter.status()
+
+    def scan_vivosun_devices(self, timeout=8):
+        result = vivosun_adapter.scan(timeout=timeout)
+        candidates = []
+
+        for candidate in result.get("candidates") or []:
+            item = dict(candidate)
+            try:
+                device_id = vivosun_device_id(item.get("address"))
+            except Exception:
+                continue
+
+            existing = self.device(device_id)
+            item["device_id"] = device_id
+            item["registered"] = bool(
+                existing is not None
+                and (existing.properties or {}).get("protocol") == VIVOSUN_PROTOCOL
+                and (existing.properties or {}).get("registered")
+            )
+            candidates.append(item)
+
+        result["candidates"] = candidates
+        result["count"] = len(candidates)
+        return result
+
+    def _apply_vivosun_read(self, device, result):
+        props = dict(device.properties or {})
+        observed_at = float(result.get("observed_at") or time.time())
+        channels = {}
+
+        for channel in ("main", "external"):
+            values = dict((result.get("channels") or {}).get(channel) or {})
+            values["last_seen"] = observed_at if values.get("available") else None
+            channels[channel] = values
+
+        preferred = "external" if channels.get("external", {}).get("available") else "main"
+        selected = channels.get(preferred) or {}
+
+        props.update({
+            "protocol": VIVOSUN_PROTOCOL,
+            "transport": "raspberry-ble",
+            "addr": normalize_vivosun_address(result.get("address") or props.get("addr")),
+            "local_name": result.get("name") or props.get("local_name") or VIVOSUN_LOCAL_NAME,
+            "model_id": VIVOSUN_MODEL,
+            "registered": True,
+            "paired": True,
+            "channels": channels,
+            "preferred_channel": preferred,
+            "temperature": selected.get("temperature"),
+            "humidity": selected.get("humidity"),
+            "rssi": result.get("rssi") if result.get("rssi") is not None else props.get("rssi"),
+            "last_seen": observed_at,
+            "last_read": time.time(),
+            "last_error": None,
+            "raw_status": result.get("raw_hex"),
+        })
+
+        device.name = device.name or "VIVOSUN AeroLab"
+        device.manufacturer = "VIVOSUN"
+        device.model = VIVOSUN_MODEL
+        device.type = "sensor"
+        device.online = True
+        device.properties = props
+
+        sources = self._publish_vivosun_sensor_sources(device)
+        return sources
+
+    def register_vivosun_device(self, address):
+        try:
+            address = normalize_vivosun_address(address)
+        except Exception as exc:
+            return {
+                "success": False,
+                "message": str(exc),
+            }
+
+        # Browserdaten allein reichen nicht: Der Kandidat muss in einem
+        # frischen lokalen Scan erneut als ThermoBeacon2 sichtbar sein.
+        scan = self.scan_vivosun_devices(timeout=5)
+        if not scan.get("success"):
+            return {
+                "success": False,
+                "message": scan.get("error") or "VIVOSUN-Suche fehlgeschlagen.",
+            }
+
+        candidate = next(
+            (
+                item
+                for item in scan.get("candidates") or []
+                if str(item.get("address") or "").upper() == address
+            ),
+            None,
+        )
+        if candidate is None:
+            return {
+                "success": False,
+                "message": (
+                    "VS-THB1S ist nicht mehr sichtbar. "
+                    "Pair/Sensor-Taste drei Sekunden druecken und erneut suchen."
+                ),
+            }
+
+        read_result = vivosun_adapter.read(address)
+        if not read_result.get("success"):
+            return {
+                "success": False,
+                "message": read_result.get("error") or "VIVOSUN konnte nicht gelesen werden.",
+            }
+
+        device_id = vivosun_device_id(address)
+        device = self.device(device_id) or HardwareDevice()
+        device.id = device_id
+        device.name = "VIVOSUN AeroLab"
+
+        props = dict(device.properties or {})
+        props["registered_at"] = props.get("registered_at") or time.time()
+        device.properties = props
+
+        sources = self._apply_vivosun_read(device, read_result)
+        manager.add_device(device)
+        manager.save_inventory(merge=True)
+
+        return {
+            "success": True,
+            "message": "VIVOSUN VS-THB1S wurde verbunden und als Sensorquelle angelegt.",
+            "device": device.to_dict(),
+            "sources": sources,
+        }
+
+    def read_vivosun_sensor_values(self, device):
+        props = dict(device.properties or {})
+        address = props.get("addr")
+        result = vivosun_adapter.read(address)
+        now = time.time()
+
+        if not result.get("success"):
+            props["last_read"] = now
+            props["last_error"] = result.get("error") or "VIVOSUN konnte nicht gelesen werden."
+            props["last_error_at"] = now
+            try:
+                last_seen = float(props.get("last_seen") or 0)
+            except (TypeError, ValueError):
+                last_seen = 0.0
+            device.online = bool(last_seen and 0 <= now - last_seen <= SENSOR_TIMEOUT)
+            device.properties = props
+            return {
+                "success": False,
+                "message": props["last_error"],
+                "device": device.to_dict(),
+            }
+
+        sources = self._apply_vivosun_read(device, result)
+        return {
+            "success": True,
+            "device": device.to_dict(),
+            "sources": sources,
+        }
     # ------------------------
     # Aktoren
     # ------------------------
@@ -736,6 +962,12 @@ class HardwareService:
             return None
     
         props = device.properties
+
+        # VIVOSUN nutzt einen direkten lokalen GATT-Read ueber den Raspberry
+        # und besitzt deshalb weder Shelly-Gateway noch BTHome-Komponenten.
+        # Der bestehende BLU-Thread ruft trotzdem dieselbe Service-Methode auf.
+        if props.get("protocol") == VIVOSUN_PROTOCOL:
+            return self.read_vivosun_sensor_values(device)
     
         gateway_id = props.get(
             "gateway_id"

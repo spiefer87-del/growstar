@@ -447,6 +447,58 @@ Schreibstatus wird niemals automatisch wiederholt.
 
 
 
+<h3>VIVOSUN BLE-Sensor</h3>
+
+<div class="grid">
+
+<div class="card">
+
+<h2>🌡️ AeroLab VS-THB1S verbinden</h2>
+
+<div class="sub">
+
+Growstar liest den internen Sensor und den externen Fühler direkt über den
+Bluetooth-Adapter des Raspberry aus. Ein Shelly-Gateway ist nicht erforderlich.
+
+</div>
+
+<div
+id="vivosun-status"
+class="provisioning-status">
+
+Bluetooth-Status wird geprüft …
+
+</div>
+
+<button
+id="scan-vivosun"
+class="button secondary"
+type="button"
+disabled>
+
+VS-THB1S suchen
+
+</button>
+
+<div
+id="vivosun-results"
+class="provisioning-results"></div>
+
+<div class="provisioning-note">
+
+Vor der Suche die PAIR/SENSOR-Taste am VS-THB1S etwa drei Sekunden drücken
+und die VIVOSUN-App schließen. Growstar akzeptiert ausschließlich Geräte mit
+dem Bluetooth-Namen „ThermoBeacon2“ und prüft beim Verbinden sofort echte
+Messwerte.
+
+</div>
+
+</div>
+
+</div>
+
+
+
 <h3>Bluetooth Geräte</h3>
 
 <div
@@ -1356,6 +1408,199 @@ async function scanProvisioningDevices(){
 
 
 
+async function loadVivosunStatus(){
+
+    const status = document.getElementById("vivosun-status");
+    const button = document.getElementById("scan-vivosun");
+
+    if(!status || !button){
+        return;
+    }
+
+    try{
+        const response = await fetch(
+            "/api/hardware/vivosun/status",
+            {cache:"no-store"}
+        );
+        const data = await response.json();
+
+        if(response.ok && data.available){
+            status.className = "provisioning-status ok";
+            status.textContent =
+                "Raspberry-Bluetooth bereit · Modell VS-THB1S · " +
+                "interner Sensor + externer Fühler";
+            button.disabled = false;
+            return;
+        }
+
+        status.className = "provisioning-status error";
+        status.textContent =
+            data.error || "Lokaler Bluetooth-Zugriff ist nicht verfügbar.";
+        button.disabled = true;
+    }
+    catch(err){
+        console.error(err);
+        status.className = "provisioning-status error";
+        status.textContent = "VIVOSUN-Bluetooth-Status konnte nicht geladen werden.";
+        button.disabled = true;
+    }
+
+}
+
+
+function renderVivosunCandidates(candidates){
+
+    const container = document.getElementById("vivosun-results");
+    if(!container){
+        return;
+    }
+
+    container.innerHTML = "";
+
+    if(!Array.isArray(candidates) || candidates.length === 0){
+        container.innerHTML = `
+            <div class="provisioning-device">
+                <strong>Kein VS-THB1S gefunden</strong>
+                <div class="sub">
+                    PAIR/SENSOR-Taste drei Sekunden drücken, VIVOSUN-App
+                    schließen und erneut suchen.
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    candidates.forEach(candidate=>{
+        const item = document.createElement("div");
+        item.className = "provisioning-device";
+        const registered = Boolean(candidate.registered);
+
+        item.innerHTML = `
+            <strong>🌡️ VIVOSUN AeroLab VS-THB1S</strong>
+            <div class="sub">Bluetooth-Name ${escapeHtml(candidate.name || "ThermoBeacon2")}</div>
+            <div class="sub">Adresse ${escapeHtml(candidate.address || "--")}</div>
+            <div class="sub">RSSI ${candidate.rssi ?? "--"} dBm</div>
+            <div class="badge ${registered ? "online" : "offline"}">
+                ${registered ? "BEREITS IN GROWSTAR" : "GEFUNDEN"}
+            </div>
+            <button class="button vivosun-register" type="button" ${registered ? "disabled" : ""}>
+                ${registered ? "Bereits verbunden" : "Verbinden & Messwerte prüfen"}
+            </button>
+            <div class="sub vivosun-register-status">
+                ${registered
+                    ? "Der Sensor wird bereits automatisch im Hintergrund ausgelesen."
+                    : "Beim Verbinden werden beide Messkanäle direkt geprüft."}
+            </div>
+        `;
+
+        container.appendChild(item);
+
+        if(!registered){
+            item.querySelector(".vivosun-register")?.addEventListener(
+                "click",
+                ()=>registerVivosunDevice(candidate, item)
+            );
+        }
+    });
+
+}
+
+
+async function registerVivosunDevice(candidate, item){
+
+    const button = item.querySelector(".vivosun-register");
+    const status = item.querySelector(".vivosun-register-status");
+
+    if(!button || !status || !candidate.address){
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Sensor wird geprüft …";
+    status.textContent =
+        "Growstar verifiziert das Gerät erneut und liest interne sowie externe Werte.";
+
+    try{
+        const response = await fetch(
+            "/api/hardware/vivosun/register",
+            {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({address:candidate.address})
+            }
+        );
+        const data = await response.json();
+
+        if(!response.ok || !data.success){
+            throw new Error(data.message || "VS-THB1S konnte nicht verbunden werden.");
+        }
+
+        button.textContent = "In Growstar übernommen";
+        status.textContent =
+            "✅ Die verfügbaren internen und externen Messkanäle wurden als getrennte Sensorquellen angelegt.";
+        await loadHardware();
+    }
+    catch(err){
+        console.error(err);
+        status.textContent = "❌ " + (err.message || String(err));
+        button.disabled = false;
+        button.textContent = "Erneut verbinden";
+    }
+
+}
+
+
+async function scanVivosunDevices(){
+
+    const button = document.getElementById("scan-vivosun");
+    const status = document.getElementById("vivosun-status");
+    const results = document.getElementById("vivosun-results");
+
+    if(!button || !status || !results){
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Bluetooth-Scan läuft …";
+    results.innerHTML = "";
+    status.className = "provisioning-status";
+    status.textContent = "Raspberry sucht nach ThermoBeacon2 …";
+
+    try{
+        const response = await fetch(
+            "/api/hardware/vivosun/scan",
+            {
+                method:"POST",
+                headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({seconds:8})
+            }
+        );
+        const data = await response.json();
+
+        if(!response.ok || !data.success){
+            throw new Error(data.error || "VIVOSUN-Scan fehlgeschlagen.");
+        }
+
+        status.className = "provisioning-status ok";
+        status.textContent =
+            data.count === 1
+                ? "Ein passender VS-THB1S wurde gefunden."
+                : `${data.count || 0} passende VS-THB1S wurden gefunden.`;
+        renderVivosunCandidates(data.candidates || []);
+    }
+    catch(err){
+        console.error(err);
+        status.className = "provisioning-status error";
+        status.textContent = err.message || "VIVOSUN-Scan fehlgeschlagen.";
+    }
+    finally{
+        button.disabled = false;
+        button.textContent = "VS-THB1S suchen";
+    }
+
+}
+
+
 async function loadHardware(){
 
     try{
@@ -1523,6 +1768,13 @@ function renderDevices(devices){
             device.properties || {};
 
         const card = document.createElement("a");
+        const isVivosun = props.protocol === "vivosun_thb1s";
+        const gatewayLabel = isVivosun
+            ? "Raspberry BLE (lokal)"
+            : (props.gateway_ip || props.gateway_id || "--");
+        const channelValues = props.channels || {};
+        const main = channelValues.main || {};
+        const external = channelValues.external || {};
 
         card.href =
             "/devices/blu/" +
@@ -1566,9 +1818,18 @@ function renderDevices(devices){
 
                     <div class="sub">
 
-                        Gateway ${escapeHtml(props.gateway_ip || props.gateway_id || "--")}
+                        Verbindung ${escapeHtml(gatewayLabel)}
 
                     </div>
+
+                    ${isVivosun ? `
+                        <div class="sub">
+                            Intern ${main.temperature ?? "--"} °C · ${main.humidity ?? "--"} %
+                        </div>
+                        <div class="sub">
+                            Extern ${external.temperature ?? "--"} °C · ${external.humidity ?? "--"} %
+                        </div>
+                    ` : ""}
 
                 </div>
 
@@ -1825,7 +2086,16 @@ document
     scanProvisioningDevices
 );
 
+document
+.getElementById("scan-vivosun")
+?.addEventListener(
+    "click",
+    scanVivosunDevices
+);
+
 loadProvisioningStatus();
+
+loadVivosunStatus();
 
 loadHardware();
 

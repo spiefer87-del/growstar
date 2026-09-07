@@ -4,6 +4,7 @@ import time
 import threading
 
 from core.config import config
+from core.hardware.vivosun import PROTOCOL as VIVOSUN_PROTOCOL
 
 from services.hardware import hardware
 
@@ -47,8 +48,15 @@ def _blu_devices():
 
             continue
 
-        if props.get("protocol") != "bthome":
+        protocol = props.get("protocol")
 
+        if protocol not in {"bthome", VIVOSUN_PROTOCOL}:
+
+            continue
+
+        if protocol == VIVOSUN_PROTOCOL:
+            if props.get("registered") and props.get("addr"):
+                devices.append(device)
             continue
 
         if not (
