@@ -489,7 +489,8 @@ class="provisioning-results"></div>
 Vor der Suche die PAIR/SENSOR-Taste am VS-THB1S etwa drei Sekunden drücken
 und die VIVOSUN-App schließen. Growstar erkennt ältere Geräte am Bluetooth-Namen
 „ThermoBeacon2“ und neuere namenlose Geräte an ihrer eindeutigen BLE-Signatur.
-Beim Verbinden werden sofort echte Messwerte geprüft.
+Bei neueren Geräten liest Growstar die Messwerte passiv und ohne aktive
+Bluetooth-Verbindung direkt aus den Advertisements.
 
 </div>
 
@@ -1489,7 +1490,7 @@ function renderVivosunCandidates(candidates){
             <div class="sub vivosun-register-status">
                 ${registered
                     ? "Der Sensor wird bereits automatisch im Hintergrund ausgelesen."
-                    : "Beim Verbinden werden beide Messkanäle direkt geprüft."}
+                    : "Beide Messkanäle werden direkt aus dem BLE-Signal geprüft."}
             </div>
         `;
 
@@ -1518,7 +1519,7 @@ async function registerVivosunDevice(candidate, item){
     button.disabled = true;
     button.textContent = "Sensor wird geprüft …";
     status.textContent =
-        "Growstar verifiziert das Gerät erneut und liest interne sowie externe Werte.";
+        "Growstar verifiziert das Gerät und liest interne sowie externe Werte aus dem BLE-Signal.";
 
     try{
         const response = await fetch(

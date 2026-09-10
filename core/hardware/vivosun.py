@@ -32,6 +32,13 @@ READ_STATUS_COMMAND = bytes((0x0D,))
 ADVERTISEMENT_MANUFACTURER_IDS = frozenset((0x0019, 0x8019))
 ADVERTISEMENT_PAYLOAD_BYTES = 20
 
+_ADVERTISEMENT_BATTERY_OFFSET = 6
+_ADVERTISEMENT_MAIN_TEMPERATURE_OFFSET = 8
+_ADVERTISEMENT_MAIN_HUMIDITY_OFFSET = 10
+_ADVERTISEMENT_EXTERNAL_TEMPERATURE_OFFSET = 12
+_ADVERTISEMENT_EXTERNAL_HUMIDITY_OFFSET = 14
+_ADVERTISEMENT_UPTIME_OFFSET = 16
+
 _MAIN_TEMPERATURE_OFFSET = 1
 _MAIN_HUMIDITY_OFFSET = 3
 _EXTERNAL_TEMPERATURE_OFFSET = 7
@@ -123,6 +130,80 @@ def decode_status_payload(payload):
     return {
         "channels": channels,
         "raw_hex": data.hex(),
+        "measurement_source": "gatt",
+    }
+
+
+def decode_advertisement_payload(payload):
+    """Dekodiert den passiven 20-Byte-Advert neuerer VS-THB1S."""
+
+    data = bytes(payload or b"")
+    if len(data) != ADVERTISEMENT_PAYLOAD_BYTES:
+        raise VivosunBleError(
+            "VIVOSUN-Advertisement hat eine ungueltige Laenge "
+            f"({len(data)} statt {ADVERTISEMENT_PAYLOAD_BYTES} Byte)"
+        )
+
+    channels = {
+        "main": {
+            "temperature": _decode_measurement(
+                data,
+                _ADVERTISEMENT_MAIN_TEMPERATURE_OFFSET,
+                kind="temperature",
+            ),
+            "humidity": _decode_measurement(
+                data,
+                _ADVERTISEMENT_MAIN_HUMIDITY_OFFSET,
+                kind="humidity",
+            ),
+        },
+        "external": {
+            "temperature": _decode_measurement(
+                data,
+                _ADVERTISEMENT_EXTERNAL_TEMPERATURE_OFFSET,
+                kind="temperature",
+            ),
+            "humidity": _decode_measurement(
+                data,
+                _ADVERTISEMENT_EXTERNAL_HUMIDITY_OFFSET,
+                kind="humidity",
+            ),
+        },
+    }
+
+    for values in channels.values():
+        values["available"] = bool(
+            values.get("temperature") is not None
+            and values.get("humidity") is not None
+        )
+
+    if not channels["main"]["available"]:
+        raise VivosunBleError(
+            "VIVOSUN-Advertisement enthaelt keine nutzbaren Hauptmesswerte"
+        )
+
+    battery_mv = struct.unpack_from(
+        "<H",
+        data,
+        _ADVERTISEMENT_BATTERY_OFFSET,
+    )[0]
+    uptime_seconds = struct.unpack_from(
+        "<I",
+        data,
+        _ADVERTISEMENT_UPTIME_OFFSET,
+    )[0]
+
+    if not 1500 <= battery_mv <= 5000:
+        raise VivosunBleError(
+            "VIVOSUN-Advertisement enthaelt eine unplausible Batteriespannung"
+        )
+
+    return {
+        "channels": channels,
+        "battery_voltage": round(battery_mv / 1000.0, 3),
+        "uptime_seconds": uptime_seconds,
+        "raw_hex": data.hex(),
+        "measurement_source": "advertisement",
     }
 
 
@@ -162,6 +243,27 @@ def _advertisement_service_uuids(device, advertisement=None):
     }
 
 
+def _vivosun_advertisement_payload(device, advertisement=None):
+    payloads = {}
+    for key, payload in _advertisement_manufacturer_data(
+        device,
+        advertisement,
+    ).items():
+        try:
+            manufacturer_id = int(key, 0) if isinstance(key, str) else int(key)
+            data = bytes(payload or b"")
+        except (TypeError, ValueError):
+            continue
+        payloads[manufacturer_id] = data
+
+    for manufacturer_id in (0x0019, 0x8019):
+        data = payloads.get(manufacturer_id)
+        if data is not None and len(data) == ADVERTISEMENT_PAYLOAD_BYTES:
+            return manufacturer_id, data
+
+    return None, None
+
+
 def _iter_discovered(discovered):
     values = discovered.values() if isinstance(discovered, dict) else discovered or ()
     for value in values:
@@ -178,23 +280,23 @@ def _has_vivosun_advertisement(device, advertisement=None):
     ):
         return False
 
-    for key, payload in _advertisement_manufacturer_data(
+    manufacturer_id, data = _vivosun_advertisement_payload(
         device,
         advertisement,
-    ).items():
-        try:
-            manufacturer_id = int(key, 0) if isinstance(key, str) else int(key)
-            data = bytes(payload or b"")
-        except (TypeError, ValueError):
-            continue
+    )
+    if manufacturer_id not in ADVERTISEMENT_MANUFACTURER_IDS or data is None:
+        return False
 
-        if (
-            manufacturer_id in ADVERTISEMENT_MANUFACTURER_IDS
-            and len(data) == ADVERTISEMENT_PAYLOAD_BYTES
-        ):
-            return True
+    try:
+        decode_advertisement_payload(data)
+    except VivosunBleError:
+        return False
+    return True
 
-    return False
+
+def _exception_text(exc):
+    detail = str(exc).strip()
+    return detail or type(exc).__name__
 
 
 def _device_rssi(device, advertisement=None):
@@ -311,7 +413,10 @@ class VivosunTHB1SAdapter:
             return {
                 "success": False,
                 "available": True,
-                "error": f"VIVOSUN-Bluetooth-Suche fehlgeschlagen: {exc}",
+                "error": (
+                    "VIVOSUN-Bluetooth-Suche fehlgeschlagen: "
+                    + _exception_text(exc)
+                ),
                 "candidates": [],
                 "count": 0,
             }
@@ -341,6 +446,21 @@ class VivosunTHB1SAdapter:
             raise VivosunBleError(
                 "Bluetooth-Adresse gehoert nicht zu einem erkannten VS-THB1S"
             )
+
+        manufacturer_id, advertisement_payload = _vivosun_advertisement_payload(
+            device,
+            advertisement,
+        )
+        if advertisement_payload is not None:
+            decoded = decode_advertisement_payload(advertisement_payload)
+            decoded.update({
+                "address": address,
+                "name": _advertisement_name(device, advertisement) or LOCAL_NAME,
+                "rssi": _device_rssi(device, advertisement),
+                "observed_at": float(self.now()),
+                "advertisement_manufacturer_id": manufacturer_id,
+            })
+            return decoded
 
         client = self.client_cls(device, timeout=connect_timeout)
         connected = False
@@ -417,7 +537,10 @@ class VivosunTHB1SAdapter:
         except Exception as exc:
             return {
                 "success": False,
-                "error": f"VIVOSUN-Messwertabfrage fehlgeschlagen: {exc}",
+                "error": (
+                    "VIVOSUN-Messwertabfrage fehlgeschlagen: "
+                    + _exception_text(exc)
+                ),
             }
         finally:
             self._lock.release()
@@ -438,6 +561,7 @@ __all__ = (
     "STATUS_UUID",
     "VivosunBleError",
     "VivosunTHB1SAdapter",
+    "decode_advertisement_payload",
     "decode_status_payload",
     "device_id_from_address",
     "normalize_address",

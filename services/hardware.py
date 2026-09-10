@@ -687,6 +687,26 @@ class HardwareService:
             "last_read": time.time(),
             "last_error": None,
             "raw_status": result.get("raw_hex"),
+            "measurement_source": (
+                result.get("measurement_source")
+                or props.get("measurement_source")
+                or "gatt"
+            ),
+            "battery_voltage": (
+                result.get("battery_voltage")
+                if result.get("battery_voltage") is not None
+                else props.get("battery_voltage")
+            ),
+            "sensor_uptime": (
+                result.get("uptime_seconds")
+                if result.get("uptime_seconds") is not None
+                else props.get("sensor_uptime")
+            ),
+            "advertisement_manufacturer_id": (
+                result.get("advertisement_manufacturer_id")
+                if result.get("advertisement_manufacturer_id") is not None
+                else props.get("advertisement_manufacturer_id")
+            ),
         })
 
         device.name = device.name or "VIVOSUN AeroLab"

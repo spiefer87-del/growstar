@@ -40,6 +40,29 @@ def status_payload(
     return bytes(payload)
 
 
+def advertisement_payload(
+    main_temperature=19.0625,
+    main_humidity=53.0,
+    external_temperature=18.8125,
+    external_humidity=53.8125,
+    battery_voltage=3.872,
+    uptime_seconds=2520,
+):
+    payload = bytearray(20)
+    payload[3:6] = bytes((0xC7, 0x65, 0xEE))
+    struct.pack_into("<H", payload, 6, round(float(battery_voltage) * 1000))
+    for offset, value in (
+        (8, main_temperature),
+        (10, main_humidity),
+        (12, external_temperature),
+        (14, external_humidity),
+    ):
+        raw = -1 if value is None else round(float(value) * 16)
+        struct.pack_into("<h", payload, offset, raw)
+    struct.pack_into("<I", payload, 16, int(uptime_seconds))
+    return bytes(payload)
+
+
 class FakeBleDevice:
     address = "AA:BB:CC:DD:EE:FF"
     name = "ThermoBeacon2"
@@ -80,7 +103,7 @@ class FakeScanner:
                 FakeScanner.anonymous,
                 SimpleNamespace(
                     local_name=None,
-                    manufacturer_data={0x0019: bytes(20)},
+                    manufacturer_data={0x0019: advertisement_payload()},
                     service_uuids=[
                         "0000fff0-0000-1000-8000-00805f9b34fb",
                     ],
@@ -106,6 +129,7 @@ class FakeScanner:
 
 
 class FakeClient:
+    connect_calls = 0
     last_command = None
     last_command_uuid = None
     last_status_uuid = None
@@ -116,6 +140,7 @@ class FakeClient:
         self.callback = None
 
     async def connect(self):
+        FakeClient.connect_calls += 1
         return True
 
     async def start_notify(self, uuid, callback):
@@ -134,6 +159,11 @@ class FakeClient:
         return True
 
 
+class TimeoutClient(FakeClient):
+    async def connect(self):
+        raise TimeoutError
+
+
 def check_decoder_and_adapter():
     from core.hardware.vivosun import (
         COMMAND_UUID,
@@ -141,6 +171,7 @@ def check_decoder_and_adapter():
         STATUS_UUID,
         VivosunBleError,
         VivosunTHB1SAdapter,
+        decode_advertisement_payload,
         decode_status_payload,
         device_id_from_address,
     )
@@ -171,6 +202,18 @@ def check_decoder_and_adapter():
         raise AssertionError("Zu kurzes VIVOSUN-Paket wurde akzeptiert")
     print("✅ Zu kurze oder unvollständige Statuspakete werden verworfen")
 
+    advertisement = decode_advertisement_payload(advertisement_payload())
+    require(
+        advertisement["channels"]["main"]["temperature"] == 19.06
+        and advertisement["channels"]["main"]["humidity"] == 53.0
+        and advertisement["channels"]["external"]["temperature"] == 18.81
+        and advertisement["channels"]["external"]["humidity"] == 53.81
+        and advertisement["battery_voltage"] == 3.872
+        and advertisement["uptime_seconds"] == 2520
+        and advertisement["measurement_source"] == "advertisement",
+        "VS-THB1S-Advertisement dekodiert Messwerte, Batterie und Laufzeit",
+    )
+
     adapter = VivosunTHB1SAdapter(
         scanner_cls=FakeScanner,
         client_cls=FakeClient,
@@ -188,7 +231,7 @@ def check_decoder_and_adapter():
     for manufacturer_id in (0x0019, 0x8019):
         advertisement = SimpleNamespace(
             local_name=None,
-            manufacturer_data={manufacturer_id: bytes(20)},
+            manufacturer_data={manufacturer_id: advertisement_payload()},
             service_uuids=["0000fff0-0000-1000-8000-00805f9b34fb"],
         )
         require(
@@ -215,9 +258,30 @@ def check_decoder_and_adapter():
         and FakeClient.last_status_uuid == STATUS_UUID,
         "Direkter GATT-Read verwendet Status-Notification und Read-Kommando 0x0D",
     )
+    gatt_connect_calls = FakeClient.connect_calls
+    passive_reading = adapter.read(FakeScanner.anonymous.address)
+    require(
+        passive_reading["success"] is True
+        and passive_reading["measurement_source"] == "advertisement"
+        and passive_reading["advertisement_manufacturer_id"] == 0x0019
+        and passive_reading["channels"]["main"]["temperature"] == 19.06
+        and FakeClient.connect_calls == gatt_connect_calls,
+        "Namenloser VS-THB1S wird ohne aktive GATT-Verbindung ausgelesen",
+    )
     require(
         device_id_from_address("aa:bb:cc:dd:ee:ff") == "vivosun_aabbccddeeff",
         "Persistente Geräte-ID wird stabil aus der BLE-Adresse gebildet",
+    )
+
+    timeout_adapter = VivosunTHB1SAdapter(
+        scanner_cls=FakeScanner,
+        client_cls=TimeoutClient,
+    )
+    timeout_result = timeout_adapter.read(FakeBleDevice.address)
+    require(
+        timeout_result["success"] is False
+        and timeout_result["error"].endswith("TimeoutError"),
+        "Leere BLE-Ausnahmen werden mit ihrem Fehlerklassennamen ausgegeben",
     )
 
 
@@ -246,6 +310,10 @@ class FakeServiceAdapter:
             "rssi": FakeBleDevice.rssi,
             "observed_at": 1_700_000_000.0,
             "raw_hex": status_payload().hex(),
+            "measurement_source": "advertisement",
+            "battery_voltage": 3.872,
+            "uptime_seconds": 2520,
+            "advertisement_manufacturer_id": 0x0019,
             "channels": decode_for_service(),
         }
 
@@ -291,7 +359,11 @@ def check_service_sources_and_recovery():
             require(
                 result["success"] is True
                 and result["device"]["properties"]["protocol"] == "vivosun_thb1s"
-                and result["device"]["properties"]["preferred_channel"] == "external",
+                and result["device"]["properties"]["preferred_channel"] == "external"
+                and result["device"]["properties"]["measurement_source"]
+                == "advertisement"
+                and result["device"]["properties"]["battery_voltage"] == 3.872
+                and result["device"]["properties"]["sensor_uptime"] == 2520,
                 "Registrierung übernimmt den geprüften VS-THB1S persistent in Growstar",
             )
 
