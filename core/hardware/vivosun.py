@@ -31,6 +31,7 @@ COMMAND_UUID = "0000fff5-0000-1000-8000-00805f9b34fb"
 READ_STATUS_COMMAND = bytes((0x0D,))
 ADVERTISEMENT_MANUFACTURER_IDS = frozenset((0x0019, 0x8019))
 ADVERTISEMENT_PAYLOAD_BYTES = 20
+PLACEHOLDER_ADDRESS = "AA:BB:CC:DD:EE:FF"
 
 _ADVERTISEMENT_BATTERY_OFFSET = 6
 _ADVERTISEMENT_MAIN_TEMPERATURE_OFFSET = 8
@@ -62,6 +63,44 @@ def normalize_address(value):
 def device_id_from_address(value):
     address = normalize_address(value)
     return "vivosun_" + address.replace(":", "").lower()
+
+
+def source_id_from_address(value, channel):
+    address = normalize_address(value)
+    channel = str(channel or "").strip().lower()
+    if channel not in ("main", "external"):
+        raise VivosunBleError("Unbekannter VIVOSUN-Sensorkanal")
+    return "vivosun:%s:%s" % (
+        address.replace(":", "").lower(),
+        channel,
+    )
+
+
+def canonical_source_id(value):
+    """Map legacy Raspberry/MQTT source IDs to one transport-neutral ID."""
+    text = str(value or "").strip()
+    patterns = (
+        r"^hardware:vivosun_([0-9a-fA-F]{12}):(main|external)$",
+        r"^mqtt:vivosun_([0-9a-fA-F]{12})_(main|external)$",
+        r"^vivosun:([0-9a-fA-F]{12}):(main|external)$",
+    )
+    for pattern in patterns:
+        match = re.fullmatch(pattern, text)
+        if match:
+            compact, channel = match.groups()
+            address = ":".join(
+                compact[index:index + 2]
+                for index in range(0, 12, 2)
+            )
+            return source_id_from_address(address, channel)
+    return text
+
+
+def is_placeholder_address(value):
+    try:
+        return normalize_address(value) == PLACEHOLDER_ADDRESS
+    except VivosunBleError:
+        return False
 
 
 def _decode_measurement(payload, offset, *, kind):
@@ -556,6 +595,7 @@ __all__ = (
     "LOCAL_NAME",
     "MODEL",
     "PROTOCOL",
+    "PLACEHOLDER_ADDRESS",
     "READ_STATUS_COMMAND",
     "SERVICE_UUID",
     "STATUS_UUID",
@@ -563,7 +603,10 @@ __all__ = (
     "VivosunTHB1SAdapter",
     "decode_advertisement_payload",
     "decode_status_payload",
+    "canonical_source_id",
     "device_id_from_address",
+    "is_placeholder_address",
     "normalize_address",
+    "source_id_from_address",
     "vivosun_adapter",
 )

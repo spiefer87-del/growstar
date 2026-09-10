@@ -1,8 +1,9 @@
 """VIVOSUN AeroLab VS-THB1S BLE client for the Growstar Pico bridge.
 
-The VS-THB1S does not broadcast measurements in a standard BLE advertising
-format.  Growstar therefore connects as a GATT client, enables status
-notifications and requests the current status with command 0x0D.
+Newer VS-THB1S revisions publish their measurements in a manufacturer
+advertisement and reject active GATT connections. Older ``ThermoBeacon2``
+revisions still use notifications and status command 0x0D. This adapter
+supports both variants and always prefers the passive, battery-friendly path.
 
 This module intentionally uses MicroPython's built-in low-level ``bluetooth``
 API.  No cloud, VIVOSUN account or additional Pico package is required.
@@ -24,6 +25,9 @@ _SERVICE_UUID_TEXT = "0000fff0-0000-1000-8000-00805f9b34fb"
 _STATUS_UUID_TEXT = "0000fff3-0000-1000-8000-00805f9b34fb"
 _COMMAND_UUID_TEXT = "0000fff5-0000-1000-8000-00805f9b34fb"
 _READ_STATUS_COMMAND = b"\x0d"
+
+_ADVERTISEMENT_MANUFACTURER_IDS = (0x0019, 0x8019)
+_ADVERTISEMENT_PAYLOAD_BYTES = 20
 
 _IRQ_SCAN_RESULT = 5
 _IRQ_SCAN_DONE = 6
@@ -106,6 +110,54 @@ def _decode_name(adv_data):
     return ""
 
 
+def _iter_advertisement_fields(adv_data):
+    data = bytes(adv_data or b"")
+    offset = 0
+
+    while offset + 1 < len(data):
+        length = data[offset]
+        if length == 0:
+            break
+
+        end = offset + length + 1
+        if end > len(data):
+            break
+
+        yield data[offset + 1], data[offset + 2:end]
+        offset = end
+
+
+def _decode_advertisement(adv_data):
+    """Return a validated passive measurement or ``None``."""
+    has_service = False
+    manufacturer_payloads = {}
+
+    for field_type, value in _iter_advertisement_fields(adv_data):
+        if field_type in (0x02, 0x03):
+            for offset in range(0, len(value) - 1, 2):
+                if value[offset] == 0xF0 and value[offset + 1] == 0xFF:
+                    has_service = True
+        elif field_type == 0xFF and len(value) >= 2:
+            manufacturer_id = value[0] | (value[1] << 8)
+            manufacturer_payloads[manufacturer_id] = bytes(value[2:])
+
+    if not has_service:
+        return None
+
+    for manufacturer_id in _ADVERTISEMENT_MANUFACTURER_IDS:
+        payload = manufacturer_payloads.get(manufacturer_id)
+        if payload is None or len(payload) != _ADVERTISEMENT_PAYLOAD_BYTES:
+            continue
+        try:
+            decoded = decode_advertisement_payload(payload)
+        except VivosunBridgeError:
+            continue
+        decoded["manufacturer_id"] = manufacturer_id
+        return decoded
+
+    return None
+
+
 def _signed_little_endian_16(data, offset):
     value = data[offset] | (data[offset + 1] << 8)
     if value & 0x8000:
@@ -156,6 +208,58 @@ def decode_status_payload(payload):
         raise VivosunBridgeError("VIVOSUN Paket enthaelt keine Messwerte")
 
     return channels
+
+
+def decode_advertisement_payload(payload):
+    """Decode the open 20-byte advertisement of newer VS-THB1S units."""
+    data = bytes(payload or b"")
+    if len(data) != _ADVERTISEMENT_PAYLOAD_BYTES:
+        raise VivosunBridgeError(
+            "VIVOSUN Advertisement hat %s statt %s Byte"
+            % (len(data), _ADVERTISEMENT_PAYLOAD_BYTES)
+        )
+
+    channels = {
+        "main": {
+            "temperature": _decode_measurement(data, 8, "temperature"),
+            "humidity": _decode_measurement(data, 10, "humidity"),
+        },
+        "external": {
+            "temperature": _decode_measurement(data, 12, "temperature"),
+            "humidity": _decode_measurement(data, 14, "humidity"),
+        },
+    }
+
+    for values in channels.values():
+        values["available"] = (
+            values["temperature"] is not None
+            and values["humidity"] is not None
+        )
+
+    if not channels["main"]["available"]:
+        raise VivosunBridgeError(
+            "VIVOSUN Advertisement enthaelt keine Hauptmesswerte"
+        )
+
+    battery_mv = data[6] | (data[7] << 8)
+    if not 1500 <= battery_mv <= 5000:
+        raise VivosunBridgeError(
+            "VIVOSUN Advertisement enthaelt unplausible Batteriespannung"
+        )
+
+    uptime_seconds = (
+        data[16]
+        | (data[17] << 8)
+        | (data[18] << 16)
+        | (data[19] << 24)
+    )
+    return {
+        "channels": channels,
+        "battery_voltage": round(battery_mv / 1000.0, 3),
+        "uptime_seconds": uptime_seconds,
+        "raw_hex": "".join("%02x" % value for value in data),
+        "measurement_source": "advertisement",
+    }
 
 
 class VivosunTHB1SBridge:
@@ -217,6 +321,15 @@ class VivosunTHB1SBridge:
             current["rssi"] = int(rssi)
             if name:
                 current["local_name"] = name
+            fragments = list(current.get("adv_fragments") or ())
+            fragment = bytes(adv_data or b"")
+            if fragment and fragment not in fragments:
+                fragments.append(fragment)
+                fragments = fragments[-8:]
+            current["adv_fragments"] = fragments
+            passive = _decode_advertisement(b"".join(fragments))
+            if passive is not None:
+                current["passive"] = passive
             self._scan_match = current
 
         elif event == _IRQ_SCAN_DONE:
@@ -314,7 +427,10 @@ class VivosunTHB1SBridge:
             self._wait(
                 lambda: self._scan_done or (
                     self._scan_match is not None
-                    and self._scan_match.get("local_name") == LOCAL_NAME
+                    and (
+                        self._scan_match.get("local_name") == LOCAL_NAME
+                        or self._scan_match.get("passive") is not None
+                    )
                 ),
                 timeout_sec + 1,
                 "VIVOSUN BLE-Suche ohne Ergebnis",
@@ -449,10 +565,20 @@ class VivosunTHB1SBridge:
 
     def read(self, address, scan_timeout_sec=6, connect_timeout_sec=12,
              read_timeout_sec=4):
-        """Read both channels and always disconnect before returning."""
+        """Read passively when possible, otherwise use the legacy GATT path."""
         address = normalize_address(address)
         self._reset_operation()
         scan = self._scan(address, scan_timeout_sec)
+
+        passive = scan.get("passive")
+        if passive is not None:
+            result = dict(passive)
+            result.update({
+                "address": address,
+                "rssi": scan.get("rssi"),
+                "local_name": scan.get("local_name") or LOCAL_NAME,
+            })
+            return result
 
         try:
             self._ble.gap_connect(

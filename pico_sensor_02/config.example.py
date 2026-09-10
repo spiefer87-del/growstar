@@ -51,8 +51,9 @@ VIVOSUN_BRIDGE_TARGETS = (
     # },
 )
 
-# VIVOSUN wird bewusst langsamer als die lokalen Kabelsensoren abgefragt.
-VIVOSUN_BRIDGE_INTERVAL_SEC = 60
+# Neuere Geräte werden passiv gelesen; 10 Sekunden reagieren flott und lassen
+# dem normalen Pico-Sensorzyklus trotzdem ausreichend Zeit.
+VIVOSUN_BRIDGE_INTERVAL_SEC = 10
 VIVOSUN_BLE_SCAN_TIMEOUT_SEC = 6
 VIVOSUN_BLE_CONNECT_TIMEOUT_SEC = 12
 VIVOSUN_BLE_READ_TIMEOUT_SEC = 4

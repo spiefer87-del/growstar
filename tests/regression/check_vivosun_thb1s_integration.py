@@ -370,8 +370,8 @@ def check_service_sources_and_recovery():
             source_ids = {source["id"] for source in list_sensor_sources()}
             require(
                 source_ids == {
-                    "hardware:vivosun_aabbccddeeff:main",
-                    "hardware:vivosun_aabbccddeeff:external",
+                    "vivosun:aabbccddeeff:main",
+                    "vivosun:aabbccddeeff:external",
                 },
                 "Interner Sensor und externer Fühler erscheinen als getrennte Sensorquellen",
             )

@@ -155,6 +155,7 @@ DEFAULT_CONFIG = {
     },
 
     "SENSOR_UPDATE_INTERVAL_SEC": 60,
+    "VIVOSUN_UPDATE_INTERVAL_SEC": 10,
 
     # ================= DEVICE SYSTEM =================
     "DEVICE_MODES": {

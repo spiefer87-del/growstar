@@ -21,8 +21,8 @@ dem jeweiligen Pico aktiv, sobald mindestens ein Ziel in dessen lokaler
 ```python
 VIVOSUN_BRIDGE_TARGETS = (
     {
-        "address": "AA:BB:CC:DD:EE:FF",
-        "name": "VIVOSUN Zelt 1",
+        "address": "EE:65:C7:00:00:00",
+        "name": "VIVOSUN Keller",
     },
 )
 ```
@@ -39,13 +39,16 @@ Die Standardintervalle können bei Bedarf ebenfalls in `config.py` gesetzt
 werden:
 
 ```python
-VIVOSUN_BRIDGE_INTERVAL_SEC = 60
+VIVOSUN_BRIDGE_INTERVAL_SEC = 10
 VIVOSUN_BLE_SCAN_TIMEOUT_SEC = 6
 VIVOSUN_BLE_CONNECT_TIMEOUT_SEC = 12
 VIVOSUN_BLE_READ_TIMEOUT_SEC = 4
 ```
 
-Der Abfrageabstand wird von der Firmware auf mindestens 30 Sekunden begrenzt.
+Der Abfrageabstand wird von der Firmware auf mindestens fünf Sekunden begrenzt;
+zehn Sekunden sind der empfohlene Wert. Neuere namenlose VS-THB1S werden dabei
+ohne aktive Verbindung direkt aus dem offenen BLE-Advertisement gelesen. Für
+ältere Geräte mit dem Namen `ThermoBeacon2` bleibt der GATT-Abruf erhalten.
 Die lokalen DHT22-/DS18B20-Werte werden weiterhin alle fünf Sekunden gelesen.
 Ein VIVOSUN-BLE-Fehler blockiert diese vorhandenen Messungen nicht.
 
@@ -67,3 +70,9 @@ Beide Quellen können wie die vorhandenen Pico-Sensoren einer Station und einem
 Messfeld zugeordnet werden. Der Pico sendet nur aktuelle Messwerte; State-
 Pakete werden nicht retained gespeichert. Fällt der Pico aus, markiert dessen
 MQTT-Last-Will auch die von ihm transportierten VIVOSUN-Quellen offline.
+
+Raspberry und Pico verwenden für denselben BLE-Sensor dieselbe kanonische
+Quellen-ID. Dadurch erscheint jeder interne beziehungsweise externe Kanal auf
+der Sensorenseite nur einmal; der jeweils frischere Transport liefert die
+angezeigten Werte. Die Beispieladresse `AA:BB:CC:DD:EE:FF` wird von Firmware
+und Backend ignoriert und erzeugt keine leeren Sensorkarten mehr.

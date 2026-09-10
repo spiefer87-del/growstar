@@ -70,6 +70,11 @@ def check_firmware_files():
         and '"transport": "pico_wifi_ble_bridge"' in main_01,
         "VIVOSUN-State bleibt nicht retained und trägt seine Brückenherkunft",
     )
+    require(
+        '"VIVOSUN_BRIDGE_INTERVAL_SEC", 10, 5' in main_01
+        and 'address == "AA:BB:CC:DD:EE:FF"' in main_01,
+        "Pico fragt flott ab und ignoriert die dokumentierte Beispieladresse",
+    )
 
     for number in ("01", "02"):
         config = read("pico_sensor_%s/config.example.py" % number)
@@ -128,6 +133,32 @@ def check_protocol_decoder():
     else:
         raise AssertionError("Zu kurze VIVOSUN-Pakete müssen abgewiesen werden")
     print("✅ Zu kurze VIVOSUN-Pakete werden abgewiesen")
+
+    advertisement = bytearray(20)
+    advertisement[6:8] = bytes((0xD7, 0x09))
+    advertisement[8:10] = encoded(19.5)
+    advertisement[10:12] = encoded(54.0)
+    advertisement[12:14] = encoded(18.75)
+    advertisement[14:16] = encoded(56.0)
+    advertisement[16:20] = bytes((0x34, 0x12, 0x00, 0x00))
+    decoded = bridge.decode_advertisement_payload(advertisement)
+    require(
+        decoded["channels"]["main"]["temperature"] == 19.5
+        and decoded["channels"]["external"]["humidity"] == 56.0
+        and decoded["battery_voltage"] == 2.519
+        and decoded["uptime_seconds"] == 0x1234,
+        "Pico dekodiert das passive 20-Byte-Advertisement",
+    )
+
+    service_field = bytes((3, 0x03, 0xF0, 0xFF))
+    manufacturer_field = bytes((23, 0xFF, 0x19, 0x00)) + bytes(advertisement)
+    passive = bridge._decode_advertisement(service_field + manufacturer_field)
+    require(
+        passive is not None
+        and passive["measurement_source"] == "advertisement"
+        and passive["manufacturer_id"] == 0x0019,
+        "Pico erkennt die FFF0-/ManufacturerData-Signatur des neuen VS-THB1S",
+    )
 
 
 def check_complete_gatt_transaction():

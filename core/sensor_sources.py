@@ -99,8 +99,13 @@ def get_sensor_source(source_id):
     if not source_id:
         return None
 
+    from core.hardware.vivosun import canonical_source_id
+
+    normalized_id = canonical_source_id(source_id)
     with ctx.state_lock:
-        source = controller_state.live_state.get("sensor_sources", {}).get(source_id)
+        source = controller_state.live_state.get("sensor_sources", {}).get(normalized_id)
+        if source is None and normalized_id != source_id:
+            source = controller_state.live_state.get("sensor_sources", {}).get(source_id)
         return dict(source) if source else None
 
 

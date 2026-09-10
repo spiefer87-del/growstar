@@ -11,6 +11,11 @@ from core.mqtt_sensor_devices import (
     update_mqtt_sensor_status,
 )
 from core.sensor_sources import update_sensor_source
+from core.hardware.vivosun import (
+    PROTOCOL as VIVOSUN_PROTOCOL,
+    is_placeholder_address as is_vivosun_placeholder_address,
+    source_id_from_address as vivosun_source_id,
+)
 
 
 MQTT_BROKER = "localhost"
@@ -116,8 +121,19 @@ def _handle_generic_sensor_message(topic, data):
         topic=topic,
     )
 
+    source_id = f"mqtt:{device_id}"
+    if data.get("protocol") == VIVOSUN_PROTOCOL:
+        address = data.get("ble_address")
+        channel = data.get("channel")
+        if is_vivosun_placeholder_address(address):
+            return True
+        try:
+            source_id = vivosun_source_id(address, channel)
+        except Exception:
+            pass
+
     update_sensor_source(
-        f"mqtt:{device_id}",
+        source_id,
         label=label,
         source_type="mqtt",
         temperature=temperature,

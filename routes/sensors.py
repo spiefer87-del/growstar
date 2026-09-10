@@ -6,7 +6,12 @@ from flask import jsonify, request
 
 from core.runtime import get_default_runtime, get_runtime
 from core.mqtt_sensor_devices import list_mqtt_sensor_devices
-from core.hardware.vivosun import PROTOCOL as VIVOSUN_PROTOCOL
+from core.hardware.vivosun import (
+    PROTOCOL as VIVOSUN_PROTOCOL,
+    canonical_source_id as canonical_vivosun_source_id,
+    is_placeholder_address as is_vivosun_placeholder_address,
+    source_id_from_address as vivosun_source_id,
+)
 from core.sensor_sources import (
     apply_sensor_assignments,
     list_sensor_sources,
@@ -53,7 +58,7 @@ def _hardware_sources():
                 if not values.get("available"):
                     continue
 
-                source_id = f"hardware:{device.id}:{channel}"
+                source_id = vivosun_source_id(props.get("addr"), channel)
                 label = f"{device.name or device.model or device.id} · {suffix}"
                 observed_at = values.get("last_seen") or props.get("last_seen")
 
@@ -132,6 +137,17 @@ def _mqtt_controller_sources():
         if not source_id or source_id == "mqtt:":
             continue
 
+        if device.get("protocol") == VIVOSUN_PROTOCOL:
+            if is_vivosun_placeholder_address(device.get("ble_address")):
+                continue
+            try:
+                source_id = vivosun_source_id(
+                    device.get("ble_address"),
+                    device.get("channel"),
+                )
+            except Exception:
+                pass
+
         result.append({
             "id": source_id,
             "label": device.get("name") or source_id,
@@ -150,34 +166,52 @@ def _mqtt_controller_sources():
     return result
 
 
+def _source_seen(source):
+    try:
+        return float((source or {}).get("last_seen") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _merge_source(sources, source):
+    source = dict(source or {})
+    source_id = canonical_vivosun_source_id(source.get("id"))
+    if not source_id or source_id in _RETIRED_SOURCE_IDS:
+        return
+    if source_id.startswith("vivosun:aabbccddeeff:"):
+        return
+
+    source["id"] = source_id
+    existing = sources.get(source_id)
+    if existing is None:
+        sources[source_id] = source
+        return
+
+    candidate_wins = (
+        _source_seen(source) > _source_seen(existing)
+        or (bool(source.get("online")) and not bool(existing.get("online")))
+    )
+    if candidate_wins:
+        merged = dict(existing)
+        merged.update({key: value for key, value in source.items() if value is not None})
+    else:
+        merged = dict(source)
+        merged.update({key: value for key, value in existing.items() if value is not None})
+    sources[source_id] = merged
+
+
 def _source_map():
     """Alle controllerweiten Sensorquellen ohne Stationsbindung."""
     sources = {}
 
     for source in list_sensor_sources():
-        source_id = source.get("id")
-        if source_id and source_id not in _RETIRED_SOURCE_IDS:
-            sources[source_id] = dict(source)
+        _merge_source(sources, source)
 
     for source in _mqtt_controller_sources():
-        source_id = source.get("id")
-        if not source_id or source_id in _RETIRED_SOURCE_IDS:
-            continue
-
-        existing = sources.get(source_id, {})
-        existing.update({k: v for k, v in source.items() if v is not None})
-        existing["online"] = source.get("online", existing.get("online"))
-        if source.get("capabilities"):
-            existing["capabilities"] = source["capabilities"]
-        sources[source_id] = existing
+        _merge_source(sources, source)
 
     for source in _hardware_sources():
-        source_id = source.get("id")
-        if not source_id:
-            continue
-        existing = sources.get(source_id, {})
-        existing.update(source)
-        sources[source_id] = existing
+        _merge_source(sources, source)
 
     return sources
 

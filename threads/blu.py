@@ -10,6 +10,7 @@ from services.hardware import hardware
 
 
 _thread_started = False
+_next_updates = {}
 
 
 def _interval():
@@ -26,6 +27,23 @@ def _interval():
     except Exception:
 
         return 60
+
+
+def _vivosun_interval():
+    try:
+        return max(
+            5,
+            int(config.get("VIVOSUN_UPDATE_INTERVAL_SEC", 10)),
+        )
+    except Exception:
+        return 10
+
+
+def _device_interval(device):
+    props = device.properties or {}
+    if props.get("protocol") == VIVOSUN_PROTOCOL:
+        return _vivosun_interval()
+    return max(15, _interval())
 
 
 def _blu_devices():
@@ -86,8 +104,19 @@ def blu_loop():
         try:
 
             devices = _blu_devices()
+            now = time.monotonic()
+            active_ids = {device.id for device in devices}
+
+            for device_id in tuple(_next_updates):
+                if device_id not in active_ids:
+                    _next_updates.pop(device_id, None)
 
             for device in devices:
+
+                if now < _next_updates.get(device.id, 0):
+                    continue
+
+                _next_updates[device.id] = now + _device_interval(device)
 
                 try:
 
@@ -116,12 +145,7 @@ def blu_loop():
                 e
             )
 
-        time.sleep(
-            max(
-                15,
-                _interval()
-            )
-        )
+        time.sleep(1)
 
 
 def start_blu_thread():

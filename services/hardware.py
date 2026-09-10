@@ -12,6 +12,7 @@ from core.hardware.vivosun import (
     PROTOCOL as VIVOSUN_PROTOCOL,
     device_id_from_address as vivosun_device_id,
     normalize_address as normalize_vivosun_address,
+    source_id_from_address as vivosun_source_id,
     vivosun_adapter,
 )
 from core.sensor_sources import update_sensor_source
@@ -54,8 +55,9 @@ class HardwareService:
         return None
 
     @staticmethod
-    def _vivosun_source_id(device_id, channel):
-        return f"hardware:{device_id}:{channel}"
+    def _vivosun_source_id(device, channel):
+        props = device.properties or {}
+        return vivosun_source_id(props.get("addr"), channel)
 
     @staticmethod
     def _vivosun_channel_label(device, channel):
@@ -77,7 +79,7 @@ class HardwareService:
             if not observed_at:
                 continue
 
-            source_id = self._vivosun_source_id(device.id, channel)
+            source_id = self._vivosun_source_id(device, channel)
             source = update_sensor_source(
                 source_id,
                 label=self._vivosun_channel_label(device, channel),
@@ -95,7 +97,7 @@ class HardwareService:
                 published[channel] = source
 
         props["sensor_source_ids"] = {
-            channel: self._vivosun_source_id(device.id, channel)
+            channel: self._vivosun_source_id(device, channel)
             for channel in published
         }
         device.properties = props

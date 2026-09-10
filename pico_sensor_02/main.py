@@ -58,7 +58,7 @@ def _optional_seconds(name, default, minimum):
 # Ohne explizite Zieladresse ist die Bruecke sicher inaktiv.
 VIVOSUN_BRIDGE_TARGETS = getattr(local_config, "VIVOSUN_BRIDGE_TARGETS", ())
 VIVOSUN_BRIDGE_INTERVAL_SEC = _optional_seconds(
-    "VIVOSUN_BRIDGE_INTERVAL_SEC", 60, 30
+    "VIVOSUN_BRIDGE_INTERVAL_SEC", 10, 5
 )
 VIVOSUN_BLE_SCAN_TIMEOUT_SEC = _optional_seconds(
     "VIVOSUN_BLE_SCAN_TIMEOUT_SEC", 6, 2
@@ -226,6 +226,10 @@ def _configured_vivosun_targets():
             print("VIVOSUN Ziel ignoriert:", exc)
             continue
 
+        if address == "AA:BB:CC:DD:EE:FF":
+            print("VIVOSUN Beispieladresse ignoriert:", address)
+            continue
+
         if address in seen:
             print("VIVOSUN Ziel doppelt ignoriert:", address)
             continue
@@ -372,6 +376,10 @@ def publish_due_vivosun_bridge_state():
             "temperature": values["temperature"],
             "humidity": values["humidity"],
             "rssi": result.get("rssi"),
+            "measurement_source": result.get("measurement_source") or "gatt",
+            "battery_voltage": result.get("battery_voltage"),
+            "sensor_uptime": result.get("uptime_seconds"),
+            "advertisement_manufacturer_id": result.get("manufacturer_id"),
             "bridge_id": DEVICE_ID,
             "bridge_name": DEVICE_NAME,
             "ble_address": target["address"],
