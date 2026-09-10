@@ -241,7 +241,9 @@ def main():
                 and "growcam_timelapse_create" in template
                 and 'name="video_fps"' in template
                 and 'name="timelapse_fps"' not in template
-                and "2560 px · Kamera-Maximum" in template,
+                and "2560 px · Kamera-Maximum" in template
+                and 'timelapse_frames["items"]' in template
+                and "timelapse_frames.items" not in template,
                 "Route, Hintergrundaufnahme und Kameraansicht sind vollständig eingebunden",
             )
         finally:

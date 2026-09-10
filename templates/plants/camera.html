@@ -135,9 +135,9 @@
             <div><h2>🖼️ Zeitrafferbilder</h2><div class="pm-help">{{ timelapse_frames.total }} gespeicherte Bilder dieses Durchgangs · Seite {{ timelapse_frames.page }} von {{ timelapse_frames.pages or 1 }}</div></div>
         </div>
         <div class="pm-card-body">
-            {% if timelapse_frames.items %}
+            {% if timelapse_frames["items"] %}
             <div class="pm-growcam-archive">
-                {% for frame_item in timelapse_frames.items %}
+                {% for frame_item in timelapse_frames["items"] %}
                 <article class="pm-growcam-archive-item">
                     <a href="{{ url_for('growcam_timelapse_frame', batch_id=camera.batch_id, filename=frame_item.filename) }}" target="_blank" title="Originalbild öffnen">
                         <img src="{{ url_for('growcam_timelapse_frame', batch_id=camera.batch_id, filename=frame_item.filename, thumbnail=1) }}" alt="Zeitrafferaufnahme" loading="lazy">
