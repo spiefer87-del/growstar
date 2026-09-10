@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}GrowCam – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}?v=3.16.34-camera1">{% endblock %}
+{% block page %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <div>
+            <h1 class="pm-title">📷 VIVOSUN GrowCam C4</h1>
+            <div class="pm-subtitle">Lokale 2K-Aufnahmen direkt über RTSP · ohne VIVOSUN-Cloud</div>
+        </div>
+    </div>
+    {% if has_permission('plants.edit') %}
+    <form method="post" action="{{ url_for('growcam_capture') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="pm-button primary" type="submit" {{ 'disabled' if not camera.enabled else '' }}>📸 Jetzt aufnehmen</button>
+    </form>
+    {% endif %}
+</header>
+
+{% set active_page = 'camera' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}<div class="pm-flashes">{% for category, message in messages %}<div class="pm-flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+
+<section class="pm-grid">
+    <article class="pm-card pm-span-8">
+        <div class="pm-card-head">
+            <h2>Aktuelles Kamerabild</h2>
+            <span id="growcam-state" class="pm-status {{ '' if camera_status.image_available and not camera_status.last_error else 'inactive' }}">
+                {% if camera_status.capturing %}Aufnahme läuft
+                {% elif camera_status.last_error %}Fehler
+                {% elif camera_status.image_available %}Online
+                {% elif camera.enabled %}Warte auf Aufnahme
+                {% else %}Deaktiviert{% endif %}
+            </span>
+        </div>
+        <div class="pm-card-body">
+            <div class="pm-growcam-frame {{ '' if camera_status.image_available else 'empty' }}" id="growcam-frame">
+                {% if camera_status.image_available %}
+                <img id="growcam-image" src="{{ url_for('growcam_image', v=camera_status.image_version) }}" alt="Aktuelles Bild der VIVOSUN GrowCam C4">
+                {% else %}
+                <div id="growcam-placeholder">Nach dem Aktivieren erscheint hier automatisch das aktuelle Kamerabild.</div>
+                {% endif %}
+            </div>
+            <div class="pm-growcam-meta">
+                <span><strong>Kamera:</strong> {{ camera.name }}</span>
+                <span><strong>Station:</strong> {% for tent in tents %}{% if tent.id == camera.tent_id %}{{ tent.name }}{% endif %}{% endfor %}</span>
+                <span><strong>Auflösung:</strong> <span id="growcam-resolution">{% if camera_status.width %}{{ camera_status.width }}×{{ camera_status.height }}{% else %}–{% endif %}</span></span>
+                <span><strong>Letzte Aufnahme:</strong> <span id="growcam-captured">{% if camera_status.last_capture %}<time data-growcam-time="{{ camera_status.last_capture }}"></time>{% else %}noch keine{% endif %}</span></span>
+            </div>
+            <div id="growcam-error" class="pm-growcam-error" {{ 'hidden' if not camera_status.last_error else '' }}>{{ camera_status.last_error or '' }}</div>
+        </div>
+    </article>
+
+    <article class="pm-card pm-span-4">
+        <div class="pm-card-head"><h2>Verbindung</h2></div>
+        <div class="pm-card-body">
+            <form class="pm-form" method="post" action="{{ url_for('growcam_configure') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="pm-growcam-switch">
+                    <input type="checkbox" name="enabled" value="1" {{ 'checked' if camera.enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}>
+                    <span>Automatische Aufnahmen aktivieren</span>
+                </label>
+                <label class="pm-field">
+                    <span class="pm-label">Anzeigename</span>
+                    <input class="pm-input" name="name" value="{{ camera.name }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
+                </label>
+                <label class="pm-field">
+                    <span class="pm-label">Station</span>
+                    <select class="pm-select" name="tent_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}>
+                        {% for tent in tents %}<option value="{{ tent.id }}" {{ 'selected' if tent.id == camera.tent_id else '' }}>{{ tent.name }} · {{ tent.id }}</option>{% endfor %}
+                    </select>
+                </label>
+                <div class="pm-form-grid">
+                    <label class="pm-field">
+                        <span class="pm-label">Kamera-IP</span>
+                        <input class="pm-input" name="host" value="{{ camera.host }}" inputmode="decimal" placeholder="192.168.178.122" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
+                    </label>
+                    <label class="pm-field">
+                        <span class="pm-label">RTSP-Port</span>
+                        <input class="pm-input" type="number" name="port" value="{{ camera.port }}" min="1" max="65535" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
+                    </label>
+                </div>
+                <label class="pm-field">
+                    <span class="pm-label">RTSP-Pfad</span>
+                    <input class="pm-input" name="path" value="{{ camera.path }}" maxlength="160" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
+                    <span class="pm-help">Für die GrowCam C4 bestätigt: /live/ch00_0</span>
+                </label>
+                <div class="pm-form-grid">
+                    <label class="pm-field">
+                        <span class="pm-label">Benutzer</span>
+                        <input class="pm-input" name="username" value="{{ camera.username }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
+                    </label>
+                    <label class="pm-field">
+                        <span class="pm-label">Intervall</span>
+                        <select class="pm-select" name="interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>
+                            {% for seconds,label in [(15,'15 Sekunden'),(30,'30 Sekunden'),(60,'1 Minute'),(300,'5 Minuten'),(900,'15 Minuten')] %}
+                            <option value="{{ seconds }}" {{ 'selected' if camera.interval_sec == seconds else '' }}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                </div>
+                <span class="pm-help">Growstar speichert weder VIVOSUN-Konto noch Cloud-Passwort. Die bestätigte Kamera verwendet lokal „admin“ mit leerem Kennwort.</span>
+                {% if has_permission('plants.edit') %}<button class="pm-button primary" type="submit">Konfiguration speichern</button>{% endif %}
+            </form>
+        </div>
+    </article>
+</section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const imageUrl = {{ url_for('growcam_image')|tojson }};
+    const statusUrl = {{ url_for('growcam_status_api')|tojson }};
+    const state = document.getElementById("growcam-state");
+    const frame = document.getElementById("growcam-frame");
+    const captured = document.getElementById("growcam-captured");
+    const resolution = document.getElementById("growcam-resolution");
+    const error = document.getElementById("growcam-error");
+    let imageVersion = {{ camera_status.image_version|tojson }};
+
+    function timeText(value) {
+        if (!value) return "noch keine";
+        return new Date(Number(value) * 1000).toLocaleString("de-DE");
+    }
+
+    document.querySelectorAll("[data-growcam-time]").forEach(item => {
+        item.textContent = timeText(item.dataset.growcamTime);
+    });
+
+    async function refresh() {
+        try {
+            const response = await fetch(statusUrl, {cache: "no-store"});
+            if (!response.ok) return;
+            const payload = await response.json();
+            const camera = payload.camera || {};
+            const online = camera.image_available && !camera.last_error;
+            state.classList.toggle("inactive", !online);
+            state.textContent = camera.capturing ? "Aufnahme läuft" : camera.last_error ? "Fehler" : online ? "Online" : camera.enabled ? "Warte auf Aufnahme" : "Deaktiviert";
+            captured.textContent = timeText(camera.last_capture);
+            resolution.textContent = camera.width ? `${camera.width}×${camera.height}` : "–";
+            error.hidden = !camera.last_error;
+            error.textContent = camera.last_error || "";
+
+            if (camera.image_available && camera.image_version !== imageVersion) {
+                imageVersion = camera.image_version;
+                frame.classList.remove("empty");
+                let image = document.getElementById("growcam-image");
+                if (!image) {
+                    frame.innerHTML = '<img id="growcam-image" alt="Aktuelles Bild der VIVOSUN GrowCam C4">';
+                    image = document.getElementById("growcam-image");
+                }
+                image.src = `${imageUrl}?v=${encodeURIComponent(imageVersion)}`;
+            }
+        } catch (_) {
+            // Der nächste Intervallabruf versucht es erneut.
+        }
+    }
+
+    window.setInterval(refresh, 10000);
+})();
+</script>
+{% endblock %}

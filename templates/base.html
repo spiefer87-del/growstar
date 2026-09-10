@@ -22,6 +22,7 @@
     or growstar_endpoint.startswith('propagation_')
     or growstar_endpoint.startswith('seed_')
     or growstar_endpoint.startswith('genetic_')
+    or growstar_endpoint.startswith('growcam_')
     or growstar_endpoint == 'cultivation_guide'
     or growstar_endpoint in ['genetics_dashboard', 'propagation_dashboard_page']
 %}
@@ -112,6 +113,7 @@
                     <a class="{% if growstar_endpoint.startswith('plant_') and growstar_endpoint not in ['plant_management_dashboard', 'plant_timeline', 'plant_journal', 'plant_journal_detail'] and growstar_endpoint not in growstar_photo_endpoints %}active{% endif %}" href="{{ url_for('plant_list') }}"><span>Pflanzen</span><small>Bestand</small></a>
                     <a class="{% if growstar_endpoint == 'plant_timeline' %}active{% endif %}" href="{{ url_for('plant_timeline') }}"><span>Timeline</span><small>Lifecycle</small></a>
                     <a class="{% if growstar_endpoint in growstar_photo_endpoints %}active{% endif %}" href="{{ url_for('plant_photo_manager') }}"><span>Fotos</span><small>Foto-Manager</small></a>
+                    <a class="{% if growstar_endpoint.startswith('growcam_') %}active{% endif %}" href="{{ url_for('growcam_page') }}"><span>Kamera</span><small>GrowCam C4</small></a>
                     <a class="{% if growstar_endpoint == 'cultivation_guide' %}active{% endif %}" href="{{ url_for('cultivation_guide') }}"><span>Anbauhilfe</span><small>VPD-Leitfaden</small></a>
                     <a class="{% if growstar_endpoint.startswith('cultivar_') %}active{% endif %}" href="{{ url_for('cultivar_list') }}"><span>Sorten</span><small>Sortenstamm</small></a>
                     <a class="{% if growstar_endpoint == 'genetics_dashboard' or growstar_endpoint.startswith('genetic_') %}active{% endif %}" href="{{ url_for('genetics_dashboard') }}"><span>Genetik & Mütter</span><small>Linien</small></a>

@@ -43,6 +43,7 @@ from services.live_control import live_arming_loop
 from services.restart_policy import apply_shutdown_restart_policy
 from services.notifications import notification_worker_loop
 from services.alerts import alarm_monitor_loop
+from services.growcam import growcam_loop
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.plant_management import register as register_plant_management_routes
@@ -65,6 +66,7 @@ from routes.restart_policy import register as register_restart_policy_routes
 from routes.notifications import register as register_notification_routes
 from routes.capability_routing import register as register_capability_routing_routes
 from routes.spiderfarmer_powerstrip import register as register_spiderfarmer_powerstrip_routes
+from routes.camera import register as register_camera_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -147,6 +149,7 @@ def create_flask_app():
     register_notification_routes(app)
     register_capability_routing_routes(app)
     register_spiderfarmer_powerstrip_routes(app)
+    register_camera_routes(app)
 
     # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
     install_auth(app)
@@ -343,6 +346,11 @@ def start_backend():
                 alarm_monitor_loop,
             )
             print("🚨 Alarm Monitor gestartet")
+
+            _start_daemon_thread(
+                "growstar-growcam",
+                growcam_loop,
+            )
 
             _backend_started = True
             print("✅ Grow-Backend läuft")

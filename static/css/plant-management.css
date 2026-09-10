@@ -1407,6 +1407,66 @@ body {
     color: #bbf7d0;
 }
 
+.pm-growcam-frame {
+    min-height: 360px;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--pm-line);
+    border-radius: 14px;
+    background: #05080e;
+}
+
+.pm-growcam-frame.empty {
+    padding: 30px;
+    color: var(--pm-muted);
+    text-align: center;
+}
+
+.pm-growcam-frame img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 72vh;
+    object-fit: contain;
+}
+
+.pm-growcam-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 18px;
+    margin-top: 14px;
+    color: var(--pm-muted);
+    font-size: .84rem;
+}
+
+.pm-growcam-meta strong {
+    color: var(--pm-text);
+}
+
+.pm-growcam-error {
+    margin-top: 13px;
+    padding: 10px 12px;
+    border: 1px solid rgba(239,68,68,.35);
+    border-radius: 10px;
+    color: #fecaca;
+    background: rgba(239,68,68,.08);
+}
+
+.pm-growcam-switch {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #dbe5f3;
+    font-weight: 650;
+}
+
+.pm-growcam-switch input {
+    width: 19px;
+    height: 19px;
+    accent-color: var(--pm-green);
+}
+
 .pm-journal-measurements {
     display: flex;
     gap: 7px;
