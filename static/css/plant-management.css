@@ -1467,6 +1467,45 @@ body {
     accent-color: var(--pm-green);
 }
 
+.pm-form-grid.pm-form-grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.pm-growcam-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 28px;
+    padding: 12px;
+    border: 1px solid var(--pm-line);
+    border-radius: 12px;
+    background: rgba(11,18,32,.38);
+}
+
+.pm-growcam-video {
+    display: block;
+    width: 100%;
+    max-height: 360px;
+    border-radius: 12px;
+    background: #05080e;
+}
+
+.pm-growcam-timelapse-empty {
+    min-height: 180px;
+    display: grid;
+    place-items: center;
+}
+
+.pm-growcam-full-button {
+    width: 100%;
+    margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+    .pm-form-grid.pm-form-grid-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
 .pm-journal-measurements {
     display: flex;
     gap: 7px;

@@ -17,6 +17,7 @@
         {% endif %}
         {% if has_permission('plants.edit') %}
         <a class="pm-button" href="{{ url_for('batch_photo_new', batch_id=batch.id) }}">＋ Durchgangsfoto</a>
+        <a class="pm-button" href="{{ url_for('growcam_page', batch_id=batch.id) }}">📹 GrowCam zuordnen</a>
         <a class="pm-button primary" href="{{ url_for('batch_edit', batch_id=batch.id) }}">Bearbeiten</a>
         {% endif %}
     </div>

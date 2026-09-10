@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_FILE = ROOT / "instance" / "growcam.json"
 CAMERA_DIR = ROOT / "instance" / "growcam"
 LATEST_IMAGE = CAMERA_DIR / "latest.jpg"
+TIMELAPSE_DIR = CAMERA_DIR / "timelapse"
 
 DEFAULT_CONFIG = {
     "enabled": False,
@@ -28,6 +29,13 @@ DEFAULT_CONFIG = {
     "username": "admin",
     "interval_sec": 60,
     "tent_id": "tent_1",
+    "batch_id": None,
+    "timelapse_enabled": False,
+    "timelapse_interval_sec": 900,
+    "timelapse_fps": 15,
+    "retention_days": 30,
+    "live_width": 960,
+    "live_fps": 5,
 }
 
 _config_lock = threading.RLock()
@@ -40,7 +48,14 @@ _status = {
     "last_duration_ms": None,
     "width": None,
     "height": None,
+    "last_archived": None,
+    "live_clients": 0,
+    "live_error": None,
+    "timelapse_rendering": False,
+    "timelapse_error": None,
+    "last_video": None,
 }
+_timelapse_lock = threading.Lock()
 
 
 def _atomic_write_json(path, data):
@@ -114,6 +129,35 @@ def _normalize_config(data):
         raise ValueError("Die Stations-ID ist ungültig.")
     result["tent_id"] = tent_id
 
+    raw_batch_id = data.get("batch_id")
+    if raw_batch_id in (None, ""):
+        result["batch_id"] = None
+    else:
+        try:
+            batch_id = int(raw_batch_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Der ausgewählte Durchgang ist ungültig.") from exc
+        if batch_id < 1:
+            raise ValueError("Der ausgewählte Durchgang ist ungültig.")
+        result["batch_id"] = batch_id
+
+    result["timelapse_enabled"] = bool(data.get("timelapse_enabled", False))
+    if result["timelapse_enabled"] and result["batch_id"] is None:
+        raise ValueError("Für den Zeitraffer muss ein Durchgang ausgewählt sein.")
+
+    for key, minimum, maximum in (
+        ("timelapse_interval_sec", 60, 86400),
+        ("timelapse_fps", 1, 30),
+        ("retention_days", 1, 365),
+        ("live_width", 480, 1920),
+        ("live_fps", 1, 10),
+    ):
+        try:
+            value = int(data.get(key, DEFAULT_CONFIG[key]))
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Der Wert für {key} ist ungültig.") from exc
+        result[key] = max(minimum, min(value, maximum))
+
     if result["enabled"] and not result["host"]:
         raise ValueError("Vor dem Aktivieren muss eine Kamera-IP eingetragen sein.")
     return result
@@ -177,7 +221,32 @@ def _safe_error(stderr, rtsp_url):
     return (lines[-1] if lines else "GrowCam-Aufnahme fehlgeschlagen")[:300]
 
 
-def capture_snapshot():
+def _batch_dir(batch_id):
+    return TIMELAPSE_DIR / f"batch_{int(batch_id)}"
+
+
+def _archive_latest(config, captured_at):
+    batch_id = config.get("batch_id")
+    if not config.get("timelapse_enabled") or not batch_id:
+        return None
+    directory = _batch_dir(batch_id)
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(captured_at))
+    target = directory / f"frame-{stamp}-{time.time_ns() % 1_000_000:06d}.jpg"
+    shutil.copy2(LATEST_IMAGE, target)
+    os.chmod(target, 0o640)
+
+    cutoff = captured_at - int(config.get("retention_days") or 120) * 86400
+    for old_frame in directory.glob("frame-*.jpg"):
+        try:
+            if old_frame.stat().st_mtime < cutoff:
+                old_frame.unlink()
+        except OSError:
+            pass
+    return target
+
+
+def capture_snapshot(*, archive=False):
     config = public_config()
     if not config.get("enabled"):
         return {"success": False, "error": "GrowCam ist nicht aktiviert."}
@@ -232,6 +301,7 @@ def capture_snapshot():
         os.replace(temp_name, LATEST_IMAGE)
         temp_name = None
         captured_at = time.time()
+        archived = _archive_latest(config, captured_at) if archive else None
         with _config_lock:
             _status.update({
                 "capturing": False,
@@ -240,6 +310,7 @@ def capture_snapshot():
                 "last_duration_ms": round((time.monotonic() - started) * 1000),
                 "width": width,
                 "height": height,
+                "last_archived": captured_at if archived else _status.get("last_archived"),
             })
         return {"success": True, **status_snapshot()}
     except subprocess.TimeoutExpired:
@@ -268,6 +339,8 @@ def status_snapshot():
     image_exists = LATEST_IMAGE.is_file()
     if image_exists and not status.get("last_capture"):
         status["last_capture"] = LATEST_IMAGE.stat().st_mtime
+    batch_id = config.get("batch_id")
+    archive = timelapse_summary(batch_id)
     return {
         **status,
         "enabled": bool(config.get("enabled")),
@@ -275,24 +348,216 @@ def status_snapshot():
         "name": config.get("name"),
         "tent_id": config.get("tent_id"),
         "interval_sec": config.get("interval_sec"),
+        "batch_id": batch_id,
+        "timelapse_enabled": bool(config.get("timelapse_enabled")),
+        "timelapse_interval_sec": config.get("timelapse_interval_sec"),
+        "timelapse_fps": config.get("timelapse_fps"),
+        "retention_days": config.get("retention_days"),
+        "live_width": config.get("live_width"),
+        "live_fps": config.get("live_fps"),
+        "timelapse": archive,
         "image_available": image_exists,
         "image_version": int(LATEST_IMAGE.stat().st_mtime) if image_exists else None,
     }
 
 
+def _video_files(batch_id):
+    if not batch_id:
+        return []
+    return sorted(_batch_dir(batch_id).glob("timelapse-*.mp4"), reverse=True)
+
+
+def timelapse_summary(batch_id=None):
+    try:
+        directory = _batch_dir(batch_id) if batch_id else None
+        frames = list(directory.glob("frame-*.jpg")) if directory and directory.is_dir() else []
+        videos = _video_files(batch_id)
+    except (OSError, TypeError, ValueError):
+        frames, videos = [], []
+    latest_video = videos[0] if videos else None
+    return {
+        "frame_count": len(frames),
+        "latest_video": latest_video.name if latest_video else None,
+        "latest_video_mtime": latest_video.stat().st_mtime if latest_video else None,
+    }
+
+
+def resolve_timelapse_video(batch_id, filename):
+    name = str(filename or "")
+    if not name.startswith("timelapse-") or not name.endswith(".mp4"):
+        return None
+    if any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_." for char in name):
+        return None
+    candidate = _batch_dir(batch_id) / name
+    return candidate if candidate.is_file() else None
+
+
+def _render_timelapse_worker(config):
+    batch_id = config["batch_id"]
+    directory = _batch_dir(batch_id)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    output = directory / f"timelapse-{stamp}.mp4"
+    temp_output = directory / f".timelapse-{stamp}.mp4"
+    try:
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            raise RuntimeError("FFmpeg ist nicht installiert.")
+        process = subprocess.run(
+            [
+                ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-framerate", str(config["timelapse_fps"]),
+                "-pattern_type", "glob", "-i", str(directory / "frame-*.jpg"),
+                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-movflags", "+faststart", str(temp_output),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        if process.returncode != 0 or not temp_output.is_file():
+            raise RuntimeError(_safe_error(process.stderr, _rtsp_url(config)))
+        os.chmod(temp_output, 0o640)
+        os.replace(temp_output, output)
+        for old_video in _video_files(batch_id)[5:]:
+            try:
+                old_video.unlink()
+            except OSError:
+                pass
+        with _config_lock:
+            _status["last_video"] = output.name
+            _status["timelapse_error"] = None
+    except subprocess.TimeoutExpired:
+        with _config_lock:
+            _status["timelapse_error"] = "Zeitraffer-Erstellung hat nach zehn Minuten nicht geantwortet."
+    except Exception as exc:
+        with _config_lock:
+            _status["timelapse_error"] = str(exc).strip() or type(exc).__name__
+    finally:
+        try:
+            if temp_output.is_file():
+                temp_output.unlink()
+        except OSError:
+            pass
+        with _config_lock:
+            _status["timelapse_rendering"] = False
+        _timelapse_lock.release()
+
+
+def start_timelapse_render():
+    config = public_config()
+    batch_id = config.get("batch_id")
+    if not batch_id:
+        return {"success": False, "error": "Der Kamera ist kein Durchgang zugeordnet."}
+    summary = timelapse_summary(batch_id)
+    if summary["frame_count"] < 2:
+        return {"success": False, "error": "Für ein Zeitraffer-Video werden mindestens zwei Aufnahmen benötigt."}
+    if not _timelapse_lock.acquire(blocking=False):
+        return {"success": False, "error": "Ein Zeitraffer-Video wird bereits erstellt."}
+    with _config_lock:
+        _status["timelapse_rendering"] = True
+        _status["timelapse_error"] = None
+    threading.Thread(
+        target=_render_timelapse_worker,
+        args=(config,),
+        name="growstar-growcam-timelapse",
+        daemon=True,
+    ).start()
+    return {"success": True, "frame_count": summary["frame_count"]}
+
+
+def mjpeg_stream():
+    config = public_config()
+    if not config.get("enabled") or not config.get("host"):
+        raise RuntimeError("GrowCam ist nicht aktiviert oder nicht konfiguriert.")
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("FFmpeg ist nicht installiert.")
+    process = subprocess.Popen(
+        [
+            ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error",
+            "-rtsp_transport", "tcp", "-i", _rtsp_url(config),
+            "-an", "-sn", "-dn",
+            "-vf", f"fps={config['live_fps']},scale={config['live_width']}:-2",
+            "-q:v", "5", "-f", "image2pipe", "-vcodec", "mjpeg", "pipe:1",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        bufsize=0,
+    )
+    with _config_lock:
+        _status["live_clients"] += 1
+        _status["live_error"] = None
+    buffer = b""
+    try:
+        while process.stdout:
+            chunk = process.stdout.read(65536)
+            if not chunk:
+                break
+            buffer += chunk
+            while True:
+                start = buffer.find(b"\xff\xd8")
+                end = buffer.find(b"\xff\xd9", start + 2) if start >= 0 else -1
+                if start < 0 or end < 0:
+                    if len(buffer) > 12_000_000:
+                        buffer = buffer[-2:]
+                    break
+                frame = buffer[start:end + 2]
+                buffer = buffer[end + 2:]
+                yield (
+                    b"--growcam\r\nContent-Type: image/jpeg\r\n"
+                    + f"Content-Length: {len(frame)}\r\n\r\n".encode("ascii")
+                    + frame + b"\r\n"
+                )
+        if process.poll() not in (None, 0):
+            with _config_lock:
+                _status["live_error"] = "Der GrowCam-Livestream wurde unerwartet beendet."
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=2)
+        with _config_lock:
+            _status["live_clients"] = max(0, _status["live_clients"] - 1)
+
+
 def growcam_loop():
     print("📷 GrowCam Snapshot-Thread gestartet")
     next_capture = 0.0
+    next_archive = 0.0
+    schedule_key = None
     while True:
         config = public_config()
         now = time.monotonic()
-        if config.get("enabled") and config.get("host") and now >= next_capture:
-            result = capture_snapshot()
+        current_key = (
+            config.get("enabled"), config.get("interval_sec"),
+            config.get("timelapse_enabled"), config.get("timelapse_interval_sec"),
+            config.get("batch_id"),
+        )
+        if current_key != schedule_key:
+            next_capture = next_archive = 0.0
+            schedule_key = current_key
+        preview_due = now >= next_capture
+        archive_due = (
+            config.get("timelapse_enabled") and config.get("batch_id")
+            and now >= next_archive
+        )
+        if config.get("enabled") and config.get("host") and (preview_due or archive_due):
+            result = capture_snapshot(archive=bool(archive_due))
             if not result.get("success"):
                 print("⚠️ GrowCam-Aufnahme fehlgeschlagen:", result.get("error"))
-            next_capture = time.monotonic() + int(config.get("interval_sec") or 60)
+            finished = time.monotonic()
+            if preview_due:
+                next_capture = finished + int(config.get("interval_sec") or 60)
+            if archive_due:
+                next_archive = finished + int(config.get("timelapse_interval_sec") or 900)
         elif not config.get("enabled"):
-            next_capture = 0.0
+            next_capture = next_archive = 0.0
         time.sleep(1)
 
 
@@ -301,10 +566,15 @@ load_config()
 
 __all__ = (
     "LATEST_IMAGE",
+    "TIMELAPSE_DIR",
     "capture_snapshot",
     "growcam_loop",
     "load_config",
     "public_config",
+    "mjpeg_stream",
+    "resolve_timelapse_video",
     "save_config",
     "status_snapshot",
+    "start_timelapse_render",
+    "timelapse_summary",
 )

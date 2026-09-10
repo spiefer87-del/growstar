@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}GrowCam – Growstar{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}?v=3.16.34-camera1">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}?v=3.16.35-camera2">{% endblock %}
 {% block page %}
 <main class="pm-shell">
 <header class="pm-header">
@@ -8,7 +8,7 @@
         <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
         <div>
             <h1 class="pm-title">📷 VIVOSUN GrowCam C4</h1>
-            <div class="pm-subtitle">Lokale 2K-Aufnahmen direkt über RTSP · ohne VIVOSUN-Cloud</div>
+            <div class="pm-subtitle">Lokaler Livestream, Durchgangsarchiv und Zeitraffer · ohne VIVOSUN-Cloud</div>
         </div>
     </div>
     {% if has_permission('plants.edit') %}
@@ -29,26 +29,29 @@
 <section class="pm-grid">
     <article class="pm-card pm-span-8">
         <div class="pm-card-head">
-            <h2>Aktuelles Kamerabild</h2>
-            <span id="growcam-state" class="pm-status {{ '' if camera_status.image_available and not camera_status.last_error else 'inactive' }}">
-                {% if camera_status.capturing %}Aufnahme läuft
-                {% elif camera_status.last_error %}Fehler
-                {% elif camera_status.image_available %}Online
-                {% elif camera.enabled %}Warte auf Aufnahme
-                {% else %}Deaktiviert{% endif %}
-            </span>
+            <h2>Live-Kamera</h2>
+            <div class="pm-actions">
+                <button id="growcam-live-button" class="pm-button primary" type="button" {{ 'disabled' if not camera.enabled else '' }}>● Live</button>
+                <button id="growcam-still-button" class="pm-button" type="button">Standbild</button>
+                <span id="growcam-state" class="pm-status {{ '' if camera_status.image_available and not camera_status.last_error else 'inactive' }}">
+                    {% if camera_status.capturing %}Aufnahme läuft{% elif camera_status.last_error %}Fehler{% elif camera_status.image_available %}Online{% elif camera.enabled %}Warte auf Aufnahme{% else %}Deaktiviert{% endif %}
+                </span>
+            </div>
         </div>
         <div class="pm-card-body">
-            <div class="pm-growcam-frame {{ '' if camera_status.image_available else 'empty' }}" id="growcam-frame">
-                {% if camera_status.image_available %}
+            <div class="pm-growcam-frame {{ '' if camera_status.image_available or camera.enabled else 'empty' }}" id="growcam-frame">
+                {% if camera.enabled %}
+                <img id="growcam-image" src="{{ url_for('growcam_live') }}" alt="Livestream der VIVOSUN GrowCam C4">
+                {% elif camera_status.image_available %}
                 <img id="growcam-image" src="{{ url_for('growcam_image', v=camera_status.image_version) }}" alt="Aktuelles Bild der VIVOSUN GrowCam C4">
                 {% else %}
-                <div id="growcam-placeholder">Nach dem Aktivieren erscheint hier automatisch das aktuelle Kamerabild.</div>
+                <div id="growcam-placeholder">Nach dem Aktivieren erscheint hier der Livestream.</div>
                 {% endif %}
             </div>
             <div class="pm-growcam-meta">
                 <span><strong>Kamera:</strong> {{ camera.name }}</span>
                 <span><strong>Station:</strong> {% for tent in tents %}{% if tent.id == camera.tent_id %}{{ tent.name }}{% endif %}{% endfor %}</span>
+                <span><strong>Durchgang:</strong> {% set ns = namespace(found=false) %}{% for batch in batches %}{% if batch.id == camera.batch_id %}{% set ns.found = true %}<a href="{{ url_for('batch_detail', batch_id=batch.id) }}">{{ batch.code }} · {{ batch.name }}</a>{% endif %}{% endfor %}{% if not ns.found %}nicht zugeordnet{% endif %}</span>
                 <span><strong>Auflösung:</strong> <span id="growcam-resolution">{% if camera_status.width %}{{ camera_status.width }}×{{ camera_status.height }}{% else %}–{% endif %}</span></span>
                 <span><strong>Letzte Aufnahme:</strong> <span id="growcam-captured">{% if camera_status.last_capture %}<time data-growcam-time="{{ camera_status.last_capture }}"></time>{% else %}noch keine{% endif %}</span></span>
             </div>
@@ -57,54 +60,60 @@
     </article>
 
     <article class="pm-card pm-span-4">
-        <div class="pm-card-head"><h2>Verbindung</h2></div>
+        <div class="pm-card-head">
+            <h2>🎞️ Zeitraffer</h2>
+            <span id="growcam-render-state" class="pm-status {{ '' if camera_status.timelapse.frame_count >= 2 else 'inactive' }}">{% if camera_status.timelapse_rendering %}Wird erstellt{% else %}{{ camera_status.timelapse.frame_count }} Bilder{% endif %}</span>
+        </div>
+        <div class="pm-card-body">
+            {% if camera_status.timelapse.latest_video and camera.batch_id %}
+            <video class="pm-growcam-video" controls preload="metadata">
+                <source src="{{ url_for('growcam_timelapse_video', batch_id=camera.batch_id, filename=camera_status.timelapse.latest_video) }}" type="video/mp4">
+            </video>
+            <p class="pm-help">Letztes Video aus {{ camera_status.timelapse.frame_count }} vorhandenen Durchgangsaufnahmen.</p>
+            {% else %}
+            <div class="pm-empty pm-growcam-timelapse-empty">{% if camera.timelapse_enabled %}Sobald mindestens zwei Archivbilder vorhanden sind, kann daraus ein Video erstellt werden.{% else %}Durchgang auswählen und Zeitraffer-Aufnahmen aktivieren.{% endif %}</div>
+            {% endif %}
+            {% if camera_status.timelapse_error %}<div class="pm-growcam-error">{{ camera_status.timelapse_error }}</div>{% endif %}
+            {% if has_permission('plants.edit') %}
+            <form method="post" action="{{ url_for('growcam_timelapse_create') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="pm-button primary pm-growcam-full-button" type="submit" {{ 'disabled' if camera_status.timelapse.frame_count < 2 or camera_status.timelapse_rendering else '' }}>Video jetzt erstellen</button>
+            </form>
+            {% endif %}
+        </div>
+    </article>
+
+    <article class="pm-card pm-span-12">
+        <div class="pm-card-head"><h2>Verbindung und Aufnahmeplan</h2></div>
         <div class="pm-card-body">
             <form class="pm-form" method="post" action="{{ url_for('growcam_configure') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <label class="pm-growcam-switch">
-                    <input type="checkbox" name="enabled" value="1" {{ 'checked' if camera.enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}>
-                    <span>Automatische Aufnahmen aktivieren</span>
-                </label>
-                <label class="pm-field">
-                    <span class="pm-label">Anzeigename</span>
-                    <input class="pm-input" name="name" value="{{ camera.name }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
-                </label>
-                <label class="pm-field">
-                    <span class="pm-label">Station</span>
-                    <select class="pm-select" name="tent_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}>
-                        {% for tent in tents %}<option value="{{ tent.id }}" {{ 'selected' if tent.id == camera.tent_id else '' }}>{{ tent.name }} · {{ tent.id }}</option>{% endfor %}
-                    </select>
-                </label>
-                <div class="pm-form-grid">
-                    <label class="pm-field">
-                        <span class="pm-label">Kamera-IP</span>
-                        <input class="pm-input" name="host" value="{{ camera.host }}" inputmode="decimal" placeholder="192.168.178.122" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
-                    </label>
-                    <label class="pm-field">
-                        <span class="pm-label">RTSP-Port</span>
-                        <input class="pm-input" type="number" name="port" value="{{ camera.port }}" min="1" max="65535" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
-                    </label>
+                <div class="pm-growcam-options">
+                    <label class="pm-growcam-switch"><input type="checkbox" name="enabled" value="1" {{ 'checked' if camera.enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}><span>Kamera und automatische Standbilder aktivieren</span></label>
+                    <label class="pm-growcam-switch"><input type="checkbox" name="timelapse_enabled" value="1" {{ 'checked' if camera.timelapse_enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}><span>Aufnahmen für Zeitraffer archivieren</span></label>
                 </div>
-                <label class="pm-field">
-                    <span class="pm-label">RTSP-Pfad</span>
-                    <input class="pm-input" name="path" value="{{ camera.path }}" maxlength="160" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
-                    <span class="pm-help">Für die GrowCam C4 bestätigt: /live/ch00_0</span>
-                </label>
-                <div class="pm-form-grid">
-                    <label class="pm-field">
-                        <span class="pm-label">Benutzer</span>
-                        <input class="pm-input" name="username" value="{{ camera.username }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}>
-                    </label>
-                    <label class="pm-field">
-                        <span class="pm-label">Intervall</span>
-                        <select class="pm-select" name="interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>
-                            {% for seconds,label in [(15,'15 Sekunden'),(30,'30 Sekunden'),(60,'1 Minute'),(300,'5 Minuten'),(900,'15 Minuten')] %}
-                            <option value="{{ seconds }}" {{ 'selected' if camera.interval_sec == seconds else '' }}>{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </label>
+                <div class="pm-form-grid pm-form-grid-3">
+                    <label class="pm-field"><span class="pm-label">Anzeigename</span><input class="pm-input" name="name" value="{{ camera.name }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
+                    <label class="pm-field"><span class="pm-label">Station</span><select class="pm-select" name="tent_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for tent in tents %}<option value="{{ tent.id }}" {{ 'selected' if tent.id == camera.tent_id else '' }}>{{ tent.name }} · {{ tent.id }}</option>{% endfor %}</select></label>
+                    <label class="pm-field"><span class="pm-label">Pflanzendurchgang</span><select class="pm-select" name="batch_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}><option value="">— nicht zugeordnet —</option>{% for batch in batches %}<option value="{{ batch.id }}" {{ 'selected' if batch.id == camera.batch_id else '' }}>{{ batch.code }} · {{ batch.name }}{% if batch.status == 'archived' %} · archiviert{% endif %}</option>{% endfor %}</select></label>
                 </div>
-                <span class="pm-help">Growstar speichert weder VIVOSUN-Konto noch Cloud-Passwort. Die bestätigte Kamera verwendet lokal „admin“ mit leerem Kennwort.</span>
+                <div class="pm-form-grid pm-form-grid-3">
+                    <label class="pm-field"><span class="pm-label">Kamera-IP</span><input class="pm-input" name="host" value="{{ camera.host }}" inputmode="decimal" placeholder="192.168.178.122" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
+                    <label class="pm-field"><span class="pm-label">RTSP-Port</span><input class="pm-input" type="number" name="port" value="{{ camera.port }}" min="1" max="65535" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
+                    <label class="pm-field"><span class="pm-label">Benutzer</span><input class="pm-input" name="username" value="{{ camera.username }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
+                </div>
+                <label class="pm-field"><span class="pm-label">RTSP-Pfad</span><input class="pm-input" name="path" value="{{ camera.path }}" maxlength="160" required {{ 'readonly' if not has_permission('plants.edit') else '' }}><span class="pm-help">Für die GrowCam C4 bestätigt: /live/ch00_0</span></label>
+                <div class="pm-form-grid pm-form-grid-3">
+                    <label class="pm-field"><span class="pm-label">Standbild aktualisieren</span><select class="pm-select" name="interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for seconds,label in [(15,'alle 15 Sekunden'),(30,'alle 30 Sekunden'),(60,'jede Minute'),(300,'alle 5 Minuten'),(900,'alle 15 Minuten')] %}<option value="{{ seconds }}" {{ 'selected' if camera.interval_sec == seconds else '' }}>{{ label }}</option>{% endfor %}</select></label>
+                    <label class="pm-field"><span class="pm-label">Zeitraffer-Aufnahmeintervall</span><select class="pm-select" name="timelapse_interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for seconds,label in [(60,'jede Minute'),(300,'alle 5 Minuten'),(600,'alle 10 Minuten'),(900,'alle 15 Minuten'),(1800,'alle 30 Minuten'),(3600,'jede Stunde'),(21600,'alle 6 Stunden')] %}<option value="{{ seconds }}" {{ 'selected' if camera.timelapse_interval_sec == seconds else '' }}>{{ label }}</option>{% endfor %}</select></label>
+                    <label class="pm-field"><span class="pm-label">Archiv behalten</span><select class="pm-select" name="retention_days" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for days,label in [(30,'30 Tage'),(60,'60 Tage'),(120,'120 Tage'),(180,'180 Tage'),(365,'1 Jahr')] %}<option value="{{ days }}" {{ 'selected' if camera.retention_days == days else '' }}>{{ label }}</option>{% endfor %}</select></label>
+                </div>
+                <div class="pm-form-grid pm-form-grid-3">
+                    <label class="pm-field"><span class="pm-label">Live-Auflösung</span><select class="pm-select" name="live_width" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for width,label in [(640,'640 px · sparsam'),(960,'960 px · empfohlen'),(1280,'1280 px · hoch'),(1920,'1920 px · sehr hoch')] %}<option value="{{ width }}" {{ 'selected' if camera.live_width == width else '' }}>{{ label }}</option>{% endfor %}</select></label>
+                    <label class="pm-field"><span class="pm-label">Live-Bildrate</span><select class="pm-select" name="live_fps" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for fps in [2,5,8,10] %}<option value="{{ fps }}" {{ 'selected' if camera.live_fps == fps else '' }}>{{ fps }} Bilder/s</option>{% endfor %}</select></label>
+                    <label class="pm-field"><span class="pm-label">Zeitraffer-Bildrate</span><select class="pm-select" name="timelapse_fps" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for fps in [5,10,15,20,25] %}<option value="{{ fps }}" {{ 'selected' if camera.timelapse_fps == fps else '' }}>{{ fps }} Bilder/s</option>{% endfor %}</select></label>
+                </div>
+                <span class="pm-help">Der Live-Modus transkodiert HEVC lokal für den Browser. Growstar speichert weiterhin weder VIVOSUN-Konto noch Cloud-Passwort.</span>
                 {% if has_permission('plants.edit') %}<button class="pm-button primary" type="submit">Konfiguration speichern</button>{% endif %}
             </form>
         </div>
@@ -117,22 +126,38 @@
 <script>
 (() => {
     const imageUrl = {{ url_for('growcam_image')|tojson }};
+    const liveUrl = {{ url_for('growcam_live')|tojson }};
     const statusUrl = {{ url_for('growcam_status_api')|tojson }};
     const state = document.getElementById("growcam-state");
     const frame = document.getElementById("growcam-frame");
     const captured = document.getElementById("growcam-captured");
     const resolution = document.getElementById("growcam-resolution");
     const error = document.getElementById("growcam-error");
+    const liveButton = document.getElementById("growcam-live-button");
+    const stillButton = document.getElementById("growcam-still-button");
     let imageVersion = {{ camera_status.image_version|tojson }};
+    let videoVersion = {{ camera_status.timelapse.latest_video_mtime|tojson }};
+    let rendering = {{ camera_status.timelapse_rendering|tojson }};
+    let liveMode = {{ camera.enabled|tojson }};
 
-    function timeText(value) {
-        if (!value) return "noch keine";
-        return new Date(Number(value) * 1000).toLocaleString("de-DE");
+    function timeText(value) { return value ? new Date(Number(value) * 1000).toLocaleString("de-DE") : "noch keine"; }
+    function imageElement() {
+        let image = document.getElementById("growcam-image");
+        if (!image) { frame.innerHTML = '<img id="growcam-image" alt="Bild der VIVOSUN GrowCam C4">'; image = document.getElementById("growcam-image"); }
+        frame.classList.remove("empty");
+        return image;
     }
-
-    document.querySelectorAll("[data-growcam-time]").forEach(item => {
-        item.textContent = timeText(item.dataset.growcamTime);
-    });
+    function selectLive() {
+        liveMode = true; liveButton.classList.add("primary"); stillButton.classList.remove("primary");
+        imageElement().src = `${liveUrl}?v=${Date.now()}`;
+    }
+    function selectStill() {
+        liveMode = false; liveButton.classList.remove("primary"); stillButton.classList.add("primary");
+        imageElement().src = `${imageUrl}?v=${encodeURIComponent(imageVersion || Date.now())}`;
+    }
+    liveButton.addEventListener("click", selectLive);
+    stillButton.addEventListener("click", selectStill);
+    document.querySelectorAll("[data-growcam-time]").forEach(item => item.textContent = timeText(item.dataset.growcamTime));
 
     async function refresh() {
         try {
@@ -142,28 +167,19 @@
             const camera = payload.camera || {};
             const online = camera.image_available && !camera.last_error;
             state.classList.toggle("inactive", !online);
-            state.textContent = camera.capturing ? "Aufnahme läuft" : camera.last_error ? "Fehler" : online ? "Online" : camera.enabled ? "Warte auf Aufnahme" : "Deaktiviert";
+            state.textContent = liveMode && camera.live_clients ? "Live" : camera.capturing ? "Aufnahme läuft" : camera.last_error ? "Fehler" : online ? "Online" : camera.enabled ? "Warte auf Aufnahme" : "Deaktiviert";
             captured.textContent = timeText(camera.last_capture);
             resolution.textContent = camera.width ? `${camera.width}×${camera.height}` : "–";
-            error.hidden = !camera.last_error;
-            error.textContent = camera.last_error || "";
-
-            if (camera.image_available && camera.image_version !== imageVersion) {
-                imageVersion = camera.image_version;
-                frame.classList.remove("empty");
-                let image = document.getElementById("growcam-image");
-                if (!image) {
-                    frame.innerHTML = '<img id="growcam-image" alt="Aktuelles Bild der VIVOSUN GrowCam C4">';
-                    image = document.getElementById("growcam-image");
-                }
-                image.src = `${imageUrl}?v=${encodeURIComponent(imageVersion)}`;
-            }
-        } catch (_) {
-            // Der nächste Intervallabruf versucht es erneut.
-        }
+            error.hidden = !camera.last_error && !camera.live_error;
+            error.textContent = camera.live_error || camera.last_error || "";
+            if (!liveMode && camera.image_available && camera.image_version !== imageVersion) { imageVersion = camera.image_version; imageElement().src = `${imageUrl}?v=${encodeURIComponent(imageVersion)}`; }
+            const nextVideoVersion = camera.timelapse && camera.timelapse.latest_video_mtime;
+            if (nextVideoVersion && nextVideoVersion !== videoVersion) window.location.reload();
+            if (rendering && !camera.timelapse_rendering) window.location.reload();
+            rendering = Boolean(camera.timelapse_rendering);
+        } catch (_) { /* Der nächste Intervallabruf versucht es erneut. */ }
     }
-
-    window.setInterval(refresh, 10000);
+    window.setInterval(refresh, 5000);
 })();
 </script>
 {% endblock %}

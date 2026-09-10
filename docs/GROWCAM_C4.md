@@ -20,7 +20,7 @@ zugeordnet werden. Port 554 darf nicht ins Internet weitergeleitet werden.
 
 1. In Growstar **Pflanzenmanagement → Kamera** öffnen.
 2. Kamera-IP, Port `554`, Pfad `/live/ch00_0`, Benutzer `admin`, Station und
-   Aufnahmeintervall eintragen.
+   Standbildintervall eintragen.
 3. **Automatische Aufnahmen aktivieren** einschalten und speichern.
 4. Mit **Jetzt aufnehmen** die Verbindung sofort prüfen.
 
@@ -28,6 +28,27 @@ Growstar überschreibt bei jeder Aufnahme ausschließlich
 `instance/growcam/latest.jpg`. Dadurch entsteht kein unbegrenztes Archiv.
 Die lokale Konfiguration liegt mit eingeschränkten Dateirechten unter
 `instance/growcam.json`.
+
+## Livestream
+
+Die GrowCam liefert HEVC, das Browser nicht zuverlässig direkt anzeigen.
+Growstar transkodiert den Stream deshalb nur während einer geöffneten
+Live-Ansicht in MJPEG. Für einen Raspberry Pi 5 werden 960 Pixel Breite und
+5 Bilder pro Sekunde empfohlen. Mit **Standbild** wird die Live-Transkodierung
+für diesen Browser sofort beendet.
+
+## Durchgang und Zeitraffer
+
+1. Der Kamera einen Pflanzendurchgang zuordnen.
+2. **Aufnahmen für Zeitraffer archivieren** aktivieren.
+3. Aufnahmeintervall, Aufbewahrungszeit und Video-Bildrate wählen.
+4. Nach mindestens zwei Aufnahmen **Video jetzt erstellen** drücken.
+
+Archivbilder und Videos liegen getrennt je Durchgang unter
+`instance/growcam/timelapse/batch_<ID>/`. Alte Einzelbilder werden nach der
+gewählten Aufbewahrungszeit automatisch entfernt. Bereits erzeugte MP4-Videos
+werden auf die fünf neuesten Videos je Durchgang begrenzt. Die MP4-Erstellung läuft im Hintergrund, damit der
+Growstar-Webserver währenddessen erreichbar bleibt.
 
 ## Diagnose auf dem Raspberry Pi
 

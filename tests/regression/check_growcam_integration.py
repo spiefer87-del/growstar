@@ -4,6 +4,7 @@
 from pathlib import Path
 import tempfile
 import sys
+import time
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,9 +24,15 @@ def require(condition, message):
 
 
 def main():
-    original_paths = growcam.CONFIG_FILE, growcam.CAMERA_DIR, growcam.LATEST_IMAGE
+    original_paths = (
+        growcam.CONFIG_FILE,
+        growcam.CAMERA_DIR,
+        growcam.LATEST_IMAGE,
+        growcam.TIMELAPSE_DIR,
+    )
     original_which = growcam.shutil.which
     original_run = growcam.subprocess.run
+    original_popen = growcam.subprocess.Popen
     original_config = growcam.public_config()
     captured_command = []
 
@@ -34,18 +41,25 @@ def main():
         growcam.CONFIG_FILE = temp / "instance" / "growcam.json"
         growcam.CAMERA_DIR = temp / "instance" / "growcam"
         growcam.LATEST_IMAGE = growcam.CAMERA_DIR / "latest.jpg"
+        growcam.TIMELAPSE_DIR = growcam.CAMERA_DIR / "timelapse"
 
         def fake_run(command, **kwargs):
             captured_command[:] = command
-            Image.effect_noise((320, 180), 70).convert("RGB").save(
-                command[-1], format="JPEG", quality=90
-            )
+            if str(command[-1]).endswith(".jpg"):
+                Image.effect_noise((320, 180), 70).convert("RGB").save(
+                    command[-1], format="JPEG", quality=90
+                )
+            else:
+                Path(command[-1]).write_bytes(b"test-mp4")
 
             class Result:
                 returncode = 0
                 stderr = ""
 
-            require(kwargs.get("timeout") == 30, "FFmpeg-Aufruf besitzt ein festes Zeitlimit")
+            require(
+                kwargs.get("timeout") in (30, 600),
+                "FFmpeg-Aufrufe besitzen feste Zeitlimits",
+            )
             return Result()
 
         try:
@@ -101,19 +115,85 @@ def main():
                 "FFmpeg liest den bestätigten lokalen RTSP-Stream über TCP",
             )
 
+            config = growcam.save_config({
+                **config,
+                "batch_id": 7,
+                "timelapse_enabled": True,
+                "timelapse_interval_sec": 300,
+                "timelapse_fps": 15,
+                "retention_days": 30,
+                "live_width": 960,
+                "live_fps": 5,
+            })
+            growcam.capture_snapshot(archive=True)
+            growcam.capture_snapshot(archive=True)
+            require(
+                growcam.timelapse_summary(7)["frame_count"] == 2,
+                "Automatische Aufnahmen werden getrennt nach Durchgang archiviert",
+            )
+            render = growcam.start_timelapse_render()
+            for _ in range(100):
+                if not growcam.status_snapshot()["timelapse_rendering"]:
+                    break
+                time.sleep(0.01)
+            summary = growcam.timelapse_summary(7)
+            require(
+                render["success"] is True
+                and summary["latest_video"]
+                and "libx264" in captured_command
+                and "+faststart" in captured_command,
+                "Durchgangsaufnahmen werden als browserfähiges MP4 gerendert",
+            )
+
+            jpeg = growcam.LATEST_IMAGE.read_bytes()
+
+            class FakeStdout:
+                def __init__(self):
+                    self.chunks = [jpeg[:300], jpeg[300:], b""]
+
+                def read(self, _size):
+                    return self.chunks.pop(0)
+
+            class FakeProcess:
+                def __init__(self, command, **_kwargs):
+                    captured_command[:] = command
+                    self.stdout = FakeStdout()
+
+                def poll(self):
+                    return 0
+
+            growcam.subprocess.Popen = FakeProcess
+            stream = growcam.mjpeg_stream()
+            first_frame = next(stream)
+            stream.close()
+            require(
+                first_frame.startswith(b"--growcam\r\nContent-Type: image/jpeg")
+                and "image2pipe" in captured_command
+                and "mjpeg" in captured_command,
+                "HEVC-Kamerastream wird als browserfähiger MJPEG-Stream bereitgestellt",
+            )
+
             read_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera", "GET"
             )
             write_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera/aufnahme", "POST"
             )
+            stream_requirement = permission_requirement(
+                "/pflanzenmanagement/kamera/live.mjpg", "GET"
+            )
+            timelapse_requirement = permission_requirement(
+                "/pflanzenmanagement/kamera/zeitraffer", "POST"
+            )
             api_requirement = permission_requirement(
                 "/api/plant-management/camera/status", "GET"
             )
             require(
                 read_requirement.permissions == ("plants.view",)
+                and stream_requirement.permissions == ("plants.view",)
                 and api_requirement.permissions == ("plants.view",)
-                and write_requirement.permissions == ("plants.edit",),
+                and write_requirement.permissions == ("plants.edit",)
+                and timelapse_requirement.permissions == ("plants.edit",),
                 "Kamerabild, Status und Bedienung sind rollenbasiert geschützt",
             )
 
@@ -122,13 +202,20 @@ def main():
             require(
                 "register_camera_routes(app)" in app_source
                 and '"growstar-growcam"' in app_source
-                and "growcam_image" in template,
+                and "growcam_live" in template
+                and "growcam_timelapse_create" in template,
                 "Route, Hintergrundaufnahme und Kameraansicht sind vollständig eingebunden",
             )
         finally:
             growcam.shutil.which = original_which
             growcam.subprocess.run = original_run
-            growcam.CONFIG_FILE, growcam.CAMERA_DIR, growcam.LATEST_IMAGE = original_paths
+            growcam.subprocess.Popen = original_popen
+            (
+                growcam.CONFIG_FILE,
+                growcam.CAMERA_DIR,
+                growcam.LATEST_IMAGE,
+                growcam.TIMELAPSE_DIR,
+            ) = original_paths
             with growcam._config_lock:
                 growcam._config = original_config
 
