@@ -47,10 +47,56 @@ class FakeBleDevice:
 
 
 class FakeScanner:
+    anonymous = SimpleNamespace(
+        address="EE:65:C7:00:00:00",
+        name=None,
+        rssi=None,
+    )
+
     @staticmethod
-    async def discover(timeout):
+    async def discover(timeout, *, return_adv=False):
         assert 2 <= timeout <= 30
-        return [FakeBleDevice(), SimpleNamespace(address="11:22:33:44:55:66", name="Other")]
+        named = FakeBleDevice()
+        other = SimpleNamespace(
+            address="11:22:33:44:55:66",
+            name="Other",
+            rssi=-80,
+        )
+        devices = [named, FakeScanner.anonymous, other]
+        if not return_adv:
+            return devices
+
+        return {
+            named.address: (
+                named,
+                SimpleNamespace(
+                    local_name="ThermoBeacon2",
+                    manufacturer_data={},
+                    service_uuids=[],
+                    rssi=-47,
+                ),
+            ),
+            FakeScanner.anonymous.address: (
+                FakeScanner.anonymous,
+                SimpleNamespace(
+                    local_name=None,
+                    manufacturer_data={0x0019: bytes(20)},
+                    service_uuids=[
+                        "0000fff0-0000-1000-8000-00805f9b34fb",
+                    ],
+                    rssi=-34,
+                ),
+            ),
+            other.address: (
+                other,
+                SimpleNamespace(
+                    local_name="Other",
+                    manufacturer_data={},
+                    service_uuids=[],
+                    rssi=-80,
+                ),
+            ),
+        }
 
     @staticmethod
     async def find_device_by_address(address, timeout):
@@ -131,11 +177,33 @@ def check_decoder_and_adapter():
         now=lambda: 1_700_000_000.0,
     )
     scan = adapter.scan(timeout=2)
+    addresses = {item["address"] for item in scan["candidates"]}
     require(
         scan["success"] is True
-        and scan["count"] == 1
-        and scan["candidates"][0]["model"] == "VS-THB1S",
-        "Discovery akzeptiert ausschließlich den Modellnamen ThermoBeacon2",
+        and scan["count"] == 2
+        and FakeBleDevice.address in addresses
+        and FakeScanner.anonymous.address in addresses,
+        "Discovery akzeptiert ThermoBeacon2 und den namenlosen VS-THB1S-Advert",
+    )
+    for manufacturer_id in (0x0019, 0x8019):
+        advertisement = SimpleNamespace(
+            local_name=None,
+            manufacturer_data={manufacturer_id: bytes(20)},
+            service_uuids=["0000fff0-0000-1000-8000-00805f9b34fb"],
+        )
+        require(
+            adapter._is_supported(FakeScanner.anonymous, advertisement),
+            f"ManufacturerData 0x{manufacturer_id:04X} wird als VS-THB1S erkannt",
+        )
+
+    invalid_advertisement = SimpleNamespace(
+        local_name=None,
+        manufacturer_data={0x0019: bytes(19)},
+        service_uuids=["0000fff0-0000-1000-8000-00805f9b34fb"],
+    )
+    require(
+        not adapter._is_supported(FakeScanner.anonymous, invalid_advertisement),
+        "Unvollständige oder fremde ManufacturerData wird nicht akzeptiert",
     )
 
     reading = adapter.read(FakeBleDevice.address)

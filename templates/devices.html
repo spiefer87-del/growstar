@@ -487,9 +487,9 @@ class="provisioning-results"></div>
 <div class="provisioning-note">
 
 Vor der Suche die PAIR/SENSOR-Taste am VS-THB1S etwa drei Sekunden drücken
-und die VIVOSUN-App schließen. Growstar akzeptiert ausschließlich Geräte mit
-dem Bluetooth-Namen „ThermoBeacon2“ und prüft beim Verbinden sofort echte
-Messwerte.
+und die VIVOSUN-App schließen. Growstar erkennt ältere Geräte am Bluetooth-Namen
+„ThermoBeacon2“ und neuere namenlose Geräte an ihrer eindeutigen BLE-Signatur.
+Beim Verbinden werden sofort echte Messwerte geprüft.
 
 </div>
 
@@ -1477,7 +1477,7 @@ function renderVivosunCandidates(candidates){
 
         item.innerHTML = `
             <strong>🌡️ VIVOSUN AeroLab VS-THB1S</strong>
-            <div class="sub">Bluetooth-Name ${escapeHtml(candidate.name || "ThermoBeacon2")}</div>
+            <div class="sub">Bluetooth-Kennung ${escapeHtml(candidate.name || "namenloser VS-THB1S")}</div>
             <div class="sub">Adresse ${escapeHtml(candidate.address || "--")}</div>
             <div class="sub">RSSI ${candidate.rssi ?? "--"} dBm</div>
             <div class="badge ${registered ? "online" : "offline"}">
@@ -1564,7 +1564,7 @@ async function scanVivosunDevices(){
     button.textContent = "Bluetooth-Scan läuft …";
     results.innerHTML = "";
     status.className = "provisioning-status";
-    status.textContent = "Raspberry sucht nach ThermoBeacon2 …";
+    status.textContent = "Raspberry sucht nach kompatiblen VS-THB1S-Sensoren …";
 
     try{
         const response = await fetch(

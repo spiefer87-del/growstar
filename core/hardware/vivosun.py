@@ -29,6 +29,8 @@ SERVICE_UUID = "0000fff0-0000-1000-8000-00805f9b34fb"
 STATUS_UUID = "0000fff3-0000-1000-8000-00805f9b34fb"
 COMMAND_UUID = "0000fff5-0000-1000-8000-00805f9b34fb"
 READ_STATUS_COMMAND = bytes((0x0D,))
+ADVERTISEMENT_MANUFACTURER_IDS = frozenset((0x0019, 0x8019))
+ADVERTISEMENT_PAYLOAD_BYTES = 20
 
 _MAIN_TEMPERATURE_OFFSET = 1
 _MAIN_HUMIDITY_OFFSET = 3
@@ -132,8 +134,73 @@ def _device_name(device):
     ).strip()
 
 
-def _device_rssi(device):
-    value = getattr(device, "rssi", None)
+def _advertisement_name(device, advertisement=None):
+    return str(
+        getattr(advertisement, "local_name", None)
+        or _device_name(device)
+        or ""
+    ).strip()
+
+
+def _advertisement_manufacturer_data(device, advertisement=None):
+    data = getattr(advertisement, "manufacturer_data", None)
+    if data is None:
+        metadata = getattr(device, "metadata", None) or {}
+        data = metadata.get("manufacturer_data")
+    return data or {}
+
+
+def _advertisement_service_uuids(device, advertisement=None):
+    values = getattr(advertisement, "service_uuids", None)
+    if values is None:
+        metadata = getattr(device, "metadata", None) or {}
+        values = metadata.get("uuids")
+    return {
+        str(value or "").strip().lower()
+        for value in values or ()
+        if value
+    }
+
+
+def _iter_discovered(discovered):
+    values = discovered.values() if isinstance(discovered, dict) else discovered or ()
+    for value in values:
+        if isinstance(value, tuple) and len(value) == 2:
+            yield value
+        else:
+            yield value, None
+
+
+def _has_vivosun_advertisement(device, advertisement=None):
+    if SERVICE_UUID.lower() not in _advertisement_service_uuids(
+        device,
+        advertisement,
+    ):
+        return False
+
+    for key, payload in _advertisement_manufacturer_data(
+        device,
+        advertisement,
+    ).items():
+        try:
+            manufacturer_id = int(key, 0) if isinstance(key, str) else int(key)
+            data = bytes(payload or b"")
+        except (TypeError, ValueError):
+            continue
+
+        if (
+            manufacturer_id in ADVERTISEMENT_MANUFACTURER_IDS
+            and len(data) == ADVERTISEMENT_PAYLOAD_BYTES
+        ):
+            return True
+
+    return False
+
+
+def _device_rssi(device, advertisement=None):
+    value = getattr(advertisement, "rssi", None)
+    if value is None:
+        value = getattr(device, "rssi", None)
     if value is None:
         metadata = getattr(device, "metadata", None) or {}
         value = metadata.get("rssi")
@@ -174,15 +241,22 @@ class VivosunTHB1SAdapter:
         }
 
     @staticmethod
-    def _is_supported(device):
-        return _device_name(device).lower() == LOCAL_NAME.lower()
+    def _is_supported(device, advertisement=None):
+        return (
+            _advertisement_name(device, advertisement).lower()
+            == LOCAL_NAME.lower()
+            or _has_vivosun_advertisement(device, advertisement)
+        )
 
     async def _scan_async(self, timeout):
-        devices = await self.scanner_cls.discover(timeout=timeout)
+        discovered = await self.scanner_cls.discover(
+            timeout=timeout,
+            return_adv=True,
+        )
         result = []
 
-        for device in devices or []:
-            if not self._is_supported(device):
+        for device, advertisement in _iter_discovered(discovered):
+            if not self._is_supported(device, advertisement):
                 continue
 
             try:
@@ -192,8 +266,8 @@ class VivosunTHB1SAdapter:
 
             result.append({
                 "address": address,
-                "name": _device_name(device) or LOCAL_NAME,
-                "rssi": _device_rssi(device),
+                "name": _advertisement_name(device, advertisement) or LOCAL_NAME,
+                "rssi": _device_rssi(device, advertisement),
                 "manufacturer": "VIVOSUN",
                 "model": MODEL,
                 "protocol": PROTOCOL,
@@ -245,22 +319,17 @@ class VivosunTHB1SAdapter:
             self._lock.release()
 
     async def _resolve_device(self, address, timeout):
-        finder = getattr(self.scanner_cls, "find_device_by_address", None)
-        if finder is not None:
-            return await finder(address, timeout=timeout)
-
-        devices = await self.scanner_cls.discover(timeout=timeout)
-        return next(
-            (
-                device
-                for device in devices or []
-                if str(getattr(device, "address", "")).upper() == address
-            ),
-            None,
+        discovered = await self.scanner_cls.discover(
+            timeout=timeout,
+            return_adv=True,
         )
+        for device, advertisement in _iter_discovered(discovered):
+            if str(getattr(device, "address", "")).upper() == address:
+                return device, advertisement
+        return None, None
 
     async def _read_async(self, address, connect_timeout, read_timeout):
-        device = await self._resolve_device(
+        device, advertisement = await self._resolve_device(
             address,
             min(8.0, connect_timeout),
         )
@@ -268,7 +337,7 @@ class VivosunTHB1SAdapter:
             raise VivosunBleError(
                 "VS-THB1S ist nicht sichtbar. Pair/Sensor-Taste drei Sekunden druecken."
             )
-        if not self._is_supported(device):
+        if not self._is_supported(device, advertisement):
             raise VivosunBleError(
                 "Bluetooth-Adresse gehoert nicht zu einem erkannten VS-THB1S"
             )
@@ -295,8 +364,8 @@ class VivosunTHB1SAdapter:
             decoded = decode_status_payload(payload)
             decoded.update({
                 "address": address,
-                "name": _device_name(device) or LOCAL_NAME,
-                "rssi": _device_rssi(device),
+                "name": _advertisement_name(device, advertisement) or LOCAL_NAME,
+                "rssi": _device_rssi(device, advertisement),
                 "observed_at": float(self.now()),
             })
             return decoded
@@ -358,6 +427,8 @@ vivosun_adapter = VivosunTHB1SAdapter()
 
 
 __all__ = (
+    "ADVERTISEMENT_MANUFACTURER_IDS",
+    "ADVERTISEMENT_PAYLOAD_BYTES",
     "COMMAND_UUID",
     "LOCAL_NAME",
     "MODEL",

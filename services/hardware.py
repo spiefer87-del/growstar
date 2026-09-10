@@ -709,7 +709,7 @@ class HardwareService:
             }
 
         # Browserdaten allein reichen nicht: Der Kandidat muss in einem
-        # frischen lokalen Scan erneut als ThermoBeacon2 sichtbar sein.
+        # frischen lokalen Scan erneut über Namen oder BLE-Signatur sichtbar sein.
         scan = self.scan_vivosun_devices(timeout=5)
         if not scan.get("success"):
             return {
