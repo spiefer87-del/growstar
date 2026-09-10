@@ -33,16 +33,25 @@ Die lokale Konfiguration liegt mit eingeschränkten Dateirechten unter
 
 Die GrowCam liefert HEVC, das Browser nicht zuverlässig direkt anzeigen.
 Growstar transkodiert den Stream deshalb nur während einer geöffneten
-Live-Ansicht in MJPEG. Für einen Raspberry Pi 5 werden 960 Pixel Breite und
-5 Bilder pro Sekunde empfohlen. Mit **Standbild** wird die Live-Transkodierung
-für diesen Browser sofort beendet.
+Live-Ansicht in MJPEG. Wählbar sind bis zu den bestätigten 2560 × 1440 Pixeln
+und 15 Bildern pro Sekunde. Das beansprucht deutlich mehr CPU und Bandbreite;
+bei Fernzugriff sind 960 oder 1280 Pixel oft flüssiger. Mit **Standbild** wird
+die Live-Transkodierung für diesen Browser sofort beendet.
+
+Die Live-Frames laufen nur durch den Arbeitsspeicher und werden nicht
+gespeichert. Ein Klick auf das Livebild öffnet die Vollbildansicht. Dort lässt
+sich bis 500 Prozent zoomen und das vergrößerte Bild per Maus oder Touch
+verschieben.
 
 ## Durchgang und Zeitraffer
 
 1. Der Kamera einen Pflanzendurchgang zuordnen.
 2. **Aufnahmen für Zeitraffer archivieren** aktivieren.
 3. Aufnahmeintervall, Aufbewahrungszeit und Video-Bildrate wählen.
-4. Nach mindestens zwei Aufnahmen **Video jetzt erstellen** drücken.
+4. Nach mindestens zwei Aufnahmen die archivierten Bilder kontrollieren und
+   ungeeignete Einzelbilder bei Bedarf entfernen.
+5. Direkt vor **Video jetzt erstellen** die Video-Bildrate, Ausgabeauflösung
+   und Kompressionsstufe festlegen.
 
 Archivbilder und Videos liegen getrennt je Durchgang unter
 `instance/growcam/timelapse/batch_<ID>/`. Alte Einzelbilder werden nach der

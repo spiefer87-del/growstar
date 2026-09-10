@@ -21,9 +21,12 @@ from plant_management.database import get_batch, list_batches
 from services.growcam import (
     LATEST_IMAGE,
     capture_snapshot,
+    delete_timelapse_frame,
+    list_timelapse_frames,
     mjpeg_stream,
     public_config,
     resolve_timelapse_video,
+    resolve_timelapse_frame,
     save_config,
     status_snapshot,
     start_timelapse_render,
@@ -56,12 +59,16 @@ def register(app):
             camera["batch_id"] = requested_batch_id
             camera_status["batch_id"] = requested_batch_id
             camera_status["timelapse"] = timelapse_summary(requested_batch_id)
+        frame_page = request.args.get("frame_page", default=1, type=int)
         return render_template(
             "plants/camera.html",
             camera=camera,
             camera_status=camera_status,
             tents=tent_manager.list_tents(),
             batches=list_batches(),
+            timelapse_frames=list_timelapse_frames(
+                camera.get("batch_id"), page=frame_page
+            ),
         )
 
     @app.post("/pflanzenmanagement/kamera/konfiguration")
@@ -86,7 +93,6 @@ def register(app):
                 "batch_id": batch_id,
                 "timelapse_enabled": request.form.get("timelapse_enabled") == "1",
                 "timelapse_interval_sec": request.form.get("timelapse_interval_sec"),
-                "timelapse_fps": request.form.get("timelapse_fps"),
                 "retention_days": request.form.get("retention_days"),
                 "live_width": request.form.get("live_width"),
                 "live_fps": request.form.get("live_fps"),
@@ -154,13 +160,18 @@ def register(app):
     @app.post("/pflanzenmanagement/kamera/zeitraffer")
     @permission_required("plants.edit")
     def growcam_timelapse_create():
-        result = start_timelapse_render()
+        result = start_timelapse_render({
+            "video_fps": request.form.get("video_fps"),
+            "video_width": request.form.get("video_width"),
+            "video_crf": request.form.get("video_crf"),
+        })
         if result.get("success"):
             _audit(
                 "plants.growcam_timelapse_started",
                 {
                     "batch_id": public_config().get("batch_id"),
                     "frame_count": result.get("frame_count"),
+                    "options": result.get("options"),
                 },
             )
             flash("Zeitraffer-Erstellung wurde im Hintergrund gestartet.", "success")
@@ -174,6 +185,37 @@ def register(app):
         if video is None:
             abort(404)
         return send_file(video, mimetype="video/mp4", conditional=True)
+
+    @app.get("/pflanzenmanagement/kamera/zeitraffer-bild/<int:batch_id>/<filename>")
+    def growcam_timelapse_frame(batch_id, filename):
+        frame = resolve_timelapse_frame(
+            batch_id,
+            filename,
+            thumbnail=request.args.get("thumbnail") == "1",
+        )
+        if frame is None:
+            abort(404)
+        return send_file(frame, mimetype="image/jpeg", conditional=True, max_age=3600)
+
+    @app.post("/pflanzenmanagement/kamera/zeitraffer-bild/<int:batch_id>/<filename>/loeschen")
+    @permission_required("plants.edit")
+    def growcam_timelapse_frame_delete(batch_id, filename):
+        result = delete_timelapse_frame(batch_id, filename)
+        if result.get("success"):
+            _audit(
+                "plants.growcam_timelapse_frame_deleted",
+                {"batch_id": batch_id, "filename": result.get("filename")},
+            )
+            flash("Zeitrafferbild wurde entfernt.", "success")
+        else:
+            flash(result.get("error") or "Bild konnte nicht entfernt werden.", "error")
+        return redirect(
+            url_for(
+                "growcam_page",
+                batch_id=batch_id,
+                frame_page=request.form.get("frame_page", type=int) or 1,
+            )
+        )
 
     @app.get("/api/plant-management/camera/status")
     def growcam_status_api():

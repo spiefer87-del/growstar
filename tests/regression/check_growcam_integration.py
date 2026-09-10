@@ -120,10 +120,9 @@ def main():
                 "batch_id": 7,
                 "timelapse_enabled": True,
                 "timelapse_interval_sec": 300,
-                "timelapse_fps": 15,
                 "retention_days": 30,
-                "live_width": 960,
-                "live_fps": 5,
+                "live_width": 2560,
+                "live_fps": 15,
             })
             growcam.capture_snapshot(archive=True)
             growcam.capture_snapshot(archive=True)
@@ -131,7 +130,11 @@ def main():
                 growcam.timelapse_summary(7)["frame_count"] == 2,
                 "Automatische Aufnahmen werden getrennt nach Durchgang archiviert",
             )
-            render = growcam.start_timelapse_render()
+            render = growcam.start_timelapse_render({
+                "video_fps": 60,
+                "video_width": 2560,
+                "video_crf": 32,
+            })
             for _ in range(100):
                 if not growcam.status_snapshot()["timelapse_rendering"]:
                     break
@@ -143,6 +146,32 @@ def main():
                 and "libx264" in captured_command
                 and "+faststart" in captured_command,
                 "Durchgangsaufnahmen werden als browserfähiges MP4 gerendert",
+            )
+            require(
+                "60" in captured_command
+                and "scale=2560:-2:force_original_aspect_ratio=decrease,format=yuv420p"
+                in captured_command
+                and "32" in captured_command,
+                "Bildrate, Auflösung und Kompression werden erst beim Video festgelegt",
+            )
+
+            frame_page = growcam.list_timelapse_frames(7, page=1, per_page=24)
+            selected_frame = frame_page["items"][0]["filename"]
+            thumbnail = growcam.resolve_timelapse_frame(
+                7, selected_frame, thumbnail=True
+            )
+            require(
+                frame_page["total"] == 2
+                and thumbnail is not None
+                and thumbnail.is_file()
+                and growcam.resolve_timelapse_frame(7, "../latest.jpg") is None,
+                "Bildarchiv bietet paginierte Vorschauen ohne unsichere Dateipfade",
+            )
+            deleted = growcam.delete_timelapse_frame(7, selected_frame)
+            require(
+                deleted["success"] is True
+                and growcam.timelapse_summary(7)["frame_count"] == 1,
+                "Einzelne ungeeignete Zeitrafferbilder können entfernt werden",
             )
 
             jpeg = growcam.LATEST_IMAGE.read_bytes()
@@ -169,8 +198,9 @@ def main():
             require(
                 first_frame.startswith(b"--growcam\r\nContent-Type: image/jpeg")
                 and "image2pipe" in captured_command
-                and "mjpeg" in captured_command,
-                "HEVC-Kamerastream wird als browserfähiger MJPEG-Stream bereitgestellt",
+                and "mjpeg" in captured_command
+                and "fps=15,scale=2560:-2" in captured_command,
+                "HEVC-Stream wird bis 2560 Pixel und 15 FPS als MJPEG bereitgestellt",
             )
 
             read_requirement = permission_requirement(
@@ -185,6 +215,10 @@ def main():
             timelapse_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera/zeitraffer", "POST"
             )
+            delete_requirement = permission_requirement(
+                "/pflanzenmanagement/kamera/zeitraffer-bild/7/frame-test.jpg/loeschen",
+                "POST",
+            )
             api_requirement = permission_requirement(
                 "/api/plant-management/camera/status", "GET"
             )
@@ -193,7 +227,8 @@ def main():
                 and stream_requirement.permissions == ("plants.view",)
                 and api_requirement.permissions == ("plants.view",)
                 and write_requirement.permissions == ("plants.edit",)
-                and timelapse_requirement.permissions == ("plants.edit",),
+                and timelapse_requirement.permissions == ("plants.edit",)
+                and delete_requirement.permissions == ("plants.edit",),
                 "Kamerabild, Status und Bedienung sind rollenbasiert geschützt",
             )
 
@@ -203,7 +238,10 @@ def main():
                 "register_camera_routes(app)" in app_source
                 and '"growstar-growcam"' in app_source
                 and "growcam_live" in template
-                and "growcam_timelapse_create" in template,
+                and "growcam_timelapse_create" in template
+                and 'name="video_fps"' in template
+                and 'name="timelapse_fps"' not in template
+                and "2560 px · Kamera-Maximum" in template,
                 "Route, Hintergrundaufnahme und Kameraansicht sind vollständig eingebunden",
             )
         finally:

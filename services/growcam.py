@@ -32,10 +32,9 @@ DEFAULT_CONFIG = {
     "batch_id": None,
     "timelapse_enabled": False,
     "timelapse_interval_sec": 900,
-    "timelapse_fps": 15,
     "retention_days": 30,
-    "live_width": 960,
-    "live_fps": 5,
+    "live_width": 2560,
+    "live_fps": 15,
 }
 
 _config_lock = threading.RLock()
@@ -54,6 +53,7 @@ _status = {
     "timelapse_rendering": False,
     "timelapse_error": None,
     "last_video": None,
+    "render_options": None,
 }
 _timelapse_lock = threading.Lock()
 
@@ -147,10 +147,9 @@ def _normalize_config(data):
 
     for key, minimum, maximum in (
         ("timelapse_interval_sec", 60, 86400),
-        ("timelapse_fps", 1, 30),
         ("retention_days", 1, 365),
-        ("live_width", 480, 1920),
-        ("live_fps", 1, 10),
+        ("live_width", 480, 2560),
+        ("live_fps", 1, 15),
     ):
         try:
             value = int(data.get(key, DEFAULT_CONFIG[key]))
@@ -225,6 +224,47 @@ def _batch_dir(batch_id):
     return TIMELAPSE_DIR / f"batch_{int(batch_id)}"
 
 
+def _thumbnail_dir(batch_id):
+    return _batch_dir(batch_id) / "thumbnails"
+
+
+def _safe_media_name(filename, *, prefix, suffix):
+    name = str(filename or "")
+    if not name.startswith(prefix) or not name.endswith(suffix):
+        return None
+    if any(
+        char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+        for char in name
+    ):
+        return None
+    return name
+
+
+def _create_thumbnail(source, target):
+    from PIL import Image
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    fd, temp_name = tempfile.mkstemp(
+        prefix=".growcam-thumb-",
+        suffix=".jpg",
+        dir=str(target.parent),
+    )
+    os.close(fd)
+    try:
+        with Image.open(source) as image:
+            image = image.convert("RGB")
+            image.thumbnail((480, 270))
+            image.save(temp_name, format="JPEG", quality=78, optimize=True)
+        os.chmod(temp_name, 0o640)
+        os.replace(temp_name, target)
+    finally:
+        try:
+            if os.path.exists(temp_name):
+                os.unlink(temp_name)
+        except OSError:
+            pass
+
+
 def _archive_latest(config, captured_at):
     batch_id = config.get("batch_id")
     if not config.get("timelapse_enabled") or not batch_id:
@@ -235,12 +275,16 @@ def _archive_latest(config, captured_at):
     target = directory / f"frame-{stamp}-{time.time_ns() % 1_000_000:06d}.jpg"
     shutil.copy2(LATEST_IMAGE, target)
     os.chmod(target, 0o640)
+    _create_thumbnail(target, _thumbnail_dir(batch_id) / target.name)
 
     cutoff = captured_at - int(config.get("retention_days") or 120) * 86400
     for old_frame in directory.glob("frame-*.jpg"):
         try:
             if old_frame.stat().st_mtime < cutoff:
                 old_frame.unlink()
+                thumbnail = _thumbnail_dir(batch_id) / old_frame.name
+                if thumbnail.is_file():
+                    thumbnail.unlink()
         except OSError:
             pass
     return target
@@ -351,7 +395,6 @@ def status_snapshot():
         "batch_id": batch_id,
         "timelapse_enabled": bool(config.get("timelapse_enabled")),
         "timelapse_interval_sec": config.get("timelapse_interval_sec"),
-        "timelapse_fps": config.get("timelapse_fps"),
         "retention_days": config.get("retention_days"),
         "live_width": config.get("live_width"),
         "live_fps": config.get("live_fps"),
@@ -383,16 +426,90 @@ def timelapse_summary(batch_id=None):
 
 
 def resolve_timelapse_video(batch_id, filename):
-    name = str(filename or "")
-    if not name.startswith("timelapse-") or not name.endswith(".mp4"):
-        return None
-    if any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_." for char in name):
+    name = _safe_media_name(filename, prefix="timelapse-", suffix=".mp4")
+    if name is None:
         return None
     candidate = _batch_dir(batch_id) / name
     return candidate if candidate.is_file() else None
 
 
-def _render_timelapse_worker(config):
+def list_timelapse_frames(batch_id, *, page=1, per_page=24):
+    if not batch_id:
+        return {"items": [], "page": 1, "pages": 0, "total": 0}
+    try:
+        frames = sorted(_batch_dir(batch_id).glob("frame-*.jpg"), reverse=True)
+    except (OSError, TypeError, ValueError):
+        frames = []
+    per_page = max(6, min(int(per_page), 60))
+    pages = (len(frames) + per_page - 1) // per_page
+    page = max(1, min(int(page), pages or 1))
+    start = (page - 1) * per_page
+    items = []
+    for frame in frames[start:start + per_page]:
+        try:
+            stat = frame.stat()
+        except OSError:
+            continue
+        items.append({
+            "filename": frame.name,
+            "captured_at": stat.st_mtime,
+            "size_bytes": stat.st_size,
+        })
+    return {"items": items, "page": page, "pages": pages, "total": len(frames)}
+
+
+def resolve_timelapse_frame(batch_id, filename, *, thumbnail=False):
+    name = _safe_media_name(filename, prefix="frame-", suffix=".jpg")
+    if name is None:
+        return None
+    source = _batch_dir(batch_id) / name
+    if not source.is_file():
+        return None
+    if not thumbnail:
+        return source
+    target = _thumbnail_dir(batch_id) / name
+    if not target.is_file():
+        try:
+            _create_thumbnail(source, target)
+        except Exception:
+            return source
+    return target
+
+
+def delete_timelapse_frame(batch_id, filename):
+    if _timelapse_lock.locked():
+        return {"success": False, "error": "Während der Videoerstellung können keine Bilder gelöscht werden."}
+    frame = resolve_timelapse_frame(batch_id, filename)
+    if frame is None:
+        return {"success": False, "error": "Zeitrafferbild wurde nicht gefunden."}
+    thumbnail = _thumbnail_dir(batch_id) / frame.name
+    try:
+        frame.unlink()
+        if thumbnail.is_file():
+            thumbnail.unlink()
+    except OSError as exc:
+        return {"success": False, "error": f"Zeitrafferbild konnte nicht gelöscht werden: {exc}"}
+    return {"success": True, "filename": frame.name}
+
+
+def _normalize_render_options(data):
+    data = dict(data or {})
+    try:
+        fps = int(data.get("video_fps", 15))
+        width = int(data.get("video_width", 1920))
+        crf = int(data.get("video_crf", 23))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Die Videoeinstellungen sind ungültig.") from exc
+    if fps not in {5, 10, 15, 20, 25, 30, 50, 60}:
+        raise ValueError("Die Zeitraffer-Bildrate ist ungültig.")
+    if width not in {960, 1280, 1920, 2560}:
+        raise ValueError("Die Videoauflösung ist ungültig.")
+    if crf not in {18, 21, 23, 26, 28, 32}:
+        raise ValueError("Die Videokompression ist ungültig.")
+    return {"video_fps": fps, "video_width": width, "video_crf": crf}
+
+
+def _render_timelapse_worker(config, options):
     batch_id = config["batch_id"]
     directory = _batch_dir(batch_id)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -405,10 +522,10 @@ def _render_timelapse_worker(config):
         process = subprocess.run(
             [
                 ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-framerate", str(config["timelapse_fps"]),
+                "-framerate", str(options["video_fps"]),
                 "-pattern_type", "glob", "-i", str(directory / "frame-*.jpg"),
-                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                "-vf", f"scale={options['video_width']}:-2:force_original_aspect_ratio=decrease,format=yuv420p",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(options["video_crf"]),
                 "-movflags", "+faststart", str(temp_output),
             ],
             stdout=subprocess.DEVNULL,
@@ -443,10 +560,11 @@ def _render_timelapse_worker(config):
             pass
         with _config_lock:
             _status["timelapse_rendering"] = False
+            _status["render_options"] = None
         _timelapse_lock.release()
 
 
-def start_timelapse_render():
+def start_timelapse_render(options=None):
     config = public_config()
     batch_id = config.get("batch_id")
     if not batch_id:
@@ -454,18 +572,27 @@ def start_timelapse_render():
     summary = timelapse_summary(batch_id)
     if summary["frame_count"] < 2:
         return {"success": False, "error": "Für ein Zeitraffer-Video werden mindestens zwei Aufnahmen benötigt."}
+    try:
+        render_options = _normalize_render_options(options)
+    except ValueError as exc:
+        return {"success": False, "error": str(exc)}
     if not _timelapse_lock.acquire(blocking=False):
         return {"success": False, "error": "Ein Zeitraffer-Video wird bereits erstellt."}
     with _config_lock:
         _status["timelapse_rendering"] = True
         _status["timelapse_error"] = None
+        _status["render_options"] = dict(render_options)
     threading.Thread(
         target=_render_timelapse_worker,
-        args=(config,),
+        args=(config, render_options),
         name="growstar-growcam-timelapse",
         daemon=True,
     ).start()
-    return {"success": True, "frame_count": summary["frame_count"]}
+    return {
+        "success": True,
+        "frame_count": summary["frame_count"],
+        "options": render_options,
+    }
 
 
 def mjpeg_stream():
@@ -568,11 +695,14 @@ __all__ = (
     "LATEST_IMAGE",
     "TIMELAPSE_DIR",
     "capture_snapshot",
+    "delete_timelapse_frame",
     "growcam_loop",
     "load_config",
+    "list_timelapse_frames",
     "public_config",
     "mjpeg_stream",
     "resolve_timelapse_video",
+    "resolve_timelapse_frame",
     "save_config",
     "status_snapshot",
     "start_timelapse_render",
