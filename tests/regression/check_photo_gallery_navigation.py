@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression fuer Growstar 3.16.26 / PLANT.PHOTO.4."""
+"""Regression fuer Foto-Galerie und eigenständige Mediennavigation."""
 
 from pathlib import Path
 
@@ -15,20 +15,33 @@ def require(condition, message):
 
 def main():
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
+    plant_nav = (ROOT / "templates/plants/_nav.html").read_text(encoding="utf-8")
+    media_nav = (ROOT / "templates/media/_nav.html").read_text(encoding="utf-8")
     manager = (ROOT / "templates/plants/photos.html").read_text(encoding="utf-8")
     routes = (ROOT / "routes/plant_management.py").read_text(encoding="utf-8")
     css = (ROOT / "static/css/plant-management.css").read_text(encoding="utf-8")
 
     require(
         "growstar_photo_endpoints" in base
+        and "growstar_media_active" in base
         and "url_for('plant_photo_manager')" in base
-        and "<span>Fotos</span><small>Foto-Manager</small>" in base,
-        "Der Foto-Manager ist als eigener Eintrag in der Pflanzen-Navigation vorhanden",
+        and "<div class=\"growstar-nav-section-title\">Medien</div>" in base
+        and "<span>Foto-Manager</span><small>Pflanzen & Durchgänge</small>" in base,
+        "Der Foto-Manager ist im eigenständigen Medienmodul vorhanden",
     )
     require(
-        "growstar_endpoint not in growstar_photo_endpoints" in base
-        and "growstar_endpoint in growstar_photo_endpoints" in base,
-        "Foto-Routen aktivieren nur den Foto-Menuepunkt",
+        "not growstar_media_active" in base
+        and "growstar_endpoint in growstar_photo_endpoints" in base
+        and "plant_photo_manager" not in plant_nav
+        and "growcam_page" not in plant_nav
+        and "plant_media_explorer" not in plant_nav
+        and "plant_photo_manager" in media_nav
+        and "growcam_page" in media_nav,
+        "Foto- und Kamerarouten aktivieren nur das Medienmodul",
+    )
+    require(
+        '{% include "media/_nav.html" %}' in manager,
+        "Der Foto-Manager verwendet die eigene Mediennavigation",
     )
 
     require(
@@ -85,7 +98,7 @@ def main():
         "Die Vollbildgalerie ist fuer Desktop und Mobilansicht gestaltet",
     )
 
-    print("✅ Growstar 3.16.26 / PLANT.PHOTO.4 vollstaendig geprueft")
+    print("✅ Foto-Galerie und Mediennavigation vollstaendig geprueft")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,5 @@
+<nav class="pm-nav" aria-label="Mediennavigation">
+    <a class="{{ 'active' if active_page == 'media' else '' }}" href="{{ url_for('plant_media_explorer') }}">Explorer</a>
+    <a class="{{ 'active' if active_page == 'photos' else '' }}" href="{{ url_for('plant_photo_manager') }}">Foto-Manager</a>
+    <a class="{{ 'active' if active_page == 'camera' else '' }}" href="{{ url_for('growcam_page') }}">Kamera</a>
+</nav>

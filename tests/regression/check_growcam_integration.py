@@ -277,6 +277,15 @@ def main():
                 encoding="utf-8"
             )
             base_template = (ROOT / "templates/base.html").read_text(encoding="utf-8")
+            plant_nav = (ROOT / "templates/plants/_nav.html").read_text(
+                encoding="utf-8"
+            )
+            media_nav = (ROOT / "templates/media/_nav.html").read_text(
+                encoding="utf-8"
+            )
+            dashboard_template = (ROOT / "templates/dashboard.html").read_text(
+                encoding="utf-8"
+            )
             dashboard_routes = (ROOT / "routes/dashboard.py").read_text(
                 encoding="utf-8"
             )
@@ -305,10 +314,18 @@ def main():
             )
             require(
                 "plant_media_explorer" in base_template
-                and "Explorer & Speicher" in base_template
+                and "Dateien & Speicher" in base_template
+                and "growstar_media_active" in base_template
+                and "Fotos, Videos & Kamera" in base_template
+                and "plant_media_explorer" not in plant_nav
+                and "growcam_page" not in plant_nav
+                and "plant_media_explorer" in media_nav
+                and "growcam_page" in media_nav
+                and '{% include "media/_nav.html" %}' in template
+                and "<h2>Medien</h2>" in dashboard_template
                 and "timelapse_frames" in media_template
                 and "growcam_timelapse_frame_delete" in media_template,
-                "Medien-Explorer ist in der Navigation verankert und verwaltet auch Zeitrafferbilder",
+                "Medien ist als eigenes Modul mit Explorer, Foto-Manager und Kamera verankert",
             )
             require(
                 "growcam_live_viewer" in station_template

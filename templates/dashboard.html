@@ -206,6 +206,10 @@
         --module-glow: rgba(56,189,248,.20);
     }
 
+    .media {
+        --module-glow: rgba(244,114,182,.20);
+    }
+
     .admin {
         --module-glow: rgba(167,139,250,.20);
     }
@@ -316,6 +320,20 @@
             <p>
                 Aktive Pflanzen, Sortenstamm, Durchgänge und Lifecycle-Timeline
                 in einem eigenständigen Management-Modul.
+            </p>
+            <div class="module-action">Öffnen →</div>
+        </section>
+    </a>
+    {% endif %}
+
+    {% if has_permission('plants.view') %}
+    <a class="module-link" href="{{ url_for('plant_media_explorer') }}">
+        <section class="module-card media">
+            <div class="module-icon">🎬</div>
+            <h2>Medien</h2>
+            <p>
+                GrowCam-Livestream und Einstellungen, Zeitraffer-Videos sowie
+                Pflanzen- und Durchgangsfotos zentral verwalten.
             </p>
             <div class="module-action">Öffnen →</div>
         </section>

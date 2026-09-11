@@ -1,6 +1,7 @@
 # Growstar Medien-Explorer
 
-Der Medien-Explorer unter **Pflanzenmanagement → Medien** zeigt ausschließlich
+Der eigenständige Hauptmenüpunkt **Medien** bündelt Explorer, Foto-Manager und
+Kamera. Der Medien-Explorer zeigt ausschließlich
 Dateien, die Growstar selbst verwaltet. Betriebssystemdateien, Datenbanken und
 Protokolle bleiben außerhalb der Löschoberfläche.
 

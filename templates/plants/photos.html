@@ -5,7 +5,7 @@
 <main class="pm-shell">
 <header class="pm-header">
     <div class="pm-heading-wrap">
-        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <a class="pm-back" href="{{ url_for('plant_media_explorer') }}">←</a>
         <div>
             <h1 class="pm-title">📷 Foto-Manager</h1>
             <div class="pm-subtitle">Bildverlauf für einzelne Pflanzen und vollständige Durchgänge</div>
@@ -21,7 +21,7 @@
 </header>
 
 {% set active_page = 'photos' %}
-{% include "plants/_nav.html" %}
+{% include "media/_nav.html" %}
 
 {% with messages = get_flashed_messages(with_categories=true) %}
 {% if messages %}<div class="pm-flashes">{% for category, message in messages %}<div class="pm-flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
