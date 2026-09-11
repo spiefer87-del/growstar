@@ -44,7 +44,12 @@ READ_EXACT = {
     "/grow-control": require("grow.view"),
     "/grow-control/watchdog": require("hardware.view"),
     "/grow-control/watchdog/systemdaten": require("hardware.view"),
+    "/grow-control/sensors": require("hardware.view"),
+    "/grow-control/connections": require("hardware.view"),
+    "/grow-control/setup": require("settings.view"),
     "/pflanzenmanagement": require("plants.view"),
+    "/hardware": require("hardware.view", "settings.view", mode="any"),
+    "/system/spiderfarmer": require("hardware.view"),
 
     # Release-/Patch-Informationen sind read-only und für alle normalen
     # angemeldeten Growstar-Rollen sichtbar.

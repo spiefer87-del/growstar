@@ -210,6 +210,10 @@
         --module-glow: rgba(244,114,182,.20);
     }
 
+    .hardware {
+        --module-glow: rgba(245,158,11,.22);
+    }
+
     .admin {
         --module-glow: rgba(167,139,250,.20);
     }
@@ -304,8 +308,22 @@
             <div class="module-icon">🎛️</div>
             <h2>Grow Control</h2>
             <p>
-                Klima, Geräte, Regelung, Energie und die technische
-                Steuerung des laufenden Grows.
+                Klima, Automatik, Live-Steuerung und Auswertung
+                der laufenden Grow-Stationen.
+            </p>
+            <div class="module-action">Öffnen →</div>
+        </section>
+    </a>
+    {% endif %}
+
+    {% if has_any_permission('hardware.view', 'settings.view') %}
+    <a class="module-link" href="{{ url_for('hardware_management_dashboard') }}">
+        <section class="module-card hardware">
+            <div class="module-icon">🛠️</div>
+            <h2>Hardware &amp; Setup</h2>
+            <p>
+                Geräte, Sensoren, Kamera-Netzwerk, Verbindungen und technische
+                Raspberry-Einstellungen zentral verwalten.
             </p>
             <div class="module-action">Öffnen →</div>
         </section>
@@ -358,6 +376,8 @@
 
 {% if not has_any_permission(
     'grow.view',
+    'hardware.view',
+    'settings.view',
     'plants.view',
     'diary.view',
     'users.view',

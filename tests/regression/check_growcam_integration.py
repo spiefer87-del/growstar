@@ -276,6 +276,10 @@ def main():
             media_template = (ROOT / "templates/plants/media_explorer.html").read_text(
                 encoding="utf-8"
             )
+            hardware_template = (ROOT / "templates/devices.html").read_text(
+                encoding="utf-8"
+            )
+            camera_routes = (ROOT / "routes/camera.py").read_text(encoding="utf-8")
             base_template = (ROOT / "templates/base.html").read_text(encoding="utf-8")
             plant_nav = (ROOT / "templates/plants/_nav.html").read_text(
                 encoding="utf-8"
@@ -300,6 +304,19 @@ def main():
                 and 'timelapse_frames["items"]' in template
                 and "timelapse_frames.items" not in template,
                 "Route, Hintergrundaufnahme und Kameraansicht sind vollständig eingebunden",
+            )
+            require(
+                "Kamera-IP" not in template
+                and "RTSP-Port" not in template
+                and "RTSP-Pfad" not in template
+                and "growcam_hardware_configure" in hardware_template
+                and "Kamera-IP" in hardware_template
+                and "RTSP-Port" in hardware_template
+                and "RTSP-Pfad" in hardware_template
+                and '@permission_required("hardware.configure")' in camera_routes
+                and '"host": request.form.get("host")' in camera_routes
+                and "**current" in camera_routes,
+                "GrowCam-Netzwerkdaten liegen im Hardware-Manager und Medienwerte bleiben erhalten",
             )
             require(
                 'name="video_retention_count"' in template

@@ -22,6 +22,14 @@
     or growstar_endpoint in growstar_media_endpoints
     or growstar_endpoint.startswith('growcam_')
 %}
+{% set growstar_hardware_endpoints = [
+    'hardware_management_dashboard', 'devices', 'gateway_page', 'bluetooth_device_page',
+    'grow_control_connections', 'spiderfarmer_system_page', 'grow_control_watchdog',
+    'watchdog_system_data', 'grow_control_setup', 'grow_control_restart_policy',
+    'system_page', 'system_network_page', 'growstar_notifications_page',
+    'grow_control_sensors_dashboard', 'grow_control_tent_sensors'
+] %}
+{% set growstar_hardware_active = growstar_endpoint in growstar_hardware_endpoints %}
 {% set growstar_plants_active = not growstar_media_active and (
     growstar_endpoint.startswith('plant_')
     or growstar_endpoint.startswith('cultivar_')
@@ -32,14 +40,12 @@
     or growstar_endpoint == 'cultivation_guide'
     or growstar_endpoint in ['genetics_dashboard', 'propagation_dashboard_page']
 ) %}
-{% set growstar_grow_active =
+{% set growstar_grow_active = not growstar_hardware_active and (
     growstar_endpoint.startswith('grow_control')
     or growstar_endpoint in [
-        'devices', 'gateway_page', 'bluetooth_device_page',
-        'spiderfarmer_system_page',
-        'diagrams_page', 'system_page'
+        'diagrams_page'
     ]
-%}
+) %}
 {% set growstar_energy_active = growstar_endpoint in [
     'energie_page', 'energie_settings_page', 'energie_diagramme_page'
 ] %}
@@ -53,6 +59,7 @@
     </a>
     <div class="growstar-appbar-context" aria-hidden="true">
         {% if growstar_grow_active %}Grow Control
+        {% elif growstar_hardware_active %}Hardware &amp; Setup
         {% elif growstar_media_active %}Medien
         {% elif growstar_plants_active %}Pflanzenmanagement
         {% elif growstar_energy_active %}Energie
@@ -88,16 +95,38 @@
                 <div id="growstar-grow-submenu" class="growstar-nav-submenu" data-growstar-nav-submenu {% if not growstar_grow_active %}hidden{% endif %}>
                     <a class="{% if growstar_endpoint == 'grow_control_dashboard' %}active{% endif %}" href="{{ url_for('grow_control_dashboard') }}"><span>Übersicht</span><small>Stationen</small></a>
                     <a class="{% if growstar_endpoint.startswith('grow_control_tent') %}active{% endif %}" href="{{ url_for('grow_control_live') }}"><span>Live-Steuerung</span><small>Hauptstation</small></a>
-                    <a class="{% if growstar_endpoint == 'grow_control_sensors_dashboard' %}active{% endif %}" href="{{ url_for('grow_control_sensors_dashboard') }}"><span>Sensoren</span><small>Messwerte</small></a>
-
-                    <div class="growstar-nav-submenu-label">Technik</div>
-                    <a class="{% if growstar_endpoint in ['devices', 'gateway_page', 'bluetooth_device_page'] %}active{% endif %}" href="{{ url_for('devices') }}"><span>Hardware</span><small>Gateways & Geräte</small></a>
-                    <a class="{% if growstar_endpoint == 'grow_control_connections' %}active{% endif %}" href="{{ url_for('grow_control_connections') }}"><span>Verbindungen</span><small>Zuordnungen</small></a>
-                    <a class="{% if growstar_endpoint == 'spiderfarmer_system_page' %}active{% endif %}" href="{{ url_for('spiderfarmer_system_page') }}"><span>Spider Farmer</span><small>Controller</small></a>
                     <a class="{% if growstar_endpoint == 'diagrams_page' %}active{% endif %}" href="{{ url_for('diagrams_page') }}"><span>Diagramme</span><small>Analyse</small></a>
+                </div>
+            </div>
+        </section>
+        {% endif %}
+
+        {% if has_any_permission('hardware.view', 'settings.view') %}
+        <section class="growstar-nav-section growstar-nav-module growstar-nav-section-hardware">
+            <div class="growstar-nav-section-title">Hardware &amp; Setup</div>
+            <div class="growstar-nav-group {% if growstar_hardware_active %}is-expanded{% endif %}" data-growstar-nav-group>
+                <div class="growstar-nav-group-row {% if growstar_hardware_active %}active{% endif %}">
+                    <button class="growstar-nav-group-toggle" type="button" data-growstar-nav-group-toggle aria-expanded="{{ 'true' if growstar_hardware_active else 'false' }}" aria-controls="growstar-hardware-submenu" aria-label="Hardwaremenü ein- oder ausklappen"><span aria-hidden="true">⌄</span></button>
+                    <a class="growstar-nav-group-main" href="{{ url_for('hardware_management_dashboard') }}">
+                        <span class="growstar-nav-icon">🛠️</span>
+                        <span class="growstar-nav-copy"><strong>Hardware &amp; Setup</strong><small>Geräte, Sensoren &amp; System</small></span>
+                    </a>
+                </div>
+                <div id="growstar-hardware-submenu" class="growstar-nav-submenu" data-growstar-nav-submenu {% if not growstar_hardware_active %}hidden{% endif %}>
+                    <a class="{% if growstar_endpoint == 'hardware_management_dashboard' %}active{% endif %}" href="{{ url_for('hardware_management_dashboard') }}"><span>Übersicht</span><small>Hardware-Manager</small></a>
+                    {% if has_permission('hardware.view') %}
+                    <a class="{% if growstar_endpoint in ['devices', 'gateway_page', 'bluetooth_device_page'] %}active{% endif %}" href="{{ url_for('devices') }}"><span>Geräte</span><small>Gateways, BLE &amp; Kamera</small></a>
+                    <a class="{% if growstar_endpoint in ['grow_control_sensors_dashboard', 'grow_control_tent_sensors'] %}active{% endif %}" href="{{ url_for('grow_control_sensors_dashboard') }}"><span>Sensoren</span><small>Quellen &amp; Zuordnung</small></a>
+                    <a class="{% if growstar_endpoint == 'grow_control_connections' %}active{% endif %}" href="{{ url_for('grow_control_connections') }}"><span>Verbindungen</span><small>Aktoren &amp; Controller</small></a>
+                    <a class="{% if growstar_endpoint == 'spiderfarmer_system_page' %}active{% endif %}" href="{{ url_for('spiderfarmer_system_page') }}"><span>Spider Farmer</span><small>GGS-Controller</small></a>
                     <a class="{% if growstar_endpoint in ['grow_control_watchdog', 'watchdog_system_data'] %}active{% endif %}" href="{{ url_for('grow_control_watchdog') }}"><span>Watchdog</span><small>Überwachung</small></a>
-                    <a class="{% if growstar_endpoint == 'grow_control_setup' %}active{% endif %}" href="{{ url_for('grow_control_setup') }}"><span>Setup</span><small>Konfiguration</small></a>
+                    {% endif %}
+                    {% if has_permission('settings.view') %}
+                    <a class="{% if growstar_endpoint == 'grow_control_setup' %}active{% endif %}" href="{{ url_for('grow_control_setup') }}"><span>Setup</span><small>Stationen &amp; Neustart</small></a>
+                    <a class="{% if growstar_endpoint == 'system_network_page' %}active{% endif %}" href="{{ url_for('system_network_page') }}"><span>Netzwerk</span><small>Raspberry-Verbindung</small></a>
+                    <a class="{% if growstar_endpoint == 'growstar_notifications_page' %}active{% endif %}" href="{{ url_for('growstar_notifications_page') }}"><span>Alarme</span><small>Telegram &amp; Meldungen</small></a>
                     <a class="{% if growstar_endpoint == 'system_page' %}active{% endif %}" href="{{ url_for('system_page') }}"><span>Systemstatus</span><small>Growstar</small></a>
+                    {% endif %}
                 </div>
             </div>
         </section>

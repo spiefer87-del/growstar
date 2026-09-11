@@ -99,7 +99,7 @@
     </article>
 
     <article class="pm-card pm-span-12">
-        <div class="pm-card-head"><h2>Verbindung und Aufnahmeplan</h2></div>
+        <div class="pm-card-head"><div><h2>Aufnahmeplan und Medienzuordnung</h2><div class="pm-help">Netzwerkverbindung: {{ camera.host }}:{{ camera.port }}{{ camera.path }}</div></div><a class="pm-button" href="{{ url_for('devices', _anchor='growcam-connection') }}">🛠️ Verbindung im Hardware-Manager</a></div>
         <div class="pm-card-body">
             <form class="pm-form" method="post" action="{{ url_for('growcam_configure') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -107,17 +107,10 @@
                     <label class="pm-growcam-switch"><input type="checkbox" name="enabled" value="1" {{ 'checked' if camera.enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}><span>Kamera und automatische Standbilder aktivieren</span></label>
                     <label class="pm-growcam-switch"><input type="checkbox" name="timelapse_enabled" value="1" {{ 'checked' if camera.timelapse_enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}><span>Aufnahmen für Zeitraffer archivieren</span></label>
                 </div>
-                <div class="pm-form-grid pm-form-grid-3">
-                    <label class="pm-field"><span class="pm-label">Anzeigename</span><input class="pm-input" name="name" value="{{ camera.name }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
+                <div class="pm-form-grid">
                     <label class="pm-field"><span class="pm-label">Station</span><select class="pm-select" name="tent_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for tent in tents %}<option value="{{ tent.id }}" {{ 'selected' if tent.id == camera.tent_id else '' }}>{{ tent.name }} · {{ tent.id }}</option>{% endfor %}</select></label>
                     <label class="pm-field"><span class="pm-label">Pflanzendurchgang</span><select class="pm-select" name="batch_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}><option value="">— nicht zugeordnet —</option>{% for batch in batches %}<option value="{{ batch.id }}" {{ 'selected' if batch.id == camera.batch_id else '' }}>{{ batch.code }} · {{ batch.name }}{% if batch.status == 'archived' %} · archiviert{% endif %}</option>{% endfor %}</select></label>
                 </div>
-                <div class="pm-form-grid pm-form-grid-3">
-                    <label class="pm-field"><span class="pm-label">Kamera-IP</span><input class="pm-input" name="host" value="{{ camera.host }}" inputmode="decimal" placeholder="192.168.178.122" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
-                    <label class="pm-field"><span class="pm-label">RTSP-Port</span><input class="pm-input" type="number" name="port" value="{{ camera.port }}" min="1" max="65535" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
-                    <label class="pm-field"><span class="pm-label">Benutzer</span><input class="pm-input" name="username" value="{{ camera.username }}" maxlength="80" required {{ 'readonly' if not has_permission('plants.edit') else '' }}></label>
-                </div>
-                <label class="pm-field"><span class="pm-label">RTSP-Pfad</span><input class="pm-input" name="path" value="{{ camera.path }}" maxlength="160" required {{ 'readonly' if not has_permission('plants.edit') else '' }}><span class="pm-help">Für die GrowCam C4 bestätigt: /live/ch00_0</span></label>
                 <div class="pm-form-grid pm-form-grid-3">
                     <label class="pm-field"><span class="pm-label">Standbild aktualisieren</span><select class="pm-select" name="interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for seconds,label in [(15,'alle 15 Sekunden'),(30,'alle 30 Sekunden'),(60,'jede Minute'),(300,'alle 5 Minuten'),(900,'alle 15 Minuten')] %}<option value="{{ seconds }}" {{ 'selected' if camera.interval_sec == seconds else '' }}>{{ label }}</option>{% endfor %}</select></label>
                     <label class="pm-field"><span class="pm-label">Zeitraffer-Aufnahmeintervall</span><select class="pm-select" name="timelapse_interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for seconds,label in [(60,'jede Minute'),(300,'alle 5 Minuten'),(600,'alle 10 Minuten'),(900,'alle 15 Minuten'),(1800,'alle 30 Minuten'),(3600,'jede Stunde'),(21600,'alle 6 Stunden')] %}<option value="{{ seconds }}" {{ 'selected' if camera.timelapse_interval_sec == seconds else '' }}>{{ label }}</option>{% endfor %}</select></label>

@@ -89,6 +89,7 @@ def register(app):
     @app.post("/pflanzenmanagement/kamera/konfiguration")
     @permission_required("plants.edit")
     def growcam_configure():
+        current = public_config()
         tent_id = str(request.form.get("tent_id") or "").strip()
         try:
             if not tent_manager.get(tent_id):
@@ -97,12 +98,8 @@ def register(app):
             if batch_id and not get_batch(batch_id):
                 raise ValueError("Der ausgewählte Durchgang existiert nicht.")
             config = save_config({
+                **current,
                 "enabled": request.form.get("enabled") == "1",
-                "name": request.form.get("name"),
-                "host": request.form.get("host"),
-                "port": request.form.get("port"),
-                "path": request.form.get("path"),
-                "username": request.form.get("username"),
                 "interval_sec": request.form.get("interval_sec"),
                 "tent_id": tent_id,
                 "batch_id": batch_id,
@@ -132,6 +129,32 @@ def register(app):
         except Exception as exc:
             flash(str(exc), "error")
         return redirect(url_for("growcam_page"))
+
+    @app.post("/devices/growcam/konfiguration")
+    @permission_required("hardware.configure")
+    def growcam_hardware_configure():
+        current = public_config()
+        try:
+            config = save_config({
+                **current,
+                "name": request.form.get("name"),
+                "host": request.form.get("host"),
+                "port": request.form.get("port"),
+                "path": request.form.get("path"),
+                "username": request.form.get("username"),
+            })
+            _audit(
+                "hardware.growcam_connection_configured",
+                {
+                    "host": config["host"],
+                    "port": config["port"],
+                    "path": config["path"],
+                },
+            )
+            flash("GrowCam-Verbindung wurde im Hardware-Manager gespeichert.", "success")
+        except Exception as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("devices", _anchor="growcam-connection"))
 
     @app.post("/pflanzenmanagement/kamera/aufnahme")
     @permission_required("plants.edit")

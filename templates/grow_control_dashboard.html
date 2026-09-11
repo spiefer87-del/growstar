@@ -424,21 +424,12 @@
 
 <section class="section" aria-labelledby="grow-tools-title">
     <div class="section-head">
-        <h2 id="grow-tools-title">🧰 System &amp; Infrastruktur</h2>
-        <p>Zentrale Werkzeuge für alle Grow-Stationen auf diesem Raspberry.</p>
+        <h2 id="grow-tools-title">🎛️ Grow-Werkzeuge</h2>
+        <p>Ansicht und Auswertung der laufenden Grow-Stationen.</p>
     </div>
 
     <div class="module-grid">
         {% if has_permission('settings.view') %}
-        <a class="module-link" href="{{ url_for('grow_control_setup') }}">
-            <article class="module-card setup">
-                <div class="module-icon">⚙️</div>
-                <h3>Setup</h3>
-                <p>Grow-Stationen anlegen, benennen, aktivieren und Shadow-Regelkreise verwalten.</p>
-                <div class="module-action">Öffnen →</div>
-            </article>
-        </a>
-
         <a class="module-link" href="{{ url_for('design_page') }}">
             <article class="module-card design">
                 <div class="module-icon">🎨</div>
@@ -448,78 +439,6 @@
             </article>
         </a>
 
-        <a class="module-link" href="{{ url_for('system_network_page') }}">
-            <article class="module-card network">
-                <div class="module-icon">🌐</div>
-                <h3>Netzwerk</h3>
-                <p>LAN, WLAN, IP-Adressen und Netzwerkdiagnose des Raspberry Pi.</p>
-                <div class="module-action">Öffnen →</div>
-            </article>
-        </a>
-
-        <a class="module-link" href="{{ url_for('growstar_notifications_page') }}">
-            <article class="module-card notifications">
-                <div class="module-icon">🔔</div>
-                <h3>Alarm & Benachrichtigungen</h3>
-                <p>Telegram einrichten und Alarmmeldungen für Sensoren, Hardware, Safety und Systemzustände verwalten.</p>
-                <div class="module-action">Öffnen →</div>
-            </article>
-        </a>
-        {% endif %}
-
-        {% if has_permission('hardware.view') %}
-        <a class="module-link" href="{{ url_for('grow_control_sensors_dashboard') }}">
-            <article class="module-card sensors">
-                <div class="module-icon">🧪</div>
-                <h3>Sensoren</h3>
-                <p>Sensorquellen, Zuordnungen, Offsets und aktuelle Messwerte.</p>
-                <div class="module-action">Öffnen →</div>
-            </article>
-        </a>
-
-        <a class="module-link" href="{{ url_for('grow_control_watchdog') }}">
-            <article class="module-card watchdog">
-                <div class="module-icon">🛡️</div>
-                <h3>Watchdog</h3>
-                <p>Systemüberwachung, Fehlerzustände und Diagnoseprotokolle.</p>
-                <div class="module-action">Öffnen →</div>
-            </article>
-        </a>
-
-        <a class="module-link" href="{{ url_for('devices') }}">
-            <article class="module-card hardware">
-                <div class="module-icon">🔌</div>
-                <h3>Hardware</h3>
-                <p>Gateways, Shellys, Bluetooth-Geräte und Hardwarestatus.</p>
-                <div class="module-action">Öffnen →</div>
-            </article>
-        </a>
-
-        <a class="module-link" href="{{ url_for('grow_control_connections') }}">
-            <article class="module-card connections">
-                <div class="module-icon">🔗</div>
-                <h3>Verbindungen</h3>
-                <p>Aktoren pro Station manuell IP/Hostname und Relay zuweisen.</p>
-                <div class="module-action">Öffnen →</div>
-            </article>
-        </a>
-
-        <a
-            class="module-link"
-            href="{{ url_for('spiderfarmer_system_page') }}"
-            aria-label="Spider Farmer GGS öffnen"
-        >
-            <article class="module-card spiderfarmer">
-                <div class="module-icon">🕷️</div>
-                <h3>Spider Farmer</h3>
-                <p>
-                    GGS-Controller, Umweltsensor, Licht, Ventilator, Gebläse
-                    und erkannte Outlet-Kanäle direkt in Growstar anzeigen.
-                </p>
-                <div class="module-state">SF · READ-ONLY</div>
-                <div class="module-action">Controller öffnen →</div>
-            </article>
-        </a>
         {% endif %}
 
         {% if has_permission('grow.view') %}

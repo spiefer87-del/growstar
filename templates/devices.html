@@ -340,6 +340,18 @@ h3{
 
 }
 
+.hardware-camera-card{max-width:920px}
+.hardware-camera-form{display:grid;gap:14px;margin-top:16px}
+.hardware-camera-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.hardware-field{display:grid;gap:6px;color:var(--muted);font-size:.78rem}
+.hardware-field.wide{grid-column:1/-1}
+.hardware-field input{width:100%;padding:11px 12px;border:1px solid #334155;border-radius:10px;background:#020617;color:var(--text);font:inherit}
+.hardware-field input:read-only{opacity:.72}
+.hardware-camera-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.hardware-camera-actions .button{width:auto;margin-top:0;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+.hardware-flash{margin:0 0 14px;padding:11px 13px;border-radius:11px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#86efac}
+.hardware-flash.error{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.25);color:#fca5a5}
+
 @media(max-width:600px){
 
     body{
@@ -347,6 +359,8 @@ h3{
         padding:12px;
 
     }
+
+    .hardware-camera-grid{grid-template-columns:1fr}
 
 }
 
@@ -360,13 +374,41 @@ h3{
 
 <h1>🛜 Hardware</h1>
 
-<a class="back" href="/system">
+<a class="back" href="{{ url_for('hardware_management_dashboard') }}">
 
-← System
+← Hardware &amp; Setup
 
 </a>
 
 </header>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% for category, message in messages %}<div class="hardware-flash {{ category }}">{{ message }}</div>{% endfor %}
+{% endwith %}
+
+<h3 id="growcam-connection">GrowCam-Verbindung</h3>
+
+<div class="grid">
+<div class="card hardware-camera-card">
+<h2>📷 VIVOSUN GrowCam C4 · Netzwerk</h2>
+<div class="sub">Technische RTSP-Verbindung der Kamera. Livebild, Aufnahmeplan, Stations- und Durchgangszuordnung bleiben im Medienmodul.</div>
+<form class="hardware-camera-form" method="post" action="{{ url_for('growcam_hardware_configure') }}">
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="hardware-camera-grid">
+<label class="hardware-field"><span>Anzeigename</span><input name="name" value="{{ camera.name }}" maxlength="80" required {{ 'readonly' if not has_permission('hardware.configure') else '' }}></label>
+<label class="hardware-field"><span>Kamera-IP</span><input name="host" value="{{ camera.host }}" inputmode="decimal" placeholder="192.168.178.122" required {{ 'readonly' if not has_permission('hardware.configure') else '' }}></label>
+<label class="hardware-field"><span>RTSP-Port</span><input type="number" name="port" value="{{ camera.port }}" min="1" max="65535" required {{ 'readonly' if not has_permission('hardware.configure') else '' }}></label>
+<label class="hardware-field"><span>Benutzer</span><input name="username" value="{{ camera.username }}" maxlength="80" required {{ 'readonly' if not has_permission('hardware.configure') else '' }}></label>
+<label class="hardware-field wide"><span>RTSP-Pfad</span><input name="path" value="{{ camera.path }}" maxlength="160" required {{ 'readonly' if not has_permission('hardware.configure') else '' }}></label>
+</div>
+<div class="sub">Bestätigter GrowCam-C4-Pfad: <strong>/live/ch00_0</strong>. Growstar speichert weiterhin kein Kamera- oder Cloud-Passwort.</div>
+<div class="hardware-camera-actions">
+{% if has_permission('hardware.configure') %}<button class="button" type="submit">Verbindung speichern</button>{% endif %}
+<a class="button secondary" href="{{ url_for('growcam_page') }}">Livebild &amp; Aufnahmeplan</a>
+</div>
+</form>
+</div>
+</div>
 
 
 
@@ -2007,7 +2049,7 @@ function renderActuators(actuators){
 
                 <div class="sub">
 
-                    Aktoren erscheinen hier automatisch, sobald unter Grow Control → Verbindungen eine IP + Relay zugewiesen wurde.
+                    Aktoren erscheinen hier automatisch, sobald unter Hardware &amp; Setup → Verbindungen eine IP + Relay zugewiesen wurde.
 
                 </div>
 

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Hardware & Setup – Growstar{% endblock %}
+
+{% block head %}
+<style>
+*,*::before,*::after{box-sizing:border-box}:root{--bg:#0f172a;--card:#1e293b;--text:#e5e7eb;--muted:#94a3b8;--green:#22c55e;--blue:#38bdf8;--line:rgba(148,163,184,.16)}
+body{margin:0;padding:24px;background:radial-gradient(circle at top left,rgba(56,189,248,.09),transparent 34rem),var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}.hm-shell{max-width:1180px;margin:auto}.hm-head{display:flex;align-items:center;gap:14px;margin-bottom:24px}.hm-back{display:inline-flex;width:44px;height:44px;align-items:center;justify-content:center;border:1px solid #334155;border-radius:12px;background:var(--card);color:var(--text);text-decoration:none}.hm-head h1{margin:0;font-size:clamp(1.65rem,4vw,2.15rem)}.hm-head p{margin:5px 0 0;color:var(--muted)}.hm-section{margin-top:28px}.hm-section h2{margin:0 0 5px;font-size:1.08rem}.hm-section>p{margin:0 0 14px;color:var(--muted);font-size:.86rem}.hm-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.hm-card{display:block;min-height:175px;padding:20px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.98));color:var(--text);text-decoration:none;box-shadow:0 12px 30px rgba(0,0,0,.2);transition:.18s}.hm-card:hover{transform:translateY(-2px);border-color:rgba(56,189,248,.45)}.hm-icon{font-size:1.7rem}.hm-card h3{margin:16px 0 7px}.hm-card p{margin:0;color:var(--muted);font-size:.82rem;line-height:1.5}.hm-action{margin-top:15px;color:#7dd3fc;font-size:.78rem;font-weight:800}@media(max-width:850px){.hm-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:560px){body{padding:14px}.hm-grid{grid-template-columns:1fr}.hm-card{min-height:0}}
+</style>
+{% endblock %}
+
+{% block page %}
+<main class="hm-shell">
+    <header class="hm-head"><a class="hm-back" href="{{ url_for('dashboard') }}">←</a><div><h1>🛠️ Hardware &amp; Setup</h1><p>Zentrale Verwaltung aller physischen Geräte, Sensorquellen, Verbindungen und Raspberry-Dienste</p></div></header>
+
+    {% if has_permission('hardware.view') %}
+    <section class="hm-section"><h2>Geräte &amp; Datenquellen</h2><p>Hardware erkennen, verbinden und den Grow-Stationen eindeutig zuordnen.</p><div class="hm-grid">
+        <a class="hm-card" href="{{ url_for('devices') }}"><span class="hm-icon">🔌</span><h3>Geräte-Manager</h3><p>Shelly-Gateways, Bluetooth-Sensoren, MQTT-Controller und die GrowCam-Netzwerkverbindung.</p><div class="hm-action">Geräte öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('grow_control_sensors_dashboard') }}"><span class="hm-icon">🧪</span><h3>Sensoren</h3><p>Messquellen, Innen-/Außenzuordnung, Kalibrierung und aktuelle Hardwarewerte.</p><div class="hm-action">Sensoren öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('grow_control_connections') }}"><span class="hm-icon">🔗</span><h3>Verbindungen</h3><p>Strom-Aktoren, Relais und Controller-Funktionen den Stationen zuweisen.</p><div class="hm-action">Zuordnungen öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('spiderfarmer_system_page') }}"><span class="hm-icon">🕷️</span><h3>Spider Farmer</h3><p>GGS-Controller, Power Strips und erkannte Sensor-/Gerätekanäle prüfen.</p><div class="hm-action">Controller öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('grow_control_watchdog') }}"><span class="hm-icon">🛡️</span><h3>Watchdog</h3><p>Hardware-Poll, MQTT, Recovery, Safety und Fehlerzustände überwachen.</p><div class="hm-action">Überwachung öffnen →</div></a>
+    </div></section>
+    {% endif %}
+
+    {% if has_permission('settings.view') %}
+    <section class="hm-section"><h2>Setup &amp; Raspberry</h2><p>Grundlegende Stations- und Systemdienste abseits der laufenden Grow-Regelung.</p><div class="hm-grid">
+        <a class="hm-card" href="{{ url_for('grow_control_setup') }}"><span class="hm-icon">⚙️</span><h3>Stations-Setup</h3><p>Stationen anlegen, benennen, Shadow/LIVE verwalten und Neustartverhalten festlegen.</p><div class="hm-action">Setup öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('system_network_page') }}"><span class="hm-icon">🌐</span><h3>Netzwerk</h3><p>LAN, WLAN, IP-Adressen und Erreichbarkeit des Raspberry Pi verwalten.</p><div class="hm-action">Netzwerk öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('growstar_notifications_page') }}"><span class="hm-icon">🔔</span><h3>Alarme</h3><p>Telegram, Hardwarefehler, Safety- und Systemmeldungen konfigurieren.</p><div class="hm-action">Alarme öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('system_page') }}"><span class="hm-icon">🖥️</span><h3>Systemstatus</h3><p>Systemfunktionen und weiterführende technische Einstellungen öffnen.</p><div class="hm-action">System öffnen →</div></a>
+    </div></section>
+    {% endif %}
+</main>
+{% endblock %}

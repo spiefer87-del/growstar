@@ -305,7 +305,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
             assignmentWarning.textContent =
                 "⚠️ Dieses Gerät ist keiner Power-Hardware zugeordnet. " +
                 "Dauerbetrieb, Zeitsteuerung, Intervall und Umgebung sind gesperrt. " +
-                "Bitte zuerst unter Grow Control → Verbindungen IP/Hostname + Relay zuweisen.";
+                "Bitte zuerst unter Hardware & Setup → Verbindungen IP/Hostname + Relay zuweisen.";
         } else {
             assignmentWarning.classList.remove("visible");
             assignmentWarning.textContent = "";
@@ -796,7 +796,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         if (mode.value !== "OFF" && !hardwareConfigured) {
             alert(
                 "Dieses Gerät ist keiner Power-Hardware zugeordnet. " +
-                "Bitte zuerst unter Grow Control → Verbindungen IP/Hostname + Relay zuweisen."
+                "Bitte zuerst unter Hardware & Setup → Verbindungen IP/Hostname + Relay zuweisen."
             );
             return;
         }

@@ -101,6 +101,10 @@ def register(app):
     def grow_control_dashboard():
         return render_template("grow_control_dashboard.html")
 
+    @app.route("/hardware")
+    def hardware_management_dashboard():
+        return render_template("hardware/dashboard.html")
+
     @app.route("/grow-control/sensors")
     def grow_control_sensors_dashboard():
         return render_template("grow_control_sensors.html")
@@ -345,7 +349,10 @@ def register(app):
 
     @app.route("/devices")
     def devices():
-        return render_template("devices.html")
+        return render_template(
+            "devices.html",
+            camera=growcam_public_config(),
+        )
 
     @app.route("/devices/<gateway_id>")
     def gateway_page(gateway_id):
