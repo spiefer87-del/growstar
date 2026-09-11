@@ -26,7 +26,7 @@
     'hardware_management_dashboard', 'devices', 'gateway_page', 'bluetooth_device_page',
     'grow_control_connections', 'spiderfarmer_system_page', 'grow_control_watchdog',
     'watchdog_system_data', 'grow_control_setup', 'grow_control_restart_policy',
-    'system_page', 'system_network_page', 'growstar_notifications_page',
+    'system_network_page', 'growstar_notifications_page',
     'grow_control_sensors_dashboard', 'grow_control_tent_sensors'
 ] %}
 {% set growstar_hardware_active = growstar_endpoint in growstar_hardware_endpoints %}
@@ -183,7 +183,6 @@
                     <a class="{% if growstar_endpoint == 'grow_control_setup' %}active{% endif %}" href="{{ url_for('grow_control_setup') }}"><span>Setup</span><small>Stationen &amp; Neustart</small></a>
                     <a class="{% if growstar_endpoint == 'system_network_page' %}active{% endif %}" href="{{ url_for('system_network_page') }}"><span>Netzwerk</span><small>Raspberry-Verbindung</small></a>
                     <a class="{% if growstar_endpoint == 'growstar_notifications_page' %}active{% endif %}" href="{{ url_for('growstar_notifications_page') }}"><span>Alarme</span><small>Telegram &amp; Meldungen</small></a>
-                    <a class="{% if growstar_endpoint == 'system_page' %}active{% endif %}" href="{{ url_for('system_page') }}"><span>Systemstatus</span><small>Growstar</small></a>
                     {% endif %}
                 </div>
             </div>

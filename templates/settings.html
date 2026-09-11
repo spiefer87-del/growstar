@@ -1,10 +1,6 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Klima & Grenzwerte – {{ tent_name }}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+{% extends "base.html" %}
+{% block title %}Klima &amp; Grenzwerte – {{ tent_name }}{% endblock %}
+{% block head %}
 <style>
 :root{
     --bg:#0f172a;--card:#1e293b;--card2:#111827;--text:#e5e7eb;
@@ -198,9 +194,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
     .compact-input{width:86px}
 }
 </style>
-</head>
-
-<body>
+{% endblock %}
+{% block page %}
 <div class="wrap">
     <div class="nav">
         <a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← {{ tent_name }}</a>
@@ -1681,5 +1676,4 @@ window.addEventListener("beforeunload",event=>{
 selectSettingsSection("classic",{remember:false});
 load();
 </script>
-</body>
-</html>
+{% endblock %}

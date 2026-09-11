@@ -44,10 +44,17 @@ def main():
     for endpoint in (
         "devices", "grow_control_sensors_dashboard", "grow_control_connections",
         "spiderfarmer_system_page", "grow_control_watchdog", "grow_control_setup",
-        "system_network_page", "growstar_notifications_page", "system_page",
+        "system_network_page", "growstar_notifications_page",
     ):
         require(f"url_for('{endpoint}')" in landing, f"Hardware-Startseite verlinkt {endpoint}")
 
+    require(
+        '@app.route("/system")' in routes
+        and 'redirect(url_for("hardware_management_dashboard"), code=302)' in routes
+        and "url_for('system_page')" not in landing
+        and "url_for('system_page')" not in base,
+        "Das veraltete System-Doppeldashboard ist entfernt und seine URL bleibt kompatibel",
+    )
     require(
         "url_for('devices')" not in grow
         and "url_for('grow_control_connections')" not in grow

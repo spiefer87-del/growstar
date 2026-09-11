@@ -41,7 +41,7 @@ def main():
     hardware_targets = (
         "hardware_management_dashboard", "devices", "grow_control_sensors_dashboard",
         "grow_control_connections", "spiderfarmer_system_page", "grow_control_watchdog",
-        "grow_control_setup", "system_network_page", "system_page",
+        "grow_control_setup", "system_network_page",
     )
     hardware_menu = base[base.index('id="growstar-hardware-submenu"'):base.index('growstar-nav-section-energy')]
     for endpoint in hardware_targets:

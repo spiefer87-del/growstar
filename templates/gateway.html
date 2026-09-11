@@ -1,11 +1,7 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
+{% block title %}Gateway – Growstar{% endblock %}
+{% block head %}
 <link rel="stylesheet" href="/static/css/dialog.css">
-
-<title>Gateway</title>
 
 <style>
 
@@ -118,9 +114,8 @@ button{
 
 </style>
 
-</head>
-
-<body>
+{% endblock %}
+{% block page %}
 
 <a href="/devices">← Hardware</a>
 
@@ -258,5 +253,4 @@ const gatewayId = "{{ gateway_id }}";
 
 <script src="/static/js/gateway.js"></script>
 
-</body>
-</html>
+{% endblock %}

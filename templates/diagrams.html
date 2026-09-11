@@ -1,10 +1,6 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Diagrammdaten verwalten</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+{% extends "base.html" %}
+{% block title %}Diagrammdaten verwalten – Growstar{% endblock %}
+{% block head %}
 <style>
 :root{
     --bg:#0f172a;
@@ -78,9 +74,8 @@ input[type="file"]{
     margin-top:8px;
 }
 </style>
-</head>
-
-<body>
+{% endblock %}
+{% block page %}
 
 <header>
     <h1>🗄️ Diagrammdaten verwalten</h1>
@@ -164,5 +159,4 @@ async function resetData(){
 }
 </script>
 
-</body>
-</html>
+{% endblock %}

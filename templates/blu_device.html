@@ -1,12 +1,6 @@
-<!DOCTYPE html>
-<html lang="de">
-
-<head>
-
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>Bluetooth Gerät</title>
+{% extends "base.html" %}
+{% block title %}Bluetooth-Gerät – Growstar{% endblock %}
+{% block head %}
 
 <link
     rel="stylesheet"
@@ -16,9 +10,8 @@
     rel="stylesheet"
     href="/static/css/dialog.css">
 
-</head>
-
-<body>
+{% endblock %}
+{% block page %}
 
 <div class="page">
 
@@ -457,6 +450,4 @@ const deviceId = "{{ device_id }}";
 <script src="/static/js/dialog.js"></script>
 <script src="/static/js/blu_device.js"></script>
 
-</body>
-
-</html>
+{% endblock %}

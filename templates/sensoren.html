@@ -1,17 +1,9 @@
-<!DOCTYPE html>
-<html lang="de">
-
-<head>
-
-<meta charset="UTF-8">
-<title>Sensoren – {{ tent_name }}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
+{% extends "base.html" %}
+{% block title %}Sensoren – {{ tent_name }}{% endblock %}
+{% block head %}
 <link rel="stylesheet" href="/static/css/growstar.css">
-
-</head>
-
-<body>
+{% endblock %}
+{% block page %}
 
 <div class="page">
 
@@ -1352,6 +1344,4 @@ setInterval(
 
 </script>
 
-</body>
-
-</html>
+{% endblock %}

@@ -1,9 +1,6 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>{{ metric_title }} – {{ tent_name }}</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+{% extends "base.html" %}
+{% block title %}{{ metric_title }} – {{ tent_name }}{% endblock %}
+{% block head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 <style>
@@ -18,8 +15,8 @@
 .chart-card{border:1px solid var(--border);border-radius:20px;padding:14px;background:linear-gradient(155deg,var(--card),#172338);box-shadow:0 18px 60px rgba(0,0,0,.22)}.chart-title{font-size:1rem;font-weight:800}.chart-subtitle{margin-top:2px;color:var(--muted);font-size:.8rem}.chart-wrap{position:relative;height:min(58vh,540px);min-height:330px}canvas{width:100%!important;height:100%!important}.empty{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted);pointer-events:none}.empty.show{display:flex}.footer-note{margin-top:10px;color:var(--muted);font-size:.75rem;text-align:right}
 @media(max-width:720px){.page{padding:12px 10px 24px}.metric-tabs{gap:5px;padding:5px}.metric-tab{font-size:.78rem;min-height:47px}.metric-tab span{display:none}.summary{grid-template-columns:repeat(3,1fr)}.summary-card.current{grid-column:1/-1}.chart-wrap{height:52vh;min-height:330px}.topbar{align-items:flex-start}.back{padding:9px 10px;font-size:.82rem}}
 </style>
-</head>
-<body>
+{% endblock %}
+{% block page %}
 <div class="page">
 <div class="topbar"><div><div class="eyebrow">{{ tent_name }} · Umgebungsverlauf</div><h1 id="page-title">{{ metric_icon }} {{ metric_title }}</h1></div><a href="{{ url_for('grow_control_diagrams_dashboard') }}" class="back">← Diagramme</a></div>
 <div class="metric-tabs">
@@ -76,5 +73,4 @@ function tooltipLabel(ctx){const c=currentMetricConfig();return `${ctx.dataset.l
 async function load(){const c=currentMetricConfig(),url=`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${currentRange}&type=${metric}`;let d;try{const res=await fetch(url,{cache:"no-store"});if(!res.ok)throw new Error(`HTTP ${res.status}`);d=await res.json();if(!Array.isArray(d))throw new Error("History API lieferte kein Array")}catch(e){console.error("History API:",e);byId("empty").textContent=`Messwerte konnten nicht geladen werden (${e.message}).`;byId("empty").classList.add("show");return}d=downsample(d,RANGES[currentRange].maxPoints);updateStats(d);const hasValues=vals(d,c.field).length>0;byId("empty").textContent="Für diesen Zeitraum sind noch keine Messwerte gespeichert.";byId("empty").classList.toggle("show",!hasValues);const ds=dataSets(d);try{if(!chart){chart=new Chart(byId("chart"),{type:"line",data:{datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},onClick:()=>scheduleTooltipHide(),scales:{x:xScale(),y:{beginAtZero:metric==="ppfd",ticks:{color:"#94a3b8"}}},plugins:{legend:{position:"bottom",labels:{color:"#e5e7eb"}},tooltip:{callbacks:{label:tooltipLabel}}}}});const canvas=byId("chart");canvas.addEventListener("pointerup",scheduleTooltipHide,{passive:true});canvas.addEventListener("touchend",scheduleTooltipHide,{passive:true})}else{chart.data.datasets=ds;chart.options.scales.x=xScale();chart.options.scales.y.beginAtZero=metric==="ppfd";chart.update("none")}}catch(e){console.error("Chart render:",e);byId("empty").textContent=`Diagramm konnte nicht gezeichnet werden (${e.message}).`;byId("empty").classList.add("show")}}
 updateTabs();updateHeader();loadStations();load();setInterval(load,60000);
 </script>
-</body>
-</html>
+{% endblock %}

@@ -361,7 +361,9 @@ def register(app):
 
     @app.route("/system")
     def system_page():
-        return render_template("system.html")
+        # Rückwärtskompatibler Einstieg für alte Lesezeichen. Das frühere
+        # System-Kacheldashboard duplizierte nur die aktuelle Hardware-Navigation.
+        return redirect(url_for("hardware_management_dashboard"), code=302)
 
     @app.route("/design")
     def design_page():
