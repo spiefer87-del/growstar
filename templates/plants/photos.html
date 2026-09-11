@@ -77,6 +77,7 @@
         <div class="pm-photo-meta">{{ photo.captured_date }} · {{ photo.captured_time }} Uhr · {{ photo.width }}×{{ photo.height }} · {{ photo.size_kb }} KB</div>
         {% if photo.note %}<p>{{ photo.note }}</p>{% endif %}
         <div class="pm-actions">
+            <a class="pm-button" href="{{ url_for('batch_photo_file', photo_id=photo.id, download=1) }}">Download</a>
             {% if photo.journal_entry_id %}<a class="pm-button" href="{{ url_for('plant_journal_detail', entry_id=photo.journal_entry_id) }}">Journal</a>{% endif %}
             {% if has_permission('plants.edit') %}
             <form method="post" action="{{ url_for('batch_photo_remove', photo_id=photo.id) }}" onsubmit="return confirm('Dieses Durchgangsfoto wirklich entfernen?');">
@@ -146,6 +147,7 @@
         <div class="pm-photo-meta">{{ photo.captured_date }} · {{ photo.captured_time }} Uhr · {{ photo.width }}×{{ photo.height }} · {{ photo.size_kb }} KB</div>
         {% if photo.note %}<p>{{ photo.note }}</p>{% endif %}
         <div class="pm-actions">
+            <a class="pm-button" href="{{ url_for('plant_photo_file', photo_id=photo.id, download=1) }}">Download</a>
             {% if photo.journal_entry_id %}<a class="pm-button" href="{{ url_for('plant_journal_detail', entry_id=photo.journal_entry_id) }}">Journal</a>{% endif %}
             {% if has_permission('plants.edit') %}
             <form method="post" action="{{ url_for('plant_photo_remove', photo_id=photo.id) }}" onsubmit="return confirm('Dieses Foto wirklich entfernen?');">

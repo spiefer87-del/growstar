@@ -946,11 +946,14 @@ def register(app):
         photo = get_plant_photo(photo_id)
         if not photo or not os.path.isfile(photo["path"]):
             abort(404)
+        download = request.args.get("download") == "1"
         return send_file(
             photo["path"],
             mimetype=photo["mime_type"],
             conditional=True,
             max_age=86400,
+            as_attachment=download,
+            download_name=f"growstar-pflanze-{photo_id}.jpg" if download else None,
         )
 
 
@@ -961,11 +964,14 @@ def register(app):
         photo = get_batch_photo(photo_id)
         if not photo or not os.path.isfile(photo["path"]):
             abort(404)
+        download = request.args.get("download") == "1"
         return send_file(
             photo["path"],
             mimetype=photo["mime_type"],
             conditional=True,
             max_age=86400,
+            as_attachment=download,
+            download_name=f"growstar-durchgang-{photo_id}.jpg" if download else None,
         )
 
 
@@ -991,9 +997,15 @@ def register(app):
                 {"plant_id": photo["plant_id"]},
             )
             flash("Foto wurde aus dem Foto-Manager entfernt.", "success")
-        return redirect(
-            url_for("plant_photo_manager", plant_id=photo["plant_id"])
-        )
+        if request.form.get("return_to") == "media":
+            return redirect(
+                url_for(
+                    "plant_media_explorer",
+                    kind="plant_photos",
+                    page=request.form.get("page", type=int) or 1,
+                )
+            )
+        return redirect(url_for("plant_photo_manager", plant_id=photo["plant_id"]))
 
 
     @app.route(
@@ -1018,6 +1030,14 @@ def register(app):
                 {"batch_id": photo["batch_id"]},
             )
             flash("Durchgangsfoto wurde aus dem Foto-Manager entfernt.", "success")
+        if request.form.get("return_to") == "media":
+            return redirect(
+                url_for(
+                    "plant_media_explorer",
+                    kind="batch_photos",
+                    page=request.form.get("page", type=int) or 1,
+                )
+            )
         return redirect(
             url_for(
                 "plant_photo_manager",

@@ -78,6 +78,10 @@
                 <source src="{{ url_for('growcam_timelapse_video', batch_id=camera.batch_id, filename=camera_status.timelapse.latest_video) }}" type="video/mp4">
             </video>
             <p class="pm-help">Letztes Video aus {{ camera_status.timelapse.frame_count }} vorhandenen Durchgangsaufnahmen.</p>
+            <div class="pm-actions pm-growcam-video-actions">
+                <a class="pm-button primary" href="{{ url_for('growcam_timelapse_video', batch_id=camera.batch_id, filename=camera_status.timelapse.latest_video, download=1) }}">⬇ Video herunterladen</a>
+                <a class="pm-button" href="{{ url_for('plant_media_explorer', kind='videos') }}">Alle Videos verwalten</a>
+            </div>
             {% else %}
             <div class="pm-empty pm-growcam-timelapse-empty">{% if camera.timelapse_enabled %}Sobald mindestens zwei Archivbilder vorhanden sind, kann daraus ein Video erstellt werden.{% else %}Durchgang auswählen und Zeitraffer-Aufnahmen aktivieren.{% endif %}</div>
             {% endif %}
@@ -119,6 +123,7 @@
                     <label class="pm-field"><span class="pm-label">Zeitraffer-Aufnahmeintervall</span><select class="pm-select" name="timelapse_interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for seconds,label in [(60,'jede Minute'),(300,'alle 5 Minuten'),(600,'alle 10 Minuten'),(900,'alle 15 Minuten'),(1800,'alle 30 Minuten'),(3600,'jede Stunde'),(21600,'alle 6 Stunden')] %}<option value="{{ seconds }}" {{ 'selected' if camera.timelapse_interval_sec == seconds else '' }}>{{ label }}</option>{% endfor %}</select></label>
                     <label class="pm-field"><span class="pm-label">Archiv behalten</span><select class="pm-select" name="retention_days" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for days,label in [(30,'30 Tage'),(60,'60 Tage'),(120,'120 Tage'),(180,'180 Tage'),(365,'1 Jahr')] %}<option value="{{ days }}" {{ 'selected' if camera.retention_days == days else '' }}>{{ label }}</option>{% endfor %}</select></label>
                 </div>
+                <label class="pm-field"><span class="pm-label">Erstellte Videos je Durchgang behalten</span><select class="pm-select" name="video_retention_count" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for count,label in [(5,'5 Videos'),(10,'10 Videos'),(25,'25 Videos · empfohlen'),(50,'50 Videos'),(100,'100 Videos'),(0,'Unbegrenzt · manuell verwalten')] %}<option value="{{ count }}" {{ 'selected' if camera.video_retention_count == count else '' }}>{{ label }}</option>{% endfor %}</select><span class="pm-help">Erst beim Erstellen eines neuen Videos werden ältere Dateien oberhalb dieser Grenze entfernt.</span></label>
                 <div class="pm-form-grid">
                     <label class="pm-field"><span class="pm-label">Live-Auflösung</span><select class="pm-select" name="live_width" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for width,label in [(640,'640 px · sparsam'),(960,'960 px · empfohlen'),(1280,'1280 px · hoch'),(1920,'1920 px · Full HD'),(2560,'2560 px · Kamera-Maximum')] %}<option value="{{ width }}" {{ 'selected' if camera.live_width == width else '' }}>{{ label }}</option>{% endfor %}</select></label>
                     <label class="pm-field"><span class="pm-label">Live-Bildrate</span><select class="pm-select" name="live_fps" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for fps in [2,5,8,10,12,15] %}<option value="{{ fps }}" {{ 'selected' if camera.live_fps == fps else '' }}>{{ fps }} Bilder/s</option>{% endfor %}</select></label>

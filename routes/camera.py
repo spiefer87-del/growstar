@@ -1,5 +1,8 @@
 """Weboberfläche und API für lokale GrowCam-Snapshots."""
 
+import shutil
+from pathlib import Path
+
 from flask import (
     Response,
     abort,
@@ -18,11 +21,20 @@ from auth.database import write_audit
 from auth.decorators import permission_required
 from core.tents import manager as tent_manager
 from plant_management.database import get_batch, list_batches
+from plant_management.photos import (
+    list_batch_photos,
+    list_plant_photos,
+    photo_storage_summary,
+)
 from services.growcam import (
     LATEST_IMAGE,
     capture_snapshot,
     delete_timelapse_frame,
+    delete_timelapse_video,
+    growcam_storage_summary,
+    list_all_timelapse_frames,
     list_timelapse_frames,
+    list_timelapse_videos,
     mjpeg_stream,
     public_config,
     resolve_timelapse_video,
@@ -32,6 +44,9 @@ from services.growcam import (
     start_timelapse_render,
     timelapse_summary,
 )
+
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _audit(action, details=None):
@@ -94,6 +109,7 @@ def register(app):
                 "timelapse_enabled": request.form.get("timelapse_enabled") == "1",
                 "timelapse_interval_sec": request.form.get("timelapse_interval_sec"),
                 "retention_days": request.form.get("retention_days"),
+                "video_retention_count": request.form.get("video_retention_count"),
                 "live_width": request.form.get("live_width"),
                 "live_fps": request.form.get("live_fps"),
             })
@@ -109,6 +125,7 @@ def register(app):
                     "batch_id": config["batch_id"],
                     "timelapse_enabled": config["timelapse_enabled"],
                     "timelapse_interval_sec": config["timelapse_interval_sec"],
+                    "video_retention_count": config["video_retention_count"],
                 },
             )
             flash("GrowCam-Konfiguration wurde gespeichert.", "success")
@@ -197,18 +214,55 @@ def register(app):
         video = resolve_timelapse_video(batch_id, filename)
         if video is None:
             abort(404)
-        return send_file(video, mimetype="video/mp4", conditional=True)
+        download = request.args.get("download") == "1"
+        return send_file(
+            video,
+            mimetype="video/mp4",
+            conditional=True,
+            as_attachment=download,
+            download_name=video.name if download else None,
+        )
+
+    @app.post("/pflanzenmanagement/kamera/zeitraffer/<int:batch_id>/<filename>/loeschen")
+    @permission_required("plants.edit")
+    def growcam_timelapse_video_delete(batch_id, filename):
+        result = delete_timelapse_video(batch_id, filename)
+        if result.get("success"):
+            _audit(
+                "plants.growcam_timelapse_video_deleted",
+                {"batch_id": batch_id, "filename": result.get("filename")},
+            )
+            flash("Zeitraffer-Video wurde dauerhaft entfernt.", "success")
+        else:
+            flash(result.get("error") or "Video konnte nicht entfernt werden.", "error")
+        if request.form.get("return_to") == "camera":
+            return redirect(url_for("growcam_page", batch_id=batch_id))
+        return redirect(
+            url_for(
+                "plant_media_explorer",
+                kind="videos",
+                page=request.form.get("page", type=int) or 1,
+            )
+        )
 
     @app.get("/pflanzenmanagement/kamera/zeitraffer-bild/<int:batch_id>/<filename>")
     def growcam_timelapse_frame(batch_id, filename):
+        download = request.args.get("download") == "1"
         frame = resolve_timelapse_frame(
             batch_id,
             filename,
-            thumbnail=request.args.get("thumbnail") == "1",
+            thumbnail=request.args.get("thumbnail") == "1" and not download,
         )
         if frame is None:
             abort(404)
-        return send_file(frame, mimetype="image/jpeg", conditional=True, max_age=3600)
+        return send_file(
+            frame,
+            mimetype="image/jpeg",
+            conditional=True,
+            max_age=3600,
+            as_attachment=download,
+            download_name=frame.name if download else None,
+        )
 
     @app.post("/pflanzenmanagement/kamera/zeitraffer-bild/<int:batch_id>/<filename>/loeschen")
     @permission_required("plants.edit")
@@ -222,12 +276,71 @@ def register(app):
             flash("Zeitrafferbild wurde entfernt.", "success")
         else:
             flash(result.get("error") or "Bild konnte nicht entfernt werden.", "error")
+        if request.form.get("return_to") == "media":
+            return redirect(
+                url_for(
+                    "plant_media_explorer",
+                    kind="timelapse_frames",
+                    page=request.form.get("page", type=int) or 1,
+                )
+            )
         return redirect(
             url_for(
                 "growcam_page",
                 batch_id=batch_id,
                 frame_page=request.form.get("frame_page", type=int) or 1,
             )
+        )
+
+    @app.get("/pflanzenmanagement/medien")
+    def plant_media_explorer():
+        kind = request.args.get("kind") or "videos"
+        if kind not in {
+            "videos", "timelapse_frames", "plant_photos", "batch_photos"
+        }:
+            kind = "videos"
+        page = max(1, request.args.get("page", default=1, type=int) or 1)
+        per_page = 24
+        camera_storage = growcam_storage_summary()
+        photo_storage = photo_storage_summary()
+        batches = list_batches(include_archived=True)
+        batch_by_id = {int(batch["id"]): batch for batch in batches}
+
+        if kind == "videos":
+            media_page = list_timelapse_videos(page=page, per_page=per_page)
+            for item in media_page["items"]:
+                item["batch"] = batch_by_id.get(item["batch_id"])
+        elif kind == "timelapse_frames":
+            media_page = list_all_timelapse_frames(page=page, per_page=per_page)
+            for item in media_page["items"]:
+                item["batch"] = batch_by_id.get(item["batch_id"])
+        else:
+            total = (
+                photo_storage["plant_count"]
+                if kind == "plant_photos"
+                else photo_storage["batch_count"]
+            )
+            pages = (total + per_page - 1) // per_page
+            page = max(1, min(page, pages or 1))
+            loader = list_plant_photos if kind == "plant_photos" else list_batch_photos
+            items = loader(limit=per_page, offset=(page - 1) * per_page)
+            media_page = {
+                "items": items,
+                "page": page,
+                "pages": pages,
+                "total": total,
+            }
+
+        disk = shutil.disk_usage(ROOT)
+        managed_bytes = camera_storage["total_bytes"] + photo_storage["total_bytes"]
+        return render_template(
+            "plants/media_explorer.html",
+            kind=kind,
+            media_page=media_page,
+            camera_storage=camera_storage,
+            photo_storage=photo_storage,
+            managed_bytes=managed_bytes,
+            disk={"total": disk.total, "used": disk.used, "free": disk.free},
         )
 
     @app.get("/api/plant-management/camera/status")

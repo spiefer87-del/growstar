@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Medien-Explorer – Growstar{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/plant-management.css') }}?v=3.16.39-media1">{% endblock %}
+{% block page %}
+{% macro size_label(value) -%}
+    {%- if value >= 1073741824 -%}{{ '%.2f'|format(value / 1073741824) }} GB
+    {%- elif value >= 1048576 -%}{{ '%.1f'|format(value / 1048576) }} MB
+    {%- elif value >= 1024 -%}{{ '%.0f'|format(value / 1024) }} KB
+    {%- else -%}{{ value }} B{%- endif -%}
+{%- endmacro %}
+<main class="pm-shell">
+<header class="pm-header">
+    <div class="pm-heading-wrap">
+        <a class="pm-back" href="{{ url_for('plant_management_dashboard') }}">←</a>
+        <div><h1 class="pm-title">🗂️ Medien-Explorer</h1><div class="pm-subtitle">Growstar-Dateien finden, ansehen, herunterladen und kontrolliert löschen</div></div>
+    </div>
+</header>
+{% set active_page = 'media' %}
+{% include "plants/_nav.html" %}
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}<div class="pm-flashes">{% for category, message in messages %}<div class="pm-flash {{ category }}">{{ message }}</div>{% endfor %}</div>{% endif %}
+{% endwith %}
+
+<section class="pm-media-summary">
+    <a href="{{ url_for('plant_media_explorer', kind='videos') }}" class="pm-media-stat {{ 'active' if kind == 'videos' else '' }}"><span>🎞️ Videos</span><strong>{{ camera_storage.video_count }}</strong><small>{{ size_label(camera_storage.video_bytes) }}</small></a>
+    <a href="{{ url_for('plant_media_explorer', kind='timelapse_frames') }}" class="pm-media-stat {{ 'active' if kind == 'timelapse_frames' else '' }}"><span>🖼️ Zeitrafferbilder</span><strong>{{ camera_storage.frame_count }}</strong><small>{{ size_label(camera_storage.frame_bytes + camera_storage.thumbnail_bytes) }}</small></a>
+    <a href="{{ url_for('plant_media_explorer', kind='plant_photos') }}" class="pm-media-stat {{ 'active' if kind == 'plant_photos' else '' }}"><span>🌱 Pflanzenfotos</span><strong>{{ photo_storage.plant_count }}</strong><small>{{ size_label(photo_storage.plant_bytes) }}</small></a>
+    <a href="{{ url_for('plant_media_explorer', kind='batch_photos') }}" class="pm-media-stat {{ 'active' if kind == 'batch_photos' else '' }}"><span>🗂️ Durchgangsfotos</span><strong>{{ photo_storage.batch_count }}</strong><small>{{ size_label(photo_storage.batch_bytes) }}</small></a>
+</section>
+
+<section class="pm-card pm-media-storage-card">
+    <div class="pm-card-head"><div><h2>Speicherübersicht</h2><div class="pm-help">Growstar verwaltet {{ size_label(managed_bytes) }} Mediendaten · {{ size_label(disk.free) }} auf dem Raspberry frei</div></div><span class="pm-status">{{ '%.1f'|format((disk.used / disk.total * 100) if disk.total else 0) }} % belegt</span></div>
+    <div class="pm-card-body">
+        <div class="pm-media-disk"><span style="width:{{ ((disk.used / disk.total * 100) if disk.total else 0)|round(1) }}%"></span></div>
+        <div class="pm-media-tree" aria-label="Growstar-Medienstruktur">
+            <div><strong>📁 instance/growcam/</strong><span>{{ size_label(camera_storage.total_bytes) }}</span></div>
+            <div class="child"><span>📄 latest.jpg</span><span>{{ size_label(camera_storage.latest_bytes) }}</span></div>
+            <div class="child"><span>📁 timelapse/batch_&lt;Durchgang&gt;/</span><span>{{ camera_storage.frame_count }} Bilder · {{ camera_storage.video_count }} Videos</span></div>
+            <div><strong>📁 instance/plant_photos/</strong><span>{{ size_label(photo_storage.total_bytes) }}</span></div>
+            <div class="child"><span>🌱 Pflanzenfotos</span><span>{{ photo_storage.plant_count }}</span></div>
+            <div class="child"><span>🗂️ Durchgangsfotos</span><span>{{ photo_storage.batch_count }}</span></div>
+        </div>
+        <p class="pm-help">Die Ansicht zeigt nur von Growstar verwaltete Medien. Betriebssystem, Datenbank, Protokolle und andere Raspberry-Dateien sind in der gesamten Laufwerksbelegung enthalten, werden hier aber nicht löschbar gemacht.</p>
+    </div>
+</section>
+
+<nav class="pm-photo-scope pm-media-kinds" aria-label="Medienart auswählen">
+    <a class="{{ 'active' if kind == 'videos' else '' }}" href="{{ url_for('plant_media_explorer', kind='videos') }}">🎞️ Zeitraffer-Videos</a>
+    <a class="{{ 'active' if kind == 'timelapse_frames' else '' }}" href="{{ url_for('plant_media_explorer', kind='timelapse_frames') }}">🖼️ Zeitrafferbilder</a>
+    <a class="{{ 'active' if kind == 'plant_photos' else '' }}" href="{{ url_for('plant_media_explorer', kind='plant_photos') }}">🌱 Pflanzenfotos</a>
+    <a class="{{ 'active' if kind == 'batch_photos' else '' }}" href="{{ url_for('plant_media_explorer', kind='batch_photos') }}">🗂️ Durchgangsfotos</a>
+</nav>
+
+<section class="pm-card">
+    <div class="pm-card-head"><div><h2>{% if kind == 'videos' %}Zeitraffer-Videos{% elif kind == 'timelapse_frames' %}Zeitrafferbilder{% elif kind == 'plant_photos' %}Pflanzenfotos{% else %}Durchgangsfotos{% endif %}</h2><div class="pm-help">{{ media_page.total }} Dateien · Seite {{ media_page.page }} von {{ media_page.pages or 1 }}</div></div>{% if kind in ['videos', 'timelapse_frames'] %}<a class="pm-button" href="{{ url_for('growcam_page') }}">Zur Kamera</a>{% else %}<a class="pm-button" href="{{ url_for('plant_photo_manager', scope='batches' if kind == 'batch_photos' else 'plants') }}">Zum Foto-Manager</a>{% endif %}</div>
+    <div class="pm-card-body">
+        {% if media_page["items"] %}
+        <div class="pm-media-grid">
+        {% for item in media_page["items"] %}
+            <article class="pm-media-item">
+            {% if kind == 'videos' %}
+                <video controls preload="metadata"><source src="{{ url_for('growcam_timelapse_video', batch_id=item.batch_id, filename=item.filename) }}" type="video/mp4"></video>
+                <div class="pm-media-info"><strong>{{ item.batch.name if item.batch else 'Durchgang ' ~ item.batch_id }}</strong><span>{{ item.batch.code if item.batch else 'batch_' ~ item.batch_id }}</span><span><time data-media-time="{{ item.created_at }}"></time> · {{ size_label(item.size_bytes) }}</span></div>
+                <div class="pm-actions">
+                    <a class="pm-button primary" href="{{ url_for('growcam_timelapse_video', batch_id=item.batch_id, filename=item.filename, download=1) }}">⬇ Download</a>
+                    {% if has_permission('plants.edit') %}<form method="post" action="{{ url_for('growcam_timelapse_video_delete', batch_id=item.batch_id, filename=item.filename) }}" onsubmit="return confirm('Dieses Zeitraffer-Video dauerhaft löschen?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="page" value="{{ media_page.page }}"><button class="pm-button danger" type="submit">Löschen</button></form>{% endif %}
+                </div>
+            {% elif kind == 'timelapse_frames' %}
+                <a class="pm-media-preview contain" href="{{ url_for('growcam_timelapse_frame', batch_id=item.batch_id, filename=item.filename) }}" target="_blank"><img src="{{ url_for('growcam_timelapse_frame', batch_id=item.batch_id, filename=item.filename, thumbnail=1) }}" alt="Zeitrafferbild" loading="lazy"></a>
+                <div class="pm-media-info"><strong>{{ item.batch.name if item.batch else 'Durchgang ' ~ item.batch_id }}</strong><span>{{ item.batch.code if item.batch else 'batch_' ~ item.batch_id }}</span><span><time data-media-time="{{ item.captured_at }}"></time> · {{ size_label(item.size_bytes) }}</span></div>
+                <div class="pm-actions"><a class="pm-button primary" href="{{ url_for('growcam_timelapse_frame', batch_id=item.batch_id, filename=item.filename, download=1) }}">⬇ Download</a>{% if has_permission('plants.edit') %}<form method="post" action="{{ url_for('growcam_timelapse_frame_delete', batch_id=item.batch_id, filename=item.filename) }}" onsubmit="return confirm('Dieses Zeitrafferbild dauerhaft löschen?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="media"><input type="hidden" name="page" value="{{ media_page.page }}"><button class="pm-button danger" type="submit">Löschen</button></form>{% endif %}</div>
+            {% elif kind == 'plant_photos' %}
+                <a class="pm-media-preview" href="{{ url_for('plant_photo_file', photo_id=item.id) }}" target="_blank"><img src="{{ url_for('plant_photo_file', photo_id=item.id) }}" alt="Foto von {{ item.plant_name }}" loading="lazy"></a>
+                <div class="pm-media-info"><strong>{{ item.plant_name }}</strong><span>{{ item.plant_code }} · {{ item.stage_label }}</span><span>{{ item.captured_date }} · {{ item.captured_time }} Uhr · {{ size_label(item.size_bytes) }}</span></div>
+                <div class="pm-actions"><a class="pm-button primary" href="{{ url_for('plant_photo_file', photo_id=item.id, download=1) }}">⬇ Download</a>{% if has_permission('plants.edit') %}<form method="post" action="{{ url_for('plant_photo_remove', photo_id=item.id) }}" onsubmit="return confirm('Dieses Pflanzenfoto dauerhaft löschen?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="media"><input type="hidden" name="page" value="{{ media_page.page }}"><button class="pm-button danger" type="submit">Löschen</button></form>{% endif %}</div>
+            {% else %}
+                <a class="pm-media-preview" href="{{ url_for('batch_photo_file', photo_id=item.id) }}" target="_blank"><img src="{{ url_for('batch_photo_file', photo_id=item.id) }}" alt="Durchgangsfoto {{ item.batch_name }}" loading="lazy"></a>
+                <div class="pm-media-info"><strong>{{ item.batch_name }}</strong><span>{{ item.batch_code }} · {{ item.batch_location or 'ohne Standort' }}</span><span>{{ item.captured_date }} · {{ item.captured_time }} Uhr · {{ size_label(item.size_bytes) }}</span></div>
+                <div class="pm-actions"><a class="pm-button primary" href="{{ url_for('batch_photo_file', photo_id=item.id, download=1) }}">⬇ Download</a>{% if has_permission('plants.edit') %}<form method="post" action="{{ url_for('batch_photo_remove', photo_id=item.id) }}" onsubmit="return confirm('Dieses Durchgangsfoto dauerhaft löschen?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="return_to" value="media"><input type="hidden" name="page" value="{{ media_page.page }}"><button class="pm-button danger" type="submit">Löschen</button></form>{% endif %}</div>
+            {% endif %}
+            </article>
+        {% endfor %}
+        </div>
+        {% else %}<div class="pm-empty">In diesem Bereich sind noch keine Dateien vorhanden.</div>{% endif %}
+        {% if media_page.pages > 1 %}<nav class="pm-growcam-pagination" aria-label="Medienseiten">{% if media_page.page > 1 %}<a class="pm-button" href="{{ url_for('plant_media_explorer', kind=kind, page=media_page.page - 1) }}">← Neuere</a>{% endif %}<span class="pm-help">Seite {{ media_page.page }} / {{ media_page.pages }}</span>{% if media_page.page < media_page.pages %}<a class="pm-button" href="{{ url_for('plant_media_explorer', kind=kind, page=media_page.page + 1) }}">Ältere →</a>{% endif %}</nav>{% endif %}
+    </div>
+</section>
+</main>
+{% endblock %}
+{% block scripts %}<script>document.querySelectorAll("[data-media-time]").forEach(item=>{item.textContent=new Date(Number(item.dataset.mediaTime)*1000).toLocaleString("de-DE")});</script>{% endblock %}

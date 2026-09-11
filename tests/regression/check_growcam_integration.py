@@ -121,6 +121,7 @@ def main():
                 "timelapse_enabled": True,
                 "timelapse_interval_sec": 300,
                 "retention_days": 30,
+                "video_retention_count": 25,
                 "live_width": 2560,
                 "live_fps": 15,
             })
@@ -147,6 +148,18 @@ def main():
                 and "+faststart" in captured_command,
                 "Durchgangsaufnahmen werden als browserfähiges MP4 gerendert",
             )
+            video_page = growcam.list_timelapse_videos(page=1, per_page=24)
+            archive_page = growcam.list_all_timelapse_frames(page=1, per_page=24)
+            storage = growcam.growcam_storage_summary()
+            require(
+                video_page["total"] == 1
+                and video_page["items"][0]["batch_id"] == 7
+                and archive_page["total"] == 2
+                and archive_page["items"][0]["batch_id"] == 7
+                and storage["video_count"] == 1
+                and storage["frame_count"] == 2,
+                "Medien-Explorer zählt Zeitrafferbilder und Videos über ihre Durchgangsordner",
+            )
             require(
                 "60" in captured_command
                 and "scale=2560:-2:force_original_aspect_ratio=decrease,format=yuv420p"
@@ -172,6 +185,13 @@ def main():
                 deleted["success"] is True
                 and growcam.timelapse_summary(7)["frame_count"] == 1,
                 "Einzelne ungeeignete Zeitrafferbilder können entfernt werden",
+            )
+            video_name = video_page["items"][0]["filename"]
+            require(
+                growcam.delete_timelapse_video(7, "../latest.mp4")["success"] is False
+                and growcam.delete_timelapse_video(7, video_name)["success"] is True
+                and growcam.list_timelapse_videos()["total"] == 0,
+                "Zeitraffer-Videos lassen sich einzeln und ohne unsichere Dateipfade löschen",
             )
 
             jpeg = growcam.LATEST_IMAGE.read_bytes()
@@ -215,8 +235,15 @@ def main():
             viewer_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera/live", "GET"
             )
+            media_requirement = permission_requirement(
+                "/pflanzenmanagement/medien", "GET"
+            )
             timelapse_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera/zeitraffer", "POST"
+            )
+            video_delete_requirement = permission_requirement(
+                "/pflanzenmanagement/kamera/zeitraffer/7/timelapse-test.mp4/loeschen",
+                "POST",
             )
             delete_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera/zeitraffer-bild/7/frame-test.jpg/loeschen",
@@ -229,9 +256,11 @@ def main():
                 read_requirement.permissions == ("plants.view",)
                 and stream_requirement.permissions == ("plants.view",)
                 and viewer_requirement.permissions == ("plants.view",)
+                and media_requirement.permissions == ("plants.view",)
                 and api_requirement.permissions == ("plants.view",)
                 and write_requirement.permissions == ("plants.edit",)
                 and timelapse_requirement.permissions == ("plants.edit",)
+                and video_delete_requirement.permissions == ("plants.edit",)
                 and delete_requirement.permissions == ("plants.edit",),
                 "Kamerabild, Status und Bedienung sind rollenbasiert geschützt",
             )
@@ -244,6 +273,10 @@ def main():
             station_template = (ROOT / "templates/grow_control.html").read_text(
                 encoding="utf-8"
             )
+            media_template = (ROOT / "templates/plants/media_explorer.html").read_text(
+                encoding="utf-8"
+            )
+            base_template = (ROOT / "templates/base.html").read_text(encoding="utf-8")
             dashboard_routes = (ROOT / "routes/dashboard.py").read_text(
                 encoding="utf-8"
             )
@@ -258,6 +291,24 @@ def main():
                 and 'timelapse_frames["items"]' in template
                 and "timelapse_frames.items" not in template,
                 "Route, Hintergrundaufnahme und Kameraansicht sind vollständig eingebunden",
+            )
+            require(
+                'name="video_retention_count"' in template
+                and "Video herunterladen" in template
+                and "plant_media_explorer" in template
+                and "growcam_timelapse_video_delete" in media_template
+                and "growcam_timelapse_frame_delete" in media_template
+                and "timelapse_frames" in media_template
+                and "download=1" in media_template
+                and "instance/growcam/" in media_template,
+                "Video-Aufbewahrung, Download und zentraler Medien-Explorer sind eingebunden",
+            )
+            require(
+                "plant_media_explorer" in base_template
+                and "Explorer & Speicher" in base_template
+                and "timelapse_frames" in media_template
+                and "growcam_timelapse_frame_delete" in media_template,
+                "Medien-Explorer ist in der Navigation verankert und verwaltet auch Zeitrafferbilder",
             )
             require(
                 "growcam_live_viewer" in station_template

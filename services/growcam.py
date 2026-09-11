@@ -33,6 +33,7 @@ DEFAULT_CONFIG = {
     "timelapse_enabled": False,
     "timelapse_interval_sec": 900,
     "retention_days": 30,
+    "video_retention_count": 25,
     "live_width": 2560,
     "live_fps": 15,
 }
@@ -156,6 +157,17 @@ def _normalize_config(data):
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Der Wert für {key} ist ungültig.") from exc
         result[key] = max(minimum, min(value, maximum))
+
+    raw_video_retention = data.get("video_retention_count")
+    if raw_video_retention in (None, ""):
+        raw_video_retention = DEFAULT_CONFIG["video_retention_count"]
+    try:
+        video_retention_count = int(raw_video_retention)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Die Video-Aufbewahrung ist ungültig.") from exc
+    if video_retention_count not in {0, 5, 10, 25, 50, 100}:
+        raise ValueError("Die Video-Aufbewahrung ist ungültig.")
+    result["video_retention_count"] = video_retention_count
 
     if result["enabled"] and not result["host"]:
         raise ValueError("Vor dem Aktivieren muss eine Kamera-IP eingetragen sein.")
@@ -396,6 +408,7 @@ def status_snapshot():
         "timelapse_enabled": bool(config.get("timelapse_enabled")),
         "timelapse_interval_sec": config.get("timelapse_interval_sec"),
         "retention_days": config.get("retention_days"),
+        "video_retention_count": config.get("video_retention_count"),
         "live_width": config.get("live_width"),
         "live_fps": config.get("live_fps"),
         "timelapse": archive,
@@ -433,6 +446,114 @@ def resolve_timelapse_video(batch_id, filename):
     return candidate if candidate.is_file() else None
 
 
+def list_timelapse_videos(batch_id=None, *, page=1, per_page=24):
+    """Listet erzeugte Videos sicher über alle oder genau einen Durchgang."""
+
+    candidates = []
+    try:
+        if batch_id:
+            directories = [_batch_dir(batch_id)]
+        else:
+            directories = [
+                path
+                for path in TIMELAPSE_DIR.glob("batch_*")
+                if path.is_dir() and path.name[6:].isdigit()
+            ]
+        for directory in directories:
+            directory_batch_id = int(directory.name[6:])
+            for video in directory.glob("timelapse-*.mp4"):
+                try:
+                    stat = video.stat()
+                except OSError:
+                    continue
+                candidates.append({
+                    "batch_id": directory_batch_id,
+                    "filename": video.name,
+                    "created_at": stat.st_mtime,
+                    "size_bytes": stat.st_size,
+                })
+    except (OSError, TypeError, ValueError):
+        candidates = []
+
+    candidates.sort(key=lambda item: item["created_at"], reverse=True)
+    per_page = max(6, min(int(per_page), 100))
+    pages = (len(candidates) + per_page - 1) // per_page
+    page = max(1, min(int(page), pages or 1))
+    start = (page - 1) * per_page
+    return {
+        "items": candidates[start:start + per_page],
+        "page": page,
+        "pages": pages,
+        "total": len(candidates),
+    }
+
+
+def delete_timelapse_video(batch_id, filename):
+    if _timelapse_lock.locked():
+        return {
+            "success": False,
+            "error": "Während der Videoerstellung können keine Videos gelöscht werden.",
+        }
+    video = resolve_timelapse_video(batch_id, filename)
+    if video is None:
+        return {"success": False, "error": "Zeitraffer-Video wurde nicht gefunden."}
+    try:
+        video.unlink()
+    except OSError as exc:
+        return {
+            "success": False,
+            "error": f"Zeitraffer-Video konnte nicht gelöscht werden: {exc}",
+        }
+    return {"success": True, "filename": video.name}
+
+
+def growcam_storage_summary():
+    """Ermittelt die tatsächlich belegten GrowCam-Dateien ohne Dateiinhalte zu lesen."""
+
+    totals = {
+        "latest_count": 0,
+        "latest_bytes": 0,
+        "frame_count": 0,
+        "frame_bytes": 0,
+        "thumbnail_count": 0,
+        "thumbnail_bytes": 0,
+        "video_count": 0,
+        "video_bytes": 0,
+    }
+    if LATEST_IMAGE.is_file():
+        try:
+            totals["latest_count"] = 1
+            totals["latest_bytes"] = LATEST_IMAGE.stat().st_size
+        except OSError:
+            pass
+    try:
+        files = TIMELAPSE_DIR.rglob("*") if TIMELAPSE_DIR.is_dir() else []
+        for path in files:
+            if not path.is_file():
+                continue
+            try:
+                size = path.stat().st_size
+            except OSError:
+                continue
+            if path.name.startswith("frame-") and path.suffix.lower() == ".jpg":
+                if path.parent.name == "thumbnails":
+                    totals["thumbnail_count"] += 1
+                    totals["thumbnail_bytes"] += size
+                else:
+                    totals["frame_count"] += 1
+                    totals["frame_bytes"] += size
+            elif path.name.startswith("timelapse-") and path.suffix.lower() == ".mp4":
+                totals["video_count"] += 1
+                totals["video_bytes"] += size
+    except OSError:
+        pass
+    totals["total_bytes"] = sum(
+        totals[key]
+        for key in ("latest_bytes", "frame_bytes", "thumbnail_bytes", "video_bytes")
+    )
+    return totals
+
+
 def list_timelapse_frames(batch_id, *, page=1, per_page=24):
     if not batch_id:
         return {"items": [], "page": 1, "pages": 0, "total": 0}
@@ -456,6 +577,44 @@ def list_timelapse_frames(batch_id, *, page=1, per_page=24):
             "size_bytes": stat.st_size,
         })
     return {"items": items, "page": page, "pages": pages, "total": len(frames)}
+
+
+def list_all_timelapse_frames(*, page=1, per_page=24):
+    """Listet Zeitrafferbilder aller Durchgänge für die zentrale Medienansicht."""
+
+    candidates = []
+    try:
+        directories = [
+            path
+            for path in TIMELAPSE_DIR.glob("batch_*")
+            if path.is_dir() and path.name[6:].isdigit()
+        ]
+        for directory in directories:
+            directory_batch_id = int(directory.name[6:])
+            for frame in directory.glob("frame-*.jpg"):
+                try:
+                    stat = frame.stat()
+                except OSError:
+                    continue
+                candidates.append({
+                    "batch_id": directory_batch_id,
+                    "filename": frame.name,
+                    "captured_at": stat.st_mtime,
+                    "size_bytes": stat.st_size,
+                })
+    except OSError:
+        candidates = []
+    candidates.sort(key=lambda item: item["captured_at"], reverse=True)
+    per_page = max(6, min(int(per_page), 100))
+    pages = (len(candidates) + per_page - 1) // per_page
+    page = max(1, min(int(page), pages or 1))
+    start = (page - 1) * per_page
+    return {
+        "items": candidates[start:start + per_page],
+        "page": page,
+        "pages": pages,
+        "total": len(candidates),
+    }
 
 
 def resolve_timelapse_frame(batch_id, filename, *, thumbnail=False):
@@ -538,11 +697,13 @@ def _render_timelapse_worker(config, options):
             raise RuntimeError(_safe_error(process.stderr, _rtsp_url(config)))
         os.chmod(temp_output, 0o640)
         os.replace(temp_output, output)
-        for old_video in _video_files(batch_id)[5:]:
-            try:
-                old_video.unlink()
-            except OSError:
-                pass
+        retention_count = int(config.get("video_retention_count") or 0)
+        if retention_count:
+            for old_video in _video_files(batch_id)[retention_count:]:
+                try:
+                    old_video.unlink()
+                except OSError:
+                    pass
         with _config_lock:
             _status["last_video"] = output.name
             _status["timelapse_error"] = None
@@ -696,6 +857,10 @@ __all__ = (
     "TIMELAPSE_DIR",
     "capture_snapshot",
     "delete_timelapse_frame",
+    "delete_timelapse_video",
+    "growcam_storage_summary",
+    "list_all_timelapse_frames",
+    "list_timelapse_videos",
     "growcam_loop",
     "load_config",
     "list_timelapse_frames",

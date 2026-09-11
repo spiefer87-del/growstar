@@ -180,6 +180,16 @@ def main():
                 == saved_batch["id"],
                 "Durchgangsfoto und Betriebsjournal-Eintrag sind direkt verknüpft",
             )
+            storage = photos.photo_storage_summary()
+            require(
+                storage["plant_count"] == 1
+                and storage["batch_count"] == 1
+                and storage["total_count"] == 2
+                and storage["total_bytes"] > 0
+                and photos.list_plant_photos(limit=1, offset=0)[0]["id"]
+                == saved["id"],
+                "Medien-Explorer zählt und paginiert Pflanzen- und Durchgangsfotos",
+            )
 
             timeline = photos.photo_markers_for_timeline(
                 database.get_timeline(active_only=True)
@@ -232,6 +242,7 @@ def main():
             dashboard_source = (ROOT / "templates/plants/dashboard.html").read_text(encoding="utf-8")
             timeline_source = (ROOT / "templates/plants/timeline.html").read_text(encoding="utf-8")
             manager_source = (ROOT / "templates/plants/photos.html").read_text(encoding="utf-8")
+            media_source = (ROOT / "templates/plants/media_explorer.html").read_text(encoding="utf-8")
             batch_detail_source = (ROOT / "templates/plants/batch_detail.html").read_text(encoding="utf-8")
             require(
                 'name="camera_photo"' in (
@@ -255,6 +266,14 @@ def main():
                 and "Durchgangsfotos" in batch_detail_source
                 and "photo_markers_for_timeline" in routes_source,
                 "Durchgangsfotos besitzen eigene Routen und Ansichten ohne eigenen Timeline-Pfad",
+            )
+            require(
+                "download=1" in manager_source
+                and "plant_photo_file" in media_source
+                and "batch_photo_file" in media_source
+                and 'name="return_to" value="media"' in media_source
+                and "as_attachment=download" in routes_source,
+                "Pflanzen- und Durchgangsfotos können im Manager und Explorer heruntergeladen werden",
             )
             print("✅ Growstar 3.16.23 / PLANT.PHOTO.3 vollständig geprüft")
         finally:

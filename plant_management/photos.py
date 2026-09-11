@@ -438,7 +438,9 @@ def _decorate_batch(row):
     return item
 
 
-def list_plant_photos(*, plant_id=None, journal_entry_id=None, stage=None, limit=250):
+def list_plant_photos(
+    *, plant_id=None, journal_entry_id=None, stage=None, limit=250, offset=0
+):
     where = ["ph.deleted_at IS NULL"]
     params = []
     if plant_id:
@@ -452,6 +454,7 @@ def list_plant_photos(*, plant_id=None, journal_entry_id=None, stage=None, limit
         params.append(str(stage))
 
     params.append(max(1, min(int(limit), 1000)))
+    params.append(max(0, int(offset)))
     rows = _photo_query(
         f"""
         SELECT ph.*, p.code AS plant_code,
@@ -462,7 +465,7 @@ def list_plant_photos(*, plant_id=None, journal_entry_id=None, stage=None, limit
         LEFT JOIN pm_cultivars c ON c.id = p.cultivar_id
         WHERE {' AND '.join(where)}
         ORDER BY ph.captured_at DESC, ph.id DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
         params,
     )
@@ -486,7 +489,9 @@ def get_plant_photo(photo_id):
     return _decorate(row)
 
 
-def list_batch_photos(*, batch_id=None, journal_entry_id=None, limit=250):
+def list_batch_photos(
+    *, batch_id=None, journal_entry_id=None, limit=250, offset=0
+):
     where = ["ph.deleted_at IS NULL"]
     params = []
     if batch_id:
@@ -497,6 +502,7 @@ def list_batch_photos(*, batch_id=None, journal_entry_id=None, limit=250):
         params.append(int(journal_entry_id))
 
     params.append(max(1, min(int(limit), 1000)))
+    params.append(max(0, int(offset)))
     rows = _photo_query(
         f"""
         SELECT ph.*, b.code AS batch_code, b.name AS batch_name,
@@ -505,11 +511,36 @@ def list_batch_photos(*, batch_id=None, journal_entry_id=None, limit=250):
         JOIN pm_batches b ON b.id = ph.batch_id
         WHERE {' AND '.join(where)}
         ORDER BY ph.captured_at DESC, ph.id DESC
-        LIMIT ?
+        LIMIT ? OFFSET ?
         """,
         params,
     )
     return [_decorate_batch(row) for row in rows]
+
+
+def photo_storage_summary():
+    """Zählt aktive Fotodatensätze und die zugehörige logische Speichergröße."""
+
+    result = {}
+    for key, table in (
+        ("plant", "pm_plant_photos"),
+        ("batch", "pm_batch_photos"),
+    ):
+        row = _photo_query(
+            f"""
+            SELECT COUNT(*) AS item_count,
+                   COALESCE(SUM(size_bytes), 0) AS total_bytes
+            FROM {table}
+            WHERE deleted_at IS NULL
+            """,
+            (),
+            one=True,
+        )
+        result[f"{key}_count"] = int(row["item_count"] if row else 0)
+        result[f"{key}_bytes"] = int(row["total_bytes"] if row else 0)
+    result["total_count"] = result["plant_count"] + result["batch_count"]
+    result["total_bytes"] = result["plant_bytes"] + result["batch_bytes"]
+    return result
 
 
 def get_batch_photo(photo_id):

@@ -62,8 +62,11 @@ nur an der tatsächlich zugewiesenen Station sichtbar.
 Archivbilder und Videos liegen getrennt je Durchgang unter
 `instance/growcam/timelapse/batch_<ID>/`. Alte Einzelbilder werden nach der
 gewählten Aufbewahrungszeit automatisch entfernt. Bereits erzeugte MP4-Videos
-werden auf die fünf neuesten Videos je Durchgang begrenzt. Die MP4-Erstellung läuft im Hintergrund, damit der
-Growstar-Webserver währenddessen erreichbar bleibt.
+werden je nach Kameraeinstellung auf 5, 10, 25, 50 oder 100 Dateien je
+Durchgang begrenzt oder unbegrenzt behalten. Standard sind 25 Videos. Über den
+Medien-Explorer lassen sie sich ansehen, herunterladen und einzeln löschen.
+Die MP4-Erstellung läuft im Hintergrund, damit der Growstar-Webserver währenddessen
+erreichbar bleibt.
 
 ## Diagnose auf dem Raspberry Pi
 
