@@ -62,9 +62,15 @@ data-label="{{ segment.stage_label }} · {{ segment.started_on }}{% if segment.e
 {% for photo in row.photo_markers %}
 <a class="pm-photo-marker"
 href="{{ url_for('plant_photo_file', photo_id=photo.id) }}"
-target="_blank"
 style="--photo-left:{{ photo.left }}%"
 data-label="Foto · {{ photo.captured_date }} {{ photo.captured_time }} · {{ photo.stage_label }}"
+data-timeline-photo
+data-gallery-plant="{{ row.plant.id }}"
+data-gallery-plant-name="{{ row.plant.display_name }}"
+data-captured-at="{{ photo.captured_at }}"
+data-lightbox-title="{{ row.plant.display_name }} · {{ photo.stage_label }}"
+data-lightbox-meta="{{ photo.captured_date }} · {{ photo.captured_time }} Uhr · {{ row.plant.code }}"
+data-lightbox-note="{{ photo.note or '' }}"
 aria-label="Foto vom {{ photo.captured_date }} öffnen">📷</a>
 {% endfor %}
 </div>
@@ -84,5 +90,209 @@ aria-label="Foto vom {{ photo.captured_date }} öffnen">📷</a>
 {% endif %}
 </div>
 </div>
+
+<div class="pm-photo-lightbox" id="pm-timeline-lightbox" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="pm-timeline-lightbox-title">
+    <div class="pm-lightbox-top">
+        <span class="pm-lightbox-count" id="pm-timeline-lightbox-count"></span>
+        <button class="pm-lightbox-close" id="pm-timeline-lightbox-close" type="button" aria-label="Galerie schließen">×</button>
+    </div>
+    <button class="pm-lightbox-nav previous" id="pm-timeline-lightbox-previous" type="button" aria-label="Vorheriges Foto dieser Pflanze">‹</button>
+    <figure class="pm-lightbox-figure">
+        <div class="pm-lightbox-stage" id="pm-timeline-lightbox-stage">
+            <img id="pm-timeline-lightbox-image" alt="">
+        </div>
+        <figcaption class="pm-lightbox-caption">
+            <strong id="pm-timeline-lightbox-title"></strong>
+            <span id="pm-timeline-lightbox-meta"></span>
+            <span id="pm-timeline-lightbox-note"></span>
+        </figcaption>
+    </figure>
+    <button class="pm-lightbox-nav next" id="pm-timeline-lightbox-next" type="button" aria-label="Nächstes Foto dieser Pflanze">›</button>
+    <div class="pm-lightbox-help">Nur Fotos dieser Pflanze · Wischen oder ← → verwenden · Esc schließt</div>
+</div>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+    const allItems = Array.from(document.querySelectorAll("[data-timeline-photo]"));
+    const lightbox = document.getElementById("pm-timeline-lightbox");
+    if (!allItems.length || !lightbox) return;
+
+    const image = document.getElementById("pm-timeline-lightbox-image");
+    const title = document.getElementById("pm-timeline-lightbox-title");
+    const meta = document.getElementById("pm-timeline-lightbox-meta");
+    const note = document.getElementById("pm-timeline-lightbox-note");
+    const count = document.getElementById("pm-timeline-lightbox-count");
+    const closeButton = document.getElementById("pm-timeline-lightbox-close");
+    const previousButton = document.getElementById("pm-timeline-lightbox-previous");
+    const nextButton = document.getElementById("pm-timeline-lightbox-next");
+    const stage = document.getElementById("pm-timeline-lightbox-stage");
+    let items = [];
+    let currentIndex = 0;
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let previousOverflow = "";
+    let opener = null;
+    let lightboxHistoryActive = false;
+
+    function itemsForPlant(plantId) {
+        return allItems
+            .filter(item => item.dataset.galleryPlant === String(plantId))
+            .sort((left, right) =>
+                (left.dataset.capturedAt || "").localeCompare(right.dataset.capturedAt || "")
+            );
+    }
+
+    function render(index) {
+        if (!items.length) return;
+        currentIndex = (index + items.length) % items.length;
+        const item = items[currentIndex];
+        image.src = item.href;
+        image.alt = item.dataset.lightboxTitle || "Pflanzenfoto";
+        title.textContent = item.dataset.lightboxTitle || "Pflanzenfoto";
+        meta.textContent = item.dataset.lightboxMeta || "";
+        note.textContent = item.dataset.lightboxNote || "";
+        note.hidden = !item.dataset.lightboxNote;
+        count.textContent = `${item.dataset.galleryPlantName || "Pflanze"} · ${currentIndex + 1} / ${items.length}`;
+        previousButton.hidden = items.length < 2;
+        nextButton.hidden = items.length < 2;
+
+        if (items.length > 1) {
+            const preload = new Image();
+            preload.src = items[(currentIndex + 1) % items.length].href;
+        }
+    }
+
+    function rememberIndex() {
+        if (!lightboxHistoryActive || !history.state?.pmTimelinePhotoLightbox) return;
+        history.replaceState(
+            {
+                ...history.state,
+                pmTimelinePhotoLightbox: {
+                    plantId: items[currentIndex].dataset.galleryPlant,
+                    index: currentIndex,
+                },
+            },
+            "",
+            window.location.href
+        );
+    }
+
+    function navigate(index) {
+        render(index);
+        rememberIndex();
+    }
+
+    function show(index, source, addHistoryEntry) {
+        opener = source || opener;
+        render(index);
+        lightbox.hidden = false;
+        lightbox.setAttribute("aria-hidden", "false");
+        previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        if (addHistoryEntry) {
+            const pageState = history.state && typeof history.state === "object"
+                ? history.state
+                : {};
+            history.pushState(
+                {
+                    ...pageState,
+                    pmTimelinePhotoLightbox: {
+                        plantId: items[currentIndex].dataset.galleryPlant,
+                        index: currentIndex,
+                    },
+                },
+                "",
+                window.location.href
+            );
+        }
+        lightboxHistoryActive = true;
+        closeButton.focus({preventScroll: true});
+    }
+
+    function openItem(item) {
+        items = itemsForPlant(item.dataset.galleryPlant);
+        show(Math.max(0, items.indexOf(item)), item, true);
+    }
+
+    function hide() {
+        if (lightbox.hidden) return;
+        lightbox.hidden = true;
+        lightbox.setAttribute("aria-hidden", "true");
+        image.removeAttribute("src");
+        document.body.style.overflow = previousOverflow;
+        lightboxHistoryActive = false;
+        opener?.focus({preventScroll: true});
+    }
+
+    function close() {
+        if (lightbox.hidden) return;
+        if (lightboxHistoryActive) {
+            history.back();
+            return;
+        }
+        hide();
+    }
+
+    allItems.forEach(item => {
+        item.addEventListener("click", event => {
+            event.preventDefault();
+            openItem(item);
+        });
+    });
+
+    previousButton.addEventListener("click", () => navigate(currentIndex - 1));
+    nextButton.addEventListener("click", () => navigate(currentIndex + 1));
+    closeButton.addEventListener("click", close);
+    lightbox.addEventListener("click", event => {
+        if (event.target === lightbox) close();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (lightbox.hidden) return;
+        if (event.key === "Escape") close();
+        if (event.key === "ArrowLeft" && items.length > 1) navigate(currentIndex - 1);
+        if (event.key === "ArrowRight" && items.length > 1) navigate(currentIndex + 1);
+    });
+
+    window.addEventListener("popstate", event => {
+        const galleryState = event.state?.pmTimelinePhotoLightbox;
+        if (galleryState) {
+            items = itemsForPlant(galleryState.plantId);
+            if (!items.length) {
+                hide();
+                return;
+            }
+            const index = Number.isInteger(galleryState.index)
+                ? galleryState.index
+                : 0;
+            if (lightbox.hidden) {
+                show(index, items[index] || items[0], false);
+            } else {
+                render(index);
+                lightboxHistoryActive = true;
+            }
+            return;
+        }
+        hide();
+    });
+
+    stage.addEventListener("touchstart", event => {
+        const touch = event.changedTouches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+    }, {passive: true});
+
+    stage.addEventListener("touchend", event => {
+        if (items.length < 2) return;
+        const touch = event.changedTouches[0];
+        const deltaX = touch.clientX - touchStartX;
+        const deltaY = touch.clientY - touchStartY;
+        if (Math.abs(deltaX) < 45 || Math.abs(deltaX) <= Math.abs(deltaY)) return;
+        navigate(deltaX < 0 ? currentIndex + 1 : currentIndex - 1);
+    }, {passive: true});
+})();
+</script>
 {% endblock %}

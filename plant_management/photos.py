@@ -644,5 +644,11 @@ def photo_markers_for_timeline(timeline):
             left = ((captured_on - start).days / total_days) * 100
             if 0 <= left <= 100:
                 markers.append({**photo, "left": round(left, 3)})
+        markers.sort(
+            key=lambda item: (
+                str(item.get("captured_at") or ""),
+                int(item.get("id") or 0),
+            )
+        )
         row["photo_markers"] = markers
     return timeline
