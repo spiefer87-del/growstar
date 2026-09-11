@@ -27,12 +27,15 @@ from plant_management.photos import (
     photo_storage_summary,
 )
 from services.growcam import (
-    LATEST_IMAGE,
+    camera_for_tent,
     capture_snapshot,
+    create_camera,
     delete_timelapse_frame,
     delete_timelapse_video,
     growcam_storage_summary,
+    latest_image_path,
     list_all_timelapse_frames,
+    list_public_configs,
     list_timelapse_frames,
     list_timelapse_videos,
     mjpeg_stream,
@@ -49,14 +52,14 @@ from services.growcam import (
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def _audit(action, details=None):
+def _audit(action, details=None, *, camera_id="camera_1"):
     user = getattr(g, "current_user", None)
     try:
         write_audit(
             action=action,
             user_id=user["id"] if user else None,
             entity_type="growcam",
-            entity_id="vsc-gcc4",
+            entity_id=camera_id,
             details=details,
             ip_address=request.remote_addr,
         )
@@ -65,35 +68,50 @@ def _audit(action, details=None):
 
 
 def register(app):
+    def selected_camera():
+        camera_id = request.values.get("camera_id")
+        camera = public_config(camera_id)
+        if camera is None:
+            abort(404)
+        return camera
+
     @app.get("/pflanzenmanagement/kamera")
     def growcam_page():
-        camera = public_config()
-        camera_status = status_snapshot()
+        camera = selected_camera()
+        camera_id = camera["camera_id"]
+        camera_status = status_snapshot(camera_id)
         requested_batch_id = request.args.get("batch_id", type=int)
         if requested_batch_id and get_batch(requested_batch_id):
             camera["batch_id"] = requested_batch_id
             camera_status["batch_id"] = requested_batch_id
-            camera_status["timelapse"] = timelapse_summary(requested_batch_id)
+            camera_status["timelapse"] = timelapse_summary(
+                requested_batch_id, camera_id=camera_id
+            )
         frame_page = request.args.get("frame_page", default=1, type=int)
         return render_template(
             "plants/camera.html",
             camera=camera,
+            cameras=list_public_configs(),
             camera_status=camera_status,
             tents=tent_manager.list_tents(),
             batches=list_batches(),
             timelapse_frames=list_timelapse_frames(
-                camera.get("batch_id"), page=frame_page
+                camera.get("batch_id"), camera_id=camera_id, page=frame_page
             ),
         )
 
     @app.post("/pflanzenmanagement/kamera/konfiguration")
     @permission_required("plants.edit")
     def growcam_configure():
-        current = public_config()
+        current = selected_camera()
+        camera_id = current["camera_id"]
         tent_id = str(request.form.get("tent_id") or "").strip()
         try:
             if not tent_manager.get(tent_id):
                 raise ValueError("Die ausgewählte Station existiert nicht.")
+            duplicate = camera_for_tent(tent_id, enabled_only=False)
+            if duplicate and duplicate["camera_id"] != camera_id:
+                raise ValueError("Dieser Station ist bereits eine Kamera zugeordnet.")
             batch_id = request.form.get("batch_id", type=int)
             if batch_id and not get_batch(batch_id):
                 raise ValueError("Der ausgewählte Durchgang existiert nicht.")
@@ -109,7 +127,7 @@ def register(app):
                 "video_retention_count": request.form.get("video_retention_count"),
                 "live_width": request.form.get("live_width"),
                 "live_fps": request.form.get("live_fps"),
-            })
+            }, camera_id=camera_id)
             _audit(
                 "plants.growcam_configured",
                 {
@@ -124,17 +142,52 @@ def register(app):
                     "timelapse_interval_sec": config["timelapse_interval_sec"],
                     "video_retention_count": config["video_retention_count"],
                 },
+                camera_id=camera_id,
             )
             flash("GrowCam-Konfiguration wurde gespeichert.", "success")
         except Exception as exc:
             flash(str(exc), "error")
-        return redirect(url_for("growcam_page"))
+        return redirect(url_for("growcam_page", camera_id=camera_id))
+
+    @app.post("/devices/growcam/hinzufuegen")
+    @permission_required("hardware.configure")
+    def growcam_hardware_add():
+        tent_id = str(request.form.get("tent_id") or "").strip()
+        try:
+            tent = tent_manager.get(tent_id)
+            if not tent:
+                raise ValueError("Die ausgewählte Station existiert nicht.")
+            existing = camera_for_tent(tent_id, enabled_only=False)
+            if existing:
+                raise ValueError("Dieser Station ist bereits eine Kamera zugeordnet.")
+            camera = create_camera({
+                "enabled": True,
+                "name": request.form.get("name") or f"GrowCam {tent.get('name') or tent_id}",
+                "host": request.form.get("host"),
+                "tent_id": tent_id,
+            })
+            _audit(
+                "hardware.growcam_added",
+                {"host": camera["host"], "tent_id": tent_id},
+                camera_id=camera["camera_id"],
+            )
+            flash("GrowCam wurde hinzugefügt und aktiviert.", "success")
+        except Exception as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("devices", _anchor="growcam-connection"))
 
     @app.post("/devices/growcam/konfiguration")
     @permission_required("hardware.configure")
     def growcam_hardware_configure():
-        current = public_config()
+        current = selected_camera()
+        camera_id = current["camera_id"]
         try:
+            tent_id = str(request.form.get("tent_id") or current.get("tent_id") or "").strip()
+            if not tent_manager.get(tent_id):
+                raise ValueError("Die ausgewählte Station existiert nicht.")
+            duplicate = camera_for_tent(tent_id, enabled_only=False)
+            if duplicate and duplicate["camera_id"] != camera_id:
+                raise ValueError("Dieser Station ist bereits eine Kamera zugeordnet.")
             config = save_config({
                 **current,
                 "name": request.form.get("name"),
@@ -142,7 +195,8 @@ def register(app):
                 "port": request.form.get("port"),
                 "path": request.form.get("path"),
                 "username": request.form.get("username"),
-            })
+                "tent_id": tent_id,
+            }, camera_id=camera_id)
             _audit(
                 "hardware.growcam_connection_configured",
                 {
@@ -150,6 +204,7 @@ def register(app):
                     "port": config["port"],
                     "path": config["path"],
                 },
+                camera_id=camera_id,
             )
             flash("GrowCam-Verbindung wurde im Hardware-Manager gespeichert.", "success")
         except Exception as exc:
@@ -159,7 +214,9 @@ def register(app):
     @app.post("/pflanzenmanagement/kamera/aufnahme")
     @permission_required("plants.edit")
     def growcam_capture():
-        result = capture_snapshot(archive=True)
+        camera = selected_camera()
+        camera_id = camera["camera_id"]
+        result = capture_snapshot(archive=True, camera_id=camera_id)
         if result.get("success"):
             _audit(
                 "plants.growcam_snapshot",
@@ -167,18 +224,21 @@ def register(app):
                     "width": result.get("width"),
                     "height": result.get("height"),
                 },
+                camera_id=camera_id,
             )
             flash("Aktuelles GrowCam-Bild wurde aufgenommen.", "success")
         else:
             flash(result.get("error") or "GrowCam-Aufnahme fehlgeschlagen.", "error")
-        return redirect(url_for("growcam_page"))
+        return redirect(url_for("growcam_page", camera_id=camera_id))
 
     @app.get("/pflanzenmanagement/kamera/bild")
     def growcam_image():
-        if not LATEST_IMAGE.is_file():
+        camera = selected_camera()
+        image = latest_image_path(camera["camera_id"])
+        if not image.is_file():
             abort(404)
         return send_file(
-            LATEST_IMAGE,
+            image,
             mimetype="image/jpeg",
             conditional=True,
             max_age=0,
@@ -186,11 +246,11 @@ def register(app):
 
     @app.get("/pflanzenmanagement/kamera/live.mjpg")
     def growcam_live():
-        config = public_config()
+        config = selected_camera()
         if not config.get("enabled") or not config.get("host"):
             abort(503)
         response = Response(
-            stream_with_context(mjpeg_stream()),
+            stream_with_context(mjpeg_stream(config["camera_id"])),
             mimetype="multipart/x-mixed-replace; boundary=growcam",
         )
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
@@ -199,7 +259,7 @@ def register(app):
 
     @app.get("/pflanzenmanagement/kamera/live")
     def growcam_live_viewer():
-        camera = public_config()
+        camera = selected_camera()
         if not camera.get("enabled") or not camera.get("host"):
             abort(404)
 
@@ -213,28 +273,34 @@ def register(app):
     @app.post("/pflanzenmanagement/kamera/zeitraffer")
     @permission_required("plants.edit")
     def growcam_timelapse_create():
+        camera = selected_camera()
+        camera_id = camera["camera_id"]
         result = start_timelapse_render({
             "video_fps": request.form.get("video_fps"),
             "video_width": request.form.get("video_width"),
             "video_crf": request.form.get("video_crf"),
-        })
+        }, camera_id=camera_id)
         if result.get("success"):
             _audit(
                 "plants.growcam_timelapse_started",
                 {
-                    "batch_id": public_config().get("batch_id"),
+                    "batch_id": camera.get("batch_id"),
                     "frame_count": result.get("frame_count"),
                     "options": result.get("options"),
                 },
+                camera_id=camera_id,
             )
             flash("Zeitraffer-Erstellung wurde im Hintergrund gestartet.", "success")
         else:
             flash(result.get("error") or "Zeitraffer konnte nicht gestartet werden.", "error")
-        return redirect(url_for("growcam_page"))
+        return redirect(url_for("growcam_page", camera_id=camera_id))
 
     @app.get("/pflanzenmanagement/kamera/zeitraffer/<int:batch_id>/<filename>")
     def growcam_timelapse_video(batch_id, filename):
-        video = resolve_timelapse_video(batch_id, filename)
+        camera = selected_camera()
+        video = resolve_timelapse_video(
+            batch_id, filename, camera_id=camera["camera_id"]
+        )
         if video is None:
             abort(404)
         download = request.args.get("download") == "1"
@@ -249,17 +315,24 @@ def register(app):
     @app.post("/pflanzenmanagement/kamera/zeitraffer/<int:batch_id>/<filename>/loeschen")
     @permission_required("plants.edit")
     def growcam_timelapse_video_delete(batch_id, filename):
-        result = delete_timelapse_video(batch_id, filename)
+        camera = selected_camera()
+        camera_id = camera["camera_id"]
+        result = delete_timelapse_video(
+            batch_id, filename, camera_id=camera_id
+        )
         if result.get("success"):
             _audit(
                 "plants.growcam_timelapse_video_deleted",
                 {"batch_id": batch_id, "filename": result.get("filename")},
+                camera_id=camera_id,
             )
             flash("Zeitraffer-Video wurde dauerhaft entfernt.", "success")
         else:
             flash(result.get("error") or "Video konnte nicht entfernt werden.", "error")
         if request.form.get("return_to") == "camera":
-            return redirect(url_for("growcam_page", batch_id=batch_id))
+            return redirect(url_for(
+                "growcam_page", camera_id=camera_id, batch_id=batch_id
+            ))
         return redirect(
             url_for(
                 "plant_media_explorer",
@@ -270,10 +343,12 @@ def register(app):
 
     @app.get("/pflanzenmanagement/kamera/zeitraffer-bild/<int:batch_id>/<filename>")
     def growcam_timelapse_frame(batch_id, filename):
+        camera = selected_camera()
         download = request.args.get("download") == "1"
         frame = resolve_timelapse_frame(
             batch_id,
             filename,
+            camera_id=camera["camera_id"],
             thumbnail=request.args.get("thumbnail") == "1" and not download,
         )
         if frame is None:
@@ -290,11 +365,16 @@ def register(app):
     @app.post("/pflanzenmanagement/kamera/zeitraffer-bild/<int:batch_id>/<filename>/loeschen")
     @permission_required("plants.edit")
     def growcam_timelapse_frame_delete(batch_id, filename):
-        result = delete_timelapse_frame(batch_id, filename)
+        camera = selected_camera()
+        camera_id = camera["camera_id"]
+        result = delete_timelapse_frame(
+            batch_id, filename, camera_id=camera_id
+        )
         if result.get("success"):
             _audit(
                 "plants.growcam_timelapse_frame_deleted",
                 {"batch_id": batch_id, "filename": result.get("filename")},
+                camera_id=camera_id,
             )
             flash("Zeitrafferbild wurde entfernt.", "success")
         else:
@@ -310,6 +390,7 @@ def register(app):
         return redirect(
             url_for(
                 "growcam_page",
+                camera_id=camera_id,
                 batch_id=batch_id,
                 frame_page=request.form.get("frame_page", type=int) or 1,
             )
@@ -328,15 +409,20 @@ def register(app):
         photo_storage = photo_storage_summary()
         batches = list_batches(include_archived=True)
         batch_by_id = {int(batch["id"]): batch for batch in batches}
+        camera_by_id = {
+            camera["camera_id"]: camera for camera in list_public_configs()
+        }
 
         if kind == "videos":
             media_page = list_timelapse_videos(page=page, per_page=per_page)
             for item in media_page["items"]:
                 item["batch"] = batch_by_id.get(item["batch_id"])
+                item["camera"] = camera_by_id.get(item["camera_id"])
         elif kind == "timelapse_frames":
             media_page = list_all_timelapse_frames(page=page, per_page=per_page)
             for item in media_page["items"]:
                 item["batch"] = batch_by_id.get(item["batch_id"])
+                item["camera"] = camera_by_id.get(item["camera_id"])
         else:
             total = (
                 photo_storage["plant_count"]
@@ -368,7 +454,8 @@ def register(app):
 
     @app.get("/api/plant-management/camera/status")
     def growcam_status_api():
+        camera = selected_camera()
         return jsonify({
             "success": True,
-            "camera": status_snapshot(),
+            "camera": status_snapshot(camera["camera_id"]),
         })

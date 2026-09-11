@@ -25,7 +25,7 @@
 </head>
 <body>
 <main id="viewer" class="viewer" aria-label="Livebild von {{ camera.name }}">
-    <img id="camera-image" src="{{ url_for('growcam_live') }}?viewer=1" alt="Livestream von {{ camera.name }}" draggable="false">
+    <img id="camera-image" src="{{ url_for('growcam_live', camera_id=camera.camera_id, viewer=1) }}" alt="Livestream von {{ camera.name }}" draggable="false">
 </main>
 <header class="topbar">
     <div class="identity"><strong>📷 {{ camera.name }}</strong><span>{{ tent_name }} · {{ camera.live_width }} px · {{ camera.live_fps }} Bilder/s</span></div>

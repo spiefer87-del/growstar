@@ -533,7 +533,7 @@ h3 {
                 {% if station_camera_available %}
                 <a
                     class="header-camera-link"
-                    href="{{ url_for('growcam_live_viewer') }}"
+                    href="{{ url_for('growcam_live_viewer', camera_id=station_camera_id) }}"
                     title="{{ station_camera_name }} live und bildschirmfüllend öffnen"
                     aria-label="Livekamera {{ station_camera_name }} für {{ tent_name }} öffnen"
                 >LIVE</a>

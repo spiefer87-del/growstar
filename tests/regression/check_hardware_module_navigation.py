@@ -56,7 +56,8 @@ def main():
     )
     require(
         "growcam_hardware_configure" in devices
-        and "camera=growcam_public_config()" in routes
+        and "cameras=growcam_public_configs()" in routes
+        and "tents=tent_manager.list_tents()" in routes
         and "Kamera-IP" in devices
         and "RTSP-Port" in devices
         and "RTSP-Pfad" in devices

@@ -12,6 +12,7 @@ import tempfile
 import threading
 import time
 from urllib.parse import quote
+import re
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -19,6 +20,8 @@ CONFIG_FILE = ROOT / "instance" / "growcam.json"
 CAMERA_DIR = ROOT / "instance" / "growcam"
 LATEST_IMAGE = CAMERA_DIR / "latest.jpg"
 TIMELAPSE_DIR = CAMERA_DIR / "timelapse"
+PRIMARY_CAMERA_ID = "camera_1"
+_CAMERA_ID_RE = re.compile(r"^camera_[1-9][0-9]*$")
 
 DEFAULT_CONFIG = {
     "enabled": False,
@@ -57,6 +60,69 @@ _status = {
     "render_options": None,
 }
 _timelapse_lock = threading.Lock()
+_configs = {}
+_statuses = {PRIMARY_CAMERA_ID: _status}
+_capture_locks = {PRIMARY_CAMERA_ID: _capture_lock}
+_timelapse_locks = {PRIMARY_CAMERA_ID: _timelapse_lock}
+_next_camera_number = 2
+
+
+def _normalize_camera_id(value):
+    camera_id = str(value or "").strip().lower()
+    if not _CAMERA_ID_RE.fullmatch(camera_id):
+        raise ValueError("Die Kamera-ID ist ungültig.")
+    return camera_id
+
+
+def _new_status():
+    return {
+        "capturing": False,
+        "last_capture": None,
+        "last_error": None,
+        "last_duration_ms": None,
+        "width": None,
+        "height": None,
+        "last_archived": None,
+        "live_clients": 0,
+        "live_error": None,
+        "timelapse_rendering": False,
+        "timelapse_error": None,
+        "last_video": None,
+        "render_options": None,
+    }
+
+
+def _status_for(camera_id):
+    camera_id = _normalize_camera_id(camera_id)
+    with _config_lock:
+        return _statuses.setdefault(camera_id, _new_status())
+
+
+def _capture_lock_for(camera_id):
+    camera_id = _normalize_camera_id(camera_id)
+    with _config_lock:
+        return _capture_locks.setdefault(camera_id, threading.Lock())
+
+
+def _timelapse_lock_for(camera_id):
+    camera_id = _normalize_camera_id(camera_id)
+    with _config_lock:
+        return _timelapse_locks.setdefault(camera_id, threading.Lock())
+
+
+def _camera_dir(camera_id):
+    camera_id = _normalize_camera_id(camera_id)
+    # Die erste Kamera behält absichtlich den bisherigen Ordner. Damit bleiben
+    # vorhandene Standbilder, Archive und Videos nach der Migration sichtbar.
+    return CAMERA_DIR if camera_id == PRIMARY_CAMERA_ID else CAMERA_DIR / camera_id
+
+
+def latest_image_path(camera_id=PRIMARY_CAMERA_ID):
+    return LATEST_IMAGE if camera_id == PRIMARY_CAMERA_ID else _camera_dir(camera_id) / "latest.jpg"
+
+
+def timelapse_dir_path(camera_id=PRIMARY_CAMERA_ID):
+    return TIMELAPSE_DIR if camera_id == PRIMARY_CAMERA_ID else _camera_dir(camera_id) / "timelapse"
 
 
 def _atomic_write_json(path, data):
@@ -82,9 +148,12 @@ def _atomic_write_json(path, data):
         raise
 
 
-def _normalize_config(data):
+def _normalize_config(data, camera_id=PRIMARY_CAMERA_ID):
     data = dict(data or {})
     result = dict(DEFAULT_CONFIG)
+    result["camera_id"] = _normalize_camera_id(
+        data.get("camera_id") or camera_id
+    )
     result["enabled"] = bool(data.get("enabled", False))
     result["name"] = str(data.get("name") or DEFAULT_CONFIG["name"]).strip()[:80]
 
@@ -175,7 +244,7 @@ def _normalize_config(data):
 
 
 def load_config():
-    global _config
+    global _config, _configs, _next_camera_number
     with _config_lock:
         data = {}
         if CONFIG_FILE.is_file():
@@ -184,25 +253,105 @@ def load_config():
             except Exception as exc:
                 print("⚠️ GrowCam-Konfiguration konnte nicht gelesen werden:", exc)
         try:
-            _config = _normalize_config(data)
-        except ValueError as exc:
+            if isinstance(data, dict) and isinstance(data.get("cameras"), list):
+                loaded = {}
+                for item in data["cameras"]:
+                    normalized = _normalize_config(
+                        item,
+                        item.get("camera_id") if isinstance(item, dict) else None,
+                    )
+                    loaded[normalized["camera_id"]] = normalized
+                _configs = loaded
+                highest = max(
+                    (int(key.split("_", 1)[1]) for key in loaded),
+                    default=0,
+                )
+                _next_camera_number = max(
+                    highest + 1,
+                    int(data.get("next_camera_number") or 1),
+                )
+            else:
+                # Format 1 enthielt genau eine Kamera. Sie bleibt camera_1 und
+                # verwendet weiter den historischen Medienordner.
+                legacy = _normalize_config(data, PRIMARY_CAMERA_ID)
+                _configs = {PRIMARY_CAMERA_ID: legacy}
+                _next_camera_number = 2
+            if not _configs:
+                empty = _normalize_config({}, PRIMARY_CAMERA_ID)
+                _configs = {PRIMARY_CAMERA_ID: empty}
+            _config = dict(_configs.get(PRIMARY_CAMERA_ID) or next(iter(_configs.values())))
+        except (TypeError, ValueError) as exc:
             print("⚠️ GrowCam-Konfiguration ist ungültig:", exc)
-            _config = dict(DEFAULT_CONFIG)
+            _config = _normalize_config({}, PRIMARY_CAMERA_ID)
+            _configs = {PRIMARY_CAMERA_ID: dict(_config)}
+            _next_camera_number = 2
         return dict(_config)
 
 
-def save_config(data):
+def _save_registry():
+    _atomic_write_json(CONFIG_FILE, {
+        "version": 2,
+        "next_camera_number": _next_camera_number,
+        "cameras": [dict(_configs[key]) for key in sorted(_configs)],
+    })
+
+
+def save_config(data, camera_id=None):
     global _config
-    normalized = _normalize_config(data)
+    requested_id = camera_id or dict(data or {}).get("camera_id") or PRIMARY_CAMERA_ID
+    normalized = _normalize_config(data, requested_id)
     with _config_lock:
-        _atomic_write_json(CONFIG_FILE, normalized)
-        _config = normalized
-    return public_config()
+        _configs[normalized["camera_id"]] = normalized
+        _save_registry()
+        if normalized["camera_id"] == PRIMARY_CAMERA_ID or not _config:
+            _config = dict(normalized)
+    return public_config(normalized["camera_id"])
 
 
-def public_config():
+def public_config(camera_id=None):
     with _config_lock:
-        return dict(_config)
+        if camera_id is None:
+            camera_id = PRIMARY_CAMERA_ID if PRIMARY_CAMERA_ID in _configs else next(iter(_configs), None)
+        if camera_id is None:
+            return _normalize_config({}, PRIMARY_CAMERA_ID)
+        try:
+            camera_id = _normalize_camera_id(camera_id)
+        except ValueError:
+            return None
+        config = _configs.get(camera_id)
+        return dict(config) if config else None
+
+
+def list_public_configs():
+    with _config_lock:
+        return [dict(_configs[key]) for key in sorted(_configs)]
+
+
+def create_camera(data):
+    global _config, _next_camera_number
+    with _config_lock:
+        number = max(1, int(_next_camera_number))
+        while f"camera_{number}" in _configs:
+            number += 1
+        camera_id = f"camera_{number}"
+        _next_camera_number = number + 1
+        normalized = _normalize_config({**dict(data or {}), "camera_id": camera_id}, camera_id)
+        _configs[camera_id] = normalized
+        _save_registry()
+        if not _config:
+            _config = dict(normalized)
+    return dict(normalized)
+
+
+def camera_for_tent(tent_id, *, enabled_only=True):
+    tent_id = str(tent_id or "")
+    for camera in list_public_configs():
+        if camera.get("tent_id") != tent_id:
+            continue
+        if enabled_only and (not camera.get("enabled") or not camera.get("host")):
+            continue
+        return camera
+    return None
 
 
 def _rtsp_url(config):
@@ -232,12 +381,12 @@ def _safe_error(stderr, rtsp_url):
     return (lines[-1] if lines else "GrowCam-Aufnahme fehlgeschlagen")[:300]
 
 
-def _batch_dir(batch_id):
-    return TIMELAPSE_DIR / f"batch_{int(batch_id)}"
+def _batch_dir(batch_id, camera_id=PRIMARY_CAMERA_ID):
+    return timelapse_dir_path(camera_id) / f"batch_{int(batch_id)}"
 
 
-def _thumbnail_dir(batch_id):
-    return _batch_dir(batch_id) / "thumbnails"
+def _thumbnail_dir(batch_id, camera_id=PRIMARY_CAMERA_ID):
+    return _batch_dir(batch_id, camera_id) / "thumbnails"
 
 
 def _safe_media_name(filename, *, prefix, suffix):
@@ -278,23 +427,24 @@ def _create_thumbnail(source, target):
 
 
 def _archive_latest(config, captured_at):
+    camera_id = config["camera_id"]
     batch_id = config.get("batch_id")
     if not config.get("timelapse_enabled") or not batch_id:
         return None
-    directory = _batch_dir(batch_id)
+    directory = _batch_dir(batch_id, camera_id)
     directory.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime(captured_at))
     target = directory / f"frame-{stamp}-{time.time_ns() % 1_000_000:06d}.jpg"
-    shutil.copy2(LATEST_IMAGE, target)
+    shutil.copy2(latest_image_path(camera_id), target)
     os.chmod(target, 0o640)
-    _create_thumbnail(target, _thumbnail_dir(batch_id) / target.name)
+    _create_thumbnail(target, _thumbnail_dir(batch_id, camera_id) / target.name)
 
     cutoff = captured_at - int(config.get("retention_days") or 120) * 86400
     for old_frame in directory.glob("frame-*.jpg"):
         try:
             if old_frame.stat().st_mtime < cutoff:
                 old_frame.unlink()
-                thumbnail = _thumbnail_dir(batch_id) / old_frame.name
+                thumbnail = _thumbnail_dir(batch_id, camera_id) / old_frame.name
                 if thumbnail.is_file():
                     thumbnail.unlink()
         except OSError:
@@ -302,29 +452,35 @@ def _archive_latest(config, captured_at):
     return target
 
 
-def capture_snapshot(*, archive=False):
-    config = public_config()
+def capture_snapshot(*, archive=False, camera_id=None):
+    config = public_config(camera_id)
+    if config is None:
+        return {"success": False, "error": "GrowCam wurde nicht gefunden."}
+    camera_id = config["camera_id"]
+    capture_lock = _capture_lock_for(camera_id)
+    status = _status_for(camera_id)
     if not config.get("enabled"):
         return {"success": False, "error": "GrowCam ist nicht aktiviert."}
     if not config.get("host"):
         return {"success": False, "error": "GrowCam-IP fehlt."}
-    if not _capture_lock.acquire(blocking=False):
+    if not capture_lock.acquire(blocking=False):
         return {"success": False, "error": "Eine GrowCam-Aufnahme läuft bereits."}
 
     started = time.monotonic()
     temp_name = None
     with _config_lock:
-        _status["capturing"] = True
+        status["capturing"] = True
     try:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             raise RuntimeError("FFmpeg ist nicht installiert.")
 
-        CAMERA_DIR.mkdir(parents=True, exist_ok=True)
+        camera_dir = _camera_dir(camera_id)
+        camera_dir.mkdir(parents=True, exist_ok=True)
         fd, temp_name = tempfile.mkstemp(
             prefix=".growcam-frame-",
             suffix=".jpg",
-            dir=str(CAMERA_DIR),
+            dir=str(camera_dir),
         )
         os.close(fd)
         rtsp_url = _rtsp_url(config)
@@ -354,21 +510,21 @@ def capture_snapshot(*, archive=False):
 
         width, height = _image_dimensions(temp_name)
         os.chmod(temp_name, 0o640)
-        os.replace(temp_name, LATEST_IMAGE)
+        os.replace(temp_name, latest_image_path(camera_id))
         temp_name = None
         captured_at = time.time()
         archived = _archive_latest(config, captured_at) if archive else None
         with _config_lock:
-            _status.update({
+            status.update({
                 "capturing": False,
                 "last_capture": captured_at,
                 "last_error": None,
                 "last_duration_ms": round((time.monotonic() - started) * 1000),
                 "width": width,
                 "height": height,
-                "last_archived": captured_at if archived else _status.get("last_archived"),
+                "last_archived": captured_at if archived else status.get("last_archived"),
             })
-        return {"success": True, **status_snapshot()}
+        return {"success": True, **status_snapshot(camera_id)}
     except subprocess.TimeoutExpired:
         error = "GrowCam-Aufnahme hat nach 30 Sekunden nicht geantwortet."
     except Exception as exc:
@@ -380,28 +536,34 @@ def capture_snapshot(*, archive=False):
             except OSError:
                 pass
         with _config_lock:
-            _status["capturing"] = False
-        _capture_lock.release()
+            status["capturing"] = False
+        capture_lock.release()
 
     with _config_lock:
-        _status["last_error"] = error[:300]
-    return {"success": False, "error": error, **status_snapshot()}
+        status["last_error"] = error[:300]
+    return {"success": False, "error": error, **status_snapshot(camera_id)}
 
 
-def status_snapshot():
-    config = public_config()
+def status_snapshot(camera_id=None):
+    config = public_config(camera_id)
+    if config is None:
+        return {"configured": False, "enabled": False, "error": "GrowCam wurde nicht gefunden."}
+    camera_id = config["camera_id"]
+    status_ref = _status_for(camera_id)
+    latest_image = latest_image_path(camera_id)
     with _config_lock:
-        status = dict(_status)
-    image_exists = LATEST_IMAGE.is_file()
+        status = dict(status_ref)
+    image_exists = latest_image.is_file()
     if image_exists and not status.get("last_capture"):
-        status["last_capture"] = LATEST_IMAGE.stat().st_mtime
+        status["last_capture"] = latest_image.stat().st_mtime
     batch_id = config.get("batch_id")
-    archive = timelapse_summary(batch_id)
+    archive = timelapse_summary(batch_id, camera_id=camera_id)
     return {
         **status,
         "enabled": bool(config.get("enabled")),
         "configured": bool(config.get("host")),
         "name": config.get("name"),
+        "camera_id": camera_id,
         "tent_id": config.get("tent_id"),
         "interval_sec": config.get("interval_sec"),
         "batch_id": batch_id,
@@ -413,21 +575,21 @@ def status_snapshot():
         "live_fps": config.get("live_fps"),
         "timelapse": archive,
         "image_available": image_exists,
-        "image_version": int(LATEST_IMAGE.stat().st_mtime) if image_exists else None,
+        "image_version": int(latest_image.stat().st_mtime) if image_exists else None,
     }
 
 
-def _video_files(batch_id):
+def _video_files(batch_id, camera_id=PRIMARY_CAMERA_ID):
     if not batch_id:
         return []
-    return sorted(_batch_dir(batch_id).glob("timelapse-*.mp4"), reverse=True)
+    return sorted(_batch_dir(batch_id, camera_id).glob("timelapse-*.mp4"), reverse=True)
 
 
-def timelapse_summary(batch_id=None):
+def timelapse_summary(batch_id=None, *, camera_id=PRIMARY_CAMERA_ID):
     try:
-        directory = _batch_dir(batch_id) if batch_id else None
+        directory = _batch_dir(batch_id, camera_id) if batch_id else None
         frames = list(directory.glob("frame-*.jpg")) if directory and directory.is_dir() else []
-        videos = _video_files(batch_id)
+        videos = _video_files(batch_id, camera_id)
     except (OSError, TypeError, ValueError):
         frames, videos = [], []
     latest_video = videos[0] if videos else None
@@ -438,40 +600,43 @@ def timelapse_summary(batch_id=None):
     }
 
 
-def resolve_timelapse_video(batch_id, filename):
+def resolve_timelapse_video(batch_id, filename, *, camera_id=PRIMARY_CAMERA_ID):
     name = _safe_media_name(filename, prefix="timelapse-", suffix=".mp4")
     if name is None:
         return None
-    candidate = _batch_dir(batch_id) / name
+    candidate = _batch_dir(batch_id, camera_id) / name
     return candidate if candidate.is_file() else None
 
 
-def list_timelapse_videos(batch_id=None, *, page=1, per_page=24):
+def list_timelapse_videos(batch_id=None, *, camera_id=None, page=1, per_page=24):
     """Listet erzeugte Videos sicher über alle oder genau einen Durchgang."""
 
     candidates = []
     try:
-        if batch_id:
-            directories = [_batch_dir(batch_id)]
-        else:
-            directories = [
-                path
-                for path in TIMELAPSE_DIR.glob("batch_*")
-                if path.is_dir() and path.name[6:].isdigit()
-            ]
-        for directory in directories:
-            directory_batch_id = int(directory.name[6:])
-            for video in directory.glob("timelapse-*.mp4"):
-                try:
-                    stat = video.stat()
-                except OSError:
-                    continue
-                candidates.append({
-                    "batch_id": directory_batch_id,
-                    "filename": video.name,
-                    "created_at": stat.st_mtime,
-                    "size_bytes": stat.st_size,
-                })
+        camera_ids = [camera_id] if camera_id else [item["camera_id"] for item in list_public_configs()]
+        for current_camera_id in camera_ids:
+            if batch_id:
+                directories = [_batch_dir(batch_id, current_camera_id)]
+            else:
+                base = timelapse_dir_path(current_camera_id)
+                directories = [
+                    path for path in base.glob("batch_*")
+                    if path.is_dir() and path.name[6:].isdigit()
+                ]
+            for directory in directories:
+                directory_batch_id = int(directory.name[6:])
+                for video in directory.glob("timelapse-*.mp4"):
+                    try:
+                        stat = video.stat()
+                    except OSError:
+                        continue
+                    candidates.append({
+                        "camera_id": current_camera_id,
+                        "batch_id": directory_batch_id,
+                        "filename": video.name,
+                        "created_at": stat.st_mtime,
+                        "size_bytes": stat.st_size,
+                    })
     except (OSError, TypeError, ValueError):
         candidates = []
 
@@ -488,13 +653,13 @@ def list_timelapse_videos(batch_id=None, *, page=1, per_page=24):
     }
 
 
-def delete_timelapse_video(batch_id, filename):
-    if _timelapse_lock.locked():
+def delete_timelapse_video(batch_id, filename, *, camera_id=PRIMARY_CAMERA_ID):
+    if _timelapse_lock_for(camera_id).locked():
         return {
             "success": False,
             "error": "Während der Videoerstellung können keine Videos gelöscht werden.",
         }
-    video = resolve_timelapse_video(batch_id, filename)
+    video = resolve_timelapse_video(batch_id, filename, camera_id=camera_id)
     if video is None:
         return {"success": False, "error": "Zeitraffer-Video wurde nicht gefunden."}
     try:
@@ -520,14 +685,22 @@ def growcam_storage_summary():
         "video_count": 0,
         "video_bytes": 0,
     }
-    if LATEST_IMAGE.is_file():
-        try:
-            totals["latest_count"] = 1
-            totals["latest_bytes"] = LATEST_IMAGE.stat().st_size
-        except OSError:
-            pass
+    for camera in list_public_configs():
+        latest_image = latest_image_path(camera["camera_id"])
+        if latest_image.is_file():
+            try:
+                totals["latest_count"] += 1
+                totals["latest_bytes"] += latest_image.stat().st_size
+            except OSError:
+                pass
     try:
-        files = TIMELAPSE_DIR.rglob("*") if TIMELAPSE_DIR.is_dir() else []
+        seen = set()
+        files = []
+        for camera in list_public_configs():
+            directory = timelapse_dir_path(camera["camera_id"])
+            if directory.is_dir() and directory not in seen:
+                seen.add(directory)
+                files.extend(directory.rglob("*"))
         for path in files:
             if not path.is_file():
                 continue
@@ -554,11 +727,11 @@ def growcam_storage_summary():
     return totals
 
 
-def list_timelapse_frames(batch_id, *, page=1, per_page=24):
+def list_timelapse_frames(batch_id, *, camera_id=PRIMARY_CAMERA_ID, page=1, per_page=24):
     if not batch_id:
         return {"items": [], "page": 1, "pages": 0, "total": 0}
     try:
-        frames = sorted(_batch_dir(batch_id).glob("frame-*.jpg"), reverse=True)
+        frames = sorted(_batch_dir(batch_id, camera_id).glob("frame-*.jpg"), reverse=True)
     except (OSError, TypeError, ValueError):
         frames = []
     per_page = max(6, min(int(per_page), 60))
@@ -579,29 +752,32 @@ def list_timelapse_frames(batch_id, *, page=1, per_page=24):
     return {"items": items, "page": page, "pages": pages, "total": len(frames)}
 
 
-def list_all_timelapse_frames(*, page=1, per_page=24):
+def list_all_timelapse_frames(*, camera_id=None, page=1, per_page=24):
     """Listet Zeitrafferbilder aller Durchgänge für die zentrale Medienansicht."""
 
     candidates = []
     try:
-        directories = [
-            path
-            for path in TIMELAPSE_DIR.glob("batch_*")
-            if path.is_dir() and path.name[6:].isdigit()
-        ]
-        for directory in directories:
-            directory_batch_id = int(directory.name[6:])
-            for frame in directory.glob("frame-*.jpg"):
-                try:
-                    stat = frame.stat()
-                except OSError:
-                    continue
-                candidates.append({
-                    "batch_id": directory_batch_id,
-                    "filename": frame.name,
-                    "captured_at": stat.st_mtime,
-                    "size_bytes": stat.st_size,
-                })
+        camera_ids = [camera_id] if camera_id else [item["camera_id"] for item in list_public_configs()]
+        for current_camera_id in camera_ids:
+            base = timelapse_dir_path(current_camera_id)
+            directories = [
+                path for path in base.glob("batch_*")
+                if path.is_dir() and path.name[6:].isdigit()
+            ]
+            for directory in directories:
+                directory_batch_id = int(directory.name[6:])
+                for frame in directory.glob("frame-*.jpg"):
+                    try:
+                        stat = frame.stat()
+                    except OSError:
+                        continue
+                    candidates.append({
+                        "camera_id": current_camera_id,
+                        "batch_id": directory_batch_id,
+                        "filename": frame.name,
+                        "captured_at": stat.st_mtime,
+                        "size_bytes": stat.st_size,
+                    })
     except OSError:
         candidates = []
     candidates.sort(key=lambda item: item["captured_at"], reverse=True)
@@ -617,16 +793,16 @@ def list_all_timelapse_frames(*, page=1, per_page=24):
     }
 
 
-def resolve_timelapse_frame(batch_id, filename, *, thumbnail=False):
+def resolve_timelapse_frame(batch_id, filename, *, camera_id=PRIMARY_CAMERA_ID, thumbnail=False):
     name = _safe_media_name(filename, prefix="frame-", suffix=".jpg")
     if name is None:
         return None
-    source = _batch_dir(batch_id) / name
+    source = _batch_dir(batch_id, camera_id) / name
     if not source.is_file():
         return None
     if not thumbnail:
         return source
-    target = _thumbnail_dir(batch_id) / name
+    target = _thumbnail_dir(batch_id, camera_id) / name
     if not target.is_file():
         try:
             _create_thumbnail(source, target)
@@ -635,13 +811,13 @@ def resolve_timelapse_frame(batch_id, filename, *, thumbnail=False):
     return target
 
 
-def delete_timelapse_frame(batch_id, filename):
-    if _timelapse_lock.locked():
+def delete_timelapse_frame(batch_id, filename, *, camera_id=PRIMARY_CAMERA_ID):
+    if _timelapse_lock_for(camera_id).locked():
         return {"success": False, "error": "Während der Videoerstellung können keine Bilder gelöscht werden."}
-    frame = resolve_timelapse_frame(batch_id, filename)
+    frame = resolve_timelapse_frame(batch_id, filename, camera_id=camera_id)
     if frame is None:
         return {"success": False, "error": "Zeitrafferbild wurde nicht gefunden."}
-    thumbnail = _thumbnail_dir(batch_id) / frame.name
+    thumbnail = _thumbnail_dir(batch_id, camera_id) / frame.name
     try:
         frame.unlink()
         if thumbnail.is_file():
@@ -669,8 +845,11 @@ def _normalize_render_options(data):
 
 
 def _render_timelapse_worker(config, options):
+    camera_id = config["camera_id"]
+    status = _status_for(camera_id)
+    render_lock = _timelapse_lock_for(camera_id)
     batch_id = config["batch_id"]
-    directory = _batch_dir(batch_id)
+    directory = _batch_dir(batch_id, camera_id)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     output = directory / f"timelapse-{stamp}.mp4"
     temp_output = directory / f".timelapse-{stamp}.mp4"
@@ -699,20 +878,20 @@ def _render_timelapse_worker(config, options):
         os.replace(temp_output, output)
         retention_count = int(config.get("video_retention_count") or 0)
         if retention_count:
-            for old_video in _video_files(batch_id)[retention_count:]:
+            for old_video in _video_files(batch_id, camera_id)[retention_count:]:
                 try:
                     old_video.unlink()
                 except OSError:
                     pass
         with _config_lock:
-            _status["last_video"] = output.name
-            _status["timelapse_error"] = None
+            status["last_video"] = output.name
+            status["timelapse_error"] = None
     except subprocess.TimeoutExpired:
         with _config_lock:
-            _status["timelapse_error"] = "Zeitraffer-Erstellung hat nach zehn Minuten nicht geantwortet."
+            status["timelapse_error"] = "Zeitraffer-Erstellung hat nach zehn Minuten nicht geantwortet."
     except Exception as exc:
         with _config_lock:
-            _status["timelapse_error"] = str(exc).strip() or type(exc).__name__
+            status["timelapse_error"] = str(exc).strip() or type(exc).__name__
     finally:
         try:
             if temp_output.is_file():
@@ -720,29 +899,34 @@ def _render_timelapse_worker(config, options):
         except OSError:
             pass
         with _config_lock:
-            _status["timelapse_rendering"] = False
-            _status["render_options"] = None
-        _timelapse_lock.release()
+            status["timelapse_rendering"] = False
+            status["render_options"] = None
+        render_lock.release()
 
 
-def start_timelapse_render(options=None):
-    config = public_config()
+def start_timelapse_render(options=None, *, camera_id=None):
+    config = public_config(camera_id)
+    if config is None:
+        return {"success": False, "error": "GrowCam wurde nicht gefunden."}
+    camera_id = config["camera_id"]
+    status = _status_for(camera_id)
+    render_lock = _timelapse_lock_for(camera_id)
     batch_id = config.get("batch_id")
     if not batch_id:
         return {"success": False, "error": "Der Kamera ist kein Durchgang zugeordnet."}
-    summary = timelapse_summary(batch_id)
+    summary = timelapse_summary(batch_id, camera_id=camera_id)
     if summary["frame_count"] < 2:
         return {"success": False, "error": "Für ein Zeitraffer-Video werden mindestens zwei Aufnahmen benötigt."}
     try:
         render_options = _normalize_render_options(options)
     except ValueError as exc:
         return {"success": False, "error": str(exc)}
-    if not _timelapse_lock.acquire(blocking=False):
+    if not render_lock.acquire(blocking=False):
         return {"success": False, "error": "Ein Zeitraffer-Video wird bereits erstellt."}
     with _config_lock:
-        _status["timelapse_rendering"] = True
-        _status["timelapse_error"] = None
-        _status["render_options"] = dict(render_options)
+        status["timelapse_rendering"] = True
+        status["timelapse_error"] = None
+        status["render_options"] = dict(render_options)
     threading.Thread(
         target=_render_timelapse_worker,
         args=(config, render_options),
@@ -756,8 +940,12 @@ def start_timelapse_render(options=None):
     }
 
 
-def mjpeg_stream():
-    config = public_config()
+def mjpeg_stream(camera_id=None):
+    config = public_config(camera_id)
+    if config is None:
+        raise RuntimeError("GrowCam wurde nicht gefunden.")
+    camera_id = config["camera_id"]
+    status = _status_for(camera_id)
     if not config.get("enabled") or not config.get("host"):
         raise RuntimeError("GrowCam ist nicht aktiviert oder nicht konfiguriert.")
     ffmpeg = shutil.which("ffmpeg")
@@ -776,8 +964,8 @@ def mjpeg_stream():
         bufsize=0,
     )
     with _config_lock:
-        _status["live_clients"] += 1
-        _status["live_error"] = None
+        status["live_clients"] += 1
+        status["live_error"] = None
     buffer = b""
     try:
         while process.stdout:
@@ -801,7 +989,7 @@ def mjpeg_stream():
                 )
         if process.poll() not in (None, 0):
             with _config_lock:
-                _status["live_error"] = "Der GrowCam-Livestream wurde unerwartet beendet."
+                status["live_error"] = "Der GrowCam-Livestream wurde unerwartet beendet."
     finally:
         if process.poll() is None:
             process.terminate()
@@ -811,41 +999,46 @@ def mjpeg_stream():
                 process.kill()
                 process.wait(timeout=2)
         with _config_lock:
-            _status["live_clients"] = max(0, _status["live_clients"] - 1)
+            status["live_clients"] = max(0, status["live_clients"] - 1)
 
 
 def growcam_loop():
     print("📷 GrowCam Snapshot-Thread gestartet")
-    next_capture = 0.0
-    next_archive = 0.0
-    schedule_key = None
+    schedules = {}
     while True:
-        config = public_config()
         now = time.monotonic()
-        current_key = (
-            config.get("enabled"), config.get("interval_sec"),
-            config.get("timelapse_enabled"), config.get("timelapse_interval_sec"),
-            config.get("batch_id"),
-        )
-        if current_key != schedule_key:
-            next_capture = next_archive = 0.0
-            schedule_key = current_key
-        preview_due = now >= next_capture
-        archive_due = (
-            config.get("timelapse_enabled") and config.get("batch_id")
-            and now >= next_archive
-        )
-        if config.get("enabled") and config.get("host") and (preview_due or archive_due):
-            result = capture_snapshot(archive=bool(archive_due))
-            if not result.get("success"):
-                print("⚠️ GrowCam-Aufnahme fehlgeschlagen:", result.get("error"))
-            finished = time.monotonic()
-            if preview_due:
-                next_capture = finished + int(config.get("interval_sec") or 60)
-            if archive_due:
-                next_archive = finished + int(config.get("timelapse_interval_sec") or 900)
-        elif not config.get("enabled"):
-            next_capture = next_archive = 0.0
+        cameras = list_public_configs()
+        active_ids = {camera["camera_id"] for camera in cameras}
+        for stale_id in set(schedules) - active_ids:
+            schedules.pop(stale_id, None)
+        for config in cameras:
+            camera_id = config["camera_id"]
+            current_key = (
+                config.get("enabled"), config.get("interval_sec"),
+                config.get("timelapse_enabled"), config.get("timelapse_interval_sec"),
+                config.get("batch_id"), config.get("host"),
+            )
+            schedule = schedules.setdefault(camera_id, {
+                "key": None, "next_capture": 0.0, "next_archive": 0.0,
+            })
+            if current_key != schedule["key"]:
+                schedule.update({"key": current_key, "next_capture": 0.0, "next_archive": 0.0})
+            preview_due = now >= schedule["next_capture"]
+            archive_due = (
+                config.get("timelapse_enabled") and config.get("batch_id")
+                and now >= schedule["next_archive"]
+            )
+            if config.get("enabled") and config.get("host") and (preview_due or archive_due):
+                result = capture_snapshot(archive=bool(archive_due), camera_id=camera_id)
+                if not result.get("success"):
+                    print(f"⚠️ GrowCam {camera_id} Aufnahme fehlgeschlagen:", result.get("error"))
+                finished = time.monotonic()
+                if preview_due:
+                    schedule["next_capture"] = finished + int(config.get("interval_sec") or 60)
+                if archive_due:
+                    schedule["next_archive"] = finished + int(config.get("timelapse_interval_sec") or 900)
+            elif not config.get("enabled"):
+                schedule["next_capture"] = schedule["next_archive"] = 0.0
         time.sleep(1)
 
 
@@ -854,16 +1047,21 @@ load_config()
 
 __all__ = (
     "LATEST_IMAGE",
+    "PRIMARY_CAMERA_ID",
     "TIMELAPSE_DIR",
+    "camera_for_tent",
     "capture_snapshot",
+    "create_camera",
     "delete_timelapse_frame",
     "delete_timelapse_video",
     "growcam_storage_summary",
     "list_all_timelapse_frames",
     "list_timelapse_videos",
     "growcam_loop",
+    "latest_image_path",
     "load_config",
     "list_timelapse_frames",
+    "list_public_configs",
     "public_config",
     "mjpeg_stream",
     "resolve_timelapse_video",

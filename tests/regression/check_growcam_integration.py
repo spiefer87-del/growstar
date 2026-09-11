@@ -347,8 +347,8 @@ def main():
             require(
                 "growcam_live_viewer" in station_template
                 and "station_camera_available" in station_template
-                and "growcam_public_config" in dashboard_routes
-                and 'camera.get("tent_id") == tent_id' in dashboard_routes
+                and "growcam_for_tent" in dashboard_routes
+                and "station_camera_id" in dashboard_routes
                 and "requestFullscreen" in live_template
                 and "growcam_live" in live_template
                 and "grow_control_tent" in live_template,
