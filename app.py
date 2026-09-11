@@ -44,6 +44,7 @@ from services.restart_policy import apply_shutdown_restart_policy
 from services.notifications import notification_worker_loop
 from services.alerts import alarm_monitor_loop
 from services.growcam import growcam_loop
+from services.grow_events import init_grow_event_db
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.plant_management import register as register_plant_management_routes
@@ -67,6 +68,7 @@ from routes.notifications import register as register_notification_routes
 from routes.capability_routing import register as register_capability_routing_routes
 from routes.spiderfarmer_powerstrip import register as register_spiderfarmer_powerstrip_routes
 from routes.camera import register as register_camera_routes
+from routes.events import register as register_event_routes
 
 from auth.database import init_auth_db
 from auth.middleware import install_auth
@@ -117,6 +119,7 @@ def create_flask_app():
     init_plant_management_db()
     init_propagation_db()
     init_plant_journal_db()
+    init_grow_event_db()
 
     app = Flask(__name__)
     app.config.update(
@@ -150,6 +153,7 @@ def create_flask_app():
     register_capability_routing_routes(app)
     register_spiderfarmer_powerstrip_routes(app)
     register_camera_routes(app)
+    register_event_routes(app)
 
     # Standardmäßig ist die gesamte Oberfläche nur nach Login erreichbar.
     install_auth(app)

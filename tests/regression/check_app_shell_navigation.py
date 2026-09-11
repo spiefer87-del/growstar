@@ -30,7 +30,7 @@ def main():
 
     grow_targets = (
         "grow_control_dashboard", "grow_control_live", "grow_control_profiles",
-        "grow_control_design", "grow_control_diagrams_dashboard",
+        "grow_control_design", "grow_control_events", "grow_control_diagrams_dashboard",
         "grow_control_diagram_temperature", "grow_control_diagram_humidity",
         "grow_control_diagram_vpd", "diagrams_page",
     )

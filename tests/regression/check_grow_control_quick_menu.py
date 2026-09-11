@@ -34,6 +34,11 @@ def main():
         "Profile und Dashboard-Design sind direkt im Grow-Control-Schnellmenü erreichbar",
     )
     require(
+        "Grow Intelligence" in grow_menu
+        and "url_for('grow_control_events')" in grow_menu,
+        "Grow Intelligence ist direkt im Grow-Control-Schnellmenü erreichbar",
+    )
+    require(
         "Diagrammübersicht" in grow_menu
         and "url_for('grow_control_diagram_temperature')" in grow_menu
         and "url_for('grow_control_diagram_humidity')" in grow_menu
@@ -63,12 +68,14 @@ def main():
     require(
         "url_for('grow_control_profiles')" in dashboard
         and "url_for('grow_control_design')" in dashboard
+        and "url_for('grow_control_events')" in dashboard
         and "url_for('grow_control_diagrams_dashboard')" in dashboard,
-        "Grow-Control-Dashboard bietet Profile, Design und Diagramme als Schnellzugriff",
+        "Grow-Control-Dashboard bietet Profile, Design, Intelligence und Diagramme als Schnellzugriff",
     )
     require(
         permission_requirement("/grow-control/profiles", "GET").permissions == ("settings.view",)
         and permission_requirement("/grow-control/design", "GET").permissions == ("settings.view",)
+        and permission_requirement("/grow-control/events", "GET").permissions == ("grow.view",)
         and permission_requirement("/grow-control/diagrams", "GET").permissions == ("grow.view",),
         "Schnellzugriffe behalten getrennte Anzeige- und Einstellungsrechte",
     )

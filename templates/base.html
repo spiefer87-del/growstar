@@ -96,6 +96,7 @@
                 <div id="growstar-grow-submenu" class="growstar-nav-submenu" data-growstar-nav-submenu {% if not growstar_grow_active %}hidden{% endif %}>
                     <a class="{% if growstar_endpoint == 'grow_control_dashboard' %}active{% endif %}" href="{{ url_for('grow_control_dashboard') }}"><span>Übersicht</span><small>Stationen</small></a>
                     <a class="{% if growstar_endpoint in ['grow_control_live', 'grow_control_tent', 'grow_control_tent_device'] %}active{% endif %}" href="{{ url_for('grow_control_live') }}"><span>Live-Steuerung</span><small>Hauptstation</small></a>
+                    <a class="{% if growstar_endpoint == 'grow_control_events' %}active{% endif %}" href="{{ url_for('grow_control_events') }}"><span>Grow Intelligence</span><small>Ereignis-Timeline</small></a>
                     {% if has_permission('settings.view') %}
                     <div class="growstar-nav-submenu-label">Profile &amp; Darstellung</div>
                     <a class="{% if growstar_endpoint in ['grow_control_profiles', 'grow_control_tent_profiles'] %}active{% endif %}" href="{{ url_for('grow_control_profiles') }}"><span>Profile</span><small>Sollwerte bearbeiten</small></a>

@@ -451,6 +451,15 @@
         {% endif %}
 
         {% if has_permission('grow.view') %}
+        <a class="module-link" href="{{ url_for('grow_control_events') }}">
+            <article class="module-card intelligence">
+                <div class="module-icon">🧠</div>
+                <h3>Grow Intelligence</h3>
+                <p>Klima, Geräte, Pflanzen und Medien als gemeinsame Ereignis-Timeline auswerten.</p>
+                <div class="module-action">Ereignisse öffnen →</div>
+            </article>
+        </a>
+
         <a class="module-link" href="{{ url_for('grow_control_diagrams_dashboard') }}">
             <article class="module-card diagrams">
                 <div class="module-icon">📊</div>

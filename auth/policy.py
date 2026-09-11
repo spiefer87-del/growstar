@@ -49,6 +49,7 @@ READ_EXACT = {
     "/grow-control/setup": require("settings.view"),
     "/grow-control/profiles": require("settings.view"),
     "/grow-control/design": require("settings.view"),
+    "/grow-control/events": require("grow.view"),
     "/pflanzenmanagement": require("plants.view"),
     "/hardware": require("hardware.view", "settings.view", mode="any"),
     "/system/spiderfarmer": require("hardware.view"),
