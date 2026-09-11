@@ -200,6 +200,9 @@ DEFAULT_CONFIG = {
     "ENERGY_DAY_OFFSET": {},
     "ENERGY_DAY_RESET_MIN": 0,
     "ENERGY_LAST_DAY_RESET": None,
+    "ENERGY_LAST_DAY_RESET_AT": None,
+    "ENERGY_LAST_DAY_RESET_SOURCE": None,
+    "ENERGY_LAST_DAY_RESET_SCOPE": None,
 
     # ================= SYSTEM =================
     "POWER_PRICE": 0.43,

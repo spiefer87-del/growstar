@@ -1,15 +1,14 @@
-import datetime
 import time
 
 import core.context as ctx
 
-from core.config import config
 from core.runtime import list_runtimes
 
 from services.energy import (
     refresh_energy_state,
     record_energy_history,
     do_energy_day_reset,
+    energy_day_reset_due,
 )
 from services.shelly import run_failsafe
 
@@ -72,22 +71,15 @@ def shelly_background_loop():
             # =========================================
             # 📅 AUTO DAY RESET – one schedule, all loaded stations
             # =========================================
-            reset_min = int(config.get("ENERGY_DAY_RESET_MIN", 0))
-            now_dt = datetime.datetime.now()
-            now_min = now_dt.hour * 60 + now_dt.minute
-            today = now_dt.date().isoformat()
-
-            if (
-                now_min >= reset_min
-                and config.get("ENERGY_LAST_DAY_RESET") != today
-            ):
+            if energy_day_reset_due(now=now):
                 with ctx.shelly_lock:
-                    reset_done = do_energy_day_reset()
+                    reset_done = do_energy_day_reset(now=now)
 
                 if reset_done:
+                    now_dt = time.localtime(now)
                     print(
                         f"📅 AUTO RESET abgeschlossen "
-                        f"({now_dt.hour:02d}:{now_dt.minute:02d})"
+                        f"({now_dt.tm_hour:02d}:{now_dt.tm_min:02d})"
                     )
 
         except Exception as exc:

@@ -52,6 +52,90 @@ def _safe_float(value, default=None):
         return default
 
 
+def _safe_reset_min(value):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        value = 0
+    return max(0, min(1439, value))
+
+
+def _configured_reset_min():
+    return _safe_reset_min(
+        get_default_runtime().config.get("ENERGY_DAY_RESET_MIN", 0)
+    )
+
+
+def _local_datetime(now=None):
+    if isinstance(now, datetime.datetime):
+        if now.tzinfo is None:
+            return now.astimezone()
+        return now.astimezone()
+    timestamp = time.time() if now is None else float(now)
+    return datetime.datetime.fromtimestamp(timestamp).astimezone()
+
+
+def _local_boundary(day, reset_min):
+    reset_min = _safe_reset_min(reset_min)
+    naive = datetime.datetime.combine(
+        day,
+        datetime.time(hour=reset_min // 60, minute=reset_min % 60),
+    )
+    return naive.astimezone()
+
+
+def energy_day_context(*, now=None, reset_min=None):
+    """Return the accounting day bounded by the configured reset clock.
+
+    A reset at 05:30 means that 00:00–05:29 still belongs to the previous
+    energy day.  This helper is the single source of truth for offsets,
+    history, peaks, scheduler status and UI labels.
+    """
+    now_dt = _local_datetime(now)
+    reset_min = _configured_reset_min() if reset_min is None else _safe_reset_min(reset_min)
+    start_day = now_dt.date()
+    start = _local_boundary(start_day, reset_min)
+    if now_dt < start:
+        start_day -= datetime.timedelta(days=1)
+        start = _local_boundary(start_day, reset_min)
+    next_reset = _local_boundary(start_day + datetime.timedelta(days=1), reset_min)
+    return {
+        "day": start_day.isoformat(),
+        "started_at": int(start.timestamp()),
+        "next_reset_at": int(next_reset.timestamp()),
+        "reset_min": reset_min,
+        "timezone": now_dt.tzname() or "lokal",
+    }
+
+
+def energy_day_reset_due(*, now=None):
+    context = energy_day_context(now=now)
+    last_day = get_default_runtime().config.get("ENERGY_LAST_DAY_RESET")
+    return str(last_day or "") != context["day"]
+
+
+def record_energy_day_reset(
+    *, source, scope, now=None, day=None, completes_schedule=False
+):
+    """Persist an auditable timestamp for automatic and manual day resets."""
+    now_dt = _local_datetime(now)
+    context = energy_day_context(now=now_dt)
+    reset_day = str(day or context["day"])
+    rt = get_default_runtime()
+    if completes_schedule:
+        rt.config["ENERGY_LAST_DAY_RESET"] = reset_day
+    rt.config["ENERGY_LAST_DAY_RESET_AT"] = int(now_dt.timestamp())
+    rt.config["ENERGY_LAST_DAY_RESET_SOURCE"] = str(source or "unknown")[:40]
+    rt.config["ENERGY_LAST_DAY_RESET_SCOPE"] = str(scope or "controller")[:120]
+    rt.persist_config()
+    return {
+        "day": reset_day,
+        "at": rt.config["ENERGY_LAST_DAY_RESET_AT"],
+        "source": rt.config["ENERGY_LAST_DAY_RESET_SOURCE"],
+        "scope": rt.config["ENERGY_LAST_DAY_RESET_SCOPE"],
+    }
+
+
 def _relay_value(value):
     if value in (None, ""):
         return None
@@ -131,7 +215,7 @@ def _read_shelly_raw_energy(host, relay, timeout=ENERGY_REQUEST_TIMEOUT_SEC):
         return None, str(exc)
 
 
-def _apply_runtime_offsets(runtime, device, raw_total_kwh, *, today=None):
+def _apply_runtime_offsets(runtime, device, raw_total_kwh, *, today=None, now=None):
     """Apply this runtime's total/day offsets to one raw Shelly counter.
 
     Returns (metrics, config_changed).  Missing TOTAL reset keeps the historic
@@ -140,7 +224,8 @@ def _apply_runtime_offsets(runtime, device, raw_total_kwh, *, today=None):
     """
     rt = resolve_runtime(runtime)
     cfg = rt.config
-    today = today or datetime.date.today().isoformat()
+    day_context = energy_day_context(now=now)
+    today = today or day_context["day"]
     changed = False
 
     resets = cfg.setdefault("ENERGY_RESET", {})
@@ -155,6 +240,19 @@ def _apply_runtime_offsets(runtime, device, raw_total_kwh, *, today=None):
 
     day_offsets = cfg.setdefault("ENERGY_DAY_OFFSET", {})
     day_entry = day_offsets.get(device)
+    calendar_day = _local_datetime(now).date().isoformat()
+    legacy_midnight_entry = (
+        isinstance(day_entry, dict)
+        and day_context["day"] != calendar_day
+        and day_entry.get("day") == calendar_day
+        and today == day_context["day"]
+    )
+    if legacy_midnight_entry:
+        # 3.17.0 and older labelled the first poll after 00:00 as a new day.
+        # Preserve that already-written offset during the one-time migration;
+        # resetting it again on deployment would lose additional consumption.
+        day_entry["day"] = today
+        changed = True
     if not isinstance(day_entry, dict) or day_entry.get("day") != today:
         day_entry = {
             "day": today,
@@ -241,7 +339,7 @@ def refresh_energy_state(runtimes=None):
     results = {rt.tent_id: {} for rt in runtimes}
     config_changed = {rt.tent_id: False for rt in runtimes}
     now = time.time()
-    today = datetime.date.today().isoformat()
+    today = energy_day_context(now=now)["day"]
 
     for endpoint, owners in plan.items():
         raw, error = raw_by_endpoint[endpoint]
@@ -271,6 +369,7 @@ def refresh_energy_state(runtimes=None):
                     device,
                     raw["raw_total"],
                     today=today,
+                    now=now,
                 )
             config_changed[rt.tent_id] = config_changed[rt.tent_id] or changed
 
@@ -449,7 +548,7 @@ def record_energy_history(runtimes=None, *, now=None):
     runtimes = list(runtimes) if runtimes is not None else list_runtimes()
     runtimes = [rt for rt in runtimes if getattr(rt, "enabled", True)]
     now = int(time.time() if now is None else now)
-    day = datetime.datetime.fromtimestamp(now).date().isoformat()
+    day = energy_day_context(now=now)["day"]
     bucket_ts = now - (now % ENERGY_HISTORY_SAMPLE_SEC)
 
     station_rows = []
@@ -634,7 +733,7 @@ def _read_daily_peak_rows(day):
 
 
 def get_daily_energy_peaks(*, day=None):
-    day = day or datetime.date.today().isoformat()
+    day = day or energy_day_context()["day"]
     result = {
         "day": day,
         "controller": None,
@@ -692,13 +791,7 @@ def _history_window(range_key, now):
     now_dt = datetime.datetime.fromtimestamp(now)
 
     if range_key == "today":
-        start_dt = now_dt.replace(
-            hour=0,
-            minute=0,
-            second=0,
-            microsecond=0,
-        )
-        start = int(start_dt.timestamp())
+        start = energy_day_context(now=now)["started_at"]
     else:
         start = int(now - int(spec["seconds"]))
 
@@ -840,21 +933,24 @@ def _energy_totals(devices, price):
     }
 
 
-def get_energy_settings():
+def get_energy_settings(*, now=None):
     """Controller-wide accounting settings intentionally live in tent_1 config."""
     rt = get_default_runtime()
     price = _safe_float(rt.config.get("POWER_PRICE"), DEFAULT_POWER_PRICE)
-    reset_min = rt.config.get("ENERGY_DAY_RESET_MIN", 0)
-    try:
-        reset_min = int(reset_min)
-    except (TypeError, ValueError):
-        reset_min = 0
-    reset_min = max(0, min(1439, reset_min))
+    reset_min = _safe_reset_min(rt.config.get("ENERGY_DAY_RESET_MIN", 0))
+    day_context = energy_day_context(now=now, reset_min=reset_min)
 
     return {
         "power_price": round(float(price), 4),
         "day_reset_min": reset_min,
         "last_day_reset": rt.config.get("ENERGY_LAST_DAY_RESET"),
+        "last_day_reset_at": rt.config.get("ENERGY_LAST_DAY_RESET_AT"),
+        "last_day_reset_source": rt.config.get("ENERGY_LAST_DAY_RESET_SOURCE"),
+        "last_day_reset_scope": rt.config.get("ENERGY_LAST_DAY_RESET_SCOPE"),
+        "current_day": day_context["day"],
+        "current_day_started_at": day_context["started_at"],
+        "next_day_reset_at": day_context["next_reset_at"],
+        "timezone": day_context["timezone"],
     }
 
 
@@ -1051,7 +1147,7 @@ def reset_runtime_today(runtime=None, device=None, *, today=None):
     if device is not None:
         _validate_reset_device(rt, device)
 
-    today = today or datetime.date.today().isoformat()
+    today = today or energy_day_context()["day"]
 
     with rt.energy_lock:
         state = rt.energy_state
@@ -1094,9 +1190,10 @@ def reset_today_all_runtimes(*, today=None):
     return changed
 
 
-def do_energy_day_reset():
+def do_energy_day_reset(*, now=None):
     """Reset today's offsets for every loaded station in one scheduled action."""
-    today = datetime.date.today().isoformat()
+    context = energy_day_context(now=now)
+    today = context["day"]
     runtimes = [rt for rt in list_runtimes() if getattr(rt, "enabled", True)]
 
     configured_count = sum(len(configured_energy_devices(rt)) for rt in runtimes)
@@ -1109,9 +1206,13 @@ def do_energy_day_reset():
 
     # No configured energy hardware: nothing to reset, but the day is complete.
     if configured_count == 0:
-        default_rt = get_default_runtime()
-        default_rt.config["ENERGY_LAST_DAY_RESET"] = today
-        default_rt.persist_config()
+        record_energy_day_reset(
+            source="automatic",
+            scope="controller",
+            now=now,
+            day=today,
+            completes_schedule=True,
+        )
         return True
 
     # Configured hardware exists but no reading is available yet.  Do not mark
@@ -1121,9 +1222,13 @@ def do_energy_day_reset():
 
     reset_today_all_runtimes(today=today)
 
-    default_rt = get_default_runtime()
-    default_rt.config["ENERGY_LAST_DAY_RESET"] = today
-    default_rt.persist_config()
+    record_energy_day_reset(
+        source="automatic",
+        scope="controller",
+        now=now,
+        day=today,
+        completes_schedule=True,
+    )
 
     print(f"📅 ENERGY: Auto-Tagesreset fuer {len(runtimes)} Station(en) durchgefuehrt")
     return True
