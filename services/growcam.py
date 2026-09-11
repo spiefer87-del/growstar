@@ -58,12 +58,18 @@ _status = {
     "timelapse_error": None,
     "last_video": None,
     "render_options": None,
+    "recording": False,
+    "recording_error": None,
+    "recording_started_at": None,
+    "recording_duration_sec": None,
+    "last_recording": None,
 }
 _timelapse_lock = threading.Lock()
 _configs = {}
 _statuses = {PRIMARY_CAMERA_ID: _status}
 _capture_locks = {PRIMARY_CAMERA_ID: _capture_lock}
 _timelapse_locks = {PRIMARY_CAMERA_ID: _timelapse_lock}
+_recording_locks = {PRIMARY_CAMERA_ID: threading.Lock()}
 _next_camera_number = 2
 
 
@@ -89,6 +95,11 @@ def _new_status():
         "timelapse_error": None,
         "last_video": None,
         "render_options": None,
+        "recording": False,
+        "recording_error": None,
+        "recording_started_at": None,
+        "recording_duration_sec": None,
+        "last_recording": None,
     }
 
 
@@ -110,6 +121,12 @@ def _timelapse_lock_for(camera_id):
         return _timelapse_locks.setdefault(camera_id, threading.Lock())
 
 
+def _recording_lock_for(camera_id):
+    camera_id = _normalize_camera_id(camera_id)
+    with _config_lock:
+        return _recording_locks.setdefault(camera_id, threading.Lock())
+
+
 def _camera_dir(camera_id):
     camera_id = _normalize_camera_id(camera_id)
     # Die erste Kamera behält absichtlich den bisherigen Ordner. Damit bleiben
@@ -123,6 +140,10 @@ def latest_image_path(camera_id=PRIMARY_CAMERA_ID):
 
 def timelapse_dir_path(camera_id=PRIMARY_CAMERA_ID):
     return TIMELAPSE_DIR if camera_id == PRIMARY_CAMERA_ID else _camera_dir(camera_id) / "timelapse"
+
+
+def recording_dir_path(camera_id=PRIMARY_CAMERA_ID):
+    return _camera_dir(camera_id) / "recordings"
 
 
 def _atomic_write_json(path, data):
@@ -684,6 +705,8 @@ def growcam_storage_summary():
         "thumbnail_bytes": 0,
         "video_count": 0,
         "video_bytes": 0,
+        "recording_count": 0,
+        "recording_bytes": 0,
     }
     for camera in list_public_configs():
         latest_image = latest_image_path(camera["camera_id"])
@@ -720,9 +743,19 @@ def growcam_storage_summary():
                 totals["video_bytes"] += size
     except OSError:
         pass
+    for camera in list_public_configs():
+        try:
+            for path in _recording_files(camera["camera_id"]):
+                totals["recording_count"] += 1
+                totals["recording_bytes"] += path.stat().st_size
+        except OSError:
+            pass
     totals["total_bytes"] = sum(
         totals[key]
-        for key in ("latest_bytes", "frame_bytes", "thumbnail_bytes", "video_bytes")
+        for key in (
+            "latest_bytes", "frame_bytes", "thumbnail_bytes",
+            "video_bytes", "recording_bytes",
+        )
     )
     return totals
 
@@ -940,6 +973,172 @@ def start_timelapse_render(options=None, *, camera_id=None):
     }
 
 
+def _recording_files(camera_id, batch_id=None):
+    base = recording_dir_path(camera_id)
+    if batch_id:
+        directories = [base / f"batch_{int(batch_id)}"]
+    else:
+        directories = [
+            path for path in base.glob("batch_*")
+            if path.is_dir() and path.name[6:].isdigit()
+        ] if base.is_dir() else []
+    files = []
+    for directory in directories:
+        files.extend(directory.glob("recording-*.mp4"))
+    return sorted(files, reverse=True)
+
+
+def resolve_recording(camera_id, batch_id, filename):
+    name = _safe_media_name(filename, prefix="recording-", suffix=".mp4")
+    if name is None:
+        return None
+    candidate = recording_dir_path(camera_id) / f"batch_{int(batch_id)}" / name
+    return candidate if candidate.is_file() else None
+
+
+def list_recordings(*, camera_id=None, batch_id=None, page=1, per_page=24):
+    candidates = []
+    camera_ids = [camera_id] if camera_id else [item["camera_id"] for item in list_public_configs()]
+    try:
+        for current_camera_id in camera_ids:
+            for video in _recording_files(current_camera_id, batch_id):
+                directory_batch_id = int(video.parent.name[6:])
+                stat = video.stat()
+                candidates.append({
+                    "camera_id": current_camera_id,
+                    "batch_id": directory_batch_id,
+                    "filename": video.name,
+                    "created_at": stat.st_mtime,
+                    "size_bytes": stat.st_size,
+                })
+    except (OSError, TypeError, ValueError):
+        candidates = []
+    candidates.sort(key=lambda item: item["created_at"], reverse=True)
+    per_page = max(6, min(int(per_page), 100))
+    pages = (len(candidates) + per_page - 1) // per_page
+    page = max(1, min(int(page), pages or 1))
+    start = (page - 1) * per_page
+    return {
+        "items": candidates[start:start + per_page],
+        "page": page,
+        "pages": pages,
+        "total": len(candidates),
+    }
+
+
+def delete_recording(camera_id, batch_id, filename):
+    if _recording_lock_for(camera_id).locked():
+        return {"success": False, "error": "Während der Aufnahme kann kein Video gelöscht werden."}
+    video = resolve_recording(camera_id, batch_id, filename)
+    if video is None:
+        return {"success": False, "error": "Videoaufnahme wurde nicht gefunden."}
+    try:
+        video.unlink()
+    except OSError as exc:
+        return {"success": False, "error": f"Videoaufnahme konnte nicht gelöscht werden: {exc}"}
+    return {"success": True, "filename": video.name}
+
+
+def _recording_worker(config, batch_id, duration_sec):
+    camera_id = config["camera_id"]
+    status = _status_for(camera_id)
+    recording_lock = _recording_lock_for(camera_id)
+    directory = recording_dir_path(camera_id) / f"batch_{int(batch_id)}"
+    directory.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    output = directory / f"recording-{stamp}.mp4"
+    temp_output = directory / f".recording-{stamp}.mp4"
+    try:
+        ffmpeg = shutil.which("ffmpeg")
+        if not ffmpeg:
+            raise RuntimeError("FFmpeg ist nicht installiert.")
+        process = subprocess.run(
+            [
+                ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-rtsp_transport", "tcp", "-i", _rtsp_url(config),
+                "-t", str(duration_sec), "-map", "0:v:0", "-an",
+                "-c:v", "copy", "-movflags", "+faststart", str(temp_output),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=duration_sec + 30,
+            check=False,
+        )
+        if process.returncode != 0 or not temp_output.is_file() or temp_output.stat().st_size < 1024:
+            raise RuntimeError(_safe_error(process.stderr, _rtsp_url(config)))
+        os.chmod(temp_output, 0o640)
+        os.replace(temp_output, output)
+        with _config_lock:
+            status["last_recording"] = {
+                "batch_id": int(batch_id),
+                "filename": output.name,
+                "created_at": output.stat().st_mtime,
+            }
+            status["recording_error"] = None
+    except subprocess.TimeoutExpired:
+        with _config_lock:
+            status["recording_error"] = "Videoaufnahme hat das Zeitlimit überschritten."
+    except Exception as exc:
+        with _config_lock:
+            status["recording_error"] = str(exc).strip() or type(exc).__name__
+    finally:
+        try:
+            if temp_output.is_file():
+                temp_output.unlink()
+        except OSError:
+            pass
+        with _config_lock:
+            status["recording"] = False
+            status["recording_started_at"] = None
+            status["recording_duration_sec"] = None
+        recording_lock.release()
+
+
+def start_video_recording(duration_sec, batch_id, *, camera_id=None):
+    config = public_config(camera_id)
+    if config is None:
+        return {"success": False, "error": "GrowCam wurde nicht gefunden."}
+    if not config.get("enabled") or not config.get("host"):
+        return {"success": False, "error": "GrowCam ist nicht aktiviert."}
+    try:
+        duration_sec = int(duration_sec)
+        batch_id = int(batch_id)
+    except (TypeError, ValueError):
+        return {"success": False, "error": "Dauer oder Durchgang ist ungültig."}
+    if duration_sec < 30 or duration_sec > 600:
+        return {"success": False, "error": "Die Aufnahmedauer muss zwischen 30 Sekunden und 10 Minuten liegen."}
+    if batch_id < 1:
+        return {"success": False, "error": "Bitte einen Durchgang auswählen."}
+    camera_id = config["camera_id"]
+    recording_lock = _recording_lock_for(camera_id)
+    if not recording_lock.acquire(blocking=False):
+        return {"success": False, "error": "Diese Kamera nimmt bereits ein Video auf."}
+    status = _status_for(camera_id)
+    with _config_lock:
+        status["recording"] = True
+        status["recording_error"] = None
+        status["recording_started_at"] = time.time()
+        status["recording_duration_sec"] = duration_sec
+    worker = threading.Thread(
+        target=_recording_worker,
+        args=(config, batch_id, duration_sec),
+        name=f"growstar-growcam-recording-{camera_id}",
+        daemon=True,
+    )
+    try:
+        worker.start()
+    except Exception as exc:
+        with _config_lock:
+            status["recording"] = False
+            status["recording_error"] = str(exc).strip() or type(exc).__name__
+            status["recording_started_at"] = None
+            status["recording_duration_sec"] = None
+        recording_lock.release()
+        return {"success": False, "error": status["recording_error"]}
+    return {"success": True, "camera_id": camera_id, "batch_id": batch_id, "duration_sec": duration_sec}
+
+
 def mjpeg_stream(camera_id=None):
     config = public_config(camera_id)
     if config is None:
@@ -1052,6 +1251,7 @@ __all__ = (
     "camera_for_tent",
     "capture_snapshot",
     "create_camera",
+    "delete_recording",
     "delete_timelapse_frame",
     "delete_timelapse_video",
     "growcam_storage_summary",
@@ -1059,15 +1259,19 @@ __all__ = (
     "list_timelapse_videos",
     "growcam_loop",
     "latest_image_path",
+    "list_recordings",
     "load_config",
     "list_timelapse_frames",
     "list_public_configs",
     "public_config",
     "mjpeg_stream",
+    "recording_dir_path",
+    "resolve_recording",
     "resolve_timelapse_video",
     "resolve_timelapse_frame",
     "save_config",
     "status_snapshot",
     "start_timelapse_render",
+    "start_video_recording",
     "timelapse_summary",
 )

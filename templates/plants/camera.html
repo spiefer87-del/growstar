@@ -8,7 +8,7 @@
         <a class="pm-back" href="{{ url_for('plant_media_explorer') }}">←</a>
         <div>
             <h1 class="pm-title">📷 VIVOSUN GrowCam C4</h1>
-            <div class="pm-subtitle">Lokaler Livestream, Durchgangsarchiv und Zeitraffer · ohne VIVOSUN-Cloud</div>
+            <div class="pm-subtitle">Lokaler Livestream, Standbilder und direkte Videoaufnahmen · ohne VIVOSUN-Cloud</div>
         </div>
     </div>
     {% if has_permission('plants.edit') %}
@@ -64,7 +64,6 @@
             <div class="pm-growcam-meta">
                 <span><strong>Kamera:</strong> {{ camera.name }}</span>
                 <span><strong>Station:</strong> {% for tent in tents %}{% if tent.id == camera.tent_id %}{{ tent.name }}{% endif %}{% endfor %}</span>
-                <span><strong>Durchgang:</strong> {% set ns = namespace(found=false) %}{% for batch in batches %}{% if batch.id == camera.batch_id %}{% set ns.found = true %}<a href="{{ url_for('batch_detail', batch_id=batch.id) }}">{{ batch.code }} · {{ batch.name }}</a>{% endif %}{% endfor %}{% if not ns.found %}nicht zugeordnet{% endif %}</span>
                 <span><strong>Standbild:</strong> <span id="growcam-resolution">{% if camera_status.width %}{{ camera_status.width }}×{{ camera_status.height }}{% else %}–{% endif %}</span></span>
                 <span><strong>Live-Proxy:</strong> {{ camera.live_width }} px · {{ camera.live_fps }} Bilder/s</span>
                 <span><strong>Letzte Aufnahme:</strong> <span id="growcam-captured">{% if camera_status.last_capture %}<time data-growcam-time="{{ camera_status.last_capture }}"></time>{% else %}noch keine{% endif %}</span></span>
@@ -74,57 +73,28 @@
     </article>
 
     <article class="pm-card pm-span-4">
-        <div class="pm-card-head">
-            <h2>🎞️ Zeitraffer</h2>
-            <span id="growcam-render-state" class="pm-status {{ '' if camera_status.timelapse.frame_count >= 2 else 'inactive' }}">{% if camera_status.timelapse_rendering %}Wird erstellt{% else %}{{ camera_status.timelapse.frame_count }} Bilder{% endif %}</span>
-        </div>
+        <div class="pm-card-head"><h2>⏺️ Videoaufnahme</h2><span id="growcam-recording-state" class="pm-status {{ '' if camera_status.recording else 'inactive' }}">{{ 'Aufnahme läuft' if camera_status.recording else 'Bereit' }}</span></div>
         <div class="pm-card-body">
-            {% if camera_status.timelapse.latest_video and camera.batch_id %}
-            <video class="pm-growcam-video" controls preload="metadata">
-                <source src="{{ url_for('growcam_timelapse_video', camera_id=camera.camera_id, batch_id=camera.batch_id, filename=camera_status.timelapse.latest_video) }}" type="video/mp4">
-            </video>
-            <p class="pm-help">Letztes Video aus {{ camera_status.timelapse.frame_count }} vorhandenen Durchgangsaufnahmen.</p>
-            <div class="pm-actions pm-growcam-video-actions">
-                <a class="pm-button primary" href="{{ url_for('growcam_timelapse_video', camera_id=camera.camera_id, batch_id=camera.batch_id, filename=camera_status.timelapse.latest_video, download=1) }}">⬇ Video herunterladen</a>
-                <a class="pm-button" href="{{ url_for('plant_media_explorer', kind='videos') }}">Alle Videos verwalten</a>
-            </div>
-            {% else %}
-            <div class="pm-empty pm-growcam-timelapse-empty">{% if camera.timelapse_enabled %}Sobald mindestens zwei Archivbilder vorhanden sind, kann daraus ein Video erstellt werden.{% else %}Durchgang auswählen und Zeitraffer-Aufnahmen aktivieren.{% endif %}</div>
-            {% endif %}
-            {% if camera_status.timelapse_error %}<div class="pm-growcam-error">{{ camera_status.timelapse_error }}</div>{% endif %}
-            {% if has_permission('plants.edit') %}
-            <form class="pm-form pm-growcam-render-form" method="post" action="{{ url_for('growcam_timelapse_create') }}">
-                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                <input type="hidden" name="camera_id" value="{{ camera.camera_id }}">
-                <label class="pm-field"><span class="pm-label">Video-Bildrate</span><select class="pm-select" name="video_fps">{% for fps in [5,10,15,20,25,30,50,60] %}<option value="{{ fps }}" {{ 'selected' if fps == 15 else '' }}>{{ fps }} Bilder/s</option>{% endfor %}</select></label>
-                <label class="pm-field"><span class="pm-label">Videoauflösung</span><select class="pm-select" name="video_width"><option value="2560">2560 px · Original</option><option value="1920" selected>1920 px · Full HD</option><option value="1280">1280 px · kompakt</option><option value="960">960 px · sehr kompakt</option></select></label>
-                <label class="pm-field"><span class="pm-label">Kompression</span><select class="pm-select" name="video_crf"><option value="18">Sehr hohe Qualität · große Datei</option><option value="21">Hohe Qualität</option><option value="23" selected>Ausgewogen</option><option value="26">Kompakt</option><option value="28">Stark komprimiert</option><option value="32">Maximal komprimiert</option></select></label>
-                <button class="pm-button primary pm-growcam-full-button" type="submit" {{ 'disabled' if camera_status.timelapse.frame_count < 2 or camera_status.timelapse_rendering else '' }}>Video jetzt erstellen</button>
-            </form>
-            {% endif %}
+            {% if camera_status.recording_error %}<div class="pm-growcam-error">{{ camera_status.recording_error }}</div>{% endif %}
+            {% if has_permission('plants.edit') %}<form class="pm-form" method="post" action="{{ url_for('growcam_recording_start') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="camera_id" value="{{ camera.camera_id }}"><label class="pm-field"><span class="pm-label">Dauer</span><select class="pm-select" name="duration_sec">{% for seconds,label in [(30,'30 Sekunden'),(60,'1 Minute'),(120,'2 Minuten'),(180,'3 Minuten'),(300,'5 Minuten'),(600,'10 Minuten')] %}<option value="{{ seconds }}">{{ label }}</option>{% endfor %}</select></label><label class="pm-field"><span class="pm-label">Durchgang</span><select class="pm-select" name="batch_id" required><option value="">Durchgang auswählen …</option>{% for batch in batches %}<option value="{{ batch.id }}">{{ batch.code }} · {{ batch.name }}</option>{% endfor %}</select></label><button class="pm-button primary" type="submit" {{ 'disabled' if camera_status.recording or not camera.enabled else '' }}>⏺ Aufnahme starten</button></form>{% endif %}
+            <p class="pm-help">Der originale 2K-RTSP-Videostream wird ohne erneute Kompression gespeichert.</p>
+            {% if camera_recordings["items"] %}<div class="pm-actions"><a class="pm-button" href="{{ url_for('plant_media_explorer', kind='recordings') }}">{{ camera_recordings.total }} Aufnahmen verwalten</a></div>{% endif %}
         </div>
     </article>
 
     <article class="pm-card pm-span-12">
-        <div class="pm-card-head"><div><h2>Aufnahmeplan und Medienzuordnung</h2><div class="pm-help">Netzwerkverbindung: {{ camera.host }}:{{ camera.port }}{{ camera.path }}</div></div><a class="pm-button" href="{{ url_for('devices', _anchor='growcam-connection') }}">🛠️ Verbindung im Hardware-Manager</a></div>
+        <div class="pm-card-head"><div><h2>Kamera und Livebild</h2><div class="pm-help">Netzwerkverbindung: {{ camera.host }}:{{ camera.port }}{{ camera.path }}</div></div><a class="pm-button" href="{{ url_for('devices', _anchor='growcam-connection') }}">🛠️ Verbindung im Hardware-Manager</a></div>
         <div class="pm-card-body">
             <form class="pm-form" method="post" action="{{ url_for('growcam_configure') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <input type="hidden" name="camera_id" value="{{ camera.camera_id }}">
                 <div class="pm-growcam-options">
                     <label class="pm-growcam-switch"><input type="checkbox" name="enabled" value="1" {{ 'checked' if camera.enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}><span>Kamera und automatische Standbilder aktivieren</span></label>
-                    <label class="pm-growcam-switch"><input type="checkbox" name="timelapse_enabled" value="1" {{ 'checked' if camera.timelapse_enabled else '' }} {{ 'disabled' if not has_permission('plants.edit') else '' }}><span>Aufnahmen für Zeitraffer archivieren</span></label>
                 </div>
                 <div class="pm-form-grid">
                     <label class="pm-field"><span class="pm-label">Station</span><select class="pm-select" name="tent_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for tent in tents %}<option value="{{ tent.id }}" {{ 'selected' if tent.id == camera.tent_id else '' }}>{{ tent.name }} · {{ tent.id }}</option>{% endfor %}</select></label>
-                    <label class="pm-field"><span class="pm-label">Pflanzendurchgang</span><select class="pm-select" name="batch_id" {{ 'disabled' if not has_permission('plants.edit') else '' }}><option value="">— nicht zugeordnet —</option>{% for batch in batches %}<option value="{{ batch.id }}" {{ 'selected' if batch.id == camera.batch_id else '' }}>{{ batch.code }} · {{ batch.name }}{% if batch.status == 'archived' %} · archiviert{% endif %}</option>{% endfor %}</select></label>
-                </div>
-                <div class="pm-form-grid pm-form-grid-3">
                     <label class="pm-field"><span class="pm-label">Standbild aktualisieren</span><select class="pm-select" name="interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for seconds,label in [(15,'alle 15 Sekunden'),(30,'alle 30 Sekunden'),(60,'jede Minute'),(300,'alle 5 Minuten'),(900,'alle 15 Minuten')] %}<option value="{{ seconds }}" {{ 'selected' if camera.interval_sec == seconds else '' }}>{{ label }}</option>{% endfor %}</select></label>
-                    <label class="pm-field"><span class="pm-label">Zeitraffer-Aufnahmeintervall</span><select class="pm-select" name="timelapse_interval_sec" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for seconds,label in [(60,'jede Minute'),(300,'alle 5 Minuten'),(600,'alle 10 Minuten'),(900,'alle 15 Minuten'),(1800,'alle 30 Minuten'),(3600,'jede Stunde'),(21600,'alle 6 Stunden')] %}<option value="{{ seconds }}" {{ 'selected' if camera.timelapse_interval_sec == seconds else '' }}>{{ label }}</option>{% endfor %}</select></label>
-                    <label class="pm-field"><span class="pm-label">Archiv behalten</span><select class="pm-select" name="retention_days" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for days,label in [(30,'30 Tage'),(60,'60 Tage'),(120,'120 Tage'),(180,'180 Tage'),(365,'1 Jahr')] %}<option value="{{ days }}" {{ 'selected' if camera.retention_days == days else '' }}>{{ label }}</option>{% endfor %}</select></label>
                 </div>
-                <label class="pm-field"><span class="pm-label">Erstellte Videos je Durchgang behalten</span><select class="pm-select" name="video_retention_count" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for count,label in [(5,'5 Videos'),(10,'10 Videos'),(25,'25 Videos · empfohlen'),(50,'50 Videos'),(100,'100 Videos'),(0,'Unbegrenzt · manuell verwalten')] %}<option value="{{ count }}" {{ 'selected' if camera.video_retention_count == count else '' }}>{{ label }}</option>{% endfor %}</select><span class="pm-help">Erst beim Erstellen eines neuen Videos werden ältere Dateien oberhalb dieser Grenze entfernt.</span></label>
                 <div class="pm-form-grid">
                     <label class="pm-field"><span class="pm-label">Live-Auflösung</span><select class="pm-select" name="live_width" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for width,label in [(640,'640 px · sparsam'),(960,'960 px · empfohlen'),(1280,'1280 px · hoch'),(1920,'1920 px · Full HD'),(2560,'2560 px · Kamera-Maximum')] %}<option value="{{ width }}" {{ 'selected' if camera.live_width == width else '' }}>{{ label }}</option>{% endfor %}</select></label>
                     <label class="pm-field"><span class="pm-label">Live-Bildrate</span><select class="pm-select" name="live_fps" {{ 'disabled' if not has_permission('plants.edit') else '' }}>{% for fps in [2,5,8,10,12,15] %}<option value="{{ fps }}" {{ 'selected' if camera.live_fps == fps else '' }}>{{ fps }} Bilder/s</option>{% endfor %}</select></label>
@@ -135,44 +105,6 @@
         </div>
     </article>
 
-    {% if camera.batch_id %}
-    <article class="pm-card pm-span-12">
-        <div class="pm-card-head">
-            <div><h2>🖼️ Zeitrafferbilder</h2><div class="pm-help">{{ timelapse_frames.total }} gespeicherte Bilder dieses Durchgangs · Seite {{ timelapse_frames.page }} von {{ timelapse_frames.pages or 1 }}</div></div>
-        </div>
-        <div class="pm-card-body">
-            {% if timelapse_frames["items"] %}
-            <div class="pm-growcam-archive">
-                {% for frame_item in timelapse_frames["items"] %}
-                <article class="pm-growcam-archive-item">
-                    <a href="{{ url_for('growcam_timelapse_frame', camera_id=camera.camera_id, batch_id=camera.batch_id, filename=frame_item.filename) }}" target="_blank" title="Originalbild öffnen">
-                        <img src="{{ url_for('growcam_timelapse_frame', camera_id=camera.camera_id, batch_id=camera.batch_id, filename=frame_item.filename, thumbnail=1) }}" alt="Zeitrafferaufnahme" loading="lazy">
-                    </a>
-                    <div class="pm-growcam-archive-meta">
-                        <time data-growcam-time="{{ frame_item.captured_at }}"></time>
-                        <span>{{ (frame_item.size_bytes / 1048576)|round(2) }} MB</span>
-                    </div>
-                    {% if has_permission('plants.edit') %}
-                    <form method="post" action="{{ url_for('growcam_timelapse_frame_delete', batch_id=camera.batch_id, filename=frame_item.filename) }}" onsubmit="return confirm('Dieses Zeitrafferbild wirklich entfernen?');">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="camera_id" value="{{ camera.camera_id }}">
-                        <input type="hidden" name="frame_page" value="{{ timelapse_frames.page }}">
-                        <button class="pm-button danger" type="submit">Entfernen</button>
-                    </form>
-                    {% endif %}
-                </article>
-                {% endfor %}
-            </div>
-            {% if timelapse_frames.pages > 1 %}
-            <nav class="pm-growcam-pagination" aria-label="Zeitrafferbildseiten">
-                {% if timelapse_frames.page > 1 %}<a class="pm-button" href="{{ url_for('growcam_page', camera_id=camera.camera_id, batch_id=camera.batch_id, frame_page=timelapse_frames.page - 1) }}">← Neuere</a>{% endif %}
-                {% if timelapse_frames.page < timelapse_frames.pages %}<a class="pm-button" href="{{ url_for('growcam_page', camera_id=camera.camera_id, batch_id=camera.batch_id, frame_page=timelapse_frames.page + 1) }}">Ältere →</a>{% endif %}
-            </nav>
-            {% endif %}
-            {% else %}<div class="pm-empty">Für diesen Durchgang sind noch keine Zeitrafferbilder gespeichert.</div>{% endif %}
-        </div>
-    </article>
-    {% endif %}
 </section>
 </main>
 {% endblock %}
@@ -192,9 +124,9 @@
     const stillButton = document.getElementById("growcam-still-button");
     const zoomControls = document.getElementById("growcam-zoom");
     const zoomLabel = document.getElementById("growcam-zoom-label");
+    const recordingState = document.getElementById("growcam-recording-state");
+    let wasRecording = {{ camera_status.recording|tojson }};
     let imageVersion = {{ camera_status.image_version|tojson }};
-    let videoVersion = {{ camera_status.timelapse.latest_video_mtime|tojson }};
-    let rendering = {{ camera_status.timelapse_rendering|tojson }};
     let liveMode = {{ camera.enabled|tojson }};
     let zoomScale = 1;
     let panX = 0;
@@ -283,11 +215,11 @@
             resolution.textContent = camera.width ? `${camera.width}×${camera.height}` : "–";
             error.hidden = !camera.last_error && !camera.live_error;
             error.textContent = camera.live_error || camera.last_error || "";
+            recordingState.classList.toggle("inactive", !camera.recording);
+            recordingState.textContent = camera.recording ? "Aufnahme läuft" : "Bereit";
+            if (wasRecording && !camera.recording) window.location.reload();
+            wasRecording = Boolean(camera.recording);
             if (!liveMode && camera.image_available && camera.image_version !== imageVersion) { imageVersion = camera.image_version; imageElement().src = `${imageUrl}?v=${encodeURIComponent(imageVersion)}`; }
-            const nextVideoVersion = camera.timelapse && camera.timelapse.latest_video_mtime;
-            if (nextVideoVersion && nextVideoVersion !== videoVersion) window.location.reload();
-            if (rendering && !camera.timelapse_rendering) window.location.reload();
-            rendering = Boolean(camera.timelapse_rendering);
         } catch (_) { /* Der nächste Intervallabruf versucht es erneut. */ }
     }
     window.setInterval(refresh, 5000);

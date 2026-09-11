@@ -182,7 +182,8 @@
                 <div id="growstar-media-submenu" class="growstar-nav-submenu" data-growstar-nav-submenu {% if not growstar_media_active %}hidden{% endif %}>
                     <a class="{% if growstar_endpoint in growstar_media_endpoints %}active{% endif %}" href="{{ url_for('plant_media_explorer') }}"><span>Explorer</span><small>Dateien & Speicher</small></a>
                     <a class="{% if growstar_endpoint in growstar_photo_endpoints %}active{% endif %}" href="{{ url_for('plant_photo_manager') }}"><span>Foto-Manager</span><small>Pflanzen & Durchgänge</small></a>
-                    <a class="{% if growstar_endpoint.startswith('growcam_') %}active{% endif %}" href="{{ url_for('growcam_page') }}"><span>Kamera</span><small>Live & Einstellungen</small></a>
+                    <a class="{% if growstar_endpoint == 'growcam_page' %}active{% endif %}" href="{{ url_for('growcam_page') }}"><span>Kamera</span><small>Live & Einstellungen</small></a>
+                    <a class="{% if growstar_endpoint.startswith('growcam_timelapse') %}active{% endif %}" href="{{ url_for('growcam_timelapse_page') }}"><span>Zeitraffer</span><small>Pläne & Videos</small></a>
                 </div>
             </div>
         </section>

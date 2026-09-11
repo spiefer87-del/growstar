@@ -267,6 +267,7 @@ def main():
 
             app_source = (ROOT / "app.py").read_text(encoding="utf-8")
             template = (ROOT / "templates/plants/camera.html").read_text(encoding="utf-8")
+            timelapse_template = (ROOT / "templates/plants/timelapse.html").read_text(encoding="utf-8")
             live_template = (ROOT / "templates/plants/camera_live.html").read_text(
                 encoding="utf-8"
             )
@@ -297,12 +298,12 @@ def main():
                 "register_camera_routes(app)" in app_source
                 and '"growstar-growcam"' in app_source
                 and "growcam_live" in template
-                and "growcam_timelapse_create" in template
-                and 'name="video_fps"' in template
-                and 'name="timelapse_fps"' not in template
+                and "growcam_timelapse_create" in timelapse_template
+                and 'name="video_fps"' in timelapse_template
+                and 'name="timelapse_fps"' not in timelapse_template
                 and "2560 px · Kamera-Maximum" in template
-                and 'timelapse_frames["items"]' in template
-                and "timelapse_frames.items" not in template,
+                and 'timelapse_frames["items"]' in timelapse_template
+                and "timelapse_frames.items" not in timelapse_template,
                 "Route, Hintergrundaufnahme und Kameraansicht sind vollständig eingebunden",
             )
             require(
@@ -319,8 +320,8 @@ def main():
                 "GrowCam-Netzwerkdaten liegen im Hardware-Manager und Medienwerte bleiben erhalten",
             )
             require(
-                'name="video_retention_count"' in template
-                and "Video herunterladen" in template
+                'name="video_retention_count"' in timelapse_template
+                and "Video herunterladen" in timelapse_template
                 and "plant_media_explorer" in template
                 and "growcam_timelapse_video_delete" in media_template
                 and "growcam_timelapse_frame_delete" in media_template

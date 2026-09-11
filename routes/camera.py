@@ -30,21 +30,25 @@ from services.growcam import (
     camera_for_tent,
     capture_snapshot,
     create_camera,
+    delete_recording,
     delete_timelapse_frame,
     delete_timelapse_video,
     growcam_storage_summary,
     latest_image_path,
     list_all_timelapse_frames,
     list_public_configs,
+    list_recordings,
     list_timelapse_frames,
     list_timelapse_videos,
     mjpeg_stream,
     public_config,
+    resolve_recording,
     resolve_timelapse_video,
     resolve_timelapse_frame,
     save_config,
     status_snapshot,
     start_timelapse_render,
+    start_video_recording,
     timelapse_summary,
 )
 
@@ -80,6 +84,23 @@ def register(app):
         camera = selected_camera()
         camera_id = camera["camera_id"]
         camera_status = status_snapshot(camera_id)
+        return render_template(
+            "plants/camera.html",
+            camera=camera,
+            cameras=list_public_configs(),
+            camera_status=camera_status,
+            tents=tent_manager.list_tents(),
+            batches=list_batches(),
+            camera_recordings=list_recordings(
+                camera_id=camera_id, page=1, per_page=6
+            ),
+        )
+
+    @app.get("/pflanzenmanagement/zeitraffer")
+    def growcam_timelapse_page():
+        camera = selected_camera()
+        camera_id = camera["camera_id"]
+        camera_status = status_snapshot(camera_id)
         requested_batch_id = request.args.get("batch_id", type=int)
         if requested_batch_id and get_batch(requested_batch_id):
             camera["batch_id"] = requested_batch_id
@@ -89,12 +110,11 @@ def register(app):
             )
         frame_page = request.args.get("frame_page", default=1, type=int)
         return render_template(
-            "plants/camera.html",
+            "plants/timelapse.html",
             camera=camera,
             cameras=list_public_configs(),
             camera_status=camera_status,
-            tents=tent_manager.list_tents(),
-            batches=list_batches(),
+            batches=list_batches(include_archived=True),
             timelapse_frames=list_timelapse_frames(
                 camera.get("batch_id"), camera_id=camera_id, page=frame_page
             ),
@@ -112,19 +132,11 @@ def register(app):
             duplicate = camera_for_tent(tent_id, enabled_only=False)
             if duplicate and duplicate["camera_id"] != camera_id:
                 raise ValueError("Dieser Station ist bereits eine Kamera zugeordnet.")
-            batch_id = request.form.get("batch_id", type=int)
-            if batch_id and not get_batch(batch_id):
-                raise ValueError("Der ausgewählte Durchgang existiert nicht.")
             config = save_config({
                 **current,
                 "enabled": request.form.get("enabled") == "1",
                 "interval_sec": request.form.get("interval_sec"),
                 "tent_id": tent_id,
-                "batch_id": batch_id,
-                "timelapse_enabled": request.form.get("timelapse_enabled") == "1",
-                "timelapse_interval_sec": request.form.get("timelapse_interval_sec"),
-                "retention_days": request.form.get("retention_days"),
-                "video_retention_count": request.form.get("video_retention_count"),
                 "live_width": request.form.get("live_width"),
                 "live_fps": request.form.get("live_fps"),
             }, camera_id=camera_id)
@@ -148,6 +160,37 @@ def register(app):
         except Exception as exc:
             flash(str(exc), "error")
         return redirect(url_for("growcam_page", camera_id=camera_id))
+
+    @app.post("/pflanzenmanagement/zeitraffer/konfiguration")
+    @permission_required("plants.edit")
+    def growcam_timelapse_configure():
+        current = selected_camera()
+        camera_id = current["camera_id"]
+        try:
+            batch_id = request.form.get("batch_id", type=int)
+            if batch_id and not get_batch(batch_id):
+                raise ValueError("Der ausgewählte Durchgang existiert nicht.")
+            config = save_config({
+                **current,
+                "batch_id": batch_id,
+                "timelapse_enabled": request.form.get("timelapse_enabled") == "1",
+                "timelapse_interval_sec": request.form.get("timelapse_interval_sec"),
+                "retention_days": request.form.get("retention_days"),
+                "video_retention_count": request.form.get("video_retention_count"),
+            }, camera_id=camera_id)
+            _audit(
+                "plants.growcam_timelapse_configured",
+                {
+                    "batch_id": config["batch_id"],
+                    "enabled": config["timelapse_enabled"],
+                    "interval_sec": config["timelapse_interval_sec"],
+                },
+                camera_id=camera_id,
+            )
+            flash("Zeitraffer-Konfiguration wurde gespeichert.", "success")
+        except Exception as exc:
+            flash(str(exc), "error")
+        return redirect(url_for("growcam_timelapse_page", camera_id=camera_id))
 
     @app.post("/devices/growcam/hinzufuegen")
     @permission_required("hardware.configure")
@@ -231,6 +274,73 @@ def register(app):
             flash(result.get("error") or "GrowCam-Aufnahme fehlgeschlagen.", "error")
         return redirect(url_for("growcam_page", camera_id=camera_id))
 
+    @app.post("/pflanzenmanagement/kamera/video-aufnahme")
+    @permission_required("plants.edit")
+    def growcam_recording_start():
+        camera = selected_camera()
+        camera_id = camera["camera_id"]
+        batch_id = request.form.get("batch_id", type=int)
+        if not batch_id or not get_batch(batch_id):
+            flash("Bitte einen vorhandenen Durchgang auswählen.", "error")
+        else:
+            result = start_video_recording(
+                request.form.get("duration_sec"),
+                batch_id,
+                camera_id=camera_id,
+            )
+            if result.get("success"):
+                _audit(
+                    "plants.growcam_recording_started",
+                    {
+                        "batch_id": batch_id,
+                        "duration_sec": result["duration_sec"],
+                    },
+                    camera_id=camera_id,
+                )
+                flash("Videoaufnahme wurde gestartet und wird im Hintergrund gespeichert.", "success")
+            else:
+                flash(result.get("error") or "Videoaufnahme konnte nicht gestartet werden.", "error")
+        return redirect(url_for("growcam_page", camera_id=camera_id))
+
+    @app.get("/pflanzenmanagement/kamera/video/<camera_id>/<int:batch_id>/<filename>")
+    def growcam_recording_file(camera_id, batch_id, filename):
+        try:
+            video = resolve_recording(camera_id, batch_id, filename)
+        except (TypeError, ValueError):
+            video = None
+        if video is None:
+            abort(404)
+        download = request.args.get("download") == "1"
+        return send_file(
+            video,
+            mimetype="video/mp4",
+            conditional=True,
+            as_attachment=download,
+            download_name=video.name if download else None,
+        )
+
+    @app.post("/pflanzenmanagement/kamera/video/<camera_id>/<int:batch_id>/<filename>/loeschen")
+    @permission_required("plants.edit")
+    def growcam_recording_delete(camera_id, batch_id, filename):
+        try:
+            result = delete_recording(camera_id, batch_id, filename)
+        except (TypeError, ValueError):
+            result = {"success": False, "error": "Videoaufnahme wurde nicht gefunden."}
+        if result.get("success"):
+            _audit(
+                "plants.growcam_recording_deleted",
+                {"batch_id": batch_id, "filename": result["filename"]},
+                camera_id=camera_id,
+            )
+            flash("Videoaufnahme wurde gelöscht.", "success")
+        else:
+            flash(result.get("error") or "Videoaufnahme konnte nicht gelöscht werden.", "error")
+        return redirect(url_for(
+            "plant_media_explorer",
+            kind="recordings",
+            page=request.form.get("page", type=int) or 1,
+        ))
+
     @app.get("/pflanzenmanagement/kamera/bild")
     def growcam_image():
         camera = selected_camera()
@@ -293,7 +403,7 @@ def register(app):
             flash("Zeitraffer-Erstellung wurde im Hintergrund gestartet.", "success")
         else:
             flash(result.get("error") or "Zeitraffer konnte nicht gestartet werden.", "error")
-        return redirect(url_for("growcam_page", camera_id=camera_id))
+        return redirect(url_for("growcam_timelapse_page", camera_id=camera_id))
 
     @app.get("/pflanzenmanagement/kamera/zeitraffer/<int:batch_id>/<filename>")
     def growcam_timelapse_video(batch_id, filename):
@@ -329,9 +439,9 @@ def register(app):
             flash("Zeitraffer-Video wurde dauerhaft entfernt.", "success")
         else:
             flash(result.get("error") or "Video konnte nicht entfernt werden.", "error")
-        if request.form.get("return_to") == "camera":
+        if request.form.get("return_to") == "timelapse":
             return redirect(url_for(
-                "growcam_page", camera_id=camera_id, batch_id=batch_id
+                "growcam_timelapse_page", camera_id=camera_id, batch_id=batch_id
             ))
         return redirect(
             url_for(
@@ -389,7 +499,7 @@ def register(app):
             )
         return redirect(
             url_for(
-                "growcam_page",
+                "growcam_timelapse_page",
                 camera_id=camera_id,
                 batch_id=batch_id,
                 frame_page=request.form.get("frame_page", type=int) or 1,
@@ -400,7 +510,7 @@ def register(app):
     def plant_media_explorer():
         kind = request.args.get("kind") or "videos"
         if kind not in {
-            "videos", "timelapse_frames", "plant_photos", "batch_photos"
+            "recordings", "videos", "timelapse_frames", "plant_photos", "batch_photos"
         }:
             kind = "videos"
         page = max(1, request.args.get("page", default=1, type=int) or 1)
@@ -413,7 +523,12 @@ def register(app):
             camera["camera_id"]: camera for camera in list_public_configs()
         }
 
-        if kind == "videos":
+        if kind == "recordings":
+            media_page = list_recordings(page=page, per_page=per_page)
+            for item in media_page["items"]:
+                item["batch"] = batch_by_id.get(item["batch_id"])
+                item["camera"] = camera_by_id.get(item["camera_id"])
+        elif kind == "videos":
             media_page = list_timelapse_videos(page=page, per_page=per_page)
             for item in media_page["items"]:
                 item["batch"] = batch_by_id.get(item["batch_id"])

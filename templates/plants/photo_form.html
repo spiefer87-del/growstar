@@ -35,6 +35,10 @@
             <div class="pm-photo-source-separator"><span>oder</span></div>
             <label class="pm-button pm-photo-file-button" for="plant-file-input">🖼️ Datei oder Galerie auswählen</label>
             <input id="plant-file-input" class="pm-file-input" type="file" name="file_photo" accept="image/jpeg,image/png,image/webp">
+            {% if growcams %}
+            <div class="pm-photo-source-separator"><span>oder GrowCam</span></div>
+            <label class="pm-field"><span class="pm-label">Schnappschuss direkt von der Zeltkamera</span><select id="plant-growcam-select" class="pm-select" name="growcam_camera_id"><option value="">— keine GrowCam verwenden —</option>{% for camera in growcams %}<option value="{{ camera.camera_id }}">📷 {{ camera.name }} · {{ camera.tent_id }}</option>{% endfor %}</select><span class="pm-help">Beim Speichern nimmt Growstar ein frisches Bild der ausgewählten Kamera auf.</span></label>
+            {% endif %}
             <div id="plant-photo-preview" class="pm-photo-preview" hidden>
                 <img alt="Vorschau des ausgewählten Pflanzenfotos">
                 <span></span>
@@ -85,6 +89,7 @@
     const info = preview.querySelector("span");
     const form = document.getElementById("plant-photo-form");
     const submit = document.getElementById("plant-photo-submit");
+    const growcamSelect = document.getElementById("plant-growcam-select");
     let objectUrl = null;
 
     function showPreview(input, otherInput) {
@@ -95,6 +100,7 @@
             return;
         }
         otherInput.value = "";
+        if (growcamSelect) growcamSelect.value = "";
         objectUrl = URL.createObjectURL(file);
         image.src = objectUrl;
         info.textContent = `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB vor Optimierung`;
@@ -103,10 +109,14 @@
 
     cameraInput.addEventListener("change", () => showPreview(cameraInput, fileInput));
     fileInput.addEventListener("change", () => showPreview(fileInput, cameraInput));
+    if (growcamSelect) growcamSelect.addEventListener("change", () => {
+        if (!growcamSelect.value) return;
+        cameraInput.value = ""; fileInput.value = ""; preview.hidden = true;
+    });
 
     form.addEventListener("submit", () => {
         submit.disabled = true;
-        submit.textContent = "Foto wird optimiert …";
+        submit.textContent = growcamSelect && growcamSelect.value ? "GrowCam nimmt Foto auf …" : "Foto wird optimiert …";
     });
 })();
 </script>
