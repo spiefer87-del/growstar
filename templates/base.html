@@ -94,8 +94,18 @@
                 </div>
                 <div id="growstar-grow-submenu" class="growstar-nav-submenu" data-growstar-nav-submenu {% if not growstar_grow_active %}hidden{% endif %}>
                     <a class="{% if growstar_endpoint == 'grow_control_dashboard' %}active{% endif %}" href="{{ url_for('grow_control_dashboard') }}"><span>Übersicht</span><small>Stationen</small></a>
-                    <a class="{% if growstar_endpoint.startswith('grow_control_tent') %}active{% endif %}" href="{{ url_for('grow_control_live') }}"><span>Live-Steuerung</span><small>Hauptstation</small></a>
-                    <a class="{% if growstar_endpoint == 'diagrams_page' %}active{% endif %}" href="{{ url_for('diagrams_page') }}"><span>Diagramme</span><small>Analyse</small></a>
+                    <a class="{% if growstar_endpoint in ['grow_control_live', 'grow_control_tent', 'grow_control_tent_device'] %}active{% endif %}" href="{{ url_for('grow_control_live') }}"><span>Live-Steuerung</span><small>Hauptstation</small></a>
+                    {% if has_permission('settings.view') %}
+                    <div class="growstar-nav-submenu-label">Profile &amp; Darstellung</div>
+                    <a class="{% if growstar_endpoint in ['grow_control_profiles', 'grow_control_tent_profiles'] %}active{% endif %}" href="{{ url_for('grow_control_profiles') }}"><span>Profile</span><small>Sollwerte bearbeiten</small></a>
+                    <a class="{% if growstar_endpoint in ['grow_control_design', 'grow_control_tent_design', 'design_page'] %}active{% endif %}" href="{{ url_for('grow_control_design') }}"><span>Dashboard-Design</span><small>Kacheln &amp; Reihenfolge</small></a>
+                    {% endif %}
+                    <div class="growstar-nav-submenu-label">Diagramme</div>
+                    <a class="{% if growstar_endpoint == 'grow_control_diagrams_dashboard' %}active{% endif %}" href="{{ url_for('grow_control_diagrams_dashboard') }}"><span>Diagrammübersicht</span><small>Alle Stationen</small></a>
+                    <a class="{% if growstar_endpoint in ['grow_control_diagram_temperature', 'grow_control_tent_temperature'] %}active{% endif %}" href="{{ url_for('grow_control_diagram_temperature') }}"><span>Temperatur</span><small>Verlauf</small></a>
+                    <a class="{% if growstar_endpoint in ['grow_control_diagram_humidity', 'grow_control_tent_humidity'] %}active{% endif %}" href="{{ url_for('grow_control_diagram_humidity') }}"><span>Luftfeuchtigkeit</span><small>Verlauf</small></a>
+                    <a class="{% if growstar_endpoint in ['grow_control_diagram_vpd', 'grow_control_tent_vpd'] %}active{% endif %}" href="{{ url_for('grow_control_diagram_vpd') }}"><span>VPD</span><small>Verlauf</small></a>
+                    {% if has_permission('settings.view') %}<a class="{% if growstar_endpoint == 'diagrams_page' %}active{% endif %}" href="{{ url_for('diagrams_page') }}"><span>Diagrammdaten</span><small>Import, Export &amp; Reset</small></a>{% endif %}
                 </div>
             </div>
         </section>

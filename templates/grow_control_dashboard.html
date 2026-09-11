@@ -430,7 +430,16 @@
 
     <div class="module-grid">
         {% if has_permission('settings.view') %}
-        <a class="module-link" href="{{ url_for('design_page') }}">
+        <a class="module-link" href="{{ url_for('grow_control_profiles') }}">
+            <article class="module-card profiles">
+                <div class="module-icon">🌱</div>
+                <h3>Profile</h3>
+                <p>Sollwerte, Phasen und Regelparameter der Hauptstation direkt bearbeiten.</p>
+                <div class="module-action">Profile öffnen →</div>
+            </article>
+        </a>
+
+        <a class="module-link" href="{{ url_for('grow_control_design') }}">
             <article class="module-card design">
                 <div class="module-icon">🎨</div>
                 <h3>Design</h3>
@@ -442,6 +451,15 @@
         {% endif %}
 
         {% if has_permission('grow.view') %}
+        <a class="module-link" href="{{ url_for('grow_control_diagrams_dashboard') }}">
+            <article class="module-card diagrams">
+                <div class="module-icon">📊</div>
+                <h3>Diagramme</h3>
+                <p>Temperatur, Luftfeuchtigkeit, VPD und PPFD je Station auswerten.</p>
+                <div class="module-action">Übersicht öffnen →</div>
+            </article>
+        </a>
+
         <a class="module-link" href="{{ url_for('energie_page') }}">
             <article class="module-card energy">
                 <div class="module-icon">⚡</div>

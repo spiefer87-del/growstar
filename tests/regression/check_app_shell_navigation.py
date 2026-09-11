@@ -22,7 +22,10 @@ def main():
     require('id="growstar-media-submenu"' in base, "Medien-Untermenü vorhanden")
 
     grow_targets = (
-        "grow_control_dashboard", "grow_control_live", "diagrams_page",
+        "grow_control_dashboard", "grow_control_live", "grow_control_profiles",
+        "grow_control_design", "grow_control_diagrams_dashboard",
+        "grow_control_diagram_temperature", "grow_control_diagram_humidity",
+        "grow_control_diagram_vpd", "diagrams_page",
     )
     grow_menu = base[base.index('id="growstar-grow-submenu"'):base.index('id="growstar-hardware-submenu"')]
     for endpoint in grow_targets:

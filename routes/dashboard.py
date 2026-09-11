@@ -128,6 +128,49 @@ def register(app):
             code=302,
         )
 
+    @app.route("/grow-control/profiles")
+    def grow_control_profiles():
+        return redirect(
+            _default_tent_url("grow_control_tent_profiles"),
+            code=302,
+        )
+
+    @app.route("/grow-control/design")
+    def grow_control_design():
+        return redirect(
+            _default_tent_url("grow_control_tent_design"),
+            code=302,
+        )
+
+    @app.route("/grow-control/diagrams")
+    def grow_control_diagrams_dashboard():
+        return render_template(
+            "grow_control_diagrams.html",
+            tents=tent_manager.list_tents(),
+            default_tent_id=tent_manager.default_tent_id(),
+        )
+
+    @app.route("/grow-control/diagrams/temperature")
+    def grow_control_diagram_temperature():
+        return redirect(
+            _default_tent_url("grow_control_tent_temperature"),
+            code=302,
+        )
+
+    @app.route("/grow-control/diagrams/humidity")
+    def grow_control_diagram_humidity():
+        return redirect(
+            _default_tent_url("grow_control_tent_humidity"),
+            code=302,
+        )
+
+    @app.route("/grow-control/diagrams/vpd")
+    def grow_control_diagram_vpd():
+        return redirect(
+            _default_tent_url("grow_control_tent_vpd"),
+            code=302,
+        )
+
     @app.route("/grow-control/tents/<tent_id>")
     def grow_control_tent(tent_id):
         return render_template(

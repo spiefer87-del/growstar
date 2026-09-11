@@ -21,7 +21,7 @@
 </head>
 <body>
 <div class="page">
-<div class="topbar"><div><div class="eyebrow">{{ tent_name }} · Umgebungsverlauf</div><h1 id="page-title">{{ metric_icon }} {{ metric_title }}</h1></div><a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}" class="back">← Dashboard</a></div>
+<div class="topbar"><div><div class="eyebrow">{{ tent_name }} · Umgebungsverlauf</div><h1 id="page-title">{{ metric_icon }} {{ metric_title }}</h1></div><a href="{{ url_for('grow_control_diagrams_dashboard') }}" class="back">← Diagramme</a></div>
 <div class="metric-tabs">
 <button class="metric-tab" data-metric="temp" onclick="selectMetric('temp')">🌡️ Temperatur<span>°C</span></button>
 <button class="metric-tab" data-metric="hum" onclick="selectMetric('hum')">💧 Feuchte<span>%</span></button>
