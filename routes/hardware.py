@@ -10,7 +10,7 @@ from core.mqtt_sensor_devices import list_mqtt_sensor_devices
 from core.sensor_sources import list_sensor_sources
 from core.hardware_assignments import hardware_snapshot
 from core.hardware.visibility import (
-    fresh_mqtt_vivosun_addresses,
+    fresh_mqtt_vivosun_details,
     hardware_device_views,
     mqtt_device_views,
 )
@@ -404,7 +404,7 @@ def register(app):
         ]
 
         mqtt_devices = list_mqtt_sensor_devices()
-        mqtt_vivosun_addresses = fresh_mqtt_vivosun_addresses(
+        mqtt_vivosun_details = fresh_mqtt_vivosun_details(
             list_sensor_sources()
         )
 
@@ -414,7 +414,7 @@ def register(app):
 
             "devices": hardware_device_views(
                 hardware.devices(),
-                mqtt_vivosun_addresses=mqtt_vivosun_addresses,
+                mqtt_vivosun_details=mqtt_vivosun_details,
             ),
 
             # Legacy HardwareManager-Aktoren bleiben unverändert erhalten.

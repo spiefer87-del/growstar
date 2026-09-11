@@ -83,6 +83,8 @@ class ShellyGateway(Gateway):
     
     def refresh(self):
 
+        self.properties["last_attempt"] = time.time()
+
         info = self.api.call("Shelly.GetDeviceInfo")
 
         if not info:
@@ -91,6 +93,8 @@ class ShellyGateway(Gateway):
             return False
 
         self.online = True
+
+        self.properties["last_seen"] = self.properties["last_attempt"]
 
         self.id = self.ip
 

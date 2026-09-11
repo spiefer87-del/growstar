@@ -899,11 +899,30 @@ def register(app):
                 user_id, user_name = _current_user_identity()
                 camera_upload = request.files.get("camera_photo")
                 file_upload = request.files.get("file_photo")
-                upload = (
-                    camera_upload
-                    if camera_upload and camera_upload.filename
-                    else file_upload
-                )
+                growcam_camera_id = str(request.form.get("growcam_camera_id") or "").strip()
+                if growcam_camera_id:
+                    growcam = growcam_public_config(growcam_camera_id)
+                    if not growcam or not growcam.get("enabled"):
+                        raise ValueError("Die ausgewählte GrowCam ist nicht verfügbar.")
+                    snapshot = growcam_capture_snapshot(
+                        archive=False, camera_id=growcam_camera_id
+                    )
+                    if not snapshot.get("success"):
+                        raise ValueError(
+                            snapshot.get("error") or "GrowCam-Schnappschuss fehlgeschlagen."
+                        )
+                    upload = SimpleNamespace(
+                        filename=f"{growcam.get('name') or growcam_camera_id}.jpg",
+                        stream=BytesIO(
+                            growcam_latest_image_path(growcam_camera_id).read_bytes()
+                        ),
+                    )
+                else:
+                    upload = (
+                        camera_upload
+                        if camera_upload and camera_upload.filename
+                        else file_upload
+                    )
                 photo = save_batch_photo(
                     request.form.get("batch_id"),
                     upload,
@@ -969,6 +988,10 @@ def register(app):
             default_captured_at=datetime.now().strftime("%Y-%m-%dT%H:%M"),
             max_image_edge=MAX_IMAGE_EDGE,
             jpeg_quality=JPEG_QUALITY,
+            growcams=[
+                camera for camera in list_growcams()
+                if camera.get("enabled") and camera.get("host")
+            ],
         )
 
 

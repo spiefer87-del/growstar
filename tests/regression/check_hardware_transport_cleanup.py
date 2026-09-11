@@ -26,7 +26,11 @@ def main():
     from core.hardware.recovery import HardwareRecoveryCoordinator
     from core.hardware.vivosun import source_id_from_address
     from core.sensor_sources import update_sensor_source
-    from core.hardware.visibility import hardware_device_views, mqtt_device_views
+    from core.hardware.visibility import (
+        fresh_mqtt_vivosun_details,
+        hardware_device_views,
+        mqtt_device_views,
+    )
 
     address = "EE:65:C7:00:00:00"
     device = HardwareDevice(
@@ -51,6 +55,11 @@ def main():
             temperature=19.4,
             humidity=55.8,
             observed_at=1_700_000_000.0,
+            raw={
+                "bridge_id": "pico_02",
+                "bridge_name": "Pico Sensor 2",
+                "ble_address": address,
+            },
         )
 
         with tempfile.TemporaryDirectory(prefix="growstar-vivosun-transport-") as temp_dir:
@@ -80,9 +89,21 @@ def main():
                 and snapshot["missing_ble_devices"] == [],
                 "Frischer Pico/MQTT-Transport ersetzt den lokalen VIVOSUN im Recovery-Count",
             )
+        details = fresh_mqtt_vivosun_details(
+            list(controller_state.live_state["sensor_sources"].values()),
+            now=1_700_000_001.0,
+        )
+        visible_hardware = hardware_device_views(
+            [device], mqtt_vivosun_details=details
+        )
         require(
-            hardware_device_views([device], mqtt_vivosun_addresses={"ee65c7000000"}) == [],
-            "Inaktiver Raspberry-Zwilling wird auf der Hardwareseite ausgeblendet",
+            len(visible_hardware) == 1
+            and visible_hardware[0]["online"] is True
+            and visible_hardware[0]["properties"]["connection_label"]
+            == "Pico Sensor 2 (MQTT)"
+            and visible_hardware[0]["properties"]["last_seen"]
+            == 1_700_000_000.0,
+            "VIVOSUN bleibt einmal als BLE-Gerät mit aktivem Pico-Transport sichtbar",
         )
         visible_mqtt = mqtt_device_views([
             {"id": "pico_02", "name": "Pico Sensor 2"},
@@ -134,6 +155,11 @@ def main():
         "fresh_mqtt_vivosun_addresses" in blu_thread
         and "compact_address in mqtt_vivosun_addresses" in blu_thread,
         "BLU-Thread beendet parallele Raspberry-Abfragen bei frischer Pico-Brücke",
+    )
+    require(
+        "Zuletzt gesichtet" in devices_template
+        and "formatLastSeen" in devices_template,
+        "Gerätemanager zeigt den letzten Sichtkontakt für Gateways, BLE und MQTT",
     )
     print("✅ Hardware-Transportbereinigung vollständig geprüft")
 

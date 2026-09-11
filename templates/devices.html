@@ -1724,6 +1724,12 @@ function renderGateways(gateways){
 
                 </div>
 
+                <div class="sub">
+
+                    Zuletzt gesichtet ${formatLastSeen((gateway.properties || {}).last_seen)}
+
+                </div>
+
             </div>
 
         `;
@@ -1776,7 +1782,7 @@ function renderDevices(devices){
         const card = document.createElement("a");
         const isVivosun = props.protocol === "vivosun_thb1s";
         const gatewayLabel = isVivosun
-            ? "Raspberry BLE (lokal)"
+            ? (props.connection_label || "Raspberry BLE (lokal)")
             : (props.gateway_ip || props.gateway_id || "--");
         const channelValues = props.channels || {};
         const main = channelValues.main || {};
@@ -1828,6 +1834,12 @@ function renderDevices(devices){
 
                     </div>
 
+                    <div class="sub">
+
+                        Zuletzt gesichtet ${formatLastSeen(props.last_seen)}
+
+                    </div>
+
                     ${isVivosun ? `
                         <div class="sub">
                             Intern ${main.temperature ?? "--"} °C · ${main.humidity ?? "--"} %
@@ -1867,6 +1879,23 @@ function formatUptime(seconds){
     if(value < 86400) return Math.floor(value / 3600) + " h";
 
     return Math.floor(value / 86400) + " d " + Math.floor((value % 86400) / 3600) + " h";
+
+}
+
+
+function formatLastSeen(timestamp){
+
+    const value = Number(timestamp);
+
+    if(!Number.isFinite(value) || value <= 0) return "--";
+
+    const age = Math.max(0, Math.round(Date.now() / 1000 - value));
+    if(age < 10) return "gerade eben";
+    if(age < 60) return `vor ${age} s`;
+    if(age < 3600) return `vor ${Math.floor(age / 60)} min`;
+    if(age < 86400) return `vor ${Math.floor(age / 3600)} h`;
+
+    return new Date(value * 1000).toLocaleString("de-DE");
 
 }
 
@@ -1916,6 +1945,7 @@ function renderMqttDevices(devices){
                         : ""}
                     <div class="sub">Temperatur ${device.temperature ?? "--"} °C · Feuchte ${device.humidity ?? "--"} %</div>
                     <div class="sub">RSSI ${device.rssi ?? "--"} dBm · Uptime ${formatUptime(device.uptime)}</div>
+                    <div class="sub">Zuletzt gesichtet ${formatLastSeen(device.last_seen || device.last_state || device.last_status)}</div>
                     ${fields ? `<div class="sub">Sensoren ${escapeHtml(fields)}</div>` : ""}
                     <div class="sub">Antippen zum Zuordnen →</div>
                 </div>

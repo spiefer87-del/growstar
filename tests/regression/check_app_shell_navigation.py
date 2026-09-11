@@ -15,11 +15,18 @@ def main():
     js = (ROOT / "static/js/growstar-app-shell.js").read_text(encoding="utf-8")
 
     require("?v=3.13.2-shell3" in base, "Shell.3 Cache-Buster aktiv")
-    require(base.count("data-growstar-nav-group") >= 4, "Grow Control, Hardware, Pflanzen und Medien sind klappbare Module")
+    require(base.count("data-growstar-nav-group") >= 6, "Hauptmodule einschließlich Administrator sind klappbar")
     require('id="growstar-grow-submenu"' in base, "Grow-Control-Untermenü vorhanden")
     require('id="growstar-hardware-submenu"' in base, "Hardware-Untermenü vorhanden")
     require('id="growstar-plants-submenu"' in base, "Pflanzen-Untermenü vorhanden")
     require('id="growstar-media-submenu"' in base, "Medien-Untermenü vorhanden")
+    require('id="growstar-admin-submenu"' in base, "Administrator-Untermenü vorhanden")
+    require(
+        base.index('growstar-nav-section-plants')
+        < base.index('growstar-nav-section-media')
+        < base.index('growstar-nav-section-hardware'),
+        "Menüreihenfolge ist Grow Control, Pflanzenmanagement, Medien und Hardware",
+    )
 
     grow_targets = (
         "grow_control_dashboard", "grow_control_live", "grow_control_profiles",
@@ -36,7 +43,7 @@ def main():
         "grow_control_connections", "spiderfarmer_system_page", "grow_control_watchdog",
         "grow_control_setup", "system_network_page", "system_page",
     )
-    hardware_menu = base[base.index('id="growstar-hardware-submenu"'):base.index('growstar-nav-section-plants')]
+    hardware_menu = base[base.index('id="growstar-hardware-submenu"'):base.index('growstar-nav-section-energy')]
     for endpoint in hardware_targets:
         require(f"url_for('{endpoint}')" in hardware_menu, f"Hardware-Ziel {endpoint} vorhanden")
     require("devices" not in grow_menu and "grow_control_setup" not in grow_menu, "Hardware und Setup sind aus Grow Control entfernt")
