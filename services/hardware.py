@@ -6,6 +6,7 @@ from core.hardware.manager import manager
 from core.hardware.scanner import scanner
 
 from core.hardware.shelly.discovery import ShellyDiscovery
+from core.hardware.shelly.gateway import ShellyGateway
 from core.hardware.vivosun import (
     LOCAL_NAME as VIVOSUN_LOCAL_NAME,
     MODEL as VIVOSUN_MODEL,
@@ -1431,7 +1432,36 @@ class HardwareService:
         if gateway is None:
             return None
 
-        gateway.refresh()
+        refresh = getattr(gateway, "refresh", None)
+
+        # Sicherheitsnetz für alte oder manuell erzeugte Inventare: Auch ein
+        # noch abstrakt geladenes Shelly wird vor dem Poll in ein echtes
+        # Laufzeit-Gateway überführt. Dadurch hängt sein Onlinezustand nicht
+        # davon ab, ob es gerade zusätzlich per mDNS annonciert wird.
+        if not callable(refresh):
+            manufacturer = str(getattr(gateway, "manufacturer", "") or "")
+            ip = str(getattr(gateway, "ip", "") or gateway_id)
+            if manufacturer.strip().lower() != "shelly" or not ip:
+                return gateway
+
+            live_gateway = ShellyGateway(ip)
+            live_gateway.id = ip
+            live_gateway.name = str(getattr(gateway, "name", "") or "")
+            live_gateway.model = str(getattr(gateway, "model", "") or "")
+            live_gateway.mac = str(getattr(gateway, "mac", "") or "")
+            live_gateway.firmware = str(getattr(gateway, "firmware", "") or "")
+            live_gateway.rssi = getattr(gateway, "rssi", None)
+            live_gateway.properties = dict(getattr(gateway, "properties", {}) or {})
+            live_gateway.methods = list(getattr(gateway, "methods", []) or [])
+            live_gateway.capabilities = dict(getattr(gateway, "capabilities", {}) or {})
+            live_gateway.bluetooth_enabled = bool(
+                getattr(gateway, "bluetooth_enabled", False)
+            )
+            manager.add_gateway(live_gateway)
+            gateway = live_gateway
+            refresh = gateway.refresh
+
+        refresh()
 
         return gateway
 

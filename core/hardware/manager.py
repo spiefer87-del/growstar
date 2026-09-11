@@ -144,15 +144,26 @@ class HardwareManager:
 
     @staticmethod
     def _gateway_from_dict(data):
-        gateway = Gateway()
+        ip = str(data.get("ip") or data.get("id") or "")
+        manufacturer = str(data.get("manufacturer") or "")
+
+        # Persistierte Shellys dürfen nicht als abstraktes Gateway geladen
+        # werden: Gateway besitzt keinen refresh()-Pfad und würde deshalb bis
+        # zur nächsten erfolgreichen mDNS-Erkennung dauerhaft offline bleiben.
+        if manufacturer.strip().lower() == "shelly" and ip:
+            from .shelly.gateway import ShellyGateway
+
+            gateway = ShellyGateway(ip)
+        else:
+            gateway = Gateway()
         gateway.id = str(data.get("id") or "")
         gateway.name = str(data.get("name") or "")
-        gateway.manufacturer = str(data.get("manufacturer") or "")
+        gateway.manufacturer = manufacturer
         gateway.model = str(data.get("model") or "")
         gateway.online = False
         gateway.properties = deepcopy(data.get("properties") or {})
 
-        gateway.ip = str(data.get("ip") or "")
+        gateway.ip = ip
         gateway.mac = str(data.get("mac") or "")
         gateway.firmware = str(data.get("firmware") or "")
         gateway.bluetooth = bool(data.get("bluetooth", False))
