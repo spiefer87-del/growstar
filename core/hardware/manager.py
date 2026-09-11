@@ -54,8 +54,44 @@ class HardwareManager:
 
     # ---------- Gateways ----------
 
+    @staticmethod
+    def _gateway_mac(value):
+        if isinstance(value, dict):
+            raw = value.get("mac")
+        else:
+            raw = getattr(value, "mac", None)
+        return "".join(character for character in str(raw or "").lower() if character in "0123456789abcdef")
+
+    @classmethod
+    def _deduplicate_gateways(cls, gateways, *, preferred_ids=()):
+        """Entfernt alte IP-Schlüssel desselben physischen Shellys per MAC."""
+        preferred_ids = {str(item) for item in preferred_ids}
+        result = {}
+        by_mac = {}
+        for gateway_id, gateway in (gateways or {}).items():
+            gateway_id = str(gateway_id)
+            mac = cls._gateway_mac(gateway)
+            previous_id = by_mac.get(mac) if len(mac) == 12 else None
+            if previous_id is not None:
+                keep_new = (
+                    gateway_id in preferred_ids
+                    or previous_id not in preferred_ids
+                )
+                if not keep_new:
+                    continue
+                result.pop(previous_id, None)
+            result[gateway_id] = gateway
+            if len(mac) == 12:
+                by_mac[mac] = gateway_id
+        return result
+
     def add_gateway(self, gateway):
         with self._lock:
+            mac = self._gateway_mac(gateway)
+            if len(mac) == 12:
+                for gateway_id, existing in list(self.gateways.items()):
+                    if gateway_id != gateway.id and self._gateway_mac(existing) == mac:
+                        self.gateways.pop(gateway_id, None)
             self.gateways[gateway.id] = gateway
 
     def gateways_list(self):
@@ -235,6 +271,10 @@ class HardwareManager:
                 gateways = dict(stored.get("gateways") or {})
                 devices = dict(stored.get("devices") or {})
                 gateways.update(current["gateways"])
+                gateways = self._deduplicate_gateways(
+                    gateways,
+                    preferred_ids=current["gateways"],
+                )
                 devices.update(current["devices"])
                 payload = {
                     "version": INVENTORY_VERSION,
@@ -251,6 +291,7 @@ class HardwareManager:
     def load_inventory(self):
         """Mischt persistierte bekannte Hardware in den Laufzeitmanager."""
         data = self._read_inventory_file()
+        data["gateways"] = self._deduplicate_gateways(data.get("gateways") or {})
         loaded = 0
 
         with self._lock:

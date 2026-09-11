@@ -9,6 +9,11 @@ from core.hardware.shelly.provisioning import provisioning_discovery
 from core.mqtt_sensor_devices import list_mqtt_sensor_devices
 from core.sensor_sources import list_sensor_sources
 from core.hardware_assignments import hardware_snapshot
+from core.hardware.visibility import (
+    fresh_mqtt_vivosun_addresses,
+    hardware_device_views,
+    mqtt_device_views,
+)
 from core.tents import manager as tent_manager
 
 
@@ -398,14 +403,19 @@ def register(app):
             for gateway in hardware.gateways()
         ]
 
+        mqtt_devices = list_mqtt_sensor_devices()
+        mqtt_vivosun_addresses = fresh_mqtt_vivosun_addresses(
+            list_sensor_sources()
+        )
+
         return jsonify({
 
             "gateways": gateways,
 
-            "devices": [
-                device.to_dict()
-                for device in hardware.devices()
-            ],
+            "devices": hardware_device_views(
+                hardware.devices(),
+                mqtt_vivosun_addresses=mqtt_vivosun_addresses,
+            ),
 
             # Legacy HardwareManager-Aktoren bleiben unverändert erhalten.
             # Growstar-Aktorzuordnungen werden zusätzlich read-only aus den
@@ -422,7 +432,7 @@ def register(app):
             # Controller-weite MQTT-Sensorcontroller (Pico etc.).
             # Sie gehören bewusst zu keinem Zelt; die Zuordnung erfolgt erst
             # über SENSOR_ASSIGNMENTS.
-            "mqtt_devices": list_mqtt_sensor_devices(),
+            "mqtt_devices": mqtt_device_views(mqtt_devices),
 
             # Spider-Farmer-Umgebungssensoren erscheinen zusätzlich in der
             # zentralen Hardwareübersicht. Read-only; keine Herstellerseite nötig.

@@ -280,6 +280,9 @@ def main():
             hardware_template = (ROOT / "templates/devices.html").read_text(
                 encoding="utf-8"
             )
+            connections_template = (ROOT / "templates/connections.html").read_text(
+                encoding="utf-8"
+            )
             camera_routes = (ROOT / "routes/camera.py").read_text(encoding="utf-8")
             base_template = (ROOT / "templates/base.html").read_text(encoding="utf-8")
             plant_nav = (ROOT / "templates/plants/_nav.html").read_text(
@@ -310,14 +313,15 @@ def main():
                 "Kamera-IP" not in template
                 and "RTSP-Port" not in template
                 and "RTSP-Pfad" not in template
-                and "growcam_hardware_configure" in hardware_template
-                and "Kamera-IP" in hardware_template
-                and "RTSP-Port" in hardware_template
-                and "RTSP-Pfad" in hardware_template
+                and "Kamera-IP" not in hardware_template
+                and "growcam_hardware_configure" in connections_template
+                and "Kamera-IP" in connections_template
+                and "RTSP-Port" in connections_template
+                and "RTSP-Pfad" in connections_template
                 and '@permission_required("hardware.configure")' in camera_routes
                 and '"host": request.form.get("host")' in camera_routes
                 and "**current" in camera_routes,
-                "GrowCam-Netzwerkdaten liegen im Hardware-Manager und Medienwerte bleiben erhalten",
+                "GrowCam-Netzwerkdaten liegen unter Verbindungen und Medienwerte bleiben erhalten",
             )
             require(
                 'name="video_retention_count"' in timelapse_template

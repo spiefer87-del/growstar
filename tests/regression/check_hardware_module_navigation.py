@@ -24,6 +24,7 @@ def main():
     dashboard = (ROOT / "templates/dashboard.html").read_text(encoding="utf-8")
     routes = (ROOT / "routes/dashboard.py").read_text(encoding="utf-8")
     devices = (ROOT / "templates/devices.html").read_text(encoding="utf-8")
+    connections = (ROOT / "templates/connections.html").read_text(encoding="utf-8")
     camera = (ROOT / "templates/plants/camera.html").read_text(encoding="utf-8")
 
     require(
@@ -55,15 +56,16 @@ def main():
         "Technische Infrastruktur ist aus dem Grow-Control-Dashboard entfernt",
     )
     require(
-        "growcam_hardware_configure" in devices
+        "growcam_hardware_configure" in connections
         and "cameras=growcam_public_configs()" in routes
         and "tents=tent_manager.list_tents()" in routes
-        and "Kamera-IP" in devices
-        and "RTSP-Port" in devices
-        and "RTSP-Pfad" in devices
+        and "Kamera-IP" not in devices
+        and "Kamera-IP" in connections
+        and "RTSP-Port" in connections
+        and "RTSP-Pfad" in connections
         and "Kamera-IP" not in camera
         and "RTSP-Port" not in camera,
-        "Die technische GrowCam-Verbindung wird ausschließlich im Hardware-Manager bearbeitet",
+        "Die technische GrowCam-Verbindung wird ausschließlich unter Verbindungen bearbeitet",
     )
     require(
         permission_requirement("/hardware", "GET").mode == "any"

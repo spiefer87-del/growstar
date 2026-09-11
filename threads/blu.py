@@ -5,6 +5,8 @@ import threading
 
 from core.config import config
 from core.hardware.vivosun import PROTOCOL as VIVOSUN_PROTOCOL
+from core.hardware.visibility import fresh_mqtt_vivosun_addresses
+from core.sensor_sources import list_sensor_sources
 
 from services.hardware import hardware
 
@@ -51,6 +53,13 @@ def _blu_devices():
     devices = []
 
     try:
+        mqtt_vivosun_addresses = fresh_mqtt_vivosun_addresses(
+            list_sensor_sources()
+        )
+    except Exception:
+        mqtt_vivosun_addresses = set()
+
+    try:
 
         all_devices = hardware.devices()
 
@@ -73,6 +82,9 @@ def _blu_devices():
             continue
 
         if protocol == VIVOSUN_PROTOCOL:
+            compact_address = str(props.get("addr") or "").replace(":", "").lower()
+            if compact_address in mqtt_vivosun_addresses:
+                continue
             if props.get("registered") and props.get("addr"):
                 devices.append(device)
             continue

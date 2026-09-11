@@ -83,6 +83,34 @@ class HardwareRecoveryCoordinator:
             or props.get("paired_gateways")
         )
 
+    def _vivosun_has_fresh_mqtt_source(self, device):
+        """Erkennt die aktive Pico-Brücke für einen lokal registrierten Sensor.
+
+        Raspberry und Pico veröffentlichen dieselben transportneutralen
+        VIVOSUN-Quellen. Sobald ein frischer MQTT-Wert vorhanden ist, darf der
+        alte lokale BLE-Eintrag weder als zweites erwartetes Gerät gezählt noch
+        durch Recovery parallel abgefragt werden.
+        """
+        if not self._is_vivosun_device(device):
+            return False
+
+        props = getattr(device, "properties", None) or {}
+        address = str(props.get("addr") or "").strip()
+        if not address:
+            return False
+
+        try:
+            from core.hardware.visibility import fresh_mqtt_vivosun_addresses
+            from core.sensor_sources import list_sensor_sources
+
+            compact = address.replace(":", "").lower()
+            return compact in fresh_mqtt_vivosun_addresses(
+                list_sensor_sources(),
+                now=self.now(),
+            )
+        except Exception:
+            return False
+
     def expected_ble_device_ids(self):
         expected = set()
 
@@ -101,6 +129,9 @@ class HardwareRecoveryCoordinator:
                     )
                     and self._looks_paired(device)
                 ):
+                    if self._vivosun_has_fresh_mqtt_source(device):
+                        expected.discard(str(getattr(device, "id", "") or ""))
+                        continue
                     if getattr(device, "id", None):
                         expected.add(str(device.id))
         except Exception:

@@ -115,7 +115,11 @@ def register(app):
 
     @app.route("/grow-control/connections")
     def grow_control_connections():
-        return render_template("connections.html")
+        return render_template(
+            "connections.html",
+            cameras=growcam_public_configs(),
+            tents=tent_manager.list_tents(),
+        )
 
     @app.route("/grow-control/watchdog")
     def grow_control_watchdog():
@@ -392,11 +396,7 @@ def register(app):
 
     @app.route("/devices")
     def devices():
-        return render_template(
-            "devices.html",
-            cameras=growcam_public_configs(),
-            tents=tent_manager.list_tents(),
-        )
+        return render_template("devices.html")
 
     @app.route("/devices/<gateway_id>")
     def gateway_page(gateway_id):

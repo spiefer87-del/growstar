@@ -107,15 +107,17 @@ def main():
 
             routes = (ROOT / "routes/camera.py").read_text(encoding="utf-8")
             hardware = (ROOT / "templates/devices.html").read_text(encoding="utf-8")
+            connections = (ROOT / "templates/connections.html").read_text(encoding="utf-8")
             camera_page = (ROOT / "templates/plants/camera.html").read_text(encoding="utf-8")
             dashboard = (ROOT / "routes/dashboard.py").read_text(encoding="utf-8")
             require(
                 "growcam_hardware_add" in routes
-                and "Kamera hinzufügen und aktivieren" in hardware
-                and "camera_id" in hardware
+                and "Kamera-IP" not in hardware
+                and "Kamera hinzufügen" in connections
+                and "camera_id" in connections
                 and "camera_id" in camera_page
                 and "growcam_for_tent(tent_id)" in dashboard,
-                "Hardware-Manager, Medienseite und Stationsdashboard sind mehrkamerafähig",
+                "Verbindungen, Medienseite und Stationsdashboard sind mehrkamerafähig",
             )
             require(
                 permission_requirement("/devices/growcam/hinzufuegen", "POST").permissions

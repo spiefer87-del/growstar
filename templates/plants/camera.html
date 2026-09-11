@@ -29,7 +29,7 @@
 
 <nav class="pm-photo-scope" aria-label="Kamera auswählen">
 {% for camera_item in cameras %}<a class="{{ 'active' if camera_item.camera_id == camera.camera_id else '' }}" href="{{ url_for('growcam_page', camera_id=camera_item.camera_id) }}">📷 {{ camera_item.name }} · {{ camera_item.tent_id }}</a>{% endfor %}
-<a href="{{ url_for('devices', _anchor='growcam-connection') }}">＋ Kamera hinzufügen</a>
+<a href="{{ url_for('grow_control_connections', _anchor='growcam-connection') }}">＋ Kamera hinzufügen</a>
 </nav>
 
 <section class="pm-grid">
@@ -83,7 +83,7 @@
     </article>
 
     <article class="pm-card pm-span-12">
-        <div class="pm-card-head"><div><h2>Kamera und Livebild</h2><div class="pm-help">Netzwerkverbindung: {{ camera.host }}:{{ camera.port }}{{ camera.path }}</div></div><a class="pm-button" href="{{ url_for('devices', _anchor='growcam-connection') }}">🛠️ Verbindung im Hardware-Manager</a></div>
+        <div class="pm-card-head"><div><h2>Kamera und Livebild</h2><div class="pm-help">Netzwerkverbindung: {{ camera.host }}:{{ camera.port }}{{ camera.path }}</div></div><a class="pm-button" href="{{ url_for('grow_control_connections', _anchor='growcam-connection') }}">🔗 Verbindung bearbeiten</a></div>
         <div class="pm-card-body">
             <form class="pm-form" method="post" action="{{ url_for('growcam_configure') }}">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">

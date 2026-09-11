@@ -193,6 +193,7 @@ def register(app):
         return redirect(url_for("growcam_timelapse_page", camera_id=camera_id))
 
     @app.post("/devices/growcam/hinzufuegen")
+    @app.post("/grow-control/connections/growcam/hinzufuegen")
     @permission_required("hardware.configure")
     def growcam_hardware_add():
         tent_id = str(request.form.get("tent_id") or "").strip()
@@ -217,9 +218,10 @@ def register(app):
             flash("GrowCam wurde hinzugefügt und aktiviert.", "success")
         except Exception as exc:
             flash(str(exc), "error")
-        return redirect(url_for("devices", _anchor="growcam-connection"))
+        return redirect(url_for("grow_control_connections", _anchor="growcam-connection"))
 
     @app.post("/devices/growcam/konfiguration")
+    @app.post("/grow-control/connections/growcam/konfiguration")
     @permission_required("hardware.configure")
     def growcam_hardware_configure():
         current = selected_camera()
@@ -249,10 +251,10 @@ def register(app):
                 },
                 camera_id=camera_id,
             )
-            flash("GrowCam-Verbindung wurde im Hardware-Manager gespeichert.", "success")
+            flash("GrowCam-Verbindung wurde gespeichert.", "success")
         except Exception as exc:
             flash(str(exc), "error")
-        return redirect(url_for("devices", _anchor="growcam-connection"))
+        return redirect(url_for("grow_control_connections", _anchor="growcam-connection"))
 
     @app.post("/pflanzenmanagement/kamera/aufnahme")
     @permission_required("plants.edit")
