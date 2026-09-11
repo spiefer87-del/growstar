@@ -43,6 +43,12 @@ gespeichert. Ein Klick auf das Livebild öffnet die Vollbildansicht. Dort lässt
 sich bis 500 Prozent zoomen und das vergrößerte Bild per Maus oder Touch
 verschieben.
 
+Ist die aktivierte Kamera einer Station zugewiesen, zeigt deren Grow-Control-
+Dashboard neben dem Tag-/Nacht-Symbol automatisch einen `LIVE`-Kameraknopf.
+Dieser öffnet ohne Umweg über die Konfiguration einen bildschirmfüllenden Viewer
+mit Zoom, Verschieben, Einpassen und optionalem Browser-Vollbild. Der Knopf ist
+nur an der tatsächlich zugewiesenen Station sichtbar.
+
 ## Durchgang und Zeitraffer
 
 1. Der Kamera einen Pflanzendurchgang zuordnen.

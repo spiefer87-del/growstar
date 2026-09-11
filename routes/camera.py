@@ -157,6 +157,19 @@ def register(app):
         response.headers["X-Accel-Buffering"] = "no"
         return response
 
+    @app.get("/pflanzenmanagement/kamera/live")
+    def growcam_live_viewer():
+        camera = public_config()
+        if not camera.get("enabled") or not camera.get("host"):
+            abort(404)
+
+        tent = tent_manager.get(str(camera.get("tent_id") or ""))
+        return render_template(
+            "plants/camera_live.html",
+            camera=camera,
+            tent_name=(tent or {}).get("name") or camera.get("tent_id"),
+        )
+
     @app.post("/pflanzenmanagement/kamera/zeitraffer")
     @permission_required("plants.edit")
     def growcam_timelapse_create():

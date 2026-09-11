@@ -95,6 +95,7 @@ h3 {
 .heading-climate-slot {
     display: flex;
     align-items: center;
+    gap: 9px;
     min-height: 42px;
     margin-top: 10px;
 }
@@ -124,6 +125,30 @@ h3 {
 .header-climate-mode-icon {
     font-size: 1.25rem;
     line-height: 1;
+}
+.header-camera-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 0 13px;
+    border: 1px solid rgba(34,197,94,.58);
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(22,163,74,.30), rgba(5,150,105,.17));
+    color: #bbf7d0;
+    box-shadow: 0 6px 18px rgba(34,197,94,.13);
+    font-size: .72rem;
+    font-weight: 900;
+    letter-spacing: .055em;
+    text-decoration: none;
+}
+.header-camera-link::before { content: "📷"; font-size: 1rem; letter-spacing: 0; }
+.header-camera-link:hover,
+.header-camera-link:focus-visible {
+    border-color: rgba(74,222,128,.92);
+    background: linear-gradient(135deg, rgba(22,163,74,.48), rgba(5,150,105,.27));
+    color: #f0fdf4;
 }
 .visually-hidden {
     position: absolute;
@@ -455,6 +480,7 @@ h3 {
     .card { padding: 13px 8px; min-height: 105px; }
     .heading-climate-slot { margin-top: 8px; }
     .header-climate-mode { width: 40px; height: 40px; flex-basis: 40px; }
+    .header-camera-link { min-height: 40px; padding: 0 11px; }
     #profile-card .phase-badge { padding: 5px 9px; font-size: .78rem; }
     .vpd-card-slot.has-vpd-log #vpd-card { padding-bottom: 34px; }
     .vpd-log-shortcut { bottom: 6px; padding: 4px 6px; font-size: .56rem; }
@@ -504,6 +530,14 @@ h3 {
                     <span id="climate-mode-icon" class="header-climate-mode-icon" aria-hidden="true">◐</span>
                     <span id="profile-phase" class="visually-hidden">---</span>
                 </div>
+                {% if station_camera_available %}
+                <a
+                    class="header-camera-link"
+                    href="{{ url_for('growcam_live_viewer') }}"
+                    title="{{ station_camera_name }} live und bildschirmfüllend öffnen"
+                    aria-label="Livekamera {{ station_camera_name }} für {{ tent_name }} öffnen"
+                >LIVE</a>
+                {% endif %}
             </div>
             {% endif %}
         </div>

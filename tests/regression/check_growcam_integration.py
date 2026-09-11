@@ -212,6 +212,9 @@ def main():
             stream_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera/live.mjpg", "GET"
             )
+            viewer_requirement = permission_requirement(
+                "/pflanzenmanagement/kamera/live", "GET"
+            )
             timelapse_requirement = permission_requirement(
                 "/pflanzenmanagement/kamera/zeitraffer", "POST"
             )
@@ -225,6 +228,7 @@ def main():
             require(
                 read_requirement.permissions == ("plants.view",)
                 and stream_requirement.permissions == ("plants.view",)
+                and viewer_requirement.permissions == ("plants.view",)
                 and api_requirement.permissions == ("plants.view",)
                 and write_requirement.permissions == ("plants.edit",)
                 and timelapse_requirement.permissions == ("plants.edit",)
@@ -234,6 +238,15 @@ def main():
 
             app_source = (ROOT / "app.py").read_text(encoding="utf-8")
             template = (ROOT / "templates/plants/camera.html").read_text(encoding="utf-8")
+            live_template = (ROOT / "templates/plants/camera_live.html").read_text(
+                encoding="utf-8"
+            )
+            station_template = (ROOT / "templates/grow_control.html").read_text(
+                encoding="utf-8"
+            )
+            dashboard_routes = (ROOT / "routes/dashboard.py").read_text(
+                encoding="utf-8"
+            )
             require(
                 "register_camera_routes(app)" in app_source
                 and '"growstar-growcam"' in app_source
@@ -245,6 +258,16 @@ def main():
                 and 'timelapse_frames["items"]' in template
                 and "timelapse_frames.items" not in template,
                 "Route, Hintergrundaufnahme und Kameraansicht sind vollständig eingebunden",
+            )
+            require(
+                "growcam_live_viewer" in station_template
+                and "station_camera_available" in station_template
+                and "growcam_public_config" in dashboard_routes
+                and 'camera.get("tent_id") == tent_id' in dashboard_routes
+                and "requestFullscreen" in live_template
+                and "growcam_live" in live_template
+                and "grow_control_tent" in live_template,
+                "Stationskamera öffnet ausschließlich an ihrer Station den bildschirmfüllenden Liveviewer",
             )
         finally:
             growcam.shutil.which = original_which

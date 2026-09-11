@@ -3,6 +3,7 @@ from flask import abort, jsonify, redirect, render_template, url_for
 from core.devices import get_device_default_label, get_device_icon, get_device_label
 from core.runtime import get_runtime
 from core.tents import manager as tent_manager, validate_tent_id
+from services.growcam import public_config as growcam_public_config
 from services.spiderfarmer import list_controllers as list_spiderfarmer_controllers
 
 
@@ -33,10 +34,19 @@ def _tent_page_context(tent_id):
     if tent is None:
         abort(404)
 
+    camera = growcam_public_config()
+    camera_available = bool(
+        camera.get("enabled")
+        and camera.get("host")
+        and camera.get("tent_id") == tent_id
+    )
+
     return {
         "tent_id": tent_id,
         "tent_name": tent.get("name") or tent_id,
         "default_tent_id": tent_manager.default_tent_id(),
+        "station_camera_available": camera_available,
+        "station_camera_name": camera.get("name") if camera_available else None,
     }
 
 
