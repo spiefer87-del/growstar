@@ -1096,7 +1096,7 @@ body {
 
 .pm-photo-lightbox {
     position: fixed;
-    z-index: 4000;
+    z-index: 10050;
     inset: 0;
     display: grid;
     grid-template-columns: 64px minmax(0, 1fr) 64px;
@@ -1220,6 +1220,30 @@ body {
     color: #64748b;
     font-size: .72rem;
     text-align: center;
+}
+
+.pm-timeline-lightbox-footer {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    display: grid;
+    justify-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.pm-timeline-lightbox-footer .pm-lightbox-help {
+    grid-column: auto;
+}
+
+.pm-lightbox-close-bottom {
+    width: min(100%, 280px);
+    height: 48px;
+    padding: 0 24px;
+    border-radius: 999px;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1;
+    touch-action: manipulation;
 }
 
 @media (max-width: 760px) {

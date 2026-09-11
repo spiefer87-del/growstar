@@ -94,7 +94,6 @@ aria-label="Foto vom {{ photo.captured_date }} öffnen">📷</a>
 <div class="pm-photo-lightbox" id="pm-timeline-lightbox" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="pm-timeline-lightbox-title">
     <div class="pm-lightbox-top">
         <span class="pm-lightbox-count" id="pm-timeline-lightbox-count"></span>
-        <button class="pm-lightbox-close" id="pm-timeline-lightbox-close" type="button" aria-label="Galerie schließen">×</button>
     </div>
     <button class="pm-lightbox-nav previous" id="pm-timeline-lightbox-previous" type="button" aria-label="Vorheriges Foto dieser Pflanze">‹</button>
     <figure class="pm-lightbox-figure">
@@ -108,7 +107,10 @@ aria-label="Foto vom {{ photo.captured_date }} öffnen">📷</a>
         </figcaption>
     </figure>
     <button class="pm-lightbox-nav next" id="pm-timeline-lightbox-next" type="button" aria-label="Nächstes Foto dieser Pflanze">›</button>
-    <div class="pm-lightbox-help">Nur Fotos dieser Pflanze · Wischen oder ← → verwenden · Esc schließt</div>
+    <div class="pm-timeline-lightbox-footer">
+        <div class="pm-lightbox-help">Nur Fotos dieser Pflanze · Wischen oder ← → verwenden · Esc schließt</div>
+        <button class="pm-lightbox-close pm-lightbox-close-bottom" id="pm-timeline-lightbox-close" type="button" aria-label="Galerie schließen">✕ Schließen</button>
+    </div>
 </div>
 </main>
 {% endblock %}
