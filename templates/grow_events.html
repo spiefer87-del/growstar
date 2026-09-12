@@ -40,7 +40,7 @@ body{margin:0;padding:24px;background:radial-gradient(circle at top left,rgba(34
             <span class="gi-insight-state {{ insights.state }}">{{ insights.headline }}</span>
         </div>
         <div class="gi-insight-grid">
-            {% for insight in insights.items %}<article class="gi-insight {{ insight.severity }}">
+            {% for insight in insights["items"] %}<article class="gi-insight {{ insight.severity }}">
                 <div class="gi-insight-icon" aria-hidden="true">{{ insight.icon }}</div>
                 <div><h3>{{ insight.title }}</h3><p>{{ insight.summary }}</p><div class="gi-insight-meta">{% if insight.station_id %}<span>📍 {{ insight.station_label }}</span>{% endif %}{% if insight.time_label %}<span>🕒 {{ insight.time_label }}</span>{% endif %}{% if insight.evidence_ids %}<span class="gi-evidence">Beleg: {% for event_id in insight.evidence_ids %}#{{ event_id }}{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}</div></div>
             </article>{% endfor %}

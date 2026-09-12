@@ -140,7 +140,9 @@ def main():
     require(
         "Aktuelle Erkenntnisse" in template
         and "keine automatisch bestätigten Ursachen" in template
-        and "insight.evidence_ids" in template,
+        and "insight.evidence_ids" in template
+        and 'insights["items"]' in template
+        and "insights.items" not in template,
         "Oberfläche kennzeichnet Hinweise, Belege und Grenzen der Analyse",
     )
 
