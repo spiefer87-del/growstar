@@ -201,7 +201,7 @@ function renderSummary(data){
         <div class="summary-card"><span>Aktuelle Leistung</span><strong>${num(t.power,1)} W</strong><small>Summe aller erreichbaren Messpunkte</small></div>
         <div class="summary-card"><span>Heute</span><strong>${num(t.today,3)} kWh</strong><small>${data.settings?.current_day_started_at ? `Seit ${dateTimeText(data.settings.current_day_started_at)}` : 'Seit dem Tagesreset'}</small></div>
         <div class="summary-card"><span>Kosten heute</span><strong>${num(t.cost_today,2)} €</strong><small>Mit dem aktuellen Controller-Strompreis</small></div>
-        <div class="summary-card"><span>Gesamt seit Reset</span><strong>${num(t.total,3)} kWh</strong><small>${num(t.cost_total,2)} € seit Gesamt-Reset</small></div>
+        <div class="summary-card"><span>Gesamt seit Reset</span><strong>${num(t.total,3)} kWh</strong><small>${data.settings?.last_total_reset_at ? `Reset ${dateTimeText(data.settings.last_total_reset_at)} · ` : ''}${num(t.cost_total,2)} € seit Gesamt-Reset</small></div>
         <div class="summary-card"><span>Tagesmaximum</span><strong>${num(t.max_power_today,1)} W</strong><small>${t.max_power_today_ts ? `Erfasst ${timeText(t.max_power_today_ts)}` : 'Historie startet ab Phase 4M'}</small></div>
         <div class="summary-card"><span>Messpunkte</span><strong>${Number(t.available_devices || 0)}/${Number(t.configured_devices || 0)}</strong><small>${(data.statistics || {}).station_count || 0} geladene Station(en)</small></div>`;
 }

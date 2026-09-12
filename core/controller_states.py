@@ -135,6 +135,19 @@ def resolve_control_state(params, name):
             ),
         }
 
+    if name in ("interval_a_night", "interval_b_night"):
+        # NIGHT.1 changes only controller values. Duration and authoritative
+        # Shelly power continue to come from the corresponding A/B day state.
+        day_name = name.removesuffix("_night")
+        day_state = resolve_control_state(params, day_name)
+        controller = _mapping(raw.get("controller"))
+        if not controller:
+            controller = _mapping(day_state.get("controller"))
+        return {
+            "power": bool(day_state.get("power")),
+            "controller": controller if day_state.get("power") else {},
+        }
+
     raise ValueError(f"Unbekannter Regelzustand: {name}")
 
 

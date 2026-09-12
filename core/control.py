@@ -194,6 +194,11 @@ def control_device(device, runtime=None):
             if phase < on_t
             else "interval_b"
         )
+        if (
+            bool(params.get("interval_night_enabled"))
+            and get_profile(runtime=rt) == "NACHT"
+        ):
+            state_name = f"{state_name}_night"
 
         apply_device_state(
             device,

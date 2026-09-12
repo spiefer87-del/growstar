@@ -136,6 +136,21 @@ def record_energy_day_reset(
     }
 
 
+def record_energy_total_reset(*, source, scope, now=None):
+    """Persist the latest total-counter reset independently from day resets."""
+    now_dt = _local_datetime(now)
+    rt = get_default_runtime()
+    rt.config["ENERGY_LAST_TOTAL_RESET_AT"] = int(now_dt.timestamp())
+    rt.config["ENERGY_LAST_TOTAL_RESET_SOURCE"] = str(source or "unknown")[:40]
+    rt.config["ENERGY_LAST_TOTAL_RESET_SCOPE"] = str(scope or "controller")[:120]
+    rt.persist_config()
+    return {
+        "at": rt.config["ENERGY_LAST_TOTAL_RESET_AT"],
+        "source": rt.config["ENERGY_LAST_TOTAL_RESET_SOURCE"],
+        "scope": rt.config["ENERGY_LAST_TOTAL_RESET_SCOPE"],
+    }
+
+
 def _relay_value(value):
     if value in (None, ""):
         return None
@@ -947,6 +962,9 @@ def get_energy_settings(*, now=None):
         "last_day_reset_at": rt.config.get("ENERGY_LAST_DAY_RESET_AT"),
         "last_day_reset_source": rt.config.get("ENERGY_LAST_DAY_RESET_SOURCE"),
         "last_day_reset_scope": rt.config.get("ENERGY_LAST_DAY_RESET_SCOPE"),
+        "last_total_reset_at": rt.config.get("ENERGY_LAST_TOTAL_RESET_AT"),
+        "last_total_reset_source": rt.config.get("ENERGY_LAST_TOTAL_RESET_SOURCE"),
+        "last_total_reset_scope": rt.config.get("ENERGY_LAST_TOTAL_RESET_SCOPE"),
         "current_day": day_context["day"],
         "current_day_started_at": day_context["started_at"],
         "next_day_reset_at": day_context["next_reset_at"],

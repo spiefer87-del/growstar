@@ -125,6 +125,20 @@ def main():
             "Teilresets werden protokolliert, unterdrücken aber den globalen Zeitplan nicht",
         )
 
+        total_audit = energy.record_energy_total_reset(
+            source="manual",
+            scope="controller",
+            now=scheduled_reset,
+        )
+        total_settings = energy.get_energy_settings(now=scheduled_reset)
+        require(
+            total_audit["at"] == int(scheduled_reset)
+            and total_settings["last_total_reset_at"] == int(scheduled_reset)
+            and total_settings["last_total_reset_source"] == "manual"
+            and total_settings["last_total_reset_scope"] == "controller",
+            "Gesamt-Reset speichert Datum, Uhrzeit, Auslöser und Umfang separat",
+        )
+
         window = energy._history_window("today", after_midnight)
         require(
             window["start"] == context_after["started_at"],
@@ -150,7 +164,8 @@ def main():
         "Manuelle API-Resets schreiben den Reset-Nachweis",
     )
     for element_id in (
-        "lastResetValue", "lastResetMeta", "energyDayValue", "nextResetValue"
+        "lastResetValue", "lastResetMeta", "lastTotalResetValue",
+        "lastTotalResetMeta", "energyDayValue", "nextResetValue"
     ):
         require(
             f'id="{element_id}"' in settings_template,
@@ -158,8 +173,9 @@ def main():
         )
     require(
         'id="resetBadge"' in overview_template
-        and "current_day_started_at" in overview_template,
-        "Energieübersicht zeigt Reset-Uhrzeit und Beginn des Abrechnungstags",
+        and "current_day_started_at" in overview_template
+        and "last_total_reset_at" in overview_template,
+        "Energieübersicht zeigt Tagesgrenze und letzten Gesamt-Reset",
     )
 
     print("✅ Energie-Tagesreset 05:30 vollständig geprüft")

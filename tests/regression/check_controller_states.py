@@ -9,11 +9,21 @@ for this regression.
 
 from pathlib import Path
 import sys
+import types
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+if "requests" not in sys.modules:
+    requests_stub = types.ModuleType("requests")
+    requests_stub.Timeout = type("Timeout", (Exception,), {})
+    requests_stub.ConnectionError = type("ConnectionError", (Exception,), {})
+    requests_stub.RequestException = type("RequestException", (Exception,), {})
+    requests_stub.get = lambda *args, **kwargs: None
+    requests_stub.post = lambda *args, **kwargs: None
+    sys.modules["requests"] = requests_stub
 
 from core.controller_states import (
     apply_device_state,

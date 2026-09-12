@@ -9,6 +9,7 @@ from services.energy import (
     get_energy_settings,
     get_runtime_energy_snapshot,
     record_energy_day_reset,
+    record_energy_total_reset,
     reset_runtime_today,
     reset_runtime_total,
     reset_today_all_runtimes,
@@ -39,6 +40,11 @@ def _reset_response(runtime, mode, device=None):
         if device:
             scope = f"{scope}/{device}"
         reset_audit = record_energy_day_reset(source="manual", scope=scope)
+    else:
+        scope = runtime.tent_id
+        if device:
+            scope = f"{scope}/{device}"
+        reset_audit = record_energy_total_reset(source="manual", scope=scope)
 
     return jsonify({
         "success": True,
@@ -163,8 +169,17 @@ def register(app):
     @app.route("/api/energy/reset_total_all", methods=["POST"])
     def api_energy_reset_total_all():
         changed = reset_total_all_runtimes()
+        reset_audit = record_energy_total_reset(
+            source="manual",
+            scope="controller",
+        )
         print("🧹 ENERGY: Manueller Total-Reset aller Stationen")
-        return jsonify(success=True, scope="controller", stations=changed)
+        return jsonify(
+            success=True,
+            scope="controller",
+            stations=changed,
+            reset_audit=reset_audit,
+        )
 
     @app.route("/api/energy/reset_today_all", methods=["POST"])
     def api_energy_reset_today_all():
