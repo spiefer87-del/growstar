@@ -741,7 +741,7 @@
 
     async function init(){
         const requestedModule = location.hash.replace(/^#/, "");
-        openConnectionModule(requestedModule || "power");
+        if(requestedModule) openConnectionModule(requestedModule);
         await loadGatewayCatalog();
         await loadStations();
     }

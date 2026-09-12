@@ -337,6 +337,7 @@ h3{
 .hardware-flash{margin:0 0 14px;padding:11px 13px;border-radius:11px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#86efac}
 .hardware-flash.error{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.25);color:#fca5a5}
 .hardware-accordion{display:grid;gap:12px}.hardware-module{border:1px solid rgba(148,163,184,.18);border-radius:16px;background:rgba(30,41,59,.5);overflow:hidden}.hardware-module.open{border-color:rgba(34,197,94,.32);box-shadow:0 10px 28px rgba(0,0,0,.18)}.hardware-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 18px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}.hardware-toggle-copy{display:flex;align-items:flex-start;gap:12px;min-width:0}.hardware-toggle-icon{font-size:1.4rem;line-height:1}.hardware-toggle-title{display:block;font-size:1.02rem;font-weight:850}.hardware-toggle-description{display:block;margin-top:4px;color:var(--muted);font-size:.76rem;line-height:1.4}.hardware-toggle-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}.hardware-count{padding:5px 9px;border-radius:999px;background:rgba(148,163,184,.1);color:#cbd5e1;font-size:.68rem;font-weight:800}.hardware-chevron{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:rgba(148,163,184,.1);color:#cbd5e1;transition:transform .18s ease}.hardware-toggle[aria-expanded="true"] .hardware-chevron{transform:rotate(180deg);background:rgba(34,197,94,.14);color:#86efac}.hardware-panel{padding:0 18px 18px;border-top:1px solid rgba(148,163,184,.12)}.hardware-panel[hidden]{display:none}.hardware-panel>h3:first-child{margin-top:18px}.hardware-status-heading{margin-top:26px}
+.gateway-inventory{grid-column:1/-1;border:1px solid rgba(56,189,248,.2);border-radius:14px;background:rgba(15,23,42,.48);overflow:hidden}.gateway-inventory-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}.gateway-inventory-title{font-weight:820}.gateway-inventory-meta{display:flex;align-items:center;gap:9px;color:var(--muted);font-size:.72rem}.gateway-inventory-toggle[aria-expanded="true"] .hardware-chevron{transform:rotate(180deg);background:rgba(56,189,248,.14);color:#7dd3fc}.gateway-inventory-panel{padding:0 14px 14px;border-top:1px solid rgba(148,163,184,.12)}.gateway-inventory-panel[hidden]{display:none}.gateway-inventory-panel .grid{margin-top:14px}
 
 @media(max-width:600px){
 
@@ -452,6 +453,16 @@ Schreibstatus wird niemals automatisch wiederholt.
 
 </div>
 
+</div>
+
+<div class="gateway-inventory" data-static-gateway-card="true">
+<button id="gateway-inventory-toggle" class="gateway-inventory-toggle" type="button" aria-expanded="false" aria-controls="gateway-inventory-panel">
+<span class="gateway-inventory-title">📡 Gefundene Shelly-Geräte</span>
+<span class="gateway-inventory-meta"><span id="gateway-inventory-count" class="hardware-count">0</span><span class="hardware-chevron" aria-hidden="true">⌄</span></span>
+</button>
+<div id="gateway-inventory-panel" class="gateway-inventory-panel" hidden>
+<div id="discovered-gateway-grid" class="grid"></div>
+</div>
 </div>
 
 </div>
@@ -682,6 +693,8 @@ const hardwareModules = [
     ...hardwareAccordion.querySelectorAll("[data-hardware-module]")
 ];
 const hardwareSensorCounts = {bluetooth:0, mqtt:0, spiderfarmer:0};
+const gatewayInventoryToggle = document.getElementById("gateway-inventory-toggle");
+const gatewayInventoryPanel = document.getElementById("gateway-inventory-panel");
 
 function setHardwareModuleState(module, open){
     const toggle = module.querySelector(".hardware-toggle");
@@ -730,6 +743,12 @@ hardwareAccordion.addEventListener("click", event => {
     }
 
     openHardwareModule(module.id, {updateHash:true});
+});
+
+gatewayInventoryToggle?.addEventListener("click", () => {
+    const open = gatewayInventoryToggle.getAttribute("aria-expanded") !== "true";
+    gatewayInventoryToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    gatewayInventoryPanel.hidden = !open;
 });
 
 function escapeHtml(value){
@@ -1759,6 +1778,11 @@ function renderGateways(gateways){
 
     });
 
+    const discoveredGrid =
+        document.getElementById("discovered-gateway-grid");
+
+    discoveredGrid.innerHTML = "";
+
     gateways.forEach(gateway=>{
 
         const card = document.createElement("a");
@@ -1817,13 +1841,15 @@ function renderGateways(gateways){
 
         `;
 
-        grid.appendChild(
+        discoveredGrid.appendChild(
             card
         );
 
     });
 
     document.getElementById("gateway-count")
+        .textContent = gateways.length;
+    document.getElementById("gateway-inventory-count")
         .textContent = gateways.length;
 
 }
@@ -2226,9 +2252,8 @@ document
     scanVivosunDevices
 );
 
-openHardwareModule(
-    location.hash.replace(/^#/, "") || "new-devices"
-);
+const requestedHardwareModule = location.hash.replace(/^#/, "");
+if(requestedHardwareModule) openHardwareModule(requestedHardwareModule);
 
 loadProvisioningStatus();
 

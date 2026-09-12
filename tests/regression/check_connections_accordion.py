@@ -45,8 +45,9 @@ def main():
         "Das aktuell geöffnete Modul lässt sich wieder vollständig schließen",
     )
     require(
-        'openConnectionModule(requestedModule || "power")' in text,
-        "Stromversorgung öffnet standardmäßig und URL-Anker wählen ihr Zielmodul",
+        'if(requestedModule) openConnectionModule(requestedModule)' in text
+        and 'requestedModule || "power"' not in text,
+        "Normalansicht startet geschlossen; URL-Anker öffnen gezielt ihr Modul",
     )
     require(
         ".connection-panel>.actions{position:sticky" in text,

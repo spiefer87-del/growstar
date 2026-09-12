@@ -68,12 +68,25 @@ def main():
         "Ein geöffnetes Hardware-Modul lässt sich vollständig schließen",
     )
     require(
-        '|| "new-devices"' in text
-        and "location.hash.replace" in text,
-        "Neue Geräte öffnet standardmäßig und URL-Anker werden unterstützt",
+        'if(requestedHardwareModule) openHardwareModule(requestedHardwareModule)' in text
+        and '|| "new-devices"' not in text,
+        "Normalansicht startet geschlossen; URL-Anker öffnen gezielt ihr Modul",
+    )
+    require(
+        'id="gateway-inventory-toggle"' in text
+        and 'aria-expanded="false"' in text
+        and 'id="gateway-inventory-panel" class="gateway-inventory-panel" hidden' in text
+        and 'id="discovered-gateway-grid"' in text,
+        "Gefundene Shelly-Geräte liegen in einem geschlossenen Untermenü",
+    )
+    require(
+        "gatewayInventoryPanel.hidden = !open" in text
+        and 'document.getElementById("gateway-inventory-count")' in text
+        and "discoveredGrid.appendChild" in text,
+        "Shelly-Untermenü ist klappbar, zeigt die Trefferzahl und enthält die Geräte",
     )
 
-    print("✅ HARDWARE.ACCORDION.1 vollständig erfolgreich")
+    print("✅ HARDWARE.ACCORDION.2 vollständig erfolgreich")
 
 
 if __name__ == "__main__":
