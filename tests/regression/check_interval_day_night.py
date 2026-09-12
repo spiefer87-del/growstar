@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression für getrennte Controllerwerte im Tag-/Nacht-Intervall."""
+"""Regression für vollständige Tag-/Nacht-Profile im Intervallmodus."""
 
 from pathlib import Path
 import sys
@@ -34,6 +34,8 @@ def main():
     params = {
         "interval_on": 300,
         "interval_off": 900,
+        "interval_night_on": 120,
+        "interval_night_off": 180,
         "interval_night_enabled": True,
         "control_states": {
             "interval_a": {
@@ -81,7 +83,7 @@ def main():
         "Bestehende Konfigurationen fallen nachts sicher auf ihre Tagwerte zurück",
     )
 
-    power_off = {
+    independent_power = {
         "control_states": {
             "interval_b": {"power": False, "controller": {}},
             "interval_b_night": {
@@ -91,11 +93,27 @@ def main():
         }
     }
     require(
-        resolve_control_state(power_off, "interval_b_night") == {
+        resolve_control_state(independent_power, "interval_b_night") == {
+            "power": True,
+            "controller": {"level": 10},
+        },
+        "Nachtphasen besitzen einen vom Tag unabhängigen Shelly-Zustand",
+    )
+
+    independent_power["control_states"]["interval_b"] = {
+        "power": True,
+        "controller": {"level": 4},
+    }
+    independent_power["control_states"]["interval_b_night"] = {
+        "power": False,
+        "controller": {"level": 10},
+    }
+    require(
+        resolve_control_state(independent_power, "interval_b_night") == {
             "power": False,
             "controller": {},
         },
-        "Shelly-Power der Grundphase bleibt auch nachts autoritativ",
+        "Eine Nachtphase kann unabhängig vom Tag vollständig ausgeschaltet werden",
     )
 
     runtime = object()
@@ -108,18 +126,23 @@ def main():
             patch("core.control.get_device_mode", return_value="INTERVAL"),
             patch("core.control.get_device_params", return_value=params),
             patch("core.control.time.time", return_value=timestamp),
-            patch("core.control.get_profile", return_value=profile),
+            patch("core.control.get_profile", return_value=profile) as profile_lookup,
             patch(
                 "core.control.apply_device_state",
                 side_effect=lambda device, state, **kwargs: applied.append(state),
             ),
         ):
             control.control_device("vent", runtime=runtime)
+        return profile_lookup.called
 
     run(timestamp=100, profile="TAG")
     run(timestamp=100, profile="NACHT")
-    run(timestamp=400, profile="NACHT")
-    run(timestamp=100, profile="NACHT", enabled=False)
+    run(timestamp=200, profile="NACHT")
+    profile_used_while_disabled = run(
+        timestamp=100,
+        profile="NACHT",
+        enabled=False,
+    )
     require(
         applied == [
             resolve_control_state(params, "interval_a"),
@@ -127,7 +150,11 @@ def main():
             resolve_control_state(params, "interval_b_night"),
             resolve_control_state(params, "interval_a"),
         ],
-        "Regelzyklus wählt automatisch Tag A, Nacht A oder Nacht B",
+        "Regelzyklus verwendet für die Nacht eigene Dauerwerte und Zustände",
+    )
+    require(
+        profile_used_while_disabled is False,
+        "Ohne Aktivierung läuft das Intervall vollständig profilunabhängig",
     )
 
     template = (ROOT / "templates/device_control.html").read_text(encoding="utf-8")
@@ -135,19 +162,36 @@ def main():
         'id="interval-night-enabled"',
         'id="interval-a-night-controller"',
         'id="interval-b-night-controller"',
+        'id="interval-a-night-minutes"',
+        'id="interval-b-night-minutes"',
+        'id="interval-a-night-power"',
+        'id="interval-b-night-power"',
+        'id="tag-profile-window"',
+        'id="night-profile-window"',
         "interval_night_enabled:",
+        "interval_night_on:",
+        "interval_night_off:",
         "interval_a_night:",
         "interval_b_night:",
     ):
         require(token in template, f"Intervall-UI enthält {token}")
 
     require(
-        "Dauer und Shelly-Power bleiben unverändert" in template
-        and "Tag-/Nacht-Zeiten dieser Station" in template,
-        "UI erklärt automatische Umschaltung und unveränderte Powerphasen",
+        'class="interval-day-options"' in template
+        and 'classList.toggle("profile-aware", profileAware)' in template
+        and "Profilzeiten dieser Station" in template,
+        "Aktivierung hebt Tag und Nacht samt Zeitfenstern farblich hervor",
     )
 
-    print("✅ INTERVAL.NIGHT.1 vollständig erfolgreich")
+    route_source = (ROOT / "routes/device.py").read_text(encoding="utf-8")
+    require(
+        '"profile_schedule"' in route_source
+        and '"day_start_min"' in route_source
+        and '"night_start_min"' in route_source,
+        "Geräte-API liefert die stationsbezogenen Profilzeiten",
+    )
+
+    print("✅ INTERVAL.NIGHT.2 vollständig erfolgreich")
 
 
 if __name__ == "__main__":

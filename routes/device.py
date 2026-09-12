@@ -163,6 +163,10 @@ def _device_payload(runtime, device):
         "mode": mode,
         "params": params,
         "env_config": env,
+        "profile_schedule": {
+            "day_start_min": int(runtime.config.get("DAY_START_MIN", 0)),
+            "night_start_min": int(runtime.config.get("NIGHT_START_MIN", 0)),
+        },
 
         # Rückwärtskompatibel + explizit diagnostisch.
         "actual_on": runtime_on,

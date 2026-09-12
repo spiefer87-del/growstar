@@ -176,8 +176,16 @@ def control_device(device, runtime=None):
         return
 
     if mode == "INTERVAL":
-        on_t = int(params.get("interval_on", 300))
-        off_t = int(params.get("interval_off", 900))
+        night_profile = (
+            bool(params.get("interval_night_enabled"))
+            and get_profile(runtime=rt) == "NACHT"
+        )
+        if night_profile:
+            on_t = int(params.get("interval_night_on", params.get("interval_on", 300)))
+            off_t = int(params.get("interval_night_off", params.get("interval_off", 900)))
+        else:
+            on_t = int(params.get("interval_on", 300))
+            off_t = int(params.get("interval_off", 900))
 
         cycle = on_t + off_t
         if cycle <= 0:
@@ -194,10 +202,7 @@ def control_device(device, runtime=None):
             if phase < on_t
             else "interval_b"
         )
-        if (
-            bool(params.get("interval_night_enabled"))
-            and get_profile(runtime=rt) == "NACHT"
-        ):
+        if night_profile:
             state_name = f"{state_name}_night"
 
         apply_device_state(
