@@ -5,7 +5,13 @@ import time
 from flask import render_template, request
 
 from core.tents import manager as tent_manager
-from services.grow_events import CATEGORIES, SEVERITIES, event_summary, list_events
+from services.grow_events import (
+    CATEGORIES,
+    SEVERITIES,
+    event_queue_status,
+    event_summary,
+    list_events,
+)
 
 
 RANGES = {
@@ -81,6 +87,7 @@ def register(app):
             selected_range=selected_range,
             page=page,
             last_page=last_page,
+            queue_status=event_queue_status(),
         )
 
 

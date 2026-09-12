@@ -15,6 +15,8 @@ import time
 from urllib.parse import quote
 import re
 
+from services.grow_events import enqueue_event
+
 
 ROOT = Path(__file__).resolve().parent.parent
 CONFIG_FILE = ROOT / "instance" / "growcam.json"
@@ -1031,12 +1033,55 @@ def _render_timelapse_worker(config, options):
         with _config_lock:
             status["last_video"] = output.name
             status["timelapse_error"] = None
+        enqueue_event(
+            station_id=config.get("tent_id"),
+            category="media",
+            event_type="timelapse_video_created",
+            severity="success",
+            title=f"Zeitraffer erstellt: {config.get('name') or camera_id}",
+            summary="Die Zeitrafferbilder wurden erfolgreich zu einem Video verarbeitet.",
+            source="growcam",
+            source_id=camera_id,
+            correlation_id=f"timelapse:{camera_id}:{batch_id}",
+            dedupe_key=f"timelapse-video:{camera_id}:{batch_id}:{output.name}",
+            metadata={
+                "durchgang": batch_id,
+                "bilder": len(list(directory.glob("frame-*.jpg"))),
+                "bildrate": f"{options['video_fps']} Bilder/s",
+                "datei": output.name,
+            },
+        )
     except subprocess.TimeoutExpired:
         with _config_lock:
             status["timelapse_error"] = "Zeitraffer-Erstellung hat nach zehn Minuten nicht geantwortet."
+        enqueue_event(
+            station_id=config.get("tent_id"),
+            category="media",
+            event_type="timelapse_video_failed",
+            severity="warning",
+            title=f"Zeitraffer fehlgeschlagen: {config.get('name') or camera_id}",
+            summary="Die Videoerstellung hat das Zeitlimit überschritten.",
+            source="growcam",
+            source_id=camera_id,
+            correlation_id=f"timelapse:{camera_id}:{batch_id}",
+            dedupe_key=f"timelapse-video-error:{camera_id}:{batch_id}:{stamp}",
+        )
     except Exception as exc:
+        error = str(exc).strip() or type(exc).__name__
         with _config_lock:
-            status["timelapse_error"] = str(exc).strip() or type(exc).__name__
+            status["timelapse_error"] = error
+        enqueue_event(
+            station_id=config.get("tent_id"),
+            category="media",
+            event_type="timelapse_video_failed",
+            severity="warning",
+            title=f"Zeitraffer fehlgeschlagen: {config.get('name') or camera_id}",
+            summary=error,
+            source="growcam",
+            source_id=camera_id,
+            correlation_id=f"timelapse:{camera_id}:{batch_id}",
+            dedupe_key=f"timelapse-video-error:{camera_id}:{batch_id}:{stamp}",
+        )
     finally:
         try:
             if temp_output.is_file():
@@ -1188,12 +1233,54 @@ def _recording_worker(config, batch_id, duration_sec):
                 "created_at": output.stat().st_mtime,
             }
             status["recording_error"] = None
+        enqueue_event(
+            station_id=config.get("tent_id"),
+            category="media",
+            event_type="camera_recording_created",
+            severity="success",
+            title=f"Videoaufnahme gespeichert: {config.get('name') or camera_id}",
+            summary=f"Die {duration_sec} Sekunden lange Aufnahme wurde dem Durchgang zugeordnet.",
+            source="growcam",
+            source_id=camera_id,
+            correlation_id=f"recording:{camera_id}:{batch_id}:{stamp}",
+            dedupe_key=f"camera-recording:{camera_id}:{batch_id}:{output.name}",
+            metadata={
+                "durchgang": batch_id,
+                "dauer": f"{duration_sec} s",
+                "datei": output.name,
+            },
+        )
     except subprocess.TimeoutExpired:
         with _config_lock:
             status["recording_error"] = "Videoaufnahme hat das Zeitlimit überschritten."
+        enqueue_event(
+            station_id=config.get("tent_id"),
+            category="media",
+            event_type="camera_recording_failed",
+            severity="warning",
+            title=f"Videoaufnahme fehlgeschlagen: {config.get('name') or camera_id}",
+            summary="Die Kameraaufnahme hat das Zeitlimit überschritten.",
+            source="growcam",
+            source_id=camera_id,
+            correlation_id=f"recording:{camera_id}:{batch_id}:{stamp}",
+            dedupe_key=f"camera-recording-error:{camera_id}:{batch_id}:{stamp}",
+        )
     except Exception as exc:
+        error = str(exc).strip() or type(exc).__name__
         with _config_lock:
-            status["recording_error"] = str(exc).strip() or type(exc).__name__
+            status["recording_error"] = error
+        enqueue_event(
+            station_id=config.get("tent_id"),
+            category="media",
+            event_type="camera_recording_failed",
+            severity="warning",
+            title=f"Videoaufnahme fehlgeschlagen: {config.get('name') or camera_id}",
+            summary=error,
+            source="growcam",
+            source_id=camera_id,
+            correlation_id=f"recording:{camera_id}:{batch_id}:{stamp}",
+            dedupe_key=f"camera-recording-error:{camera_id}:{batch_id}:{stamp}",
+        )
     finally:
         try:
             if temp_output.is_file():

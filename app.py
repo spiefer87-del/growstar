@@ -44,7 +44,7 @@ from services.restart_policy import apply_shutdown_restart_policy
 from services.notifications import notification_worker_loop
 from services.alerts import alarm_monitor_loop
 from services.growcam import growcam_loop
-from services.grow_events import init_grow_event_db
+from services.grow_events import grow_event_writer_loop, init_grow_event_db
 
 from routes.dashboard import register as register_dashboard_routes
 from routes.plant_management import register as register_plant_management_routes
@@ -290,6 +290,11 @@ def start_backend():
                 notification_worker_loop,
             )
             print("🔔 Notification Worker gestartet")
+
+            _start_daemon_thread(
+                "growstar-events",
+                grow_event_writer_loop,
+            )
 
             _start_daemon_thread(
                 "growstar-watchdog",

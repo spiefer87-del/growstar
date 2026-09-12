@@ -52,6 +52,7 @@ from services.growcam import (
     start_video_recording,
     timelapse_summary,
 )
+from services.grow_events import enqueue_event
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -74,6 +75,12 @@ def _datetime_local_value(value):
     if value in (None, ""):
         return ""
     return datetime.datetime.fromtimestamp(int(value)).astimezone().strftime("%Y-%m-%dT%H:%M")
+
+
+def _datetime_label(value):
+    if value in (None, ""):
+        return "—"
+    return datetime.datetime.fromtimestamp(int(value)).astimezone().strftime("%d.%m.%Y %H:%M")
 
 
 def _audit(action, details=None, *, camera_id="camera_1"):
@@ -229,6 +236,46 @@ def register(app):
                     "end_at": config["timelapse_end_at"],
                 },
                 camera_id=camera_id,
+            )
+            event_type = (
+                "timelapse_plan_activated"
+                if config["timelapse_enabled"] and not current.get("timelapse_enabled")
+                else "timelapse_plan_deactivated"
+                if not config["timelapse_enabled"] and current.get("timelapse_enabled")
+                else "timelapse_plan_updated"
+            )
+            plan_title = (
+                f"Zeitrafferplan aktiv: {config.get('name') or camera_id}"
+                if config["timelapse_enabled"]
+                else f"Zeitrafferplan deaktiviert: {config.get('name') or camera_id}"
+                if current.get("timelapse_enabled")
+                else f"Zeitrafferplan gespeichert: {config.get('name') or camera_id}"
+            )
+            enqueue_event(
+                station_id=config.get("tent_id"),
+                category="media",
+                event_type=event_type,
+                severity="success" if config["timelapse_enabled"] else "info",
+                title=plan_title,
+                summary=(
+                    "Aufnahmezeitraum und feste Bildzeitpunkte wurden gespeichert."
+                    if config["timelapse_enabled"]
+                    else "Die automatische Zeitrafferaufnahme wurde ausgeschaltet."
+                ),
+                source="growcam",
+                source_id=camera_id,
+                correlation_id=f"timelapse:{camera_id}:{config.get('batch_id')}",
+                dedupe_key=(
+                    f"timelapse-plan:{camera_id}:{config.get('batch_id')}:"
+                    f"{int(config['timelapse_enabled'])}:{config.get('timelapse_start_at')}:"
+                    f"{config.get('timelapse_end_at')}:{config.get('timelapse_interval_sec')}"
+                ),
+                metadata={
+                    "durchgang": config.get("batch_id") or "—",
+                    "start": _datetime_label(config.get("timelapse_start_at")),
+                    "letztes_bild": _datetime_label(config.get("timelapse_end_at")),
+                    "intervall": f"{config.get('timelapse_interval_sec')} s",
+                },
             )
             flash("Zeitraffer-Konfiguration wurde gespeichert.", "success")
         except Exception as exc:

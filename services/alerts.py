@@ -18,6 +18,7 @@ from core.runtime import get_runtime
 from core.watchdog_health import build_watchdog_snapshot
 from services.notification_settings import load_notification_settings
 from services.notifications import enqueue_notification
+from services.grow_events import enqueue_event
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -514,6 +515,45 @@ def _append_history(event, record, now):
     del _HISTORY[:-MAX_HISTORY]
 
 
+def _timeline_alarm(record, *, kind, now):
+    rule = str(record.get("rule") or "")
+    if rule in {"sensor_stale", "sensor_limits"}:
+        category = "climate"
+    elif rule == "hardware":
+        category = "device"
+    else:
+        category = "alert"
+
+    first_seen = int(float(record.get("first_seen") or now))
+    correlation_id = f"alarm:{record.get('key')}:{first_seen}"
+    if kind == "opened":
+        title = str(record.get("title") or "Growstar-Warnung")
+        summary = str(record.get("detail") or "")
+        severity = "critical" if record.get("severity") in {"critical", "error"} else "warning"
+        metadata = {"status": "aktiv", "regel": rule}
+    else:
+        title = f"Entwarnung: {record.get('title') or 'Störung behoben'}"
+        duration = max(0, int(now - float(record.get("first_seen") or now)))
+        summary = f"Der zuvor gemeldete Zustand ist nach {_duration_text(duration)} wieder normal."
+        severity = "success"
+        metadata = {"status": "behoben", "dauer_sekunden": duration, "regel": rule}
+
+    enqueue_event(
+        station_id=record.get("station"),
+        occurred_at=int(now),
+        category=category,
+        event_type=f"alarm_{kind}",
+        severity=severity,
+        title=title,
+        summary=summary,
+        source="watchdog",
+        source_id=record.get("key"),
+        correlation_id=correlation_id,
+        dedupe_key=f"{correlation_id}:{kind}",
+        metadata=metadata,
+    )
+
+
 def process_watchdog_snapshot(snapshot, *, now=None):
     global _LAST_CYCLE_AT
 
@@ -545,6 +585,7 @@ def process_watchdog_snapshot(snapshot, *, now=None):
                 }
                 _ACTIVE[key] = record
                 _append_history("opened", record, now)
+                _timeline_alarm(record, kind="opened", now=now)
                 changed = True
 
                 if _notifications_available(settings, record["rule"]):
@@ -595,6 +636,7 @@ def process_watchdog_snapshot(snapshot, *, now=None):
         for key in recovered_keys:
             record = _ACTIVE.pop(key)
             _append_history("recovered", record, now)
+            _timeline_alarm(record, kind="recovered", now=now)
             changed = True
 
             if (

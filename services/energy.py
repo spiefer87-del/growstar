@@ -18,6 +18,7 @@ from copy import deepcopy
 import requests
 
 import core.context as ctx
+from services.grow_events import enqueue_event
 
 from core.hardware_assignments import DEVICE_HARDWARE
 from core.runtime import (
@@ -128,6 +129,24 @@ def record_energy_day_reset(
     rt.config["ENERGY_LAST_DAY_RESET_SOURCE"] = str(source or "unknown")[:40]
     rt.config["ENERGY_LAST_DAY_RESET_SCOPE"] = str(scope or "controller")[:120]
     rt.persist_config()
+    station_id = None if str(scope) == "controller" else str(scope).split("/", 1)[0]
+    enqueue_event(
+        station_id=station_id,
+        occurred_at=int(now_dt.timestamp()),
+        category="energy",
+        event_type="energy_day_reset",
+        severity="success",
+        title=(
+            "Automatischer Energie-Tagesreset"
+            if str(source) == "automatic"
+            else "Energie-Tagesreset durchgeführt"
+        ),
+        summary=f"Tageszähler für {scope} wurden auf den aktuellen Rohzählerstand gesetzt.",
+        source="energy",
+        source_id=str(scope),
+        dedupe_key=f"energy:day:{reset_day}:{source}:{scope}",
+        metadata={"abrechnungstag": reset_day, "ausloeser": source, "umfang": scope},
+    )
     return {
         "day": reset_day,
         "at": rt.config["ENERGY_LAST_DAY_RESET_AT"],
@@ -144,6 +163,21 @@ def record_energy_total_reset(*, source, scope, now=None):
     rt.config["ENERGY_LAST_TOTAL_RESET_SOURCE"] = str(source or "unknown")[:40]
     rt.config["ENERGY_LAST_TOTAL_RESET_SCOPE"] = str(scope or "controller")[:120]
     rt.persist_config()
+    reset_at = int(now_dt.timestamp())
+    station_id = None if str(scope) == "controller" else str(scope).split("/", 1)[0]
+    enqueue_event(
+        station_id=station_id,
+        occurred_at=reset_at,
+        category="energy",
+        event_type="energy_total_reset",
+        severity="warning",
+        title="Energie-Gesamtzähler zurückgesetzt",
+        summary=f"Die Gesamt-Offsets für {scope} wurden manuell neu gesetzt.",
+        source="energy",
+        source_id=str(scope),
+        dedupe_key=f"energy:total:{reset_at}:{source}:{scope}",
+        metadata={"ausloeser": source, "umfang": scope},
+    )
     return {
         "at": rt.config["ENERGY_LAST_TOTAL_RESET_AT"],
         "source": rt.config["ENERGY_LAST_TOTAL_RESET_SOURCE"],

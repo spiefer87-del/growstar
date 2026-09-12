@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import queue
 import sqlite3
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +19,7 @@ CATEGORIES = {
     "plant": {"label": "Pflanzen", "icon": "🌿"},
     "media": {"label": "Medien", "icon": "📷"},
     "alert": {"label": "Warnungen", "icon": "🔔"},
+    "energy": {"label": "Energie", "icon": "⚡"},
     "system": {"label": "System", "icon": "🧠"},
 }
 
@@ -26,6 +29,10 @@ SEVERITIES = {
     "warning": {"label": "Hinweis"},
     "critical": {"label": "Kritisch"},
 }
+
+EVENT_QUEUE_SIZE = 1000
+_EVENT_QUEUE = queue.Queue(maxsize=EVENT_QUEUE_SIZE)
+_DROPPED_EVENTS = 0
 
 
 def _db():
@@ -168,6 +175,67 @@ def record_event(
         connection.close()
 
 
+def enqueue_event(**event):
+    """Übergibt ein Ereignis ohne Wartezeit an den getrennten DB-Writer."""
+    global _DROPPED_EVENTS
+    try:
+        _EVENT_QUEUE.put_nowait(dict(event))
+        return True
+    except queue.Full:
+        _DROPPED_EVENTS += 1
+        if _DROPPED_EVENTS == 1 or _DROPPED_EVENTS % 100 == 0:
+            print(f"⚠️ Grow Intelligence Queue voll · {_DROPPED_EVENTS} Ereignis(se) verworfen")
+        return False
+
+
+def _write_event_safely(event):
+    try:
+        return record_event(**event)
+    except Exception as exc:
+        # Ereignisprotokollierung darf niemals Regelung, Watchdog oder Medien
+        # beeinflussen. Der Fehler bleibt deshalb lokal beim Writer.
+        print("⚠️ Grow Intelligence Ereignis konnte nicht gespeichert werden:", exc)
+        return None
+
+
+def flush_event_queue(*, limit=100):
+    """Schreibt bereits wartende Ereignisse; auch für deterministische Tests."""
+    written = 0
+    for _ in range(max(1, int(limit))):
+        try:
+            event = _EVENT_QUEUE.get_nowait()
+        except queue.Empty:
+            break
+        try:
+            _write_event_safely(event)
+            written += 1
+        finally:
+            _EVENT_QUEUE.task_done()
+    return written
+
+
+def grow_event_writer_loop():
+    print("🧠 Grow Intelligence Event-Writer gestartet")
+    while True:
+        event = _EVENT_QUEUE.get()
+        try:
+            _write_event_safely(event)
+        finally:
+            _EVENT_QUEUE.task_done()
+
+
+def event_queue_status():
+    return {
+        "queued": _EVENT_QUEUE.qsize(),
+        "capacity": EVENT_QUEUE_SIZE,
+        "dropped": _DROPPED_EVENTS,
+        "writer_alive": any(
+            thread.name == "growstar-events" and thread.is_alive()
+            for thread in threading.enumerate()
+        ),
+    }
+
+
 def _where(*, station_id=None, include_global=True, category=None, severity=None, since=None):
     clauses = []
     params = []
@@ -265,6 +333,7 @@ def event_summary(*, station_id=None, include_global=True, since=None):
 
 
 __all__ = (
-    "CATEGORIES", "SEVERITIES", "event_summary", "init_grow_event_db",
-    "list_events", "record_event",
+    "CATEGORIES", "SEVERITIES", "enqueue_event", "event_queue_status",
+    "event_summary", "flush_event_queue", "grow_event_writer_loop",
+    "init_grow_event_db", "list_events", "record_event",
 )

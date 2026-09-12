@@ -7,6 +7,7 @@ import math
 from pathlib import Path
 import tempfile
 import threading
+import time
 
 from core.config import (
     DEFAULT_CONFIG,
@@ -38,12 +39,43 @@ def get_profile(runtime=None):
         profile = "TAG"
 
     if profile != st.current_profile:
+        previous_profile = st.current_profile
         print(
             f"🔄 [{rt.tent_id}] Profilwechsel: "
             f"{st.current_profile} -> {profile} "
             f"({minutes_now()} min)"
         )
         st.current_profile = profile
+        try:
+            from services.grow_events import enqueue_event
+
+            occurred_at = int(time.time())
+            enqueue_event(
+                station_id=rt.tent_id,
+                occurred_at=occurred_at,
+                category="system",
+                event_type="day_night_profile_changed",
+                severity="info",
+                title=f"{'Nacht' if profile == 'NACHT' else 'Tag'}profil aktiv",
+                summary=(
+                    "Growstar hat das aktive Zeitfenster anhand der Stationszeiten gewechselt."
+                    if previous_profile
+                    else "Growstar hat beim Start das aktuell gültige Zeitfenster erkannt."
+                ),
+                source="profile_scheduler",
+                source_id=rt.tent_id,
+                dedupe_key=(
+                    f"profile-window:{rt.tent_id}:{previous_profile or 'start'}:"
+                    f"{profile}:{occurred_at // 60}"
+                ),
+                metadata={
+                    "vorher": previous_profile or "unbekannt",
+                    "aktiv": profile,
+                    "minute_des_tages": now_min,
+                },
+            )
+        except Exception as exc:
+            print("⚠️ Profilwechsel konnte nicht an Grow Intelligence übergeben werden:", exc)
 
     st.live_state["profile"] = profile
 

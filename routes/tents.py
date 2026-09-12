@@ -35,6 +35,7 @@ from core.tents import manager as tent_manager, validate_tent_id
 from core.vpd import vpd_device_context
 from services.live_control import LiveTransitionError, request_live, request_shadow
 from services.spiderfarmer import device as spiderfarmer_device
+from services.grow_events import enqueue_event
 from core.sensor_sources import get_sensor_source
 
 
@@ -692,6 +693,21 @@ def register(app):
                 profile=name,
             ), 404
 
+        occurred_at = int(time.time())
+        enqueue_event(
+            station_id=tent_id,
+            occurred_at=occurred_at,
+            category="system",
+            event_type="grow_profile_applied",
+            severity="success",
+            title=f"Grow-Profil aktiviert: {name}",
+            summary="Die gespeicherten Profilwerte wurden auf diese Station angewendet.",
+            source="profile_manager",
+            source_id=str(name),
+            dedupe_key=f"profile-apply:{tent_id}:{name}:{occurred_at // 60}",
+            metadata={"profil": name},
+        )
+
         return jsonify(_config_payload(runtime))
 
     @app.get("/api/tents/<tent_id>/profiles")
@@ -728,6 +744,20 @@ def register(app):
             ), 500
 
         payload = _profiles_payload(runtime)
+        occurred_at = int(time.time())
+        enqueue_event(
+            station_id=tent_id,
+            occurred_at=occurred_at,
+            category="system",
+            event_type="grow_profile_updated",
+            severity="info",
+            title=f"Grow-Profil bearbeitet: {name}",
+            summary="Profilwerte wurden gespeichert; die laufende Station wurde nicht automatisch umgestellt.",
+            source="profile_manager",
+            source_id=str(name),
+            dedupe_key=f"profile-update:{tent_id}:{name}:{occurred_at}",
+            metadata={"profil": name, "werte": len(saved)},
+        )
         payload.update({
             "saved_profile": name,
             "saved_settings": saved,

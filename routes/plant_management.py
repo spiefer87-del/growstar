@@ -21,6 +21,7 @@ from plant_management.constants import (
     STAGE_LABELS,
     STAGE_COLORS,
     PLANT_STATUSES,
+    PLANT_STATUS_LABELS,
     BATCH_STATUSES,
     PLANT_ROLES,
     PLANT_ROLE_LABELS,
@@ -126,6 +127,7 @@ from services.growcam import (
     list_public_configs as list_growcams,
     public_config as growcam_public_config,
 )
+from services.grow_events import enqueue_event
 
 
 MAX_EXCEL_BYTES = 10 * 1024 * 1024
@@ -162,6 +164,16 @@ def _current_user_identity():
         or f"Benutzer {user.get('id')}"
     )
     return user.get("id"), name
+
+
+def _timeline_timestamp(value=None):
+    try:
+        parsed = datetime.fromisoformat(str(value)) if value else datetime.now().astimezone()
+        if parsed.tzinfo is None:
+            parsed = parsed.astimezone()
+        return int(parsed.timestamp())
+    except (TypeError, ValueError):
+        return int(datetime.now().timestamp())
 
 
 def _system_journal(
@@ -620,6 +632,25 @@ def register(app):
                 plant_id,
                 {"stage": stage},
             )
+            enqueue_event(
+                station_id=None,
+                category="plant",
+                event_type="plant_stage_changed",
+                severity="success",
+                title=f"Pflanzenphase: {plant['display_name']}",
+                summary=f"Die Pflanze befindet sich jetzt in der Phase {STAGE_LABELS.get(stage, stage)}.",
+                source="plant_management",
+                source_id=str(plant_id),
+                dedupe_key=(
+                    f"plant-stage:{plant_id}:{stage}:"
+                    f"{request.form.get('started_on') or datetime.now().date().isoformat()}"
+                ),
+                metadata={
+                    "pflanze": plant.get("code") or plant_id,
+                    "phase": STAGE_LABELS.get(stage, stage),
+                    "durchgang": plant.get("batch_code") or "—",
+                },
+            )
             flash("Phase wurde aktualisiert.", "success")
         else:
             flash("Die Pflanze befindet sich bereits in dieser Phase.", "info")
@@ -696,6 +727,9 @@ def register(app):
     )
     @permission_required("plants.edit")
     def plant_status_change(plant_id):
+        plant = get_plant(plant_id)
+        if not plant:
+            abort(404)
         status = request.form.get("status", "").strip()
         allowed = {item[0] for item in PLANT_STATUSES}
         if status not in allowed:
@@ -708,6 +742,22 @@ def register(app):
             "plant",
             plant_id,
             {"status": status},
+        )
+        enqueue_event(
+            station_id=None,
+            category="plant",
+            event_type="plant_status_changed",
+            severity="info",
+            title=f"Pflanzenstatus: {plant['display_name']}",
+            summary=f"Der Status wurde auf {PLANT_STATUS_LABELS.get(status, status)} gesetzt.",
+            source="plant_management",
+            source_id=str(plant_id),
+            dedupe_key=f"plant-status:{plant_id}:{status}:{_timeline_timestamp() // 60}",
+            metadata={
+                "pflanze": plant.get("code") or plant_id,
+                "status": PLANT_STATUS_LABELS.get(status, status),
+                "durchgang": plant.get("batch_code") or "—",
+            },
         )
         flash("Status wurde aktualisiert.", "success")
         return redirect(url_for("plant_detail", plant_id=plant_id))
@@ -854,6 +904,23 @@ def register(app):
                         "journal_entry_id": entry_id,
                     },
                 )
+                enqueue_event(
+                    station_id=(growcam.get("tent_id") if growcam_camera_id else None),
+                    occurred_at=_timeline_timestamp(photo["captured_at"]),
+                    category="media",
+                    event_type="plant_photo_created",
+                    severity="success",
+                    title=f"Pflanzenfoto gespeichert: {plant['display_name']}",
+                    summary=f"Fotodokumentation in der Phase {photo['stage_label']} wurde angelegt.",
+                    source="plant_management",
+                    source_id=str(photo["id"]),
+                    dedupe_key=f"plant-photo:{photo['id']}",
+                    metadata={
+                        "pflanze": plant.get("code") or plant["id"],
+                        "phase": photo["stage_label"],
+                        "quelle": "GrowCam" if growcam_camera_id else "Upload/Kamera",
+                    },
+                )
                 flash(
                     "Foto wurde verkleinert, gespeichert und im "
                     "Betriebsjournal dokumentiert.",
@@ -958,6 +1025,22 @@ def register(app):
                         "batch_id": batch["id"],
                         "captured_at": photo["captured_at"],
                         "journal_entry_id": entry_id,
+                    },
+                )
+                enqueue_event(
+                    station_id=(growcam.get("tent_id") if growcam_camera_id else None),
+                    occurred_at=_timeline_timestamp(photo["captured_at"]),
+                    category="media",
+                    event_type="batch_photo_created",
+                    severity="success",
+                    title=f"Durchgangsfoto gespeichert: {batch['name']}",
+                    summary="Eine neue Gesamtaufnahme wurde dem Durchgang zugeordnet.",
+                    source="plant_management",
+                    source_id=str(photo["id"]),
+                    dedupe_key=f"batch-photo:{photo['id']}",
+                    metadata={
+                        "durchgang": batch.get("code") or batch["id"],
+                        "quelle": "GrowCam" if growcam_camera_id else "Upload/Kamera",
                     },
                 )
                 flash(
