@@ -236,9 +236,23 @@ def event_queue_status():
     }
 
 
-def _where(*, station_id=None, include_global=True, category=None, severity=None, since=None):
+def _where(
+    *, station_id=None, include_global=True, category=None, severity=None,
+    since=None, include_boot_profile_events=False
+):
     clauses = []
     params = []
+    if not include_boot_profile_events:
+        clauses.append(
+            """NOT (
+                event_type = 'day_night_profile_changed'
+                AND source = 'profile_scheduler'
+                AND (
+                    COALESCE(metadata_json, '') LIKE '%\"vorher\":\"unbekannt\"%'
+                    OR COALESCE(summary, '') LIKE 'Growstar hat beim Start%'
+                )
+            )"""
+        )
     if station_id:
         clauses.append("(station_id = ? OR station_id IS NULL)" if include_global else "station_id = ?")
         params.append(str(station_id))
@@ -278,11 +292,13 @@ def _decorate(row, station_names=None):
 
 def list_events(
     *, station_id=None, include_global=True, category=None, severity=None,
-    since=None, limit=100, offset=0, station_names=None
+    since=None, limit=100, offset=0, station_names=None,
+    include_boot_profile_events=False
 ):
     where, params = _where(
         station_id=station_id, include_global=include_global,
         category=category, severity=severity, since=since,
+        include_boot_profile_events=include_boot_profile_events,
     )
     limit = max(1, min(int(limit), 250))
     offset = max(0, int(offset))
@@ -308,13 +324,14 @@ def list_events(
 
 def analysis_events(
     *, station_id=None, include_global=True, since=None, event_types=None,
-    limit=2000, station_names=None
+    limit=2000, station_names=None, include_boot_profile_events=False
 ):
     """Liefert eine begrenzte, chronologische Datenbasis für Read-only-Analysen."""
     where, params = _where(
         station_id=station_id,
         include_global=include_global,
         since=since,
+        include_boot_profile_events=include_boot_profile_events,
     )
     normalized_types = tuple(
         _text(value, maximum=100).lower()
@@ -338,9 +355,15 @@ def analysis_events(
     return [_decorate(row, station_names) for row in rows]
 
 
-def event_summary(*, station_id=None, include_global=True, since=None):
+def event_summary(
+    *, station_id=None, include_global=True, since=None,
+    include_boot_profile_events=False
+):
     where, params = _where(
-        station_id=station_id, include_global=include_global, since=since
+        station_id=station_id,
+        include_global=include_global,
+        since=since,
+        include_boot_profile_events=include_boot_profile_events,
     )
     connection = _db()
     try:
