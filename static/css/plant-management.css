@@ -1700,6 +1700,57 @@ body {
     margin-top: 16px;
 }
 
+.pm-timelapse-plan,
+.pm-timelapse-archive-settings {
+    display: grid;
+    gap: 14px;
+    padding: 15px;
+    border: 1px solid rgba(56,189,248,.22);
+    border-radius: 14px;
+    background: linear-gradient(145deg, rgba(14,116,144,.12), rgba(11,18,32,.5));
+}
+
+.pm-timelapse-plan-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.pm-timelapse-plan-head > div { display: grid; gap: 4px; }
+.pm-timelapse-plan-head > div > span { color: var(--pm-muted); font-size: .74rem; }
+.pm-timelapse-plan-head > span {
+    flex: 0 0 auto;
+    padding: 5px 8px;
+    border-radius: 999px;
+    color: #a5f3fc;
+    background: rgba(8,145,178,.18);
+    font-size: .68rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.pm-timelapse-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.pm-timelapse-stats > div {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid rgba(148,163,184,.14);
+    border-radius: 10px;
+    background: rgba(2,6,23,.35);
+}
+
+.pm-timelapse-stats span { color: var(--pm-muted); font-size: .68rem; }
+.pm-timelapse-stats strong { font-size: .78rem; overflow-wrap: anywhere; }
+.pm-timelapse-note { margin: 0; color: #bae6fd; font-size: .75rem; line-height: 1.5; }
+.pm-timelapse-archive-settings { border-color: var(--pm-line); background: rgba(11,18,32,.38); }
+
 .pm-growcam-archive {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1776,6 +1827,7 @@ body {
     .pm-media-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .pm-media-grid { grid-template-columns: 1fr; }
     .pm-media-tree > div { align-items: flex-start; flex-direction: column; gap: 3px; }
+    .pm-timelapse-stats { grid-template-columns: 1fr; }
     .pm-media-tree .child { margin-left: 12px; }
 }
 
