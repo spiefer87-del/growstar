@@ -126,6 +126,7 @@ def apply_config_patch(data, runtime=None):
     rt = resolve_runtime(runtime)
     cfg = rt.config
     st = rt.state
+    original = deepcopy(cfg)
     working = deepcopy(cfg)
 
     tracked_keys = {
@@ -193,6 +194,13 @@ def apply_config_patch(data, runtime=None):
         key for key in tracked_keys
         if cfg.get(key, missing) != working.get(key, missing)
     }
+    changed_values = {
+        key: {
+            "before": deepcopy(original.get(key)),
+            "after": deepcopy(working.get(key)),
+        }
+        for key in changed_keys
+    }
 
     # Phase 4V.2: Klima-/Alarmgrenzen werden VOR dem Commit validiert.
     validate_environment_limits(working)
@@ -251,5 +259,6 @@ def apply_config_patch(data, runtime=None):
 
     return {
         "changed_keys": sorted(changed_keys),
+        "changes": changed_values,
         "config": config_snapshot(rt),
     }

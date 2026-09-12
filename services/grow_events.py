@@ -34,6 +34,43 @@ EVENT_QUEUE_SIZE = 1000
 _EVENT_QUEUE = queue.Queue(maxsize=EVENT_QUEUE_SIZE)
 _DROPPED_EVENTS = 0
 
+SETTING_DESCRIPTORS = {
+    "DAY_TEMP": ("Tag-Solltemperatur", "°C"),
+    "NIGHT_TEMP": ("Nacht-Solltemperatur", "°C"),
+    "DAY_HUM": ("Tag-Sollfeuchte", "%"),
+    "NIGHT_HUM": ("Nacht-Sollfeuchte", "%"),
+    "DAY_TEMP_TOL": ("Tag-Temperaturtoleranz", "°C"),
+    "NIGHT_TEMP_TOL": ("Nacht-Temperaturtoleranz", "°C"),
+    "DAY_HUM_TOL": ("Tag-Feuchtetoleranz", "%"),
+    "NIGHT_HUM_TOL": ("Nacht-Feuchtetoleranz", "%"),
+    "MIN_TEMP": ("Absolute Mindesttemperatur", "°C"),
+    "MAX_TEMP": ("Absolute Höchsttemperatur", "°C"),
+    "MIN_HUM": ("Absolute Mindestfeuchte", "%"),
+    "MAX_HUM": ("Absolute Höchstfeuchte", "%"),
+    "DAY_START_MIN": ("Tagbeginn", "time"),
+    "NIGHT_START_MIN": ("Nachtbeginn", "time"),
+    "RAMP_ENABLED": ("Profilrampe", "switch"),
+    "RAMP_DURATION_MIN": ("Rampendauer", "Min."),
+    "LIGHT_SUN_ENABLED": ("Sonnenverlauf", "switch"),
+    "LIGHT_SUNRISE_DURATION_MIN": ("Sonnenaufgang", "Min."),
+    "LIGHT_SUNSET_DURATION_MIN": ("Sonnenuntergang", "Min."),
+    "LIGHT_SUN_MIN_LEVEL": ("Minimale Lichtstufe", "Stufe"),
+    "VPD_TARGET_DAY": ("Tag-VPD-Ziel", "kPa"),
+    "VPD_TOLERANCE_DAY": ("Tag-VPD-Toleranz", "kPa"),
+    "VPD_TARGET_NIGHT": ("Nacht-VPD-Ziel", "kPa"),
+    "VPD_TOLERANCE_NIGHT": ("Nacht-VPD-Toleranz", "kPa"),
+    "VPD_TEMP_MIN_DAY": ("Tag-VPD Temperatur Minimum", "°C"),
+    "VPD_TEMP_MAX_DAY": ("Tag-VPD Temperatur Maximum", "°C"),
+    "VPD_HUM_MIN_DAY": ("Tag-VPD Feuchte Minimum", "%"),
+    "VPD_HUM_MAX_DAY": ("Tag-VPD Feuchte Maximum", "%"),
+    "VPD_TEMP_MIN_NIGHT": ("Nacht-VPD Temperatur Minimum", "°C"),
+    "VPD_TEMP_MAX_NIGHT": ("Nacht-VPD Temperatur Maximum", "°C"),
+    "VPD_HUM_MIN_NIGHT": ("Nacht-VPD Feuchte Minimum", "%"),
+    "VPD_HUM_MAX_NIGHT": ("Nacht-VPD Feuchte Maximum", "%"),
+    "VPD_SECONDARY_PRIORITY_DAY": ("Tag-VPD Priorität 2", "choice"),
+    "VPD_SECONDARY_PRIORITY_NIGHT": ("Nacht-VPD Priorität 2", "choice"),
+}
+
 
 def _db():
     connection = sqlite3.connect(DB_FILE, timeout=10, check_same_thread=False)
@@ -188,6 +225,95 @@ def enqueue_event(**event):
         return False
 
 
+def _setting_value(key, value, unit):
+    if value is None:
+        return "—"
+    if unit == "time":
+        try:
+            minutes = max(0, min(1439, int(value)))
+            return f"{minutes // 60:02d}:{minutes % 60:02d} Uhr"
+        except (TypeError, ValueError):
+            return str(value)
+    if unit == "switch":
+        return "Ein" if bool(value) else "Aus"
+    if unit == "choice":
+        return {
+            "TEMPERATURE": "Temperatur",
+            "HUMIDITY": "Feuchtigkeit",
+        }.get(str(value).upper(), str(value))
+    if isinstance(value, bool):
+        text = "Ja" if value else "Nein"
+    elif isinstance(value, (int, float)):
+        text = f"{float(value):.3f}".rstrip("0").rstrip(".").replace(".", ",")
+    else:
+        text = str(value)
+    return f"{text} {unit}" if unit else text
+
+
+def describe_setting_changes(changes, *, limit=12):
+    """Formatiert ausschließlich freigegebene, nicht geheime Regelwerte."""
+    described = []
+    for key in sorted(changes or {}):
+        descriptor = SETTING_DESCRIPTORS.get(str(key))
+        values = changes.get(key)
+        if not descriptor or not isinstance(values, dict):
+            continue
+        before = values.get("before")
+        after = values.get("after")
+        if before == after:
+            continue
+        label, unit = descriptor
+        before_label = _setting_value(key, before, unit)
+        after_label = _setting_value(key, after, unit)
+        described.append({
+            "key": str(key),
+            "label": label,
+            "before": before_label,
+            "after": after_label,
+            "text": f"{label}: {before_label} → {after_label}",
+        })
+    return described[:max(1, int(limit))]
+
+
+def enqueue_setting_change_event(
+    *, changes, title, source, event_type="settings_updated",
+    station_id=None, source_id=None, summary_suffix=None, metadata=None
+):
+    """Erzeugt genau ein lesbares Ereignis je erfolgreichem Speichervorgang."""
+    described = describe_setting_changes(changes)
+    if not described:
+        return False
+    visible = described[:4]
+    remaining = len(described) - len(visible)
+    summary = "; ".join(item["text"] for item in visible)
+    if remaining:
+        summary += f"; +{remaining} weitere Änderung(en)"
+    summary += "."
+    if summary_suffix:
+        summary += f" {str(summary_suffix).strip()}"
+    event_metadata = dict(metadata or {})
+    event_metadata["geändert"] = len(described)
+    for index, item in enumerate(described[:8], start=1):
+        event_metadata[f"änderung_{index}"] = item["text"]
+    occurred_at = int(time.time())
+    return enqueue_event(
+        station_id=station_id,
+        occurred_at=occurred_at,
+        category="climate",
+        event_type=event_type,
+        severity="info",
+        title=title,
+        summary=summary,
+        source=source,
+        source_id=source_id,
+        dedupe_key=(
+            f"setting-change:{source}:{station_id or 'global'}:"
+            f"{source_id or '-'}:{time.time_ns()}"
+        ),
+        metadata=event_metadata,
+    )
+
+
 def _write_event_safely(event):
     try:
         return record_event(**event)
@@ -245,11 +371,14 @@ def _where(
     if not include_boot_profile_events:
         clauses.append(
             """NOT (
-                event_type = 'day_night_profile_changed'
-                AND source = 'profile_scheduler'
-                AND (
-                    COALESCE(metadata_json, '') LIKE '%\"vorher\":\"unbekannt\"%'
-                    OR COALESCE(summary, '') LIKE 'Growstar hat beim Start%'
+                event_type = 'grow_intelligence_enabled'
+                OR (
+                    event_type = 'day_night_profile_changed'
+                    AND source = 'profile_scheduler'
+                    AND (
+                        COALESCE(metadata_json, '') LIKE '%\"vorher\":\"unbekannt\"%'
+                        OR COALESCE(summary, '') LIKE 'Growstar hat beim Start%'
+                    )
                 )
             )"""
         )
@@ -388,7 +517,8 @@ def event_summary(
 
 
 __all__ = (
-    "CATEGORIES", "SEVERITIES", "analysis_events", "enqueue_event", "event_queue_status",
+    "CATEGORIES", "SEVERITIES", "analysis_events", "describe_setting_changes",
+    "enqueue_event", "enqueue_setting_change_event", "event_queue_status",
     "event_summary", "flush_event_queue", "grow_event_writer_loop",
     "init_grow_event_db", "list_events", "record_event",
 )

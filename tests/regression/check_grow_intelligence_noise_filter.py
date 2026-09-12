@@ -68,8 +68,8 @@ def main():
                 "Timeline blendet nur die Start-Erkennung aus",
             )
             require(
-                grow_events.event_summary(station_id="tent_1", since=0)["total"] == 3,
-                "Kennzahlen ignorieren Start-Rauschen und behalten globale Aktivierung",
+                grow_events.event_summary(station_id="tent_1", since=0)["total"] == 2,
+                "Kennzahlen ignorieren Profil- und technische Starteinträge",
             )
             analysis_ids = {
                 item["id"] for item in grow_events.analysis_events(
@@ -103,7 +103,7 @@ def main():
         "Profilinitialisierung erzeugt künftig kein Ereignis",
     )
     require(
-        "Systemstarts ausgeblendet" in template,
+        "Technische Starteinträge ausgeblendet" in template,
         "Oberfläche erklärt den aktiven Rauschfilter",
     )
 

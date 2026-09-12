@@ -119,9 +119,9 @@ def main():
             )
             summary = grow_events.event_summary(station_id="tent_1", since=100)
             require(
-                summary["total"] == 3
+                summary["total"] == 2
                 and summary["severities"]["warning"] == 1
-                and summary["categories"]["system"] == 2,
+                and summary["categories"]["system"] == 1,
                 "Kennzahlen verwenden denselben Stations- und Zeitraumfilter",
             )
 

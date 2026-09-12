@@ -3,6 +3,7 @@ from flask import jsonify, render_template, request
 from auth.decorators import permission_required
 from core.config_update import apply_config_patch, config_snapshot
 from core.runtime import get_default_runtime
+from services.grow_events import enqueue_setting_change_event
 from services.network import (
     NetworkChangeError,
     connect_wifi,
@@ -177,6 +178,15 @@ def register(app):
             result = apply_config_patch(data, runtime=runtime)
         except (TypeError, ValueError) as exc:
             return jsonify(status="error", error=str(exc)), 400
+
+        enqueue_setting_change_event(
+            station_id=runtime.tent_id,
+            changes=result.get("changes"),
+            title=f"Stationswerte geändert: {runtime.name}",
+            event_type="station_settings_updated",
+            source="station_config",
+            source_id=runtime.tent_id,
+        )
 
         return jsonify({
             "status": "ok",

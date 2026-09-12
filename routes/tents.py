@@ -35,7 +35,7 @@ from core.tents import manager as tent_manager, validate_tent_id
 from core.vpd import vpd_device_context
 from services.live_control import LiveTransitionError, request_live, request_shadow
 from services.spiderfarmer import device as spiderfarmer_device
-from services.grow_events import enqueue_event
+from services.grow_events import enqueue_event, enqueue_setting_change_event
 from core.sensor_sources import get_sensor_source
 
 
@@ -668,6 +668,14 @@ def register(app):
 
         payload = _config_payload(runtime)
         payload["changed_keys"] = result["changed_keys"]
+        enqueue_setting_change_event(
+            station_id=tent_id,
+            changes=result.get("changes"),
+            title=f"Stationswerte geändert: {runtime.name}",
+            event_type="station_settings_updated",
+            source="station_config",
+            source_id=tent_id,
+        )
         return jsonify(payload)
 
     @app.route("/api/tents/<tent_id>/profile/<name>", methods=["POST"])
@@ -725,6 +733,7 @@ def register(app):
             return error
 
         data = request.get_json(silent=True)
+        previous = (profile_catalog().get(name) or {}).copy()
 
         try:
             saved = update_profile(name, data)
@@ -744,19 +753,20 @@ def register(app):
             ), 500
 
         payload = _profiles_payload(runtime)
-        occurred_at = int(time.time())
-        enqueue_event(
-            station_id=tent_id,
-            occurred_at=occurred_at,
-            category="system",
-            event_type="grow_profile_updated",
-            severity="info",
+        profile_changes = {
+            key: {"before": previous.get(key), "after": saved.get(key)}
+            for key in set(previous) | set(saved)
+            if previous.get(key) != saved.get(key)
+        }
+        enqueue_setting_change_event(
+            station_id=None,
+            changes=profile_changes,
             title=f"Grow-Profil bearbeitet: {name}",
-            summary="Profilwerte wurden gespeichert; die laufende Station wurde nicht automatisch umgestellt.",
+            event_type="grow_profile_updated",
             source="profile_manager",
             source_id=str(name),
-            dedupe_key=f"profile-update:{tent_id}:{name}:{occurred_at}",
-            metadata={"profil": name, "werte": len(saved)},
+            summary_suffix="Die laufende Station wurde nicht automatisch umgestellt.",
+            metadata={"profil": name, "bearbeitet_über": tent_id},
         )
         payload.update({
             "saved_profile": name,

@@ -28,7 +28,7 @@ body{margin:0;padding:24px;background:radial-gradient(circle at top left,rgba(34
     <div class="gi-live" aria-label="Status der Ereignisverarbeitung">
         <span class="{% if queue_status.writer_alive %}active{% endif %}">● Event-Writer {{ 'aktiv' if queue_status.writer_alive else 'nicht aktiv' }}</span>
         <span>Warteschlange {{ queue_status.queued }}/{{ queue_status.capacity }}</span>
-        <span>🧹 Systemstarts ausgeblendet</span>
+        <span>🧹 Technische Starteinträge ausgeblendet</span>
         {% if queue_status.dropped %}<span>{{ queue_status.dropped }} verworfen</span>{% endif %}
     </div>
     <div class="gi-sources" aria-label="Erfasste Ereignisquellen">
