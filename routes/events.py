@@ -12,6 +12,7 @@ from services.grow_events import (
     event_summary,
     list_events,
 )
+from services.grow_insights import build_insights
 
 
 RANGES = {
@@ -88,6 +89,11 @@ def register(app):
             page=page,
             last_page=last_page,
             queue_status=event_queue_status(),
+            insights=build_insights(
+                station_id=station_id,
+                since=since,
+                station_names=station_names,
+            ),
         )
 
 

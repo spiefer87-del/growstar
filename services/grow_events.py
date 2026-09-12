@@ -306,6 +306,38 @@ def list_events(
     }
 
 
+def analysis_events(
+    *, station_id=None, include_global=True, since=None, event_types=None,
+    limit=2000, station_names=None
+):
+    """Liefert eine begrenzte, chronologische Datenbasis für Read-only-Analysen."""
+    where, params = _where(
+        station_id=station_id,
+        include_global=include_global,
+        since=since,
+    )
+    normalized_types = tuple(
+        _text(value, maximum=100).lower()
+        for value in (event_types or ())
+        if _text(value, maximum=100)
+    )
+    if normalized_types:
+        placeholders = ",".join("?" for _ in normalized_types)
+        where += f" AND event_type IN ({placeholders})"
+        params.extend(normalized_types)
+    limit = max(1, min(int(limit), 5000))
+    connection = _db()
+    try:
+        rows = connection.execute(
+            f"""SELECT * FROM grow_events WHERE {where}
+            ORDER BY occurred_at DESC, id DESC LIMIT ?""",
+            [*params, limit],
+        ).fetchall()
+    finally:
+        connection.close()
+    return [_decorate(row, station_names) for row in rows]
+
+
 def event_summary(*, station_id=None, include_global=True, since=None):
     where, params = _where(
         station_id=station_id, include_global=include_global, since=since
@@ -333,7 +365,7 @@ def event_summary(*, station_id=None, include_global=True, since=None):
 
 
 __all__ = (
-    "CATEGORIES", "SEVERITIES", "enqueue_event", "event_queue_status",
+    "CATEGORIES", "SEVERITIES", "analysis_events", "enqueue_event", "event_queue_status",
     "event_summary", "flush_event_queue", "grow_event_writer_loop",
     "init_grow_event_db", "list_events", "record_event",
 )
