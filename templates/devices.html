@@ -336,6 +336,7 @@ h3{
 
 .hardware-flash{margin:0 0 14px;padding:11px 13px;border-radius:11px;background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.25);color:#86efac}
 .hardware-flash.error{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.25);color:#fca5a5}
+.hardware-accordion{display:grid;gap:12px}.hardware-module{border:1px solid rgba(148,163,184,.18);border-radius:16px;background:rgba(30,41,59,.5);overflow:hidden}.hardware-module.open{border-color:rgba(34,197,94,.32);box-shadow:0 10px 28px rgba(0,0,0,.18)}.hardware-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:17px 18px;border:0;background:transparent;color:var(--text);font:inherit;text-align:left;cursor:pointer}.hardware-toggle-copy{display:flex;align-items:flex-start;gap:12px;min-width:0}.hardware-toggle-icon{font-size:1.4rem;line-height:1}.hardware-toggle-title{display:block;font-size:1.02rem;font-weight:850}.hardware-toggle-description{display:block;margin-top:4px;color:var(--muted);font-size:.76rem;line-height:1.4}.hardware-toggle-side{display:flex;align-items:center;gap:10px;flex:0 0 auto}.hardware-count{padding:5px 9px;border-radius:999px;background:rgba(148,163,184,.1);color:#cbd5e1;font-size:.68rem;font-weight:800}.hardware-chevron{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:9px;background:rgba(148,163,184,.1);color:#cbd5e1;transition:transform .18s ease}.hardware-toggle[aria-expanded="true"] .hardware-chevron{transform:rotate(180deg);background:rgba(34,197,94,.14);color:#86efac}.hardware-panel{padding:0 18px 18px;border-top:1px solid rgba(148,163,184,.12)}.hardware-panel[hidden]{display:none}.hardware-panel>h3:first-child{margin-top:18px}.hardware-status-heading{margin-top:26px}
 
 @media(max-width:600px){
 
@@ -344,6 +345,10 @@ h3{
         padding:12px;
 
     }
+
+    .hardware-toggle{padding:14px}
+    .hardware-toggle-description{font-size:.72rem}
+    .hardware-panel{padding:0 12px 14px}
 
 }
 
@@ -368,7 +373,15 @@ h3{
 {% for category, message in messages %}<div class="hardware-flash {{ category }}">{{ message }}</div>{% endfor %}
 {% endwith %}
 
-<h3>Gateways</h3>
+<div class="hardware-accordion" id="hardware-accordion">
+<section class="hardware-module" id="hardware-new-devices" data-hardware-module="new-devices">
+<button class="hardware-toggle" type="button" aria-expanded="false" aria-controls="hardware-new-devices-panel">
+<span class="hardware-toggle-copy"><span class="hardware-toggle-icon">✨</span><span><span class="hardware-toggle-title">Neue Geräte</span><span class="hardware-toggle-description">LAN-Gateways, neue Shellys und VIVOSUN-Sensoren suchen.</span></span></span>
+<span class="hardware-toggle-side"><span class="hardware-count">SUCHEN</span><span class="hardware-chevron" aria-hidden="true">⌄</span></span>
+</button>
+<div class="hardware-panel" id="hardware-new-devices-panel" hidden>
+
+<h3>Gateways und neue Shellys</h3>
 
 <div class="grid" id="gateway-grid">
 
@@ -496,7 +509,17 @@ Bluetooth-Verbindung direkt aus den Advertisements.
 
 </div>
 
+</div>
+</section>
 
+
+
+<section class="hardware-module" id="hardware-sensors" data-hardware-module="sensors">
+<button class="hardware-toggle" type="button" aria-expanded="false" aria-controls="hardware-sensors-panel">
+<span class="hardware-toggle-copy"><span class="hardware-toggle-icon">🌡️</span><span><span class="hardware-toggle-title">Sensoren</span><span class="hardware-toggle-description">Bluetooth-, MQTT- und Spider-Farmer-Sensorquellen prüfen.</span></span></span>
+<span class="hardware-toggle-side"><span id="hardware-sensor-count" class="hardware-count">0</span><span class="hardware-chevron" aria-hidden="true">⌄</span></span>
+</button>
+<div class="hardware-panel" id="hardware-sensors-panel" hidden>
 
 <h3>Bluetooth Geräte</h3>
 
@@ -525,8 +548,16 @@ id="spiderfarmer-sensor-grid">
 
 </div>
 
+</div>
+</section>
 
-<h3>Aktoren</h3>
+
+<section class="hardware-module" id="hardware-actuators" data-hardware-module="actuators">
+<button class="hardware-toggle" type="button" aria-expanded="false" aria-controls="hardware-actuators-panel">
+<span class="hardware-toggle-copy"><span class="hardware-toggle-icon">🔌</span><span><span class="hardware-toggle-title">Aktoren</span><span class="hardware-toggle-description">Zugeordnete Shelly-Ausgänge, Relais und Betriebszustände prüfen.</span></span></span>
+<span class="hardware-toggle-side"><span id="hardware-actuator-module-count" class="hardware-count">0</span><span class="hardware-chevron" aria-hidden="true">⌄</span></span>
+</button>
+<div class="hardware-panel" id="hardware-actuators-panel" hidden>
 
 <div
 class="grid"
@@ -534,9 +565,13 @@ id="actuator-grid">
 
 </div>
 
+</div>
+</section>
+</div>
 
 
-<h3>Hardware Status</h3>
+
+<h3 class="hardware-status-heading">Hardware Status</h3>
 
 <div class="grid">
 
@@ -641,6 +676,61 @@ Hardware Manager
 
 
 <script>
+
+const hardwareAccordion = document.getElementById("hardware-accordion");
+const hardwareModules = [
+    ...hardwareAccordion.querySelectorAll("[data-hardware-module]")
+];
+const hardwareSensorCounts = {bluetooth:0, mqtt:0, spiderfarmer:0};
+
+function setHardwareModuleState(module, open){
+    const toggle = module.querySelector(".hardware-toggle");
+    const panel = document.getElementById(toggle.getAttribute("aria-controls"));
+    module.classList.toggle("open", open);
+    toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    panel.hidden = !open;
+}
+
+function openHardwareModule(target, {updateHash=false}={}){
+    const module = hardwareModules.find(item =>
+        item.id === target || item.dataset.hardwareModule === target
+    );
+    if(!module) return;
+
+    hardwareModules.forEach(item => {
+        setHardwareModuleState(item, item === module);
+    });
+
+    if(updateHash){
+        const url = new URL(location.href);
+        url.hash = module.id;
+        history.replaceState(null, "", url);
+    }
+}
+
+function updateHardwareSensorCount(){
+    const total = Object.values(hardwareSensorCounts)
+        .reduce((sum, value) => sum + Number(value || 0), 0);
+    document.getElementById("hardware-sensor-count").textContent = total;
+}
+
+hardwareAccordion.addEventListener("click", event => {
+    const toggle = event.target.closest(".hardware-toggle");
+    if(!toggle) return;
+
+    const module = toggle.closest("[data-hardware-module]");
+    const wasOpen = toggle.getAttribute("aria-expanded") === "true";
+
+    if(wasOpen){
+        setHardwareModuleState(module, false);
+        const url = new URL(location.href);
+        url.hash = "";
+        history.replaceState(null, "", url);
+        return;
+    }
+
+    openHardwareModule(module.id, {updateHash:true});
+});
 
 function escapeHtml(value){
 
@@ -1856,6 +1946,8 @@ function renderDevices(devices){
 
     document.getElementById("device-count")
         .textContent = devices.length;
+    hardwareSensorCounts.bluetooth = devices.length;
+    updateHardwareSensorCount();
 
 }
 
@@ -1951,6 +2043,8 @@ function renderMqttDevices(devices){
 
     document.getElementById("mqtt-device-count")
         .textContent = devices.length;
+    hardwareSensorCounts.mqtt = devices.length;
+    updateHardwareSensorCount();
 
 }
 
@@ -1961,6 +2055,8 @@ function renderSpiderFarmerSensors(devices){
         document.getElementById("spiderfarmer-sensor-grid");
 
     grid.innerHTML = "";
+    hardwareSensorCounts.spiderfarmer = devices.length;
+    updateHardwareSensorCount();
 
     if(devices.length === 0){
 
@@ -2102,6 +2198,8 @@ function renderActuators(actuators){
 
     document.getElementById("actuator-count")
         .textContent = actuators.length;
+    document.getElementById("hardware-actuator-module-count")
+        .textContent = actuators.length;
 
 }
 
@@ -2126,6 +2224,10 @@ document
 ?.addEventListener(
     "click",
     scanVivosunDevices
+);
+
+openHardwareModule(
+    location.hash.replace(/^#/, "") || "new-devices"
 );
 
 loadProvisioningStatus();

@@ -11,6 +11,7 @@ Read-only:
 from __future__ import annotations
 
 import ast
+import importlib
 import importlib.util
 from pathlib import Path
 import sys
@@ -696,13 +697,7 @@ def main():
         "Hardware-UI bietet den BLE-RPC-Preflight ausschließlich für neue Kandidaten an",
     )
 
-    release_spec = importlib.util.spec_from_file_location(
-        "growstar_phase4w_release_test",
-        ROOT / "core/release.py",
-    )
-    release = importlib.util.module_from_spec(release_spec)
-    sys.modules[release_spec.name] = release
-    release_spec.loader.exec_module(release)
+    release = importlib.import_module("core.release")
 
     feature_release = next(
         (
