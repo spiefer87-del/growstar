@@ -24,7 +24,7 @@ def main():
         "Profilverwaltung trennt klassische und VPD-Regelung in zwei Reiter",
     )
     require(
-        profiles.count("data-profile-accordion") >= 5
+        profiles.count("data-profile-accordion") >= 6
         and "setupProfileAccordions()" in profiles
         and "closeProfileAccordions(opening ? card : null)" in profiles,
         "Profilbereiche starten als Klappmenüs und lassen nur einen Bereich offen",
@@ -55,6 +55,31 @@ def main():
         and "VPD_CONTROL_MODE" in settings
         and "LIGHT_SUN_ENABLED" in settings,
         "Bestehende Klima-, VPD- und Sonnenverlauf-Felder bleiben erhalten",
+    )
+    for page_name, source in (("Profilverwaltung", profiles), ("Klima & Grenzwerte", settings)):
+        require(
+            source.count('id="RAMP_ENABLED"') == 1
+            and source.count('id="RAMP_DURATION_MIN"') == 1,
+            f"{page_name} enthält die Rampenfelder genau einmal",
+        )
+        require(
+            source.index('data-accordion-title="💧 Luftfeuchtigkeit"')
+            < source.index('data-accordion-title="⏱️ Temperaturrampe"')
+            < source.index('data-accordion-title="☀️ Sonnenverlauf"'),
+            f"{page_name} ordnet die Temperaturrampe zwischen Luftfeuchtigkeit und Sonnenverlauf ein",
+        )
+    require(
+        'data-profile-panel="shared" data-accordion-title="⏱️ Temperaturrampe"' in profiles,
+        "Profilrampe bleibt in klassischer und VPD-Ansicht erreichbar",
+    )
+    require(
+        'id="vpd-ramp-settings" class="card" data-settings-accordion' in settings
+        and 'class="card vpd-ramp-settings"' not in settings,
+        "Temperaturrampe verwendet auf Klima & Grenzwerte das normale Kategorie-Layout",
+    )
+    require(
+        'rampHeading.querySelector(".accordion-title")' in settings,
+        "Dynamische Rampenbezeichnung erhält Pfeil und Bedienbarkeit des Klappmenüs",
     )
 
     print("✅ UI.PROFILE-ACCORDION.1 vollständig erfolgreich")

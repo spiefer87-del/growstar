@@ -101,20 +101,6 @@ button:disabled{opacity:.48;cursor:not-allowed}
     border-color:rgba(167,139,250,.28);
     color:#ddd6fe;
 }
-.vpd-ramp-settings{
-    margin:0;
-    padding:16px 14px 8px;
-    border-radius:14px;
-    background:linear-gradient(145deg,rgba(14,116,144,.13),rgba(15,23,42,.82));
-    border:1px solid rgba(56,189,248,.28);
-}
-.vpd-ramp-settings h3{
-    margin:0 0 8px;
-    text-align:center;
-    color:#bae6fd;
-    font-size:.88rem;
-}
-.vpd-ramp-settings .info{margin:8px 0 12px}
 .vpd-phase-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:14px 0}
 .vpd-phase{padding:13px 9px 5px;border-radius:13px;background:linear-gradient(145deg,rgba(15,23,42,.88),rgba(30,41,59,.72));border:1px solid var(--border)}
 .vpd-phase.day{border-color:rgba(250,204,21,.25)}
@@ -317,31 +303,6 @@ button:disabled{opacity:.48;cursor:not-allowed}
             </div>
         </div>
 
-        <section id="vpd-ramp-settings" class="card vpd-ramp-settings" aria-labelledby="vpd-ramp-heading" data-settings-accordion data-accordion-title="⏱️ Profilrampe">
-            <h3 id="vpd-ramp-heading">⏱️ Eigene VPD-Rampe</h3>
-            <div class="info help-copy">
-                Diese Rampe ist vollständig von Helligkeitssensor und Sonnenverlauf
-                unabhängig. Morgens startet sie bei <strong>Tag Start</strong>, abends
-                endet sie bei <strong>Nacht Start</strong>. Die Lichtfunktion besitzt
-                weiterhin ihren eigenen Schalter und eigene Dimmzeiten.
-            </div>
-            <div class="row-inline">
-                <div class="field">
-                    <label id="ramp-enabled-label" for="RAMP_ENABLED">VPD-Rampe aktiv</label>
-                    <input type="checkbox" id="RAMP_ENABLED">
-                </div>
-                <div class="field">
-                    <label for="RAMP_DURATION_MIN">Rampenzeit (min)</label>
-                    <div class="num-control">
-                        <button type="button" onclick="step('RAMP_DURATION_MIN',-5)">−</button>
-                        <input type="number" step="5" id="RAMP_DURATION_MIN" class="compact-input">
-                        <button type="button" onclick="step('RAMP_DURATION_MIN',5)">+</button>
-                    </div>
-                </div>
-            </div>
-            <div id="vpd-ramp-preview" class="preview"></div>
-        </section>
-
         <div class="card" data-settings-panel="classic" data-settings-accordion data-accordion-title="🌡️ Temperatur">
             <h2>🌡️ Temperatur</h2>
 
@@ -514,6 +475,31 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 Feuchteregelung arbeitet weiterhin mit Sollwert ± Regel-Toleranz.
             </div>
             <div id="hum-preview" class="preview"></div>
+        </div>
+
+        <div id="vpd-ramp-settings" class="card" data-settings-accordion data-accordion-title="⏱️ Temperaturrampe">
+            <h2 id="vpd-ramp-heading">⏱️ Temperaturrampe</h2>
+            <div class="info help-copy">
+                Beim klassischen Betrieb wechselt der Temperatur-Sollwert gleitend
+                zwischen Tag und Nacht. In der intelligenten VPD-Regelung werden
+                zusätzlich VPD-Ziel, Toleranz und Klimafenster gleitend überführt.
+                Die Rampe arbeitet unabhängig vom Sonnenverlauf des Lichts.
+            </div>
+            <div class="row-inline">
+                <div class="field">
+                    <label id="ramp-enabled-label" for="RAMP_ENABLED">Temperatur-Rampe aktiv</label>
+                    <input type="checkbox" id="RAMP_ENABLED">
+                </div>
+                <div class="field">
+                    <label for="RAMP_DURATION_MIN">Rampenzeit (min)</label>
+                    <div class="num-control">
+                        <button type="button" onclick="step('RAMP_DURATION_MIN',-5)">−</button>
+                        <input type="number" step="5" id="RAMP_DURATION_MIN" class="compact-input">
+                        <button type="button" onclick="step('RAMP_DURATION_MIN',5)">+</button>
+                    </div>
+                </div>
+            </div>
+            <div id="vpd-ramp-preview" class="preview"></div>
         </div>
 
         <div class="card" id="vpd-control-card" data-settings-panel="vpd" data-settings-accordion data-accordion-title="🧠 Intelligente VPD-Steuerung" hidden>
@@ -1071,7 +1057,8 @@ function updateVpdModeUi(){
 
     const rampHeading = el("vpd-ramp-heading");
     if(rampHeading){
-        rampHeading.textContent = mode === "OFF"
+        const rampTitle = rampHeading.querySelector(".accordion-title") || rampHeading;
+        rampTitle.textContent = mode === "OFF"
             ? "⏱️ Klassische Temperatur-Rampe"
             : mode === "MONITOR"
                 ? "⏱️ VPD-Rampe beobachten"
