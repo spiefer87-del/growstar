@@ -12,7 +12,7 @@ from services.grow_events import (
     event_summary,
     list_events,
 )
-from services.grow_insights import build_insights
+from services.grow_insights import build_device_activity, build_insights
 
 
 RANGES = {
@@ -73,6 +73,16 @@ def register(app):
                 station_names=station_names,
             )
 
+        show_device_activity = (
+            selected_category in {"all", "device"}
+            and selected_severity in {"all", "info"}
+        )
+        device_activity = build_device_activity(
+            station_id=station_id,
+            since=since,
+            station_names=station_names,
+        )
+
         return render_template(
             "grow_events.html",
             events=result["items"],
@@ -89,10 +99,13 @@ def register(app):
             page=page,
             last_page=last_page,
             queue_status=event_queue_status(),
+            device_activity=device_activity,
+            show_device_activity=show_device_activity,
             insights=build_insights(
                 station_id=station_id,
                 since=since,
                 station_names=station_names,
+                device_activity=device_activity,
             ),
         )
 
