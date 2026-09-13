@@ -1,10 +1,52 @@
 # core/actuators.py
 
 import requests
+import time
 
 import core.context as ctx
 
 from core.runtime import resolve_runtime
+
+
+def _enqueue_actuator_transition(runtime, device, enabled, reason=""):
+    """Protokolliert nur einen tatsaechlich angenommenen Relaiswechsel."""
+    try:
+        from core.devices import get_device_label, get_device_mode
+        from services.grow_events import enqueue_event
+
+        label = get_device_label(device, runtime=runtime)
+        state_label = "eingeschaltet" if enabled else "ausgeschaltet"
+        clean_reason = " ".join(str(reason or "").strip(" ()").split())[:300]
+        mode = get_device_mode(device, runtime=runtime)
+        summary = (
+            f"Growstar hat {label} {state_label}."
+            + (f" Grund: {clean_reason}." if clean_reason else "")
+        )
+        occurred_at = int(time.time())
+        enqueue_event(
+            station_id=runtime.tent_id,
+            occurred_at=occurred_at,
+            category="device",
+            event_type="actuator_power_changed",
+            severity="info",
+            title=f"{label} {state_label}",
+            summary=summary,
+            source="actuator_control",
+            source_id=str(device),
+            dedupe_key=(
+                f"actuator:{runtime.tent_id}:{device}:"
+                f"{'on' if enabled else 'off'}:{time.time_ns()}"
+            ),
+            metadata={
+                "geraet": str(device),
+                "zustand": "EIN" if enabled else "AUS",
+                "modus": mode,
+                "grund": clean_reason or None,
+            },
+        )
+    except Exception as exc:
+        # Die Timeline darf einen erfolgreichen Hardwarepfad nie beeinflussen.
+        print("⚠️ Aktorwechsel konnte nicht an Grow Intelligence übergeben werden:", exc)
 
 
 def _request_error(stage, exc, timeout):
@@ -263,6 +305,7 @@ def _set_shelly_device(
     setattr(st, state_attr, enabled)
     st.live_state[live_key] = enabled
     print((on_text if enabled else off_text) + reason + f" [{rt.tent_id}]")
+    _enqueue_actuator_transition(rt, live_key, bool(enabled), reason)
 
 
 def set_heating(enabled, reason="", runtime=None):

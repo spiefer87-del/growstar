@@ -1,4 +1,5 @@
 from copy import deepcopy
+import time
 
 from flask import jsonify, request
 
@@ -11,9 +12,11 @@ from core.controller_setpoints import (
     normalize_controller_setpoints,
     stored_controller_setpoints,
 )
+from core.controller_states import resolve_control_state
 from core.devices import (
     DeviceHardwareRequiredError,
     get_device_env_config,
+    get_device_label,
     get_device_mode,
     get_device_params,
     update_device_config,
@@ -26,6 +29,27 @@ from core.safety import get_runtime_safety_snapshot
 from core.tents import manager as tent_manager, validate_tent_id
 from core.vpd import vpd_device_context
 from services.spiderfarmer_commands import send_controller_setpoints
+from services.grow_events import enqueue_event
+
+
+_DEVICE_STATE_LABELS = {
+    "on": "Dauerbetrieb",
+    "time": "Zeitsteuerung",
+    "env": "ENV",
+    "env_standby": "ENV-Standby",
+    "interval_a": "Phase A · Tag",
+    "interval_b": "Phase B · Tag",
+    "interval_a_night": "Phase A · Nacht",
+    "interval_b_night": "Phase B · Nacht",
+}
+
+_DEVICE_MODE_LABELS = {
+    "OFF": "Deaktiviert",
+    "ON": "Dauerbetrieb",
+    "TIME": "Zeitsteuerung",
+    "INTERVAL": "Intervall",
+    "ENV": "Umweltregelung",
+}
 
 
 class VpdDeviceLockedError(RuntimeError):
@@ -230,6 +254,152 @@ def _normalize_device_update(runtime, device, data):
     return working
 
 
+def _device_setting_snapshot(runtime, device, schema=None):
+    """Normalisierte, freigegebene Gerätewerte für einen sicheren Diff."""
+    params = deepcopy(get_device_params(device, runtime=runtime))
+    env = deepcopy(get_device_env_config(device, runtime=runtime))
+    schema = schema if isinstance(schema, dict) else {}
+    values = {}
+
+    def add(key, label, value, kind="value", unit=""):
+        values[key] = {
+            "label": label,
+            "value": deepcopy(value),
+            "kind": kind,
+            "unit": unit,
+        }
+
+    add("mode", "Betriebsmodus", get_device_mode(device, runtime=runtime), "mode")
+    add("start_min", "Startzeit", int(params.get("start_min", 0) or 0), "time")
+    add("end_min", "Endzeit", int(params.get("end_min", 0) or 0), "time")
+    add("interval_on", "Phase A · Dauer", int(params.get("interval_on", 300) or 0), "duration")
+    add("interval_off", "Phase B · Dauer", int(params.get("interval_off", 900) or 0), "duration")
+    add(
+        "interval_night_enabled",
+        "Eigenes Nachtprofil",
+        bool(params.get("interval_night_enabled", False)),
+        "switch",
+    )
+    add(
+        "interval_night_on",
+        "Phase A · Nacht · Dauer",
+        int(params.get("interval_night_on", params.get("interval_on", 300)) or 0),
+        "duration",
+    )
+    add(
+        "interval_night_off",
+        "Phase B · Nacht · Dauer",
+        int(params.get("interval_night_off", params.get("interval_off", 900)) or 0),
+        "duration",
+    )
+
+    for state_name, state_label in _DEVICE_STATE_LABELS.items():
+        state = resolve_control_state(params, state_name)
+        add(
+            f"state.{state_name}.power",
+            f"{state_label} · Shelly-Power",
+            bool(state.get("power")),
+            "switch",
+        )
+        controller = state.get("controller") or {}
+        for setting_name, spec in schema.items():
+            add(
+                f"state.{state_name}.controller.{setting_name}",
+                f"{state_label} · {spec.get('label') or setting_name}",
+                controller.get(setting_name),
+                "value",
+                str(spec.get("unit") or ""),
+            )
+
+    add("env.use_temp", "Temperatur auswerten", bool(env.get("use_temp", False)), "switch")
+    add("env.use_hum", "Feuchte auswerten", bool(env.get("use_hum", False)), "switch")
+    add("env.logic", "ENV-Verknüpfung", str(env.get("logic", "OR") or "OR"), "choice")
+    add("env.direction", "ENV-Richtung", str(env.get("direction", "HIGH") or "HIGH"), "choice")
+    add("env.standby_enabled", "ENV-Standby", bool(env.get("standby_enabled", False)), "switch")
+    return values
+
+
+def _format_device_setting(item):
+    value = item.get("value")
+    kind = item.get("kind")
+    if value is None:
+        return "—"
+    if kind == "mode":
+        return _DEVICE_MODE_LABELS.get(str(value).upper(), str(value))
+    if kind == "time":
+        minutes = max(0, min(1439, int(value)))
+        return f"{minutes // 60:02d}:{minutes % 60:02d} Uhr"
+    if kind == "duration":
+        minutes = float(value) / 60.0
+        text = f"{minutes:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+        return f"{text} Min."
+    if kind == "switch":
+        return "Ein" if bool(value) else "Aus"
+    if kind == "choice":
+        return {
+            "OR": "ODER",
+            "AND": "UND",
+            "HIGH": "oberhalb des Sollwerts",
+            "LOW": "unterhalb des Sollwerts",
+        }.get(str(value).upper(), str(value))
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        text = f"{float(value):.3f}".rstrip("0").rstrip(".").replace(".", ",")
+    else:
+        text = str(value)
+    unit = str(item.get("unit") or "")
+    return f"{text} {unit}" if unit else text
+
+
+def _enqueue_device_setting_change(runtime, device, before, after, payload=None):
+    """Ein Speichervorgang ergibt höchstens eine kompakte Timeline-Karte."""
+    changes = []
+    for key in sorted(set(before) | set(after)):
+        previous = before.get(key) or {}
+        current = after.get(key) or {}
+        if previous.get("value") == current.get("value"):
+            continue
+        descriptor = current or previous
+        changes.append(
+            f"{descriptor.get('label') or key}: "
+            f"{_format_device_setting(previous)} → "
+            f"{_format_device_setting(current)}"
+        )
+
+    if not changes:
+        return False
+
+    visible = changes[:4]
+    summary = "; ".join(visible)
+    if len(changes) > len(visible):
+        summary += f"; +{len(changes) - len(visible)} weitere Änderung(en)"
+    summary += "."
+
+    label = get_device_label(device, runtime=runtime)
+    metadata = {"gerät": device, "geändert": len(changes)}
+    for index, change in enumerate(changes[:8], start=1):
+        metadata[f"änderung_{index}"] = change
+    apply_status = ((payload or {}).get("controller_apply") or {}).get("status")
+    if apply_status:
+        metadata["controller_status"] = apply_status
+
+    occurred_at = int(time.time())
+    return enqueue_event(
+        station_id=runtime.tent_id,
+        occurred_at=occurred_at,
+        category="device",
+        event_type="device_settings_updated",
+        severity="info",
+        title=f"Geräteeinstellungen geändert: {label}",
+        summary=summary,
+        source="device_config",
+        source_id=device,
+        dedupe_key=(
+            f"device-setting:{runtime.tent_id}:{device}:{time.time_ns()}"
+        ),
+        metadata=metadata,
+    )
+
+
 def _save_device(runtime, device, data):
     vpd_context = vpd_device_context(device, runtime=runtime)
     if vpd_context.get("locked"):
@@ -246,6 +416,13 @@ def _save_device(runtime, device, data):
         if isinstance(data, dict)
         and isinstance(data.get("controller_setpoints"), dict)
         else None
+    )
+
+    schema = (_controller_context(runtime, device).get("schema") or {})
+    settings_before = _device_setting_snapshot(
+        runtime,
+        device,
+        schema=schema,
     )
 
     changed = update_device_config(
@@ -301,6 +478,23 @@ def _save_device(runtime, device, data):
                     "status": "bridge_error",
                     "message": str(exc),
                 }
+
+    settings_after = _device_setting_snapshot(
+        runtime,
+        device,
+        schema=schema,
+    )
+    try:
+        _enqueue_device_setting_change(
+            runtime,
+            device,
+            settings_before,
+            settings_after,
+            payload,
+        )
+    except Exception as exc:
+        # Konfigurationsspeicherung bleibt unabhängig von der Timeline.
+        print("⚠️ Geräteänderung konnte nicht an Grow Intelligence übergeben werden:", exc)
 
     return payload
 
