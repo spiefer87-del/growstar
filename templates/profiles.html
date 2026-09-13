@@ -58,13 +58,34 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .lighting-duration{margin:4px auto 0;padding:10px 12px;max-width:360px;text-align:center;border-radius:11px;background:rgba(250,204,21,.07);border:1px solid rgba(250,204,21,.22);color:#fde68a;font-size:.8rem}
 .feedback{min-height:20px;margin:10px 0 0;text-align:center;font-size:.78rem;color:var(--muted)}
 .feedback.ok{color:#86efac}.feedback.err{color:#fca5a5}.feedback.dirty{color:#fde68a}
-.actions{position:sticky;bottom:10px;z-index:5;margin-top:16px;text-align:center;border-color:rgba(56,189,248,.3)}
+.actions{position:static;margin-top:16px;text-align:center;border-color:rgba(56,189,248,.3)}
 .action-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .save-button{background:var(--green);color:#052e16;min-width:150px}
 .activate-button{background:var(--blue);color:#082f49;min-width:150px}
 .discard-button{background:#334155}
 .separate-note{margin:12px auto 0;max-width:580px;color:var(--muted);font-size:.72rem;line-height:1.45}
-@media(max-width:620px){body{padding:13px}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.vpd-phase-grid{grid-template-columns:1fr}.actions{position:static}.copy-button{min-width:0;width:100%}}
+.profile-mode-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:6px;border:1px solid var(--border);border-radius:14px;background:rgba(15,23,42,.72)}
+.profile-mode-tab{min-height:46px;border:1px solid transparent;border-radius:10px;background:transparent;color:var(--muted);font-size:.82rem}
+.profile-mode-tab.active{border-color:rgba(56,189,248,.34);background:linear-gradient(145deg,rgba(14,165,233,.23),rgba(30,41,59,.78));color:#e0f2fe}
+[data-profile-panel][hidden]{display:none!important}
+.accordion-card{padding:0;overflow:hidden}
+.accordion-header{display:flex;align-items:center;border-bottom:1px solid transparent}.accordion-card.open .accordion-header{border-bottom-color:var(--border)}
+.accordion-head{display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:16px 18px;background:transparent;border:0;border-radius:0;text-align:left}
+.accordion-head:hover{background:rgba(51,65,85,.42)}
+.accordion-title{flex:1;color:#e2e8f0;font-size:.92rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.accordion-chevron{color:var(--muted);font-size:1.05rem;transition:transform .18s ease}
+.accordion-head[aria-expanded="true"] .accordion-chevron{transform:rotate(180deg)}
+.accordion-body{padding:3px 18px 18px;border-top:1px solid var(--border)}
+.accordion-body[hidden]{display:none}
+.info-trigger{display:inline-flex;align-items:center;justify-content:center;width:31px;height:31px;padding:0;border:1px solid rgba(56,189,248,.34);border-radius:50%;background:rgba(14,165,233,.1);color:#bae6fd;font-size:.88rem}
+.accordion-header .info-trigger{flex:0 0 31px;margin-right:14px}
+.profile-help-row{display:flex;justify-content:center;margin-top:10px}
+.help-copy{display:none!important}
+.help-modal{position:fixed;inset:0;z-index:1300;display:none;align-items:flex-end;justify-content:center;padding:18px;background:rgba(2,6,23,.82)}
+.help-modal.open{display:flex}
+.help-dialog{width:min(520px,100%);max-height:76vh;overflow:auto;padding:20px;border:1px solid rgba(56,189,248,.3);border-radius:18px;background:#172235;box-shadow:0 22px 60px rgba(0,0,0,.5)}
+.help-dialog-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}.help-dialog-head h2{flex:1;margin:0;text-align:left}.help-close{width:38px;height:38px;padding:0;font-size:1.2rem}.help-dialog-content{color:#cbd5e1;font-size:.84rem;line-height:1.6}
+@media(max-width:620px){body{padding:13px}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.vpd-phase-grid{grid-template-columns:1fr}.actions{position:static}.copy-button{min-width:0;width:100%}.accordion-head{padding:14px}.accordion-body{padding:3px 14px 15px}}
 </style>
 {% endblock %}
 {% block page %}
@@ -82,7 +103,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
     </div>
 
     <div class="grid">
-        <div class="card">
+        <div class="card" id="profile-selection-card" data-accordion-title="Profilauswahl">
             <h2>Profil auswählen</h2>
             <div id="profile-list" class="profile-list"></div>
             <div class="status-grid">
@@ -105,18 +126,29 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 >
                     Aktuelle Werte aus {{ tent_name }} übernehmen
                 </button>
-                <div class="hint">
+                <div class="hint help-copy">
                     Kopiert die gespeicherten Stationswerte nur in den Entwurf
                     des ausgewählten Profils. Erst „Profil speichern“ ändert die Vorlage.
                 </div>
             </div>
-            <div class="info warning">
+            <div class="info warning help-copy">
                 Profilvorlagen gelten controllerweit und stehen allen Stationen zur Verfügung.
                 „Profil aktivieren“ wirkt dagegen ausschließlich auf {{ tent_name }}.
+            </div>
+            <div class="profile-help-row">
+                <button type="button" class="info-trigger" aria-label="Hilfe zur Profilauswahl" onclick="openProfileHelp(el('profile-selection-card'))">i</button>
             </div>
         </div>
 
         <div class="card">
+            <h2>Regelung bearbeiten</h2>
+            <div class="profile-mode-tabs" role="tablist" aria-label="Profil-Regelung auswählen">
+                <button type="button" class="profile-mode-tab active" data-profile-tab="classic" role="tab" aria-selected="true">🌡️ Klassische Regelung</button>
+                <button type="button" class="profile-mode-tab" data-profile-tab="vpd" role="tab" aria-selected="false">🧠 VPD-Regelung</button>
+            </div>
+        </div>
+
+        <div class="card" data-profile-accordion data-profile-panel="shared" data-accordion-title="⏰ Zeiten">
             <h2>⏰ Zeiten</h2>
             <div class="row-inline">
                 <div class="field">
@@ -133,7 +165,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
             </div>
         </div>
 
-        <div class="card">
+        <div class="card" data-profile-accordion data-profile-panel="classic" data-accordion-title="🌡️ Temperatur">
             <h2>🌡️ Temperatur</h2>
             <div class="row-inline">
                 <div class="field">
@@ -174,7 +206,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <div id="temp-preview" class="preview"></div>
         </div>
 
-        <div class="card">
+        <div class="card" data-profile-accordion data-profile-panel="classic" data-accordion-title="💧 Luftfeuchtigkeit">
             <h2>💧 Luftfeuchtigkeit</h2>
             <div class="row-inline">
                 <div class="field">
@@ -215,14 +247,14 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <div id="hum-preview" class="preview"></div>
         </div>
 
-        <div class="card">
+        <div class="card" data-profile-accordion data-profile-panel="vpd" data-accordion-title="🧠 VPD-Ziel & Klimaziele" data-help-target="profile-vpd-help">
             <h2>🧠 VPD-Ziel &amp; Klimaziele</h2>
-            <div class="info">
+            <div class="info help-copy" id="profile-vpd-help">
                 Diese Werte gehören zur Profilvorlage. Ob Growstar sie nur
                 <strong>beobachtet</strong> oder <strong>automatisch regelt</strong>,
                 bleibt eine stationsbezogene Sicherheitsentscheidung unter Klima &amp; Grenzwerte.
             </div>
-            <div class="info">
+            <div class="info help-copy">
                 Temperatur-Ziel ± Range und Feuchte-Ziel ± Range definieren den
                 bevorzugten Klimapunkt und zugleich seine verbindlichen Grenzen.
                 VPD bleibt immer Priorität 1. Mit Priorität 2 legst du fest, welcher
@@ -373,7 +405,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
             </div>
             <section id="profile-vpd-ramp-settings" class="vpd-ramp-settings" aria-labelledby="profile-vpd-ramp-heading">
                 <h3 id="profile-vpd-ramp-heading">⏱️ Eigene VPD-Rampe</h3>
-                <div class="info">
+                <div class="info help-copy">
                     Funktioniert unabhängig von Helligkeitssensor und Sonnenverlauf.
                     Sie beginnt morgens bei <strong>Tag Start</strong> und endet abends
                     bei <strong>Nacht Start</strong>. Im VPD-Automatikmodus werden Ziel,
@@ -398,7 +430,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <div id="vpd-profile-preview" class="preview"></div>
         </div>
 
-        <div class="card" id="profile-light-sun-card">
+        <div class="card" id="profile-light-sun-card" data-profile-accordion data-profile-panel="classic" data-accordion-title="☀️ Sonnenverlauf" data-help-target="profile-light-help">
             <h2>☀️ Sonnenaufgang & Sonnenuntergang</h2>
             <div class="row-inline">
                 <div class="field">
@@ -432,7 +464,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
             </div>
             <div id="light-sun-preview" class="preview"></div>
             <div id="profile-light-sun-note" class="info"></div>
-            <div class="hint">
+            <div class="hint help-copy" id="profile-light-help">
                 Tag Start beginnt den Sonnenaufgang. Nacht Start beendet den
                 Sonnenuntergang und schaltet das Licht aus.
             </div>
@@ -457,6 +489,16 @@ button:disabled{opacity:.48;cursor:not-allowed}
             in {{ tent_name }} und setzt eine laufende Rampe zurück.
         </div>
     </div>
+</div>
+
+<div id="profile-help-modal" class="help-modal" aria-hidden="true">
+    <section class="help-dialog" role="dialog" aria-modal="true" aria-labelledby="profile-help-title">
+        <div class="help-dialog-head">
+            <h2 id="profile-help-title">Hilfe</h2>
+            <button type="button" class="help-close" aria-label="Hilfe schließen">×</button>
+        </div>
+        <div id="profile-help-content" class="help-dialog-content"></div>
+    </section>
 </div>
 
 <script>
@@ -503,6 +545,95 @@ function el(id){ return document.getElementById(id); }
 function num(id){ return Number(el(id)?.value); }
 function profileLabel(name){
     return PROFILE_LABELS[name] || String(name || "--");
+}
+
+function closeProfileAccordions(except=null){
+    document.querySelectorAll("[data-profile-accordion]").forEach(card=>{
+        if(card === except) return;
+        card.classList.remove("open");
+        card.querySelector(".accordion-head")?.setAttribute("aria-expanded","false");
+        const body = card.querySelector(".accordion-body");
+        if(body) body.hidden = true;
+    });
+}
+
+function openProfileHelp(card){
+    const modal = el("profile-help-modal");
+    const content = el("profile-help-content");
+    const title = el("profile-help-title");
+    const copies = Array.from(card.querySelectorAll(".help-copy"));
+    title.textContent = `Hilfe · ${card.dataset.accordionTitle || "Profile"}`;
+    content.innerHTML = copies.length
+        ? copies.map(copy=>`<div>${copy.innerHTML}</div>`).join("<hr>")
+        : "Für diesen Bereich ist keine zusätzliche Hilfe hinterlegt.";
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden","false");
+    modal.querySelector(".help-close")?.focus();
+}
+
+function closeProfileHelp(){
+    const modal = el("profile-help-modal");
+    modal.classList.remove("open");
+    modal.setAttribute("aria-hidden","true");
+}
+
+function setupProfileAccordions(){
+    document.querySelectorAll("[data-profile-accordion]").forEach((card,index)=>{
+        const heading = card.querySelector(":scope > h2");
+        if(!heading) return;
+        const title = card.dataset.accordionTitle || heading.textContent.trim();
+        const panelId = `profile-accordion-${index}`;
+        const body = document.createElement("div");
+        body.className = "accordion-body";
+        body.id = panelId;
+        body.hidden = true;
+        while(heading.nextSibling) body.appendChild(heading.nextSibling);
+
+        const header = document.createElement("div");
+        header.className = "accordion-header";
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "accordion-head";
+        toggle.setAttribute("aria-expanded","false");
+        toggle.setAttribute("aria-controls",panelId);
+        toggle.innerHTML = `<span class="accordion-title">${title}</span><span class="accordion-chevron" aria-hidden="true">⌄</span>`;
+        toggle.addEventListener("click",()=>{
+            const opening = body.hidden;
+            closeProfileAccordions(opening ? card : null);
+            body.hidden = !opening;
+            card.classList.toggle("open",opening);
+            toggle.setAttribute("aria-expanded",opening ? "true" : "false");
+        });
+        header.appendChild(toggle);
+
+        if(card.querySelector(".help-copy")){
+            const help = document.createElement("button");
+            help.type = "button";
+            help.className = "info-trigger";
+            help.setAttribute("aria-label",`Hilfe zu ${title}`);
+            help.textContent = "i";
+            help.addEventListener("click",()=>openProfileHelp(card));
+            header.appendChild(help);
+        }
+
+        heading.remove();
+        card.classList.add("accordion-card");
+        card.prepend(body);
+        card.prepend(header);
+    });
+}
+
+function selectProfileSection(section){
+    if(!["classic","vpd"].includes(section)) return;
+    closeProfileAccordions();
+    document.querySelectorAll("[data-profile-panel]").forEach(panel=>{
+        panel.hidden = !["shared",section].includes(panel.dataset.profilePanel);
+    });
+    document.querySelectorAll("[data-profile-tab]").forEach(button=>{
+        const selected = button.dataset.profileTab === section;
+        button.classList.toggle("active",selected);
+        button.setAttribute("aria-selected",selected ? "true" : "false");
+    });
 }
 
 function orderedProfileNames(){
@@ -1084,12 +1215,27 @@ document.querySelectorAll("input,select").forEach(input=>{
     });
 });
 
+document.querySelectorAll("[data-profile-tab]").forEach(button=>{
+    button.addEventListener("click",()=>selectProfileSection(button.dataset.profileTab));
+});
+
+el("profile-help-modal")?.addEventListener("click",event=>{
+    if(event.target === event.currentTarget || event.target.closest(".help-close")){
+        closeProfileHelp();
+    }
+});
+document.addEventListener("keydown",event=>{
+    if(event.key === "Escape") closeProfileHelp();
+});
+
 window.addEventListener("beforeunload",event=>{
     if(!dirty) return;
     event.preventDefault();
     event.returnValue = "";
 });
 
+setupProfileAccordions();
+selectProfileSection("classic");
 loadProfiles();
 </script>
 {% endblock %}
