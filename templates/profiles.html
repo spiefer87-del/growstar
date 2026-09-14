@@ -42,6 +42,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .status-item strong{font-size:.9rem}
 .copy-current{margin-top:13px;text-align:center}
 .copy-button{background:#a78bfa;color:#2e1065;min-width:240px}
+.profile-selection-actions{display:flex;justify-content:center;margin-top:13px}.profile-selection-actions .activate-button{min-width:220px}
 .hint,.info{color:var(--muted);font-size:.76rem;line-height:1.5;text-align:center}
 .info{margin:10px 0 0;padding:11px 12px;border-radius:11px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);color:#bae6fd}
 .warning{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.26);color:#fde68a}
@@ -113,6 +114,12 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     <strong id="editing-profile-label">--</strong>
                 </div>
             </div>
+            <div class="profile-selection-actions">
+                <button id="activate-profile-button" type="button" class="activate-button" onclick="activateProfile()" disabled>
+                    Profil aktivieren
+                </button>
+            </div>
+            <div id="profile-feedback" class="feedback" aria-live="polite"></div>
             <div class="copy-current">
                 <button
                     id="copy-current-button"
@@ -477,11 +484,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <button id="discard-profile-button" type="button" class="discard-button" onclick="discardChanges()" disabled>
                 Änderungen verwerfen
             </button>
-            <button id="activate-profile-button" type="button" class="activate-button" onclick="activateProfile()" disabled>
-                Profil aktivieren
-            </button>
         </div>
-        <div id="profile-feedback" class="feedback"></div>
         <div class="separate-note">
             Speichern ändert nur die Profilvorlage. Erst „Profil aktivieren“ übernimmt deren gespeicherte Werte
             in {{ tent_name }} und setzt eine laufende Rampe zurück.
@@ -933,16 +936,21 @@ function fillEditor(profile,{markDirty=false}={}){
 function selectProfile(name){
     if(name === selectedProfile) return;
     if(dirty){
-        feedback(
-            "Bitte das bearbeitete Profil zuerst speichern oder die Änderungen verwerfen.",
-            "err"
+        const discard = confirm(
+            `Ungespeicherte Änderungen an ${profileLabel(selectedProfile)} verwerfen ` +
+            `und ${profileLabel(name)} öffnen?`
         );
-        return;
+        if(!discard){
+            feedback("Profilwechsel abgebrochen. Der aktuelle Entwurf bleibt erhalten.","dirty");
+            return;
+        }
     }
 
     selectedProfile = name;
+    dirty = false;
     renderProfileButtons();
     fillEditor(catalog[name]);
+    feedback(`${profileLabel(name)} ist ausgewählt und kann jetzt aktiviert werden.`);
 }
 
 function discardChanges(){
@@ -1143,11 +1151,12 @@ async function activateProfile(){
     );
     if(!confirmed) return;
 
+    const targetProfile = selectedProfile;
     setRequestInFlight(true);
-    feedback("Profil wird aktiviert …");
+    feedback(`${profileLabel(targetProfile)} wird aktiviert …`);
 
     try{
-        const response = await fetch(PROFILE_ACTIVATE_URL(selectedProfile),{
+        const response = await fetch(PROFILE_ACTIVATE_URL(targetProfile),{
             method:"POST"
         });
         const payload = await response.json().catch(()=>({}));
@@ -1157,13 +1166,22 @@ async function activateProfile(){
             return;
         }
 
-        activeProfile = payload.active_profile || selectedProfile;
+        if(payload.active_profile !== targetProfile){
+            feedback(
+                `Growstar hat ${profileLabel(targetProfile)} nicht als aktives Profil bestätigt. ` +
+                "Bitte Seite neu laden und den Vorgang erneut versuchen.",
+                "err"
+            );
+            return;
+        }
+
+        activeProfile = payload.active_profile;
         lightSunAvailable = payload.light_sun_available ?? lightSunAvailable;
         lightSunUnavailableReason =
             payload.light_sun_unavailable_reason || lightSunUnavailableReason;
         renderProfileButtons();
         updatePreview();
-        feedback(`${profileLabel(selectedProfile)} ist jetzt in ${TENT_NAME} aktiv.`,"ok");
+        feedback(`${profileLabel(targetProfile)} ist jetzt in ${TENT_NAME} aktiv.`,"ok");
     }catch(error){
         feedback("Profil konnte nicht aktiviert werden: Growstar ist nicht erreichbar.","err");
     }finally{

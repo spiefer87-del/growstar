@@ -108,7 +108,8 @@ def check_ui_contract():
     )
     require(
         "selectProfile(name)" in profiles
-        and "PROFILE_ACTIVATE_URL(selectedProfile)" in profiles
+        and "const targetProfile = selectedProfile;" in profiles
+        and "PROFILE_ACTIVATE_URL(targetProfile)" in profiles
         and "button.addEventListener(\"click\",()=>selectProfile(name))" in profiles,
         "Profilauswahl öffnet nur den Editor und aktiviert nicht automatisch",
     )
