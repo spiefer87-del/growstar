@@ -43,6 +43,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .copy-current{margin-top:13px;text-align:center}
 .copy-button{background:#a78bfa;color:#2e1065;min-width:240px}
 .profile-selection-actions{display:flex;justify-content:center;margin-top:13px}.profile-selection-actions .activate-button{min-width:220px}
+.profile-controller-link{margin:8px 0 0;text-align:center}.profile-controller-link[hidden]{display:none}.profile-controller-link a{display:inline-flex;padding:8px 13px;border:1px solid rgba(245,158,11,.35);border-radius:999px;background:rgba(245,158,11,.08);color:#fde68a;text-decoration:none;font-size:.75rem;font-weight:800}
 .hint,.info{color:var(--muted);font-size:.76rem;line-height:1.5;text-align:center}
 .info{margin:10px 0 0;padding:11px 12px;border-radius:11px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);color:#bae6fd}
 .warning{background:rgba(245,158,11,.07);border-color:rgba(245,158,11,.26);color:#fde68a}
@@ -120,6 +121,9 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 </button>
             </div>
             <div id="profile-feedback" class="feedback" aria-live="polite"></div>
+            <div id="profile-controller-link" class="profile-controller-link" hidden>
+                <a href="{{ url_for('grow_control_connections') }}">🔗 Controller-Zuordnung öffnen</a>
+            </div>
             <div class="copy-current">
                 <button
                     id="copy-current-button"
@@ -879,10 +883,11 @@ function syncActionState(){
     el("discard-profile-button").disabled = requestInFlight || unavailable || !dirty;
     el("copy-current-button").disabled = requestInFlight || unavailable;
     el("activate-profile-button").disabled =
-        requestInFlight || unavailable || dirty || activationBlocked;
+        requestInFlight || unavailable || dirty;
     el("activate-profile-button").title = activationBlocked
         ? lightSunUnavailableReason
         : "";
+    el("profile-controller-link").hidden = !activationBlocked;
 }
 
 function renderProfileButtons(){
@@ -950,7 +955,15 @@ function selectProfile(name){
     dirty = false;
     renderProfileButtons();
     fillEditor(catalog[name]);
-    feedback(`${profileLabel(name)} ist ausgewählt und kann jetzt aktiviert werden.`);
+    if(savedProfileNeedsLightController()){
+        feedback(
+            `${profileLabel(name)} verwendet den Sonnenverlauf und benötigt vor der Aktivierung ` +
+            `einen Licht-Controller: ${lightSunUnavailableReason}`,
+            "err"
+        );
+    }else{
+        feedback(`${profileLabel(name)} ist ausgewählt und kann jetzt aktiviert werden.`);
+    }
 }
 
 function discardChanges(){

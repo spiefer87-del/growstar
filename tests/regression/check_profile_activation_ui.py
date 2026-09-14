@@ -49,6 +49,18 @@ def main():
         and 'el("activate-profile-button")?.addEventListener("click",activateProfile);' in template,
         "Aktivierung verwendet einen zuverlässig registrierten Event-Listener",
     )
+    require(
+        "requestInFlight || unavailable || dirty;" in template
+        and "requestInFlight || unavailable || dirty || activationBlocked" not in template
+        and 'id="profile-controller-link"' in template
+        and "grow_control_connections" in template,
+        "Fehlende Licht-Zuordnung bleibt erklärbar anklickbar und führt direkt zur Lösung",
+    )
+    require(
+        "verwendet den Sonnenverlauf und benötigt vor der Aktivierung" in template
+        and "if(savedProfileNeedsLightController())" in template,
+        "Die Profilauswahl überschreibt den echten Sperrgrund nicht mehr mit einer Erfolgsmeldung",
+    )
     activation_function = template[
         template.index("async function activateProfile()"):
         template.index("async function loadProfiles()")
