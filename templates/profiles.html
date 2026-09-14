@@ -115,7 +115,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 </div>
             </div>
             <div class="profile-selection-actions">
-                <button id="activate-profile-button" type="button" class="activate-button" onclick="activateProfile()" disabled>
+                <button id="activate-profile-button" type="button" class="activate-button" disabled>
                     Profil aktivieren
                 </button>
             </div>
@@ -1140,17 +1140,6 @@ async function activateProfile(){
         return;
     }
 
-    const reapply = selectedProfile === activeProfile;
-    const confirmed = confirm(
-        `${profileLabel(selectedProfile)} ${reapply ? "erneut anwenden" : "aktivieren"}?\n\n` +
-        "• Die gespeicherten Profilwerte werden in diese Station übernommen.\n" +
-        "• Temperatur-Rampe und Sonnenverlauf werden mit übernommen.\n" +
-        "• VPD-Ziele, Klimaziele, Ranges und Priorität 2 für Tag/Nacht werden mit übernommen.\n" +
-        "• Eine laufende Rampe wird beendet.\n" +
-        "• Die Profilvorlage selbst wird dabei nicht verändert."
-    );
-    if(!confirmed) return;
-
     const targetProfile = selectedProfile;
     setRequestInFlight(true);
     feedback(`${profileLabel(targetProfile)} wird aktiviert …`);
@@ -1234,6 +1223,8 @@ document.querySelectorAll("input,select").forEach(input=>{
 document.querySelectorAll("[data-profile-tab]").forEach(button=>{
     button.addEventListener("click",()=>selectProfileSection(button.dataset.profileTab));
 });
+
+el("activate-profile-button")?.addEventListener("click",activateProfile);
 
 el("profile-help-modal")?.addEventListener("click",event=>{
     if(event.target === event.currentTarget || event.target.closest(".help-close")){

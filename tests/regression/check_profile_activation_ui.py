@@ -44,8 +44,20 @@ def main():
     )
     require(
         "PROFILE_ACTIVATE_URL(targetProfile)" in template
-        and "renderProfileButtons();" in template,
-        "Bestätigte Aktivierung aktualisiert Profilmarkierung und Statusanzeige",
+        and "renderProfileButtons();" in template
+        and 'id="activate-profile-button" type="button" class="activate-button" disabled' in template
+        and 'el("activate-profile-button")?.addEventListener("click",activateProfile);' in template,
+        "Aktivierung verwendet einen zuverlässig registrierten Event-Listener",
+    )
+    activation_function = template[
+        template.index("async function activateProfile()"):
+        template.index("async function loadProfiles()")
+    ]
+    require(
+        "confirm(" not in activation_function
+        and "Profil wird aktiviert" not in activation_function
+        and "wird aktiviert …" in activation_function,
+        "Der bewusste Auswahl-plus-Aktivieren-Weg startet ohne blockierenden Browserdialog",
     )
 
     print("✅ PROFILE.ACTIVATION-UI.1 vollständig erfolgreich")
