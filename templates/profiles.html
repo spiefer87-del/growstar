@@ -14,6 +14,7 @@ body{margin:0;padding:18px;background:var(--bg);color:var(--text);font-family:sy
 .nav a{color:var(--muted);text-decoration:none;font-size:.86rem}
 h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
 .subtitle{text-align:center;color:var(--muted);font-size:.8rem;margin-bottom:20px;line-height:1.5}
+.profile-station-switch{display:flex;align-items:center;gap:10px;margin:0 auto 16px;padding:11px 13px;max-width:430px;border:1px solid var(--border);border-radius:14px;background:rgba(30,41,59,.78)}.profile-station-switch label{color:var(--muted);font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.profile-station-switch select{flex:1;min-width:0;height:42px;padding:7px 34px 7px 11px;border:1px solid #475569;border-radius:10px;background:#0f172a;color:var(--text);font:inherit;font-weight:750}.profile-station-switch select:disabled{opacity:.55}
 .grid{display:grid;gap:16px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .card h2{margin:0 0 12px;text-align:center;font-size:1rem;color:#cbd5e1;text-transform:uppercase;letter-spacing:.04em}
@@ -99,6 +100,13 @@ button:disabled{opacity:.48;cursor:not-allowed}
     <div class="subtitle">
         Profile vorbereiten und speichern, ohne das laufende Profil zu verändern.
         Aktiviert wird erst über eine eigene, bestätigte Aktion.
+    </div>
+
+    <div class="profile-station-switch">
+        <label for="profile-tent-switcher">Station</label>
+        <select id="profile-tent-switcher" aria-label="Grow-Station für die Profilverwaltung wechseln">
+            <option value="{{ tent_id }}">{{ tent_name }}</option>
+        </select>
     </div>
 
     <div class="grid">
@@ -514,6 +522,8 @@ const PROFILE_SAVE_URL = name =>
     `/api/tents/${encodeURIComponent(TENT_ID)}/profiles/${encodeURIComponent(name)}`;
 const PROFILE_ACTIVATE_URL = name =>
     `/api/tents/${encodeURIComponent(TENT_ID)}/profile/${encodeURIComponent(name)}`;
+const TENT_LIST_URL = "/api/tents";
+const PROFILE_PAGE_TEMPLATE = {{ url_for('grow_control_tent_profiles', tent_id='__TENT_ID__')|tojson }};
 
 const PROFILE_LABELS = {
     veg: "Vegetation",
@@ -550,6 +560,53 @@ function el(id){ return document.getElementById(id); }
 function num(id){ return Number(el(id)?.value); }
 function profileLabel(name){
     return PROFILE_LABELS[name] || String(name || "--");
+}
+
+function profilePageUrl(tentId){
+    return PROFILE_PAGE_TEMPLATE.replace("__TENT_ID__",encodeURIComponent(tentId));
+}
+
+async function loadProfileTentSwitcher(){
+    const select = el("profile-tent-switcher");
+    if(!select) return;
+
+    try{
+        const response = await fetch(TENT_LIST_URL,{cache:"no-store"});
+        if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const tents = Array.isArray(payload.tents) ? payload.tents : [];
+        select.innerHTML = "";
+        tents.forEach(tent=>{
+            if(!tent?.id) return;
+            const option = document.createElement("option");
+            option.value = tent.id;
+            const mode = tent.control_enabled
+                ? "LIVE"
+                : tent.shadow_enabled ? "SHADOW" : tent.runtime_loaded ? "BEREIT" : "OFFLINE";
+            option.textContent = `${tent.name || tent.id} · ${mode}`;
+            option.selected = tent.id === TENT_ID;
+            option.disabled = !tent.runtime_loaded;
+            select.appendChild(option);
+        });
+    }catch(error){
+        console.error("Stationsliste konnte nicht geladen werden:",error);
+    }
+
+    select.addEventListener("change",()=>{
+        const targetTent = select.value;
+        if(!targetTent || targetTent === TENT_ID) return;
+        if(
+            dirty &&
+            !confirm("Ungespeicherte Profiländerungen verwerfen und die Station wechseln?")
+        ){
+            select.value = TENT_ID;
+            return;
+        }
+        dirty = false;
+        select.disabled = true;
+        feedback("Profilverwaltung der gewählten Station wird geöffnet …");
+        window.location.assign(profilePageUrl(targetTent));
+    });
 }
 
 function closeProfileAccordions(except=null){
@@ -1256,6 +1313,7 @@ window.addEventListener("beforeunload",event=>{
 
 setupProfileAccordions();
 selectProfileSection("classic");
+loadProfileTentSwitcher();
 loadProfiles();
 </script>
 {% endblock %}
