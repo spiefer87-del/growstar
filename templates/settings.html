@@ -14,6 +14,7 @@ body{margin:0;padding:18px;background:var(--bg);color:var(--text);font-family:sy
 .nav a{color:var(--muted);text-decoration:none;font-size:.86rem}
 h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
 .subtitle{text-align:center;color:var(--muted);font-size:.8rem;margin-bottom:20px}
+.page-station-switch{display:flex;justify-content:flex-end;margin:0 0 14px}.page-station-switch select{width:min(210px,100%);height:42px;padding:7px 34px 7px 12px;border:1px solid #475569;border-radius:10px;background:#0f172a;color:var(--text);font:inherit;font-weight:750}.page-station-switch select:disabled{opacity:.55}
 .grid{display:grid;gap:16px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 
@@ -206,6 +207,12 @@ button:disabled{opacity:.48;cursor:not-allowed}
 
     <h1>⚙️ {{ tent_name }} · Klima & Grenzwerte</h1>
     <div class="subtitle">Änderungen werden erst nach „Einstellungen speichern“ übernommen</div>
+
+    <div class="page-station-switch">
+        <select id="settings-tent-switcher" aria-label="Grow-Station für Klima und Grenzwerte wechseln">
+            <option value="{{ tent_id }}">{{ tent_name }}</option>
+        </select>
+    </div>
 
     <div class="grid">
 
@@ -816,6 +823,8 @@ button:disabled{opacity:.48;cursor:not-allowed}
 <script>
 const TENT_ID = {{ tent_id|tojson }};
 const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
+const TENT_LIST_URL = "/api/tents";
+const SETTINGS_PAGE_TEMPLATE = {{ url_for('grow_control_tent_settings', tent_id='__TENT_ID__')|tojson }};
 
 let lightSunAvailable = false;
 let lightSunUnavailableReason = "";
@@ -864,6 +873,53 @@ let loadedConfig = {};
 
 function el(id){ return document.getElementById(id); }
 function num(id){ return Number(el(id)?.value); }
+
+function settingsPageUrl(tentId){
+    return SETTINGS_PAGE_TEMPLATE.replace("__TENT_ID__",encodeURIComponent(tentId));
+}
+
+async function loadSettingsTentSwitcher(){
+    const select = el("settings-tent-switcher");
+    if(!select) return;
+
+    try{
+        const response = await fetch(TENT_LIST_URL,{cache:"no-store"});
+        if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const tents = Array.isArray(payload.tents) ? payload.tents : [];
+        select.innerHTML = "";
+        tents.forEach(tent=>{
+            if(!tent?.id) return;
+            const option = document.createElement("option");
+            option.value = tent.id;
+            const mode = tent.control_enabled
+                ? "LIVE"
+                : tent.shadow_enabled ? "SHADOW" : tent.runtime_loaded ? "BEREIT" : "OFFLINE";
+            option.textContent = `${tent.name || tent.id} · ${mode}`;
+            option.selected = tent.id === TENT_ID;
+            option.disabled = !tent.runtime_loaded;
+            select.appendChild(option);
+        });
+    }catch(error){
+        console.error("Stationsliste konnte nicht geladen werden:",error);
+    }
+
+    select.addEventListener("change",()=>{
+        const targetTent = select.value;
+        if(!targetTent || targetTent === TENT_ID) return;
+        if(
+            settingsDirty &&
+            !confirm("Ungespeicherte Klima-Einstellungen verwerfen und die Station wechseln?")
+        ){
+            select.value = TENT_ID;
+            return;
+        }
+        settingsDirty = false;
+        select.disabled = true;
+        feedback("Klima & Grenzwerte der gewählten Station werden geöffnet …");
+        window.location.assign(settingsPageUrl(targetTent));
+    });
+}
 
 function closeSettingsAccordions(except=null){
     document.querySelectorAll("[data-settings-accordion]").forEach(card=>{
@@ -1739,7 +1795,7 @@ function step(id,delta){
     setDirty(true);
 }
 
-document.querySelectorAll("input,select").forEach(input=>{
+document.querySelectorAll("input,select:not(#settings-tent-switcher)").forEach(input=>{
     const updateDraft = ()=>{
         if(input.id === "VPD_CONTROL_MODE") updateVpdModeUi();
         syncVpdBoundsFromWindowEditors();
@@ -1777,6 +1833,7 @@ window.addEventListener("beforeunload",event=>{
 
 setupSettingsAccordions();
 selectSettingsSection("classic",{remember:false});
+loadSettingsTentSwitcher();
 load();
 </script>
 {% endblock %}
