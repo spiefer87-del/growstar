@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ipaddress
-import datetime
 import json
 import os
 from pathlib import Path
@@ -14,8 +13,6 @@ import threading
 import time
 from urllib.parse import quote
 import re
-
-from services.grow_events import enqueue_event
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,8 +35,6 @@ DEFAULT_CONFIG = {
     "batch_id": None,
     "timelapse_enabled": False,
     "timelapse_interval_sec": 900,
-    "timelapse_start_at": None,
-    "timelapse_end_at": None,
     "retention_days": 30,
     "video_retention_count": 25,
     "live_width": 2560,
@@ -61,6 +56,12 @@ _status = {
     "live_error": None,
     "timelapse_rendering": False,
     "timelapse_error": None,
+    "timelapse_progress": 0,
+    "timelapse_stage": "Bereit",
+    "timelapse_processed_frames": 0,
+    "timelapse_total_frames": 0,
+    "timelapse_started_at": None,
+    "timelapse_finished_at": None,
     "last_video": None,
     "render_options": None,
     "recording": False,
@@ -98,6 +99,12 @@ def _new_status():
         "live_error": None,
         "timelapse_rendering": False,
         "timelapse_error": None,
+        "timelapse_progress": 0,
+        "timelapse_stage": "Bereit",
+        "timelapse_processed_frames": 0,
+        "timelapse_total_frames": 0,
+        "timelapse_started_at": None,
+        "timelapse_finished_at": None,
         "last_video": None,
         "render_options": None,
         "recording": False,
@@ -252,24 +259,6 @@ def _normalize_config(data, camera_id=PRIMARY_CAMERA_ID):
         except (TypeError, ValueError) as exc:
             raise ValueError(f"Der Wert für {key} ist ungültig.") from exc
         result[key] = max(minimum, min(value, maximum))
-
-    for key, label in (
-        ("timelapse_start_at", "Startzeitpunkt"),
-        ("timelapse_end_at", "Endzeitpunkt"),
-    ):
-        raw_value = data.get(key)
-        if raw_value in (None, ""):
-            result[key] = None
-            continue
-        try:
-            result[key] = int(float(raw_value))
-        except (TypeError, ValueError) as exc:
-            raise ValueError(f"Der Zeitraffer-{label} ist ungültig.") from exc
-
-    start_at = result["timelapse_start_at"]
-    end_at = result["timelapse_end_at"]
-    if start_at is not None and end_at is not None and end_at <= start_at:
-        raise ValueError("Das letzte Zeitrafferbild muss nach dem Start liegen.")
 
     raw_video_retention = data.get("video_retention_count")
     if raw_video_retention in (None, ""):
@@ -496,94 +485,6 @@ def _archive_latest(config, captured_at):
     return target
 
 
-def _latest_timelapse_frame_at(config):
-    batch_id = config.get("batch_id")
-    if not batch_id:
-        return None
-    try:
-        frames = _batch_dir(batch_id, config["camera_id"]).glob("frame-*.jpg")
-        return max((frame.stat().st_mtime for frame in frames), default=None)
-    except (OSError, TypeError, ValueError):
-        return None
-
-
-def _planned_timelapse_images(start_at, end_at, interval):
-    if start_at is None or end_at is None or end_at < start_at:
-        return None
-    regular_steps = (end_at - start_at) // interval
-    count = regular_steps + 1
-    if start_at + regular_steps * interval != end_at:
-        count += 1
-    return count
-
-
-def timelapse_schedule_snapshot(config=None, *, camera_id=None, now=None, last_archived_at=None):
-    """Berechnet den Zeitplan ausschließlich aus persistenten Wandzeiten.
-
-    Dadurch bleibt jeder Slot auch über Prozess- und Raspberry-Neustarts hinweg
-    stabil. Ein nicht ausgerichteter Endzeitpunkt wird als letztes Bild ergänzt.
-    """
-    if config is None:
-        config = public_config(camera_id)
-    config = dict(config or {})
-    now = time.time() if now is None else float(now)
-    interval = max(60, int(config.get("timelapse_interval_sec") or 900))
-    start_at = config.get("timelapse_start_at")
-    end_at = config.get("timelapse_end_at")
-    start_at = int(start_at) if start_at is not None else None
-    end_at = int(end_at) if end_at is not None else None
-    enabled = bool(config.get("timelapse_enabled") and config.get("batch_id"))
-
-    # Alte Konfigurationen ohne Startzeit bleiben kompatibel und werden an
-    # echten Unix-Zeitgrenzen ausgerichtet, statt nach jedem Restart zu driften.
-    anchor = start_at if start_at is not None else 0
-    due_at = None
-    next_capture_at = None
-    if enabled and now >= anchor and (end_at is None or now <= end_at + 60):
-        capped_now = min(now, end_at) if end_at is not None else now
-        due_at = anchor + int((capped_now - anchor) // interval) * interval
-        if end_at is not None and now >= end_at:
-            due_at = end_at
-
-    if enabled:
-        if now < anchor:
-            next_capture_at = anchor
-        elif end_at is None or now < end_at:
-            next_regular = anchor + (int((now - anchor) // interval) + 1) * interval
-            next_capture_at = min(next_regular, end_at) if end_at is not None else next_regular
-
-    if last_archived_at is None:
-        last_archived_at = _latest_timelapse_frame_at(config)
-    capture_due = bool(
-        due_at is not None
-        and (last_archived_at is None or float(last_archived_at) + 0.5 < due_at)
-    )
-
-    if not enabled:
-        state = "disabled"
-    elif start_at is not None and now < start_at:
-        state = "upcoming"
-    elif end_at is not None and now > end_at:
-        state = "finishing" if capture_due else "completed"
-        if capture_due:
-            next_capture_at = end_at
-    else:
-        state = "running"
-
-    return {
-        "state": state,
-        "start_at": start_at,
-        "end_at": end_at,
-        "interval_sec": interval,
-        "last_archived_at": last_archived_at,
-        "next_capture_at": next_capture_at,
-        "due_at": due_at,
-        "capture_due": capture_due,
-        "planned_images": _planned_timelapse_images(start_at, end_at, interval),
-        "timezone": datetime.datetime.fromtimestamp(now).astimezone().tzname() or "lokal",
-    }
-
-
 def capture_snapshot(*, archive=False, camera_id=None):
     config = public_config(camera_id)
     if config is None:
@@ -701,14 +602,11 @@ def status_snapshot(camera_id=None):
         "batch_id": batch_id,
         "timelapse_enabled": bool(config.get("timelapse_enabled")),
         "timelapse_interval_sec": config.get("timelapse_interval_sec"),
-        "timelapse_start_at": config.get("timelapse_start_at"),
-        "timelapse_end_at": config.get("timelapse_end_at"),
         "retention_days": config.get("retention_days"),
         "video_retention_count": config.get("video_retention_count"),
         "live_width": config.get("live_width"),
         "live_fps": config.get("live_fps"),
         "timelapse": archive,
-        "timelapse_schedule": timelapse_schedule_snapshot(config),
         "image_available": image_exists,
         "image_version": int(latest_image.stat().st_mtime) if image_exists else None,
     }
@@ -991,7 +889,37 @@ def _normalize_render_options(data):
     return {"video_fps": fps, "video_width": width, "video_crf": crf}
 
 
-def _render_timelapse_worker(config, options):
+def _update_timelapse_progress(status, frame_count, processed_frames):
+    processed = max(0, min(int(processed_frames or 0), int(frame_count or 0)))
+    percent = 5
+    if frame_count:
+        percent = min(95, 5 + round((processed / frame_count) * 90))
+    with _config_lock:
+        status["timelapse_progress"] = max(
+            int(status.get("timelapse_progress") or 0), percent
+        )
+        status["timelapse_stage"] = "Video wird kodiert"
+        status["timelapse_processed_frames"] = processed
+
+
+def _monitor_timelapse_progress(progress_file, status, frame_count, stop_event):
+    """Liest die von FFmpeg geschriebenen Framewerte während des Renderns."""
+    last_processed = -1
+    while not stop_event.wait(0.25):
+        try:
+            content = progress_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        matches = re.findall(r"(?m)^frame=(\d+)\s*$", content)
+        if not matches:
+            continue
+        processed = int(matches[-1])
+        if processed != last_processed:
+            _update_timelapse_progress(status, frame_count, processed)
+            last_processed = processed
+
+
+def _render_timelapse_worker(config, options, frame_count):
     camera_id = config["camera_id"]
     status = _status_for(camera_id)
     render_lock = _timelapse_lock_for(camera_id)
@@ -1000,13 +928,27 @@ def _render_timelapse_worker(config, options):
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
     output = directory / f"timelapse-{stamp}.mp4"
     temp_output = directory / f".timelapse-{stamp}.mp4"
+    progress_file = directory / f".timelapse-{stamp}.progress"
+    progress_stop = threading.Event()
+    progress_thread = None
     try:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             raise RuntimeError("FFmpeg ist nicht installiert.")
+        with _config_lock:
+            status["timelapse_progress"] = 5
+            status["timelapse_stage"] = "Video wird kodiert"
+        progress_thread = threading.Thread(
+            target=_monitor_timelapse_progress,
+            args=(progress_file, status, frame_count, progress_stop),
+            name=f"growstar-growcam-timelapse-progress-{camera_id}",
+            daemon=True,
+        )
+        progress_thread.start()
         process = subprocess.run(
             [
                 ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-progress", str(progress_file), "-nostats",
                 "-framerate", str(options["video_fps"]),
                 "-pattern_type", "glob", "-i", str(directory / "frame-*.jpg"),
                 "-vf", f"scale={options['video_width']}:-2:force_original_aspect_ratio=decrease,format=yuv420p",
@@ -1021,6 +963,10 @@ def _render_timelapse_worker(config, options):
         )
         if process.returncode != 0 or not temp_output.is_file():
             raise RuntimeError(_safe_error(process.stderr, _rtsp_url(config)))
+        _update_timelapse_progress(status, frame_count, frame_count)
+        with _config_lock:
+            status["timelapse_progress"] = 97
+            status["timelapse_stage"] = "Video wird abgeschlossen"
         os.chmod(temp_output, 0o640)
         os.replace(temp_output, output)
         retention_count = int(config.get("video_retention_count") or 0)
@@ -1033,59 +979,32 @@ def _render_timelapse_worker(config, options):
         with _config_lock:
             status["last_video"] = output.name
             status["timelapse_error"] = None
-        enqueue_event(
-            station_id=config.get("tent_id"),
-            category="media",
-            event_type="timelapse_video_created",
-            severity="success",
-            title=f"Zeitraffer erstellt: {config.get('name') or camera_id}",
-            summary="Die Zeitrafferbilder wurden erfolgreich zu einem Video verarbeitet.",
-            source="growcam",
-            source_id=camera_id,
-            correlation_id=f"timelapse:{camera_id}:{batch_id}",
-            dedupe_key=f"timelapse-video:{camera_id}:{batch_id}:{output.name}",
-            metadata={
-                "durchgang": batch_id,
-                "bilder": len(list(directory.glob("frame-*.jpg"))),
-                "bildrate": f"{options['video_fps']} Bilder/s",
-                "datei": output.name,
-            },
-        )
+            status["timelapse_progress"] = 100
+            status["timelapse_stage"] = "Fertig"
+            status["timelapse_processed_frames"] = frame_count
+            status["timelapse_finished_at"] = time.time()
     except subprocess.TimeoutExpired:
         with _config_lock:
             status["timelapse_error"] = "Zeitraffer-Erstellung hat nach zehn Minuten nicht geantwortet."
-        enqueue_event(
-            station_id=config.get("tent_id"),
-            category="media",
-            event_type="timelapse_video_failed",
-            severity="warning",
-            title=f"Zeitraffer fehlgeschlagen: {config.get('name') or camera_id}",
-            summary="Die Videoerstellung hat das Zeitlimit überschritten.",
-            source="growcam",
-            source_id=camera_id,
-            correlation_id=f"timelapse:{camera_id}:{batch_id}",
-            dedupe_key=f"timelapse-video-error:{camera_id}:{batch_id}:{stamp}",
-        )
+            status["timelapse_stage"] = "Fehlgeschlagen"
+            status["timelapse_finished_at"] = time.time()
     except Exception as exc:
-        error = str(exc).strip() or type(exc).__name__
         with _config_lock:
-            status["timelapse_error"] = error
-        enqueue_event(
-            station_id=config.get("tent_id"),
-            category="media",
-            event_type="timelapse_video_failed",
-            severity="warning",
-            title=f"Zeitraffer fehlgeschlagen: {config.get('name') or camera_id}",
-            summary=error,
-            source="growcam",
-            source_id=camera_id,
-            correlation_id=f"timelapse:{camera_id}:{batch_id}",
-            dedupe_key=f"timelapse-video-error:{camera_id}:{batch_id}:{stamp}",
-        )
+            status["timelapse_error"] = str(exc).strip() or type(exc).__name__
+            status["timelapse_stage"] = "Fehlgeschlagen"
+            status["timelapse_finished_at"] = time.time()
     finally:
+        progress_stop.set()
+        if progress_thread is not None:
+            progress_thread.join(timeout=1)
         try:
             if temp_output.is_file():
                 temp_output.unlink()
+        except OSError:
+            pass
+        try:
+            if progress_file.is_file():
+                progress_file.unlink()
         except OSError:
             pass
         with _config_lock:
@@ -1117,9 +1036,15 @@ def start_timelapse_render(options=None, *, camera_id=None):
         status["timelapse_rendering"] = True
         status["timelapse_error"] = None
         status["render_options"] = dict(render_options)
+        status["timelapse_progress"] = 1
+        status["timelapse_stage"] = "Bilder werden vorbereitet"
+        status["timelapse_processed_frames"] = 0
+        status["timelapse_total_frames"] = summary["frame_count"]
+        status["timelapse_started_at"] = time.time()
+        status["timelapse_finished_at"] = None
     threading.Thread(
         target=_render_timelapse_worker,
-        args=(config, render_options),
+        args=(config, render_options, summary["frame_count"]),
         name="growstar-growcam-timelapse",
         daemon=True,
     ).start()
@@ -1233,54 +1158,12 @@ def _recording_worker(config, batch_id, duration_sec):
                 "created_at": output.stat().st_mtime,
             }
             status["recording_error"] = None
-        enqueue_event(
-            station_id=config.get("tent_id"),
-            category="media",
-            event_type="camera_recording_created",
-            severity="success",
-            title=f"Videoaufnahme gespeichert: {config.get('name') or camera_id}",
-            summary=f"Die {duration_sec} Sekunden lange Aufnahme wurde dem Durchgang zugeordnet.",
-            source="growcam",
-            source_id=camera_id,
-            correlation_id=f"recording:{camera_id}:{batch_id}:{stamp}",
-            dedupe_key=f"camera-recording:{camera_id}:{batch_id}:{output.name}",
-            metadata={
-                "durchgang": batch_id,
-                "dauer": f"{duration_sec} s",
-                "datei": output.name,
-            },
-        )
     except subprocess.TimeoutExpired:
         with _config_lock:
             status["recording_error"] = "Videoaufnahme hat das Zeitlimit überschritten."
-        enqueue_event(
-            station_id=config.get("tent_id"),
-            category="media",
-            event_type="camera_recording_failed",
-            severity="warning",
-            title=f"Videoaufnahme fehlgeschlagen: {config.get('name') or camera_id}",
-            summary="Die Kameraaufnahme hat das Zeitlimit überschritten.",
-            source="growcam",
-            source_id=camera_id,
-            correlation_id=f"recording:{camera_id}:{batch_id}:{stamp}",
-            dedupe_key=f"camera-recording-error:{camera_id}:{batch_id}:{stamp}",
-        )
     except Exception as exc:
-        error = str(exc).strip() or type(exc).__name__
         with _config_lock:
-            status["recording_error"] = error
-        enqueue_event(
-            station_id=config.get("tent_id"),
-            category="media",
-            event_type="camera_recording_failed",
-            severity="warning",
-            title=f"Videoaufnahme fehlgeschlagen: {config.get('name') or camera_id}",
-            summary=error,
-            source="growcam",
-            source_id=camera_id,
-            correlation_id=f"recording:{camera_id}:{batch_id}:{stamp}",
-            dedupe_key=f"camera-recording-error:{camera_id}:{batch_id}:{stamp}",
-        )
+            status["recording_error"] = str(exc).strip() or type(exc).__name__
     finally:
         try:
             if temp_output.is_file():
@@ -1404,8 +1287,7 @@ def growcam_loop():
     print("📷 GrowCam Snapshot-Thread gestartet")
     schedules = {}
     while True:
-        monotonic_now = time.monotonic()
-        wall_now = time.time()
+        now = time.monotonic()
         cameras = list_public_configs()
         active_ids = {camera["camera_id"] for camera in cameras}
         for stale_id in set(schedules) - active_ids:
@@ -1415,31 +1297,29 @@ def growcam_loop():
             current_key = (
                 config.get("enabled"), config.get("interval_sec"),
                 config.get("timelapse_enabled"), config.get("timelapse_interval_sec"),
-                config.get("timelapse_start_at"), config.get("timelapse_end_at"),
                 config.get("batch_id"), config.get("host"),
             )
             schedule = schedules.setdefault(camera_id, {
-                "key": None, "next_capture": 0.0, "last_archive_attempt": 0.0,
+                "key": None, "next_capture": 0.0, "next_archive": 0.0,
             })
             if current_key != schedule["key"]:
-                schedule.update({"key": current_key, "next_capture": 0.0, "last_archive_attempt": 0.0})
-            preview_due = monotonic_now >= schedule["next_capture"]
-            plan = timelapse_schedule_snapshot(config, now=wall_now)
-            archive_due = bool(
-                plan["capture_due"]
-                and wall_now - schedule["last_archive_attempt"] >= 30
+                schedule.update({"key": current_key, "next_capture": 0.0, "next_archive": 0.0})
+            preview_due = now >= schedule["next_capture"]
+            archive_due = (
+                config.get("timelapse_enabled") and config.get("batch_id")
+                and now >= schedule["next_archive"]
             )
             if config.get("enabled") and config.get("host") and (preview_due or archive_due):
-                if archive_due:
-                    schedule["last_archive_attempt"] = wall_now
                 result = capture_snapshot(archive=bool(archive_due), camera_id=camera_id)
                 if not result.get("success"):
                     print(f"⚠️ GrowCam {camera_id} Aufnahme fehlgeschlagen:", result.get("error"))
                 finished = time.monotonic()
                 if preview_due:
                     schedule["next_capture"] = finished + int(config.get("interval_sec") or 60)
+                if archive_due:
+                    schedule["next_archive"] = finished + int(config.get("timelapse_interval_sec") or 900)
             elif not config.get("enabled"):
-                schedule["next_capture"] = 0.0
+                schedule["next_capture"] = schedule["next_archive"] = 0.0
         time.sleep(1)
 
 
@@ -1474,7 +1354,6 @@ __all__ = (
     "save_config",
     "status_snapshot",
     "start_timelapse_render",
-    "timelapse_schedule_snapshot",
     "start_video_recording",
     "timelapse_summary",
 )
