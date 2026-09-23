@@ -1699,15 +1699,45 @@ body {
 .pm-timelapse-panel > summary:focus-visible { outline: 2px solid #38bdf8; outline-offset: 2px; }
 .pm-timelapse-recent { margin-top: 16px; }
 .pm-timelapse-recent h3 { margin: 0 0 8px; font-size: .95rem; }
-.pm-timelapse-recent-item {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 8px 0;
-    border-top: 1px solid rgba(148,163,184,.16);
+.pm-timelapse-video-link,
+.pm-timelapse-video-link:visited {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 20px;
+    align-items: center;
+    gap: 12px;
+    min-height: 68px;
+    padding: 11px 14px;
+    margin-top: 9px;
+    border: 1px solid var(--pm-line);
+    border-radius: 14px;
+    background: rgba(15, 23, 42, .55);
+    color: var(--pm-text);
+    text-decoration: none;
+    transition: background .18s ease, border-color .18s ease, transform .18s ease;
 }
-.pm-timelapse-recent-item time { color: var(--pm-muted); }
+.pm-timelapse-video-link:hover {
+    background: rgba(34, 197, 94, .1);
+    border-color: rgba(34, 197, 94, .55);
+    transform: translateY(-1px);
+}
+.pm-timelapse-video-link:focus-visible {
+    outline: 2px solid var(--pm-blue);
+    outline-offset: 2px;
+}
+.pm-timelapse-video-icon {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(34, 197, 94, .14);
+    color: #baf7cc;
+    font-size: .9rem;
+}
+.pm-timelapse-video-label { display: grid; gap: 2px; min-width: 0; }
+.pm-timelapse-video-label strong { font-weight: 650; }
+.pm-timelapse-video-label time { color: var(--pm-muted); font-size: .82rem; }
+.pm-timelapse-video-arrow { color: #baf7cc; font-size: 1.1rem; }
 
 .pm-timelapse-progress {
     margin: 16px 0;
