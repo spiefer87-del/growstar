@@ -1,6 +1,5 @@
 """Weboberfläche und API für lokale GrowCam-Snapshots."""
 
-import datetime
 import shutil
 from pathlib import Path
 
@@ -50,37 +49,12 @@ from services.growcam import (
     status_snapshot,
     start_timelapse_render,
     start_video_recording,
+    timelapse_frame_days,
     timelapse_summary,
 )
-from services.grow_events import enqueue_event
 
 
 ROOT = Path(__file__).resolve().parent.parent
-
-
-def _parse_local_datetime(value, label):
-    value = str(value or "").strip()
-    if not value:
-        return None
-    try:
-        parsed = datetime.datetime.fromisoformat(value)
-    except ValueError as exc:
-        raise ValueError(f"{label} ist ungültig.") from exc
-    if parsed.tzinfo is None:
-        parsed = parsed.astimezone()
-    return int(parsed.timestamp())
-
-
-def _datetime_local_value(value):
-    if value in (None, ""):
-        return ""
-    return datetime.datetime.fromtimestamp(int(value)).astimezone().strftime("%Y-%m-%dT%H:%M")
-
-
-def _datetime_label(value):
-    if value in (None, ""):
-        return "—"
-    return datetime.datetime.fromtimestamp(int(value)).astimezone().strftime("%d.%m.%Y %H:%M")
 
 
 def _audit(action, details=None, *, camera_id="camera_1"):
@@ -136,8 +110,6 @@ def register(app):
                 requested_batch_id, camera_id=camera_id
             )
         frame_page = request.args.get("frame_page", default=1, type=int)
-        suggested_start = datetime.datetime.now().astimezone().replace(second=0, microsecond=0)
-        suggested_end = suggested_start + datetime.timedelta(days=60)
         return render_template(
             "plants/timelapse.html",
             camera=camera,
@@ -147,12 +119,8 @@ def register(app):
             timelapse_frames=list_timelapse_frames(
                 camera.get("batch_id"), camera_id=camera_id, page=frame_page
             ),
-            timelapse_start_local=_datetime_local_value(
-                camera.get("timelapse_start_at") or int(suggested_start.timestamp())
-            ),
-            timelapse_end_local=_datetime_local_value(
-                camera.get("timelapse_end_at") or int(suggested_end.timestamp())
-            ),
+            frame_day_counts=timelapse_frame_days(camera.get("batch_id"), camera_id=camera_id),
+            recent_videos=list_timelapse_videos(camera.get("batch_id"), camera_id=camera_id, per_page=6)["items"] if camera.get("batch_id") else [],
         )
 
     @app.post("/pflanzenmanagement/kamera/konfiguration")
@@ -205,24 +173,11 @@ def register(app):
             batch_id = request.form.get("batch_id", type=int)
             if batch_id and not get_batch(batch_id):
                 raise ValueError("Der ausgewählte Durchgang existiert nicht.")
-            timelapse_enabled = request.form.get("timelapse_enabled") == "1"
-            start_at = _parse_local_datetime(
-                request.form.get("timelapse_start_at"), "Der Startzeitpunkt"
-            )
-            end_at = _parse_local_datetime(
-                request.form.get("timelapse_end_at"), "Der Zeitpunkt des letzten Bildes"
-            )
-            if timelapse_enabled and (start_at is None or end_at is None):
-                raise ValueError("Für einen aktiven Zeitraffer müssen Start und letztes Bild festgelegt sein.")
-            if start_at is not None and end_at is not None and end_at <= start_at:
-                raise ValueError("Das letzte Zeitrafferbild muss nach dem Start liegen.")
             config = save_config({
                 **current,
                 "batch_id": batch_id,
-                "timelapse_enabled": timelapse_enabled,
+                "timelapse_enabled": request.form.get("timelapse_enabled") == "1",
                 "timelapse_interval_sec": request.form.get("timelapse_interval_sec"),
-                "timelapse_start_at": start_at,
-                "timelapse_end_at": end_at,
                 "retention_days": request.form.get("retention_days"),
                 "video_retention_count": request.form.get("video_retention_count"),
             }, camera_id=camera_id)
@@ -232,50 +187,8 @@ def register(app):
                     "batch_id": config["batch_id"],
                     "enabled": config["timelapse_enabled"],
                     "interval_sec": config["timelapse_interval_sec"],
-                    "start_at": config["timelapse_start_at"],
-                    "end_at": config["timelapse_end_at"],
                 },
                 camera_id=camera_id,
-            )
-            event_type = (
-                "timelapse_plan_activated"
-                if config["timelapse_enabled"] and not current.get("timelapse_enabled")
-                else "timelapse_plan_deactivated"
-                if not config["timelapse_enabled"] and current.get("timelapse_enabled")
-                else "timelapse_plan_updated"
-            )
-            plan_title = (
-                f"Zeitrafferplan aktiv: {config.get('name') or camera_id}"
-                if config["timelapse_enabled"]
-                else f"Zeitrafferplan deaktiviert: {config.get('name') or camera_id}"
-                if current.get("timelapse_enabled")
-                else f"Zeitrafferplan gespeichert: {config.get('name') or camera_id}"
-            )
-            enqueue_event(
-                station_id=config.get("tent_id"),
-                category="media",
-                event_type=event_type,
-                severity="success" if config["timelapse_enabled"] else "info",
-                title=plan_title,
-                summary=(
-                    "Aufnahmezeitraum und feste Bildzeitpunkte wurden gespeichert."
-                    if config["timelapse_enabled"]
-                    else "Die automatische Zeitrafferaufnahme wurde ausgeschaltet."
-                ),
-                source="growcam",
-                source_id=camera_id,
-                correlation_id=f"timelapse:{camera_id}:{config.get('batch_id')}",
-                dedupe_key=(
-                    f"timelapse-plan:{camera_id}:{config.get('batch_id')}:"
-                    f"{int(config['timelapse_enabled'])}:{config.get('timelapse_start_at')}:"
-                    f"{config.get('timelapse_end_at')}:{config.get('timelapse_interval_sec')}"
-                ),
-                metadata={
-                    "durchgang": config.get("batch_id") or "—",
-                    "start": _datetime_label(config.get("timelapse_start_at")),
-                    "letztes_bild": _datetime_label(config.get("timelapse_end_at")),
-                    "intervall": f"{config.get('timelapse_interval_sec')} s",
-                },
             )
             flash("Zeitraffer-Konfiguration wurde gespeichert.", "success")
         except Exception as exc:
@@ -481,6 +394,7 @@ def register(app):
             "video_fps": request.form.get("video_fps"),
             "video_width": request.form.get("video_width"),
             "video_crf": request.form.get("video_crf"),
+            "start_date": request.form.get("start_date"),
         }, camera_id=camera_id)
         if result.get("success"):
             _audit(
@@ -495,7 +409,7 @@ def register(app):
             flash("Zeitraffer-Erstellung wurde im Hintergrund gestartet.", "success")
         else:
             flash(result.get("error") or "Zeitraffer konnte nicht gestartet werden.", "error")
-        return redirect(url_for("growcam_timelapse_page", camera_id=camera_id))
+        return redirect(url_for("growcam_timelapse_page", camera_id=camera_id, create=1, _anchor="video-create"))
 
     @app.get("/pflanzenmanagement/kamera/zeitraffer/<int:batch_id>/<filename>")
     def growcam_timelapse_video(batch_id, filename):

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+from datetime import date
 import json
 import os
 from pathlib import Path
@@ -797,6 +798,20 @@ def list_timelapse_frames(batch_id, *, camera_id=PRIMARY_CAMERA_ID, page=1, per_
     return {"items": items, "page": page, "pages": pages, "total": len(frames)}
 
 
+def timelapse_frame_days(batch_id, *, camera_id=PRIMARY_CAMERA_ID):
+    """Counts available images by the Raspberry Pi's local calendar day."""
+    days = {}
+    if not batch_id:
+        return days
+    for frame in _batch_dir(batch_id, camera_id).glob("frame-*.jpg"):
+        try:
+            day = time.strftime("%Y-%m-%d", time.localtime(frame.stat().st_mtime))
+        except OSError:
+            continue
+        days[day] = days.get(day, 0) + 1
+    return days
+
+
 def list_all_timelapse_frames(*, camera_id=None, page=1, per_page=24):
     """Listet Zeitrafferbilder aller Durchgänge für die zentrale Medienansicht."""
 
@@ -919,7 +934,7 @@ def _monitor_timelapse_progress(progress_file, status, frame_count, stop_event):
             last_processed = processed
 
 
-def _render_timelapse_worker(config, options, frame_count):
+def _render_timelapse_worker(config, options, selected_frames):
     camera_id = config["camera_id"]
     status = _status_for(camera_id)
     render_lock = _timelapse_lock_for(camera_id)
@@ -930,39 +945,22 @@ def _render_timelapse_worker(config, options, frame_count):
     temp_output = directory / f".timelapse-{stamp}.mp4"
     progress_file = directory / f".timelapse-{stamp}.progress"
     progress_stop = threading.Event()
-    progress_thread = None
+    frame_count = len(selected_frames)
     try:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             raise RuntimeError("FFmpeg ist nicht installiert.")
-        with _config_lock:
-            status["timelapse_progress"] = 5
-            status["timelapse_stage"] = "Video wird kodiert"
-        progress_thread = threading.Thread(
-            target=_monitor_timelapse_progress,
-            args=(progress_file, status, frame_count, progress_stop),
-            name=f"growstar-growcam-timelapse-progress-{camera_id}",
-            daemon=True,
-        )
-        progress_thread.start()
-        process = subprocess.run(
-            [
-                ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-                "-progress", str(progress_file), "-nostats",
-                "-framerate", str(options["video_fps"]),
-                "-pattern_type", "glob", "-i", str(directory / "frame-*.jpg"),
-                "-vf", f"scale={options['video_width']}:-2:force_original_aspect_ratio=decrease,format=yuv420p",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(options["video_crf"]),
-                "-movflags", "+faststart", str(temp_output),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=600,
-            check=False,
-        )
-        if process.returncode != 0 or not temp_output.is_file():
-            raise RuntimeError(_safe_error(process.stderr, _rtsp_url(config)))
+        # Freeze the exact selection without duplicating the image data. This also
+        # prevents a newly archived image from joining an already running render.
+        selection = tempfile.TemporaryDirectory(prefix=".timelapse-selection-", dir=directory)
+        try:
+            for frame in selected_frames:
+                os.link(frame, Path(selection.name) / frame.name)
+            _encode_timelapse(ffmpeg, selection.name, options, progress_file, temp_output, status, frame_count, camera_id, progress_stop)
+        finally:
+            selection.cleanup()
+        if not temp_output.is_file():
+            raise RuntimeError("Das Zeitraffer-Video wurde nicht erstellt.")
         _update_timelapse_progress(status, frame_count, frame_count)
         with _config_lock:
             status["timelapse_progress"] = 97
@@ -995,8 +993,6 @@ def _render_timelapse_worker(config, options, frame_count):
             status["timelapse_finished_at"] = time.time()
     finally:
         progress_stop.set()
-        if progress_thread is not None:
-            progress_thread.join(timeout=1)
         try:
             if temp_output.is_file():
                 temp_output.unlink()
@@ -1011,6 +1007,41 @@ def _render_timelapse_worker(config, options, frame_count):
             status["timelapse_rendering"] = False
             status["render_options"] = None
         render_lock.release()
+
+
+def _encode_timelapse(ffmpeg, selection_dir, options, progress_file, temp_output, status, frame_count, camera_id, progress_stop):
+    with _config_lock:
+        status["timelapse_progress"] = 5
+        status["timelapse_stage"] = "Video wird kodiert"
+    progress_thread = threading.Thread(
+        target=_monitor_timelapse_progress,
+        args=(progress_file, status, frame_count, progress_stop),
+        name=f"growstar-growcam-timelapse-progress-{camera_id}",
+        daemon=True,
+    )
+    progress_thread.start()
+    try:
+        process = subprocess.run(
+            [
+                ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
+                "-progress", str(progress_file), "-nostats",
+                "-framerate", str(options["video_fps"]),
+                "-pattern_type", "glob", "-i", str(Path(selection_dir) / "frame-*.jpg"),
+                "-vf", f"scale={options['video_width']}:-2:force_original_aspect_ratio=decrease,format=yuv420p",
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", str(options["video_crf"]),
+                "-movflags", "+faststart", str(temp_output),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        if process.returncode != 0 or not temp_output.is_file():
+            raise RuntimeError(_safe_error(process.stderr, ""))
+    finally:
+        progress_stop.set()
+        progress_thread.join(timeout=1)
 
 
 def start_timelapse_render(options=None, *, camera_id=None):
@@ -1030,8 +1061,30 @@ def start_timelapse_render(options=None, *, camera_id=None):
         render_options = _normalize_render_options(options)
     except ValueError as exc:
         return {"success": False, "error": str(exc)}
+    start_date = str((options or {}).get("start_date") or "").strip()
+    if start_date:
+        try:
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", start_date):
+                raise ValueError("invalid format")
+            date.fromisoformat(start_date)
+        except ValueError:
+            return {"success": False, "error": "Ungültiges Startdatum (JJJJ-MM-TT)."}
+    render_options["start_date"] = start_date
     if not render_lock.acquire(blocking=False):
         return {"success": False, "error": "Ein Zeitraffer-Video wird bereits erstellt."}
+    selected_frames = []
+    try:
+        for frame in sorted(_batch_dir(batch_id, camera_id).glob("frame-*.jpg")):
+            day = time.strftime("%Y-%m-%d", time.localtime(frame.stat().st_mtime))
+            if not start_date or day >= start_date:
+                selected_frames.append(frame)
+        if len(selected_frames) < 2:
+            return {"success": False, "error": "Ab diesem Startdatum sind weniger als zwei Zeitrafferbilder vorhanden."}
+    except OSError:
+        return {"success": False, "error": "Zeitrafferbilder konnten nicht gelesen werden."}
+    finally:
+        if len(selected_frames) < 2:
+            render_lock.release()
     with _config_lock:
         status["timelapse_rendering"] = True
         status["timelapse_error"] = None
@@ -1039,18 +1092,18 @@ def start_timelapse_render(options=None, *, camera_id=None):
         status["timelapse_progress"] = 1
         status["timelapse_stage"] = "Bilder werden vorbereitet"
         status["timelapse_processed_frames"] = 0
-        status["timelapse_total_frames"] = summary["frame_count"]
+        status["timelapse_total_frames"] = len(selected_frames)
         status["timelapse_started_at"] = time.time()
         status["timelapse_finished_at"] = None
     threading.Thread(
         target=_render_timelapse_worker,
-        args=(config, render_options, summary["frame_count"]),
+        args=(config, render_options, selected_frames),
         name="growstar-growcam-timelapse",
         daemon=True,
     ).start()
     return {
         "success": True,
-        "frame_count": summary["frame_count"],
+        "frame_count": len(selected_frames),
         "options": render_options,
     }
 
