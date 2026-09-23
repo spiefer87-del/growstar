@@ -50,6 +50,7 @@ from services.growcam import (
     start_timelapse_render,
     start_video_recording,
     timelapse_frame_days,
+    timelapse_download_filename,
     timelapse_summary,
 )
 
@@ -395,6 +396,7 @@ def register(app):
             "video_width": request.form.get("video_width"),
             "video_crf": request.form.get("video_crf"),
             "start_date": request.form.get("start_date"),
+            "end_date": request.form.get("end_date"),
         }, camera_id=camera_id)
         if result.get("success"):
             _audit(
@@ -425,7 +427,7 @@ def register(app):
             mimetype="video/mp4",
             conditional=True,
             as_attachment=download,
-            download_name=video.name if download else None,
+            download_name=timelapse_download_filename(video, camera.get("tent_id"), camera_id=camera["camera_id"]) if download else None,
         )
 
     @app.post("/pflanzenmanagement/kamera/zeitraffer/<int:batch_id>/<filename>/loeschen")

@@ -1675,6 +1675,11 @@ body {
 .pm-growcam-render-form {
     margin-top: 16px;
 }
+.pm-timelapse-date-range {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+    gap: 12px;
+}
 
 .pm-timelapse-panel > summary {
     cursor: pointer;

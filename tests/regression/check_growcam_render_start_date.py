@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import os
+import re
 import sys
 import tempfile
 import time
@@ -25,7 +26,7 @@ def main():
         with tempfile.TemporaryDirectory(prefix="growcam-start-date-") as temp:
             growcam.TIMELAPSE_DIR = Path(temp)
             growcam.public_config = lambda camera_id=None: {
-                "camera_id": "camera_1", "batch_id": 17, "video_retention_count": 25,
+                "camera_id": "camera_1", "batch_id": 17, "tent_id": "tent_2", "video_retention_count": 25,
             }
             growcam.shutil.which = lambda command: "/usr/bin/ffmpeg"
             batch = growcam._batch_dir(17, "camera_1")
@@ -41,6 +42,9 @@ def main():
             for bad in ("2026-02-30", "yesterday", "2026-09-22;echo hi"):
                 require(not growcam.start_timelapse_render({"start_date": bad})["success"], "Ungültiges Datum wird abgewiesen")
             require(not growcam.start_timelapse_render({"start_date": "2026-09-23"})["success"], "Start ohne zwei Bilder wird abgewiesen")
+            require(not growcam.start_timelapse_render({"end_date": "2026-09-19"})["success"], "Ende ohne zwei Bilder wird abgewiesen")
+            require(not growcam.start_timelapse_render({"end_date": "2026-02-30"})["success"], "Ungültiges Enddatum wird abgewiesen")
+            require(not growcam.start_timelapse_render({"start_date": "2026-09-22", "end_date": "2026-09-21"})["success"], "Ende vor Start wird abgewiesen")
 
             calls = []
             def fake_run(command, **kwargs):
@@ -49,18 +53,23 @@ def main():
                 Path(command[-1]).write_bytes(b"video")
                 return SimpleNamespace(returncode=0, stderr="")
             growcam.subprocess.run = fake_run
-            for start, expected in (("2026-09-21", 4), ("", 5)):
-                result = growcam.start_timelapse_render({"start_date": start})
+            for start, end, expected in (("2026-09-21", "2026-09-21", 2), ("", "2026-09-21", 3), ("2026-09-21", "", 4), ("", "", 5)):
+                result = growcam.start_timelapse_render({"start_date": start, "end_date": end})
                 require(result["success"] and result["frame_count"] == expected, "Renderauftrag zählt nur ausgewählte Bilder")
                 for _ in range(100):
                     if not growcam.status_snapshot()["timelapse_rendering"]:
                         break
                     time.sleep(.02)
                 require(len(calls[-1]) == expected and growcam.status_snapshot()["timelapse_total_frames"] == expected, "FFmpeg erhält genau die ausgewählten Bilder")
+            videos = growcam.list_timelapse_videos(17, camera_id="camera_1")["items"]
+            require(len(videos) == 4 and all(re.fullmatch(r"timelapse-Zelt-2-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{6}\.mp4", video["filename"]) for video in videos), "Neue Video-Dateinamen enthalten Station und Erstellungsdatum")
+            legacy = batch / "timelapse-20260923T101800Z.mp4"
+            legacy.write_bytes(b"legacy")
+            require(growcam.timelapse_download_filename(legacy, "tent_2").startswith("timelapse-Zelt-2-"), "Auch alte Videos erhalten beim Download einen Stationsnamen")
             require(not list(batch.glob(".timelapse-selection-*")), "Temporäre Bildauswahl wird bereinigt")
 
         template = (ROOT / "templates/plants/timelapse.html").read_text(encoding="utf-8")
-        require('name="start_date"' in template and 'id="video-create"' in template and 'id="timelapse-frames"' in template, "Videoerstellung und Bildarchiv sind getrennt")
+        require('name="start_date"' in template and 'name="end_date"' in template and 'id="video-create"' in template and 'id="timelapse-frames"' in template, "Videoerstellung und Bildarchiv sind getrennt und bieten beide Datumsgrenzen")
         require('video.created_at' in template and 'latest_video_mtime' in template, "Erstellungsdatum steht bei letzten Videos")
     finally:
         growcam.TIMELAPSE_DIR, growcam.public_config, growcam.shutil.which, growcam.subprocess.run = original

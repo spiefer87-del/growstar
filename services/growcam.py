@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
-from datetime import date
+from datetime import date, datetime
 import json
 import os
 from pathlib import Path
@@ -642,6 +642,21 @@ def resolve_timelapse_video(batch_id, filename, *, camera_id=PRIMARY_CAMERA_ID):
     return candidate if candidate.is_file() else None
 
 
+def _station_filename_label(tent_id, camera_id=PRIMARY_CAMERA_ID):
+    tent_id = str(tent_id or "").strip()
+    if re.fullmatch(r"tent_[1-9][0-9]*", tent_id):
+        return "Zelt-" + tent_id[5:]
+    return re.sub(r"[^A-Za-z0-9]+", "-", tent_id).strip("-") or camera_id
+
+
+def timelapse_download_filename(video, tent_id, *, camera_id=PRIMARY_CAMERA_ID):
+    """Give legacy videos a meaningful downloaded name without renaming stored files."""
+    if re.fullmatch(r"timelapse-.+-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{6}\.mp4", video.name):
+        return video.name
+    stamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime(video.stat().st_mtime))
+    return f"timelapse-{_station_filename_label(tent_id, camera_id)}-{stamp}.mp4"
+
+
 def list_timelapse_videos(batch_id=None, *, camera_id=None, page=1, per_page=24):
     """Listet erzeugte Videos sicher über alle oder genau einen Durchgang."""
 
@@ -940,8 +955,9 @@ def _render_timelapse_worker(config, options, selected_frames):
     render_lock = _timelapse_lock_for(camera_id)
     batch_id = config["batch_id"]
     directory = _batch_dir(batch_id, camera_id)
-    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-    output = directory / f"timelapse-{stamp}.mp4"
+    stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
+    station = _station_filename_label(config.get("tent_id"), camera_id)
+    output = directory / f"timelapse-{station}-{stamp}.mp4"
     temp_output = directory / f".timelapse-{stamp}.mp4"
     progress_file = directory / f".timelapse-{stamp}.progress"
     progress_stop = threading.Event()
@@ -1062,24 +1078,29 @@ def start_timelapse_render(options=None, *, camera_id=None):
     except ValueError as exc:
         return {"success": False, "error": str(exc)}
     start_date = str((options or {}).get("start_date") or "").strip()
-    if start_date:
-        try:
-            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", start_date):
-                raise ValueError("invalid format")
-            date.fromisoformat(start_date)
-        except ValueError:
-            return {"success": False, "error": "Ungültiges Startdatum (JJJJ-MM-TT)."}
+    end_date = str((options or {}).get("end_date") or "").strip()
+    for label, value in (("Startdatum", start_date), ("Enddatum", end_date)):
+        if value:
+            try:
+                if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+                    raise ValueError("invalid format")
+                date.fromisoformat(value)
+            except ValueError:
+                return {"success": False, "error": f"Ungültiges {label} (JJJJ-MM-TT)."}
+    if start_date and end_date and start_date > end_date:
+        return {"success": False, "error": "Das Enddatum darf nicht vor dem Startdatum liegen."}
     render_options["start_date"] = start_date
+    render_options["end_date"] = end_date
     if not render_lock.acquire(blocking=False):
         return {"success": False, "error": "Ein Zeitraffer-Video wird bereits erstellt."}
     selected_frames = []
     try:
         for frame in sorted(_batch_dir(batch_id, camera_id).glob("frame-*.jpg")):
             day = time.strftime("%Y-%m-%d", time.localtime(frame.stat().st_mtime))
-            if not start_date or day >= start_date:
+            if (not start_date or day >= start_date) and (not end_date or day <= end_date):
                 selected_frames.append(frame)
         if len(selected_frames) < 2:
-            return {"success": False, "error": "Ab diesem Startdatum sind weniger als zwei Zeitrafferbilder vorhanden."}
+            return {"success": False, "error": "Im gewählten Zeitraum sind weniger als zwei Zeitrafferbilder vorhanden."}
     except OSError:
         return {"success": False, "error": "Zeitrafferbilder konnten nicht gelesen werden."}
     finally:
