@@ -270,6 +270,9 @@ def _device_setting_snapshot(runtime, device, schema=None):
         }
 
     add("mode", "Betriebsmodus", get_device_mode(device, runtime=runtime), "mode")
+    if device == "heating":
+        add("predictive_heating", "Vorausschauende Heizregelung",
+            params.get("predictive_heating") is True, "switch")
     add("start_min", "Startzeit", int(params.get("start_min", 0) or 0), "time")
     add("end_min", "Endzeit", int(params.get("end_min", 0) or 0), "time")
     add("interval_on", "Phase A · Dauer", int(params.get("interval_on", 300) or 0), "duration")

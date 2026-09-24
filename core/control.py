@@ -1,6 +1,7 @@
 # core/control.py
 
 import time
+import math
 
 from core.runtime import resolve_runtime
 from core.profile import get_profile
@@ -22,6 +23,7 @@ from core.devices import (
     get_device_params,
 )
 from core.vpd_control import apply_vpd_device_plan, vpd_manages_device
+from core.heating_predictive import decide as predictive_heating_decision, observe_target
 
 
 # =========================================
@@ -143,6 +145,9 @@ def control_device(device, runtime=None):
 
     mode = get_device_mode(device, runtime=rt)
     params = get_device_params(device, runtime=rt)
+    if device == "heating" and (mode != "ENV" or vpd_manages_device(device, runtime=rt)):
+        rt.heating_predictive_state.clear()
+        observe_target(rt)
 
     now_min = minutes_now()
 
@@ -351,8 +356,10 @@ def control_heating_env(runtime=None):
     st = rt.state
 
     temp = st.live_state.get("temp")
-    if temp is None:
+    if temp is None or bool(getattr(st, "temp_stale", False)):
         set_heating(False, runtime=rt)
+        rt.heating_predictive_state.clear()
+        observe_target(rt)
         return
 
     update_temperature_setpoint(runtime=rt)
@@ -361,6 +368,18 @@ def control_heating_env(runtime=None):
     tol = st.live_state.get("temp_tol")
 
     if target is None or tol is None:
+        rt.heating_predictive_state.clear()
+        observe_target(rt)
+        return
+
+    try:
+        temp, target, tol = float(temp), float(target), float(tol)
+        if not all(math.isfinite(x) for x in (temp, target, tol)):
+            raise ValueError("Ungültiger Temperaturwert")
+    except (TypeError, ValueError):
+        set_heating(False, "(Temperaturwert ungültig)", runtime=rt)
+        rt.heating_predictive_state.clear()
+        observe_target(rt)
         return
 
     min_temp = float(cfg.get("MIN_TEMP", 18.0))
@@ -368,16 +387,32 @@ def control_heating_env(runtime=None):
 
     if temp >= max_temp:
         set_heating(False, "(MAX TEMP Schutz)", runtime=rt)
+        rt.heating_predictive_state.clear()
+        observe_target(rt)
         return
 
     if temp <= min_temp:
         set_heating(True, "(MIN TEMP Schutz)", runtime=rt)
+        rt.heating_predictive_state.clear()
+        observe_target(rt, temperature=temp, target=target, active=bool(st.heating_on))
         return
 
-    if temp < (target - tol):
-        set_heating(True, f"(unter Soll {target:.1f}°C)", runtime=rt)
-    elif temp >= target:
-        set_heating(False, f"(Soll {target:.1f}°C erreicht)", runtime=rt)
+    params = get_device_params("heating", runtime=rt)
+    if params.get("predictive_heating") is True:
+        requested, reason = predictive_heating_decision(
+            rt.heating_predictive_state, temperature=temp, target=target,
+            tolerance=tol, enabled=bool(st.heating_on), now=time.time(),
+        )
+        if requested != bool(st.heating_on):
+            set_heating(requested, f"({reason}; Soll {target:.1f}°C)", runtime=rt)
+    else:
+        rt.heating_predictive_state.clear()
+        if temp < (target - tol):
+            set_heating(True, f"(unter Soll {target:.1f}°C)", runtime=rt)
+        elif temp >= target:
+            set_heating(False, f"(Soll {target:.1f}°C erreicht)", runtime=rt)
+
+    observe_target(rt, temperature=temp, target=target, active=bool(st.heating_on))
 
 
 def _env_inputs_ready(device, runtime=None):

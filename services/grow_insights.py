@@ -8,6 +8,7 @@ from services.grow_events import analysis_events
 
 
 ALARM_TYPES = ("alarm_opened", "alarm_recovered")
+HEATING_TARGET_TYPES = ("heating_target_missed", "heating_target_recovered")
 PROFILE_TYPES = ("day_night_profile_changed", "grow_profile_applied")
 PHOTO_TYPES = ("plant_photo_created", "batch_photo_created")
 DEVICE_ACTIVITY_TYPES = ("actuator_power_changed",)
@@ -418,6 +419,28 @@ def _open_alarm_insights(station_id, station_names):
     ], len(open_events)
 
 
+def _heating_target_insights(station_id, station_names):
+    # The newest event for each station represents its current heater episode.
+    rows = analysis_events(
+        station_id=station_id, include_global=False,
+        event_types=HEATING_TARGET_TYPES, limit=100,
+        station_names=station_names,
+    )
+    newest = {}
+    for event in rows:
+        newest.setdefault(event.get("station_id"), event)
+    return [
+        _insight(
+            "heating_target_missed", "warning", "🔥",
+            "Heizung erreicht Solltemperatur nicht",
+            event.get("summary") or "Die Solltemperatur wurde nach 30 Minuten Heizen nicht erreicht.",
+            event=event,
+        )
+        for event in newest.values()
+        if event.get("event_type") == "heating_target_missed"
+    ]
+
+
 def _correlation_insight(rows):
     opened = [
         event for event in rows
@@ -471,6 +494,9 @@ def build_insights(
         station_names=station_names,
     )
     insights, open_count = _open_alarm_insights(station_id, station_names)
+    heating_insights = _heating_target_insights(station_id, station_names)
+    insights.extend(heating_insights)
+    open_count += len(heating_insights)
 
     correlation = _correlation_insight(rows)
     if correlation:
@@ -593,7 +619,7 @@ def build_insights(
         )
     elif operational_count:
         state = "stable"
-        headline = "Keine offenen Watchdog-Vorgänge"
+        headline = "Keine offenen Meldungen"
     else:
         state = "collecting"
         headline = "Datenbasis wird aufgebaut"

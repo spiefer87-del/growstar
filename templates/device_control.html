@@ -202,6 +202,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
         <div id="env-section" class="section">
             <h3>Umgebungsregelung</h3>
             <div id="env-special" class="hint"></div>
+            <div id="heating-predictive-option" class="interval-night-toggle" style="display:none">
+                <input type="checkbox" id="predictive-heating">
+                <label for="predictive-heating" style="margin:0;color:var(--text)">
+                    <strong>Vorausschauende Heizregelung</strong>
+                    <small>Beobachtet Temperaturtrend und Nachheizen. Schaltet nahe am Sollwert früher ab oder bei fallender Temperatur früher ein. Mindestabstand zwischen Schaltungen: 4 Minuten. Bei größerer Abweichung heizt das Gerät ohne künstliche Pausen weiter. Nur im klassischen ENV-Modus.</small>
+                </label>
+            </div>
             <div id="env-generic">
                 <div class="checkbox-row">
                     <label><input type="checkbox" id="use-temp"> Temperatur berücksichtigen</label>
@@ -306,6 +313,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         "use-hum",
         "logic",
         "direction",
+        "predictive-heating",
         "fan-standby-enabled"
     ];
 
@@ -423,6 +431,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         if (DEVICE === "heating") {
             special.textContent = "Die Heizung nutzt Temperatur-Sollwert, Toleranz, Sicherheitsgrenzen und gegebenenfalls die aktive Rampe dieser Station.";
             generic.style.display = "none";
+            document.getElementById("heating-predictive-option").style.display = current === "ENV" ? "flex" : "none";
         } else if (DEVICE === "light") {
             special.textContent = "Das Hauptlicht folgt im ENV-Modus den Tag-/Nacht-Zeiten dieser Station.";
             generic.style.display = "none";
@@ -749,6 +758,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 
     function applyDeviceForm(data) {
         const params = data.params || {};
+        document.getElementById("predictive-heating").checked = params.predictive_heating === true;
         const env = data.env_config || {};
         const states = params.control_states || {};
         const a = states.interval_a || {};
@@ -924,6 +934,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
         const payload = {
             mode: mode.value,
             params: {
+                ...(DEVICE === "heating" ? {predictive_heating: document.getElementById("predictive-heating").checked} : {}),
                 start_min: minutesFromTime(document.getElementById("start").value),
                 end_min: minutesFromTime(document.getElementById("end").value),
                 interval_on: minutesToSeconds(

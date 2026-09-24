@@ -67,6 +67,10 @@ class TentRuntime:
     safety_status: object = None
     last_safety_ts: object = None
     safety_lock: object = field(default_factory=threading.RLock)
+    # Heating control/monitor state is independent for each station and resets
+    # on process restart; stale observations never cross a restart boundary.
+    heating_predictive_state: dict = field(default_factory=dict)
+    heating_target_watch: dict = field(default_factory=dict)
 
     _save_config_callback: object = None
 
