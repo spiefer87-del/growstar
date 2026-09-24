@@ -33,7 +33,7 @@ def add_transition(station_id, device, state, occurred_at, label):
         source="actuator_control",
         source_id=device,
         dedupe_key=f"activity-test:{station_id}:{device}:{state}:{occurred_at}",
-        metadata={"geraet": device, "zustand": state, "modus": "ENV", "grund": "Regeltest"},
+        metadata={"geraet": device, "zustand": state, "modus": "ENV", "grund": "Regeltest", "sitzung": "testlauf"},
     )
 
 
@@ -118,7 +118,7 @@ def main():
                 insights["state"] == "attention"
                 and insights["attention_count"] == 1
                 and short_cycle["station_id"] == "tent_1"
-                and set(short_cycle["evidence_ids"]) == set(heating_ids),
+                and set(short_cycle["evidence_ids"]) == set(heating["short_cycle_evidence_ids"]),
                 "Wiederholte Kurztaktung erscheint als belegte aktuelle Erkenntnis",
             )
         finally:

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Gerätezyklen – Grow Intelligence{% endblock %}
+{% block head %}
+<style>
+body{margin:0;padding:24px;background:#0f172a;color:#e5e7eb;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}.gc-shell{max-width:850px;margin:auto}.gc-back,.gc-pages a{display:inline-flex;padding:10px 14px;border:1px solid #334155;border-radius:10px;color:#bae6fd;text-decoration:none}.gc-back:hover,.gc-pages a:hover{background:#1e293b}.gc-title{margin:18px 0 5px;font-size:clamp(1.5rem,5vw,2rem)}.gc-muted,.gc-notes{color:#aebbd0;line-height:1.5}.gc-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}.gc-toolbar select{padding:9px 12px;border:1px solid #334155;border-radius:9px;background:#111827;color:#e5e7eb}.gc-toolbar button{padding:10px 14px;border:1px solid #22c55e;border-radius:9px;background:#123c2c;color:#baf7cc;cursor:pointer}.gc-card{margin:10px 0;padding:15px;border:1px solid #334155;border-radius:14px;background:#1e293b}.gc-card.short{border-left:3px solid #f59e0b}.gc-card h2{margin:0 0 9px;font-size:1rem}.gc-card p{margin:6px 0;color:#cbd5e1;font-size:.86rem;line-height:1.45}.gc-card small{color:#94a3b8}.gc-tag{display:inline-flex;padding:3px 8px;margin-left:7px;border:1px solid #64748b;border-radius:99px;color:#cbd5e1;font-size:.7rem}.gc-tag.short{border-color:#f59e0b;color:#fcd34d}.gc-tag.uncertain{border-color:#38bdf8;color:#bae6fd}.gc-pages{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:18px 0}.gc-empty{padding:20px;border:1px dashed #475569;border-radius:12px;color:#aebbd0}
+</style>
+{% endblock %}
+{% block page %}
+<main class="gc-shell">
+<a class="gc-back" href="{{ url_for('grow_control_events', station=station_id, range=selected_range, category='device') }}">← Zur Geräteübersicht</a>
+<h1 class="gc-title">⚙️ {{ station_label }} · {{ device|replace('_', ' ')|title }}</h1>
+<p class="gc-muted">{{ cycle_log.total }} vollständige EIN/AUS-Paare im gewählten Zeitraum. Die Dauer stammt aus den protokollierten Uhrzeiten.</p>
+<form class="gc-toolbar" method="get"><label for="cycle-range">Zeitraum</label><select id="cycle-range" name="range">{% for key, item in ranges.items() %}<option value="{{ key }}" {{ 'selected' if selected_range == key else '' }}>{{ item.label }}</option>{% endfor %}</select><button type="submit">Anzeigen</button></form>
+{% if cycle_log.source_limited %}<p class="gc-notes">Die Auswertung ist auf die neuesten 5.000 Geräteereignisse begrenzt. Ältere Paare können fehlen.</p>{% endif %}
+{% if cycle_log.restart_interruptions or cycle_log.unmatched_off or cycle_log.duplicate_on %}<p class="gc-notes">Nicht als Vollzyklus gezählt: {{ cycle_log.restart_interruptions }} durch App-Neustart getrennte Phase(n), {{ cycle_log.unmatched_off }} AUS ohne bekanntes EIN, {{ cycle_log.duplicate_on }} erneute EIN-Meldung(en).</p>{% endif %}
+{% if cycle_log.open_event %}<p class="gc-notes">Eine EIN-Phase ab Ereignis #{{ cycle_log.open_event.id }} ist noch offen und hat keine belegte Endzeit.</p>{% endif %}
+{% for cycle in cycle_log['items'] %}
+<article class="gc-card {{ 'short' if cycle.short and cycle.warning_eligible else '' }}">
+<h2>{{ cycle.duration_label }}{% if cycle.short and cycle.warning_eligible %}<span class="gc-tag short">≤ 3 Min.</span>{% elif cycle.quality_note %}<span class="gc-tag uncertain">eingeschränkt vergleichbar</span>{% endif %}</h2>
+<p><strong>EIN</strong> {{ cycle.start_label }} · Ereignis #{{ cycle.start_id }}<br><strong>AUS</strong> {{ cycle.end_label }} · Ereignis #{{ cycle.end_id }}</p>
+<p>{{ cycle.mode_label }}{% if cycle.quality_note %} · {{ cycle.quality_note }}{% endif %}</p>
+{% if cycle.temperature_delta or cycle.humidity_delta %}<p>Sensoränderung zwischen EIN und AUS:{% if cycle.temperature_delta %} Temperatur {{ cycle.temperature_delta }}{% endif %}{% if cycle.humidity_delta %} · Feuchte {{ cycle.humidity_delta }}{% endif %}</p>{% endif %}
+</article>
+{% else %}<div class="gc-empty">Keine vollständigen Zyklen in diesem Zeitraum. Wähle einen längeren Zeitraum oder prüfe das Ereignisprotokoll.</div>{% endfor %}
+{% if cycle_log.pages > 1 %}<nav class="gc-pages" aria-label="Zyklusseiten">{% if cycle_log.page > 1 %}<a href="{{ url_for('grow_control_device_cycles', station_id=station_id, device=device, range=selected_range, page=cycle_log.page-1) }}">← Neuere</a>{% endif %}<span>Seite {{ cycle_log.page }} / {{ cycle_log.pages }}</span>{% if cycle_log.page < cycle_log.pages %}<a href="{{ url_for('grow_control_device_cycles', station_id=station_id, device=device, range=selected_range, page=cycle_log.page+1) }}">Ältere →</a>{% endif %}</nav>{% endif %}
+<p class="gc-notes">Sensoränderungen zeigen nur zwei Messpunkte; sie beweisen keine Gerätewirkung. Die Shelly-Antwort bestätigt den angenommenen Befehl, nicht eine unabhängige Relaismessung. Ältere Ereignisse ohne App-Sitzung oder Paare mit wechselnder Regelart zählen nicht in die Kurztakt-Warnung.</p>
+</main>
+{% endblock %}

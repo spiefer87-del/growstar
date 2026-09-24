@@ -1,8 +1,9 @@
 """Read-only Webansicht für Grow-Intelligence-Ereignisse."""
 
 import time
+import re
 
-from flask import render_template, request
+from flask import abort, render_template, request
 
 from core.tents import manager as tent_manager
 from services.grow_events import (
@@ -12,7 +13,7 @@ from services.grow_events import (
     event_summary,
     list_events,
 )
-from services.grow_insights import build_device_activity, build_insights
+from services.grow_insights import build_device_activity, build_device_cycle_log, build_insights
 
 
 RANGES = {
@@ -29,6 +30,31 @@ def _selection(value, allowed, fallback="all"):
 
 
 def register(app):
+    @app.get("/grow-control/events/zyklen/<station_id>/<device>")
+    def grow_control_device_cycles(station_id, device):
+        station_names = {
+            str(tent.get("id")): str(tent.get("name") or tent.get("id"))
+            for tent in tent_manager.list_tents() if tent.get("id")
+        }
+        if station_id not in station_names or not re.fullmatch(r"[a-z0-9_]{1,64}", device):
+            abort(404)
+        selected_range = _selection(request.args.get("range"), RANGES, "7d")
+        seconds = RANGES[selected_range]["seconds"]
+        since = int(time.time()) - seconds if seconds is not None else None
+        try:
+            page = max(1, int(request.args.get("page") or 1))
+        except (TypeError, ValueError):
+            page = 1
+        cycle_log = build_device_cycle_log(
+            station_id=station_id, device=device, since=since,
+            station_names=station_names, page=page,
+        )
+        return render_template(
+            "grow_device_cycles.html", cycle_log=cycle_log,
+            station_id=station_id, station_label=station_names[station_id],
+            device=device, selected_range=selected_range, ranges=RANGES,
+        )
+
     @app.get("/grow-control/events")
     def grow_control_events():
         tents = tent_manager.list_tents()

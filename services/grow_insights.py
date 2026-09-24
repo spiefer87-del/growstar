@@ -77,6 +77,158 @@ def _device_label(event, device):
     return str(device or "Aktor").replace("_", " ").strip().title()
 
 
+def _decimal_label(value, digits=1):
+    try:
+        return f"{float(value):.{digits}f}".replace(".", ",")
+    except (TypeError, ValueError):
+        return None
+
+
+def _climate_context_label(metadata):
+    metadata = metadata if isinstance(metadata, dict) else {}
+    parts = []
+    profile = str(metadata.get("profil") or "").upper()
+    if profile in {"TAG", "NACHT"}:
+        parts.append("Tagprofil" if profile == "TAG" else "Nachtprofil")
+    temperature = _decimal_label(metadata.get("temperatur_c"))
+    humidity = _decimal_label(metadata.get("luftfeuchte_pct"))
+    vpd = _decimal_label(metadata.get("vpd_kpa"), 2)
+    if temperature:
+        parts.append(f"{temperature} °C")
+    if humidity:
+        parts.append(f"{humidity} %")
+    if vpd:
+        parts.append(f"VPD {vpd} kPa")
+    temp_target = _decimal_label(metadata.get("temperatur_soll_c"))
+    temp_tol = _decimal_label(metadata.get("temperatur_toleranz_c"))
+    if temp_target:
+        parts.append(
+            f"Temp.-Soll {temp_target}"
+            + (f" ± {temp_tol} °C" if temp_tol else " °C")
+        )
+    hum_target = _decimal_label(metadata.get("feuchte_soll_pct"))
+    hum_tol = _decimal_label(metadata.get("feuchte_toleranz_pct"))
+    if hum_target:
+        parts.append(
+            f"Feuchte-Soll {hum_target}"
+            + (f" ± {hum_tol} %" if hum_tol else " %")
+        )
+    return " · ".join(parts) or None
+
+
+def _operation_label(mode, strategy):
+    labels = {
+        "DAUERBETRIEB": "Dauerbetrieb",
+        "INTERVALL_DAUERSTROM": "Intervall · Shelly bleibt EIN",
+        "INTERVALL_SCHALTEND": "Intervall · Shelly schaltet",
+        "INTERVALL_AUS": "Intervall · Shelly bleibt AUS",
+        "INTERVALL_UNBEKANNT": "Intervallbetrieb",
+        "ZEITPLAN": "Zeitplan",
+        "BEDARFSGESTEUERT": "Umgebungsregelung",
+    }
+    return labels.get(strategy) or {
+        "ON": "Dauerbetrieb",
+        "INTERVAL": "Intervallbetrieb",
+        "TIME": "Zeitplan",
+        "ENV": "Umgebungsregelung",
+        "OFF": "Aus",
+    }.get(mode, mode or "Unbekannter Modus")
+
+
+def _cycle_delta(start_metadata, end_metadata, key, unit):
+    try:
+        start = float(start_metadata[key])
+        end = float(end_metadata[key])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not all(-1000 < value < 1000 for value in (start, end)):
+        return None
+    change = round(end - start, 1)
+    return f"{change:+.1f} {unit}".replace(".", ",")
+
+
+def _pair_device_events(events):
+    """Pair ordered transitions once for both overview and verifiable cycle pages."""
+    open_event = None
+    previous_session = None
+    states = []
+    cycles = []
+    interrupted = duplicate_on = unmatched_off = 0
+    for event in events:
+        metadata = event.get("metadata") or {}
+        state = str(metadata.get("zustand") or "").upper()
+        if state not in {"EIN", "AUS"}:
+            continue
+        session = str(metadata.get("sitzung") or "").strip() or None
+        if previous_session and session and session != previous_session and open_event is not None:
+            interrupted += 1
+            open_event = None
+        if session:
+            previous_session = session
+        states.append(state)
+        if state == "EIN":
+            if open_event is not None:
+                duplicate_on += 1
+            open_event = event
+        elif open_event is not None:
+            started = open_event
+            start_meta = started.get("metadata") or {}
+            start_session = str(start_meta.get("sitzung") or "").strip()
+            start_mode = str(start_meta.get("modus") or "").upper()
+            end_mode = str(metadata.get("modus") or "").upper()
+            seconds = max(0, int(event.get("occurred_at") or 0) - int(started.get("occurred_at") or 0))
+            reliable = bool(start_session and session and start_session == session)
+            eligible = reliable and start_mode == end_mode == "ENV"
+            cycles.append({
+                "start_id": started["id"], "end_id": event["id"],
+                "started_at": int(started.get("occurred_at") or 0),
+                "ended_at": int(event.get("occurred_at") or 0),
+                "start_label": f"{started.get('day_label', '')} {started.get('time_label', '')}".strip(),
+                "end_label": f"{event.get('day_label', '')} {event.get('time_label', '')}".strip(),
+                "seconds": seconds, "duration_label": _duration_label(seconds),
+                "short": seconds <= SHORT_CYCLE_SECONDS,
+                "warning_eligible": eligible,
+                "quality_note": None if reliable and start_mode == end_mode and start_mode else (
+                    "Regelart wechselte oder fehlt" if reliable else
+                    "Sitzungskennung fehlt; Neustart dazwischen nicht ausschließbar"
+                ),
+                "mode_label": _operation_label(start_mode, str(start_meta.get("relaisstrategie") or "").upper()),
+                "temperature_delta": _cycle_delta(start_meta, metadata, "temperatur_c", "°C"),
+                "humidity_delta": _cycle_delta(start_meta, metadata, "luftfeuchte_pct", "%"),
+            })
+            open_event = None
+        else:
+            unmatched_off += 1
+    return {
+        "cycles": cycles, "states": states, "open_event": open_event,
+        "restart_interruptions": interrupted,
+        "duplicate_on": duplicate_on, "unmatched_off": unmatched_off,
+    }
+
+
+def build_device_cycle_log(*, station_id, device, since=None, station_names=None, page=1, per_page=25):
+    """Read-only, paginated evidence for every matched cycle in the selected window."""
+    rows = analysis_events(
+        station_id=station_id, include_global=False, since=since,
+        event_types=DEVICE_ACTIVITY_TYPES, limit=5000, station_names=station_names,
+    )
+    events = [row for row in reversed(rows) if str(row.get("source_id") or (row.get("metadata") or {}).get("geraet") or "aktor") == device]
+    paired = _pair_device_events(events)
+    cycles = list(reversed(paired["cycles"]))
+    per_page = max(1, min(50, int(per_page)))
+    pages = max(1, (len(cycles) + per_page - 1) // per_page)
+    page = max(1, min(int(page), pages))
+    return {
+        "items": cycles[(page - 1) * per_page:page * per_page],
+        "total": len(cycles), "page": page, "pages": pages,
+        "source_limited": len(rows) >= 5000,
+        "restart_interruptions": paired["restart_interruptions"],
+        "unmatched_off": paired["unmatched_off"],
+        "duplicate_on": paired["duplicate_on"],
+        "open_event": paired["open_event"],
+    }
+
+
 def build_device_activity(*, station_id=None, since=None, station_names=None, now=None):
     """Verdichtet bestätigte Relaiswechsel ohne die Rohereignisse zu verändern."""
     now = int(time.time() if now is None else now)
@@ -98,37 +250,76 @@ def build_device_activity(*, station_id=None, since=None, station_names=None, no
 
     items = []
     for (_, device), events in groups.items():
-        open_since = None
-        open_event = None
-        completed = []
-        states = []
-        for event in events:
-            state = str((event.get("metadata") or {}).get("zustand") or "").upper()
-            occurred_at = int(event.get("occurred_at") or 0)
-            if state not in {"EIN", "AUS"}:
-                continue
-            states.append(state)
-            if state == "EIN":
-                if open_since is None:
-                    open_since = occurred_at
-                    open_event = event
-            elif open_since is not None:
-                completed.append(max(0, occurred_at - open_since))
-                open_since = None
-                open_event = None
+        paired = _pair_device_events(events)
+        completed_cycles = paired["cycles"]
+        completed = [cycle["seconds"] for cycle in completed_cycles]
+        eligible_cycles = [cycle for cycle in completed_cycles if cycle["warning_eligible"]]
+        states = paired["states"]
+        open_event = paired["open_event"]
+        restart_interruptions = paired["restart_interruptions"]
+        duplicate_on = paired["duplicate_on"]
+        unmatched_off = paired["unmatched_off"]
 
         newest = events[-1]
+        latest_metadata = newest.get("metadata") or {}
+        mode = str(latest_metadata.get("modus") or "").upper()
+        strategy = str(latest_metadata.get("relaisstrategie") or "").upper()
+        continuous_operation = (
+            mode == "ON"
+            or strategy in {"DAUERBETRIEB", "INTERVALL_DAUERSTROM"}
+        )
         active = bool(states and states[-1] == "EIN")
-        ongoing_seconds = max(0, now - open_since) if active and open_since is not None else 0
+        ongoing_seconds = max(0, now - int(open_event.get("occurred_at") or 0)) if active and open_event is not None else 0
         documented_seconds = sum(completed)
         average_seconds = round(sum(completed) / len(completed)) if completed else 0
-        short_cycles = sum(1 for duration in completed if duration <= SHORT_CYCLE_SECONDS)
+        short_cycles = sum(1 for cycle in eligible_cycles if cycle["short"])
         short_cycle_warning = (
-            len(completed) >= SHORT_CYCLE_MIN_COMPLETED
+            mode == "ENV"
+            and len(eligible_cycles) >= SHORT_CYCLE_MIN_COMPLETED
             and short_cycles >= 3
-            and short_cycles / len(completed) >= 0.6
+            and short_cycles / len(eligible_cycles) >= 0.6
         )
-        latest_metadata = newest.get("metadata") or {}
+        if completed:
+            average_display = _duration_label(average_seconds)
+        elif continuous_operation:
+            average_display = "nicht nötig"
+        elif mode == "INTERVAL":
+            average_display = "kein Relais-Aus"
+        elif active:
+            average_display = "Phase offen"
+        else:
+            average_display = "kein Vollzyklus"
+
+        cycle_notes = []
+        if strategy == "INTERVALL_DAUERSTROM":
+            cycle_notes.append(
+                "In beiden Intervallphasen bleibt Shelly-Power EIN; nur die Controllerwerte wechseln."
+            )
+        elif mode == "ON" or strategy == "DAUERBETRIEB":
+            cycle_notes.append("Im Dauerbetrieb ist kein regelmäßiger AUS-Zyklus vorgesehen.")
+        elif mode == "INTERVAL" and not completed:
+            cycle_notes.append(
+                "Im Intervallbetrieb wurde bisher kein Relais-AUS erfasst; abhängig vom Phasenprofil kann das korrekt sein."
+            )
+        elif active and not completed:
+            cycle_notes.append("Der erste Durchschnitt folgt nach einem bestätigten Ausschalten.")
+        elif unmatched_off and not completed:
+            cycle_notes.append(
+                "Der Beginn lag vor dem Zeitraum oder wurde noch nicht protokolliert."
+            )
+        if restart_interruptions:
+            cycle_notes.append(
+                f"{restart_interruptions} offene Phase(n) wurden an einem App-Neustart getrennt."
+            )
+        if duplicate_on:
+            cycle_notes.append(
+                f"{duplicate_on} erneute EIN-Meldung(en) ohne vorheriges AUS wurden nicht als Vollzyklus gezählt."
+            )
+        uncertain_cycles = len(completed_cycles) - len(eligible_cycles)
+        if mode == "ENV" and uncertain_cycles:
+            cycle_notes.append(
+                f"{uncertain_cycles} Zyklus/Zyklen gehen nicht in die Kurztakt-Bewertung ein (ältere Daten oder geänderte Regelart)."
+            )
         reason = str(latest_metadata.get("grund") or "").strip()
         items.append({
             "station_id": newest.get("station_id"),
@@ -145,8 +336,23 @@ def build_device_activity(*, station_id=None, since=None, station_names=None, no
             "active_since_time_label": open_event.get("time_label") if open_event else None,
             "average_seconds": average_seconds,
             "average_label": _duration_label(average_seconds) if completed else "–",
+            "average_display": average_display,
             "short_cycles": short_cycles,
+            "warning_eligible_cycles": len(eligible_cycles),
+            "cycle_examples": list(reversed(completed_cycles[-3:])),
+            "recent_short_cycles": list(reversed([cycle for cycle in eligible_cycles if cycle["short"]][-3:])),
+            "short_cycle_evidence_ids": [
+                event_id for cycle in reversed([cycle for cycle in eligible_cycles if cycle["short"]][-3:])
+                for event_id in (cycle["start_id"], cycle["end_id"])
+            ],
             "short_cycle_warning": short_cycle_warning,
+            "continuous_operation": continuous_operation,
+            "operation_label": _operation_label(mode, strategy),
+            "cycle_note": " ".join(cycle_notes) or None,
+            "restart_interruptions": restart_interruptions,
+            "duplicate_on": duplicate_on,
+            "unmatched_off": unmatched_off,
+            "climate_context": _climate_context_label(latest_metadata),
             "active": active,
             "state_label": "AKTIV" if active else "AUS",
             "latest_at": int(newest.get("occurred_at") or 0),
@@ -292,12 +498,12 @@ def build_insights(
             item["icon"],
             f"Kurze {item['label']}-Zyklen erkannt",
             (
-                f"{item['short_cycles']} von {item['cycles']} vollständig beobachteten "
+                f"{item['short_cycles']} von {item['warning_eligible_cycles']} vergleichbaren "
                 "Einschaltphasen dauerten höchstens drei Minuten. Bitte Regel-Toleranz "
                 "und Sensorposition prüfen; dies ist keine bestätigte Störung."
             ),
             event=event,
-            evidence=item["evidence_ids"],
+            evidence=item["short_cycle_evidence_ids"],
         ))
 
     recovered = [event for event in rows if event.get("event_type") == "alarm_recovered"]
@@ -407,5 +613,5 @@ def build_insights(
 
 __all__ = (
     "CORRELATION_WINDOW_SEC", "SHORT_CYCLE_MIN_COMPLETED", "SHORT_CYCLE_SECONDS",
-    "build_device_activity", "build_insights",
+    "build_device_activity", "build_device_cycle_log", "build_insights",
 )
