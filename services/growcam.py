@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import json
 import os
 from pathlib import Path
@@ -36,6 +36,7 @@ DEFAULT_CONFIG = {
     "batch_id": None,
     "timelapse_enabled": False,
     "timelapse_interval_sec": 900,
+    "timelapse_start_time": "",
     "retention_days": 30,
     "video_retention_count": 25,
     "live_width": 2560,
@@ -248,6 +249,12 @@ def _normalize_config(data, camera_id=PRIMARY_CAMERA_ID):
     result["timelapse_enabled"] = bool(data.get("timelapse_enabled", False))
     if result["timelapse_enabled"] and result["batch_id"] is None:
         raise ValueError("Für den Zeitraffer muss ein Durchgang ausgewählt sein.")
+
+    start_time = str(data.get("timelapse_start_time") or "").strip()
+    if start_time:
+        if not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", start_time):
+            raise ValueError("Die Zeitraffer-Startzeit muss im Format HH:MM angegeben werden.")
+    result["timelapse_start_time"] = start_time
 
     for key, minimum, maximum in (
         ("timelapse_interval_sec", 60, 86400),
@@ -603,6 +610,7 @@ def status_snapshot(camera_id=None):
         "batch_id": batch_id,
         "timelapse_enabled": bool(config.get("timelapse_enabled")),
         "timelapse_interval_sec": config.get("timelapse_interval_sec"),
+        "timelapse_start_time": config.get("timelapse_start_time") or "",
         "retention_days": config.get("retention_days"),
         "video_retention_count": config.get("video_retention_count"),
         "live_width": config.get("live_width"),
@@ -1357,11 +1365,33 @@ def mjpeg_stream(camera_id=None):
             status["live_clients"] = max(0, status["live_clients"] - 1)
 
 
+def next_timelapse_capture(now_timestamp, interval_seconds, start_time):
+    """Next local wall-clock slot, strictly after now, without replaying missed slots."""
+    hour, minute = map(int, start_time.split(":"))
+    now_local = datetime.fromtimestamp(now_timestamp)
+    anchor = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    interval = int(interval_seconds)
+    elapsed = (now_local - anchor).total_seconds()
+    steps = int(elapsed // interval) + 1
+    return (anchor + timedelta(seconds=steps * interval)).timestamp()
+
+
+def next_timelapse_capture_label(config):
+    start_time = config.get("timelapse_start_time")
+    if not start_time or not config.get("timelapse_enabled") or not config.get("enabled") or not config.get("host"):
+        return None
+    next_timestamp = next_timelapse_capture(
+        time.time(), config.get("timelapse_interval_sec") or 900, start_time
+    )
+    return time.strftime("%d.%m.%Y, %H:%M", time.localtime(next_timestamp))
+
+
 def growcam_loop():
     print("📷 GrowCam Snapshot-Thread gestartet")
     schedules = {}
     while True:
         now = time.monotonic()
+        now_wall = time.time()
         cameras = list_public_configs()
         active_ids = {camera["camera_id"] for camera in cameras}
         for stale_id in set(schedules) - active_ids:
@@ -1371,17 +1401,24 @@ def growcam_loop():
             current_key = (
                 config.get("enabled"), config.get("interval_sec"),
                 config.get("timelapse_enabled"), config.get("timelapse_interval_sec"),
-                config.get("batch_id"), config.get("host"),
+                config.get("timelapse_start_time"), config.get("batch_id"), config.get("host"),
             )
             schedule = schedules.setdefault(camera_id, {
                 "key": None, "next_capture": 0.0, "next_archive": 0.0,
             })
             if current_key != schedule["key"]:
-                schedule.update({"key": current_key, "next_capture": 0.0, "next_archive": 0.0})
+                start_time = config.get("timelapse_start_time")
+                schedule.update({
+                    "key": current_key, "next_capture": 0.0,
+                    "next_archive": next_timelapse_capture(
+                        now_wall, config.get("timelapse_interval_sec") or 900, start_time
+                    ) if start_time else 0.0,
+                })
             preview_due = now >= schedule["next_capture"]
+            start_time = config.get("timelapse_start_time")
             archive_due = (
                 config.get("timelapse_enabled") and config.get("batch_id")
-                and now >= schedule["next_archive"]
+                and (now_wall if start_time else now) >= schedule["next_archive"]
             )
             if config.get("enabled") and config.get("host") and (preview_due or archive_due):
                 result = capture_snapshot(archive=bool(archive_due), camera_id=camera_id)
@@ -1391,7 +1428,10 @@ def growcam_loop():
                 if preview_due:
                     schedule["next_capture"] = finished + int(config.get("interval_sec") or 60)
                 if archive_due:
-                    schedule["next_archive"] = finished + int(config.get("timelapse_interval_sec") or 900)
+                    schedule["next_archive"] = (
+                        next_timelapse_capture(time.time(), config.get("timelapse_interval_sec") or 900, start_time)
+                        if start_time else finished + int(config.get("timelapse_interval_sec") or 900)
+                    )
             elif not config.get("enabled"):
                 schedule["next_capture"] = schedule["next_archive"] = 0.0
         time.sleep(1)

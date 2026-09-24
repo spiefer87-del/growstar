@@ -41,6 +41,7 @@ from services.growcam import (
     list_timelapse_frames,
     list_timelapse_videos,
     mjpeg_stream,
+    next_timelapse_capture_label,
     public_config,
     resolve_recording,
     resolve_timelapse_video,
@@ -122,7 +123,25 @@ def register(app):
             ),
             frame_day_counts=timelapse_frame_days(camera.get("batch_id"), camera_id=camera_id),
             recent_videos=list_timelapse_videos(camera.get("batch_id"), camera_id=camera_id, per_page=6)["items"] if camera.get("batch_id") else [],
+            next_timelapse_capture=next_timelapse_capture_label(camera),
         )
+
+    @app.post("/pflanzenmanagement/zeitraffer/aktivieren")
+    @permission_required("plants.edit")
+    def growcam_timelapse_toggle():
+        current = selected_camera()
+        camera_id = current["camera_id"]
+        enabled = request.form.get("enabled") == "1"
+        try:
+            config = save_config({**current, "timelapse_enabled": enabled}, camera_id=camera_id)
+            _audit("plants.growcam_timelapse_configured", {
+                "batch_id": config["batch_id"], "enabled": config["timelapse_enabled"],
+            }, camera_id=camera_id)
+            flash("Zeitraffer-Aufnahmen aktiviert." if enabled else "Zeitraffer-Aufnahmen deaktiviert.", "success")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("growcam_timelapse_page", camera_id=camera_id, plan=1, _anchor="timelapse-plan"))
+        return redirect(url_for("growcam_timelapse_page", camera_id=camera_id))
 
     @app.post("/pflanzenmanagement/kamera/konfiguration")
     @permission_required("plants.edit")
@@ -177,8 +196,9 @@ def register(app):
             config = save_config({
                 **current,
                 "batch_id": batch_id,
-                "timelapse_enabled": request.form.get("timelapse_enabled") == "1",
+                "timelapse_enabled": current["timelapse_enabled"],
                 "timelapse_interval_sec": request.form.get("timelapse_interval_sec"),
+                "timelapse_start_time": request.form.get("timelapse_start_time"),
                 "retention_days": request.form.get("retention_days"),
                 "video_retention_count": request.form.get("video_retention_count"),
             }, camera_id=camera_id)
@@ -188,13 +208,14 @@ def register(app):
                     "batch_id": config["batch_id"],
                     "enabled": config["timelapse_enabled"],
                     "interval_sec": config["timelapse_interval_sec"],
+                    "start_time": config["timelapse_start_time"],
                 },
                 camera_id=camera_id,
             )
             flash("Zeitraffer-Konfiguration wurde gespeichert.", "success")
         except Exception as exc:
             flash(str(exc), "error")
-        return redirect(url_for("growcam_timelapse_page", camera_id=camera_id))
+        return redirect(url_for("growcam_timelapse_page", camera_id=camera_id, plan=1, _anchor="timelapse-plan"))
 
     @app.post("/devices/growcam/hinzufuegen")
     @app.post("/grow-control/connections/growcam/hinzufuegen")
