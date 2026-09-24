@@ -23,7 +23,7 @@ from core.runtime import resolve_runtime
 
 SAFETY_LOOP_MAX_AGE_SEC = 8.0
 SAFETY_STATUS_STALE_SEC = 6.0
-_ALLOWED_MODES = {"OFF", "ON", "TIME", "INTERVAL", "ENV"}
+_ALLOWED_MODES = {"OFF", "ON", "TIME", "TIMER", "INTERVAL", "ENV"}
 
 
 def _age(now, timestamp):

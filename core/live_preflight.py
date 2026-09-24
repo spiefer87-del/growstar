@@ -11,6 +11,7 @@ import time
 
 from core.constants import SENSOR_TIMEOUT
 from core.devices import get_device_mode, get_device_params
+from core.timer_schedule import validate_timer_windows
 from core.hardware.actuator_health import get_endpoint_health
 from core.hardware_assignments import (
     DEVICE_HARDWARE,
@@ -22,7 +23,7 @@ from core.runtime import resolve_runtime
 
 
 LIVE_LOOP_MAX_AGE_SEC = 8.0
-_ALLOWED_MODES = {"OFF", "ON", "TIME", "INTERVAL", "ENV"}
+_ALLOWED_MODES = {"OFF", "ON", "TIME", "TIMER", "INTERVAL", "ENV"}
 
 
 def _age(now, timestamp):
@@ -92,6 +93,11 @@ def _config_check(runtime, active_devices):
         if mode == "TIME":
             minute_value(device, "start_min", params.get("start_min", 0))
             minute_value(device, "end_min", params.get("end_min", 0))
+        elif mode == "TIMER":
+            try:
+                validate_timer_windows(params.get("timer_windows"), require_one=True)
+            except ValueError as exc:
+                errors.append(f"{device}: {exc}")
         elif mode == "INTERVAL":
             try:
                 on_sec = int(params.get("interval_on", 300))

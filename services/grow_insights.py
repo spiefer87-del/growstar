@@ -125,12 +125,14 @@ def _operation_label(mode, strategy):
         "INTERVALL_AUS": "Intervall · Shelly bleibt AUS",
         "INTERVALL_UNBEKANNT": "Intervallbetrieb",
         "ZEITPLAN": "Zeitplan",
+        "ZEITSCHALTUHR": "Zeitschaltuhr",
         "BEDARFSGESTEUERT": "Umgebungsregelung",
     }
     return labels.get(strategy) or {
         "ON": "Dauerbetrieb",
         "INTERVAL": "Intervallbetrieb",
         "TIME": "Zeitplan",
+        "TIMER": "Zeitschaltuhr",
         "ENV": "Umgebungsregelung",
         "OFF": "Aus",
     }.get(mode, mode or "Unbekannter Modus")

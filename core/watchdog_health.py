@@ -20,6 +20,7 @@ from core.hardware.actuator_health import actuator_poll_status, get_endpoint_hea
 from core.hardware_assignments import DEVICE_HARDWARE, device_display_label
 from core.runtime import list_runtimes
 from core.tents import DEFAULT_TENT_ID
+from core.timer_schedule import validate_timer_windows
 
 
 CONTROL_LOOP_STALE_SEC = 10
@@ -147,6 +148,12 @@ def _config_health(rt):
             mode = str(raw_mode or "OFF").upper()
             if mode not in DEVICE_MODES:
                 issues.append(f"{device}: ungültiger Modus {mode}")
+            elif mode == "TIMER":
+                try:
+                    params = (cfg.get("DEVICE_PARAMS") or {}).get(device) or {}
+                    validate_timer_windows(params.get("timer_windows"), require_one=True)
+                except (AttributeError, ValueError):
+                    issues.append(f"{device}: Zeitschaltuhr ohne gültige Zeitfenster")
 
     assignments = cfg.get("SENSOR_ASSIGNMENTS")
     if assignments is not None and not isinstance(assignments, dict):

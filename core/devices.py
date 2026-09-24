@@ -23,7 +23,7 @@ DEVICE_META = {
 }
 
 DEVICE_NAMES = tuple(DEVICE_META)
-DEVICE_MODES = {"OFF", "ON", "TIME", "INTERVAL", "ENV"}
+DEVICE_MODES = {"OFF", "ON", "TIME", "TIMER", "INTERVAL", "ENV"}
 DEVICE_LABEL_MAX_LENGTH = 48
 
 
@@ -170,7 +170,7 @@ def update_device_config(device, data, runtime=None):
     """Aktualisiert genau ein Gerät atomar in genau einer TentRuntime.
 
     Phase 4L:
-    OFF bleibt immer möglich. ON/TIME/INTERVAL/ENV werden dagegen nur
+    OFF bleibt immer möglich. Aktive Modi werden dagegen nur
     gespeichert, wenn bereits IP/Hostname + Relay zugeordnet sind.
     """
 
@@ -197,22 +197,34 @@ def update_device_config(device, data, runtime=None):
         env = data["DEVICE_ENV_CONFIG"].get(device, env)
 
     changed = []
+    effective_mode = _normalize_mode(mode) if mode is not None else get_device_mode(device, runtime=rt)
 
     if mode is not None:
-        normalized_mode = _normalize_mode(mode)
-        _assert_hardware_for_active_mode(device, normalized_mode, rt)
-        working["DEVICE_MODES"][device] = normalized_mode
+        _assert_hardware_for_active_mode(device, effective_mode, rt)
+        working["DEVICE_MODES"][device] = effective_mode
         changed.append("mode")
 
     if params is not None:
         if not isinstance(params, dict):
             raise TypeError("params muss ein JSON-Objekt sein")
+        if "timer_windows" in params:
+            from core.timer_schedule import validate_timer_windows
+            params = deepcopy(params)
+            params["timer_windows"] = validate_timer_windows(
+                params["timer_windows"],
+                require_one=effective_mode == "TIMER",
+            )
         current = working["DEVICE_PARAMS"].setdefault(device, {})
         if not isinstance(current, dict):
             current = {}
             working["DEVICE_PARAMS"][device] = current
         current.update(deepcopy(params))
         changed.append("params")
+
+    if effective_mode == "TIMER":
+        from core.timer_schedule import validate_timer_windows
+        timer_params = working["DEVICE_PARAMS"].get(device) or {}
+        validate_timer_windows(timer_params.get("timer_windows"), require_one=True)
 
     if env is not None:
         if not isinstance(env, dict):

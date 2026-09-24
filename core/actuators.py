@@ -2,10 +2,109 @@
 
 import requests
 import time
+import uuid
 
 import core.context as ctx
 
 from core.runtime import resolve_runtime
+
+
+_ACTUATOR_EVENT_SESSION_ID = uuid.uuid4().hex[:12]
+
+
+def _rounded_event_value(value, digits=2):
+    try:
+        return round(float(value), digits)
+    except (TypeError, ValueError):
+        return None
+
+
+def _interval_relay_strategy(params, profile):
+    params = params if isinstance(params, dict) else {}
+    states = params.get("control_states")
+    states = states if isinstance(states, dict) else {}
+
+    def power(name, fallback):
+        state = states.get(name)
+        if not isinstance(state, dict):
+            return bool(fallback)
+        return bool(state.get("power", fallback))
+
+    day_a = power("interval_a", True)
+    day_b = power("interval_b", False)
+    use_night = bool(params.get("interval_night_enabled")) and profile == "NACHT"
+    phase_a = power("interval_a_night", day_a) if use_night else day_a
+    phase_b = power("interval_b_night", day_b) if use_night else day_b
+    if phase_a and phase_b:
+        strategy = "INTERVALL_DAUERSTROM"
+    elif phase_a or phase_b:
+        strategy = "INTERVALL_SCHALTEND"
+    else:
+        strategy = "INTERVALL_AUS"
+    return {
+        "relaisstrategie": strategy,
+        "phase_a_power": "EIN" if phase_a else "AUS",
+        "phase_b_power": "EIN" if phase_b else "AUS",
+        "intervallprofil": "NACHT" if use_night else "TAG",
+    }
+
+
+def _actuator_event_context(runtime, device, mode):
+    """Liest einen konsistenten, rein diagnostischen Klima-Snapshot."""
+    st = runtime.state
+    cfg = runtime.config
+    with runtime.state_lock:
+        live = dict(st.live_state or {})
+        vpd_control = dict(live.get("vpd_control") or {})
+
+    profile = str(
+        live.get("profile") or getattr(st, "current_profile", None) or ""
+    ).upper() or None
+    temperature = _rounded_event_value(live.get("temp"))
+    humidity = _rounded_event_value(live.get("hum"))
+    vpd = _rounded_event_value(live.get("vpd"), 3)
+    temp_target = _rounded_event_value(live.get("temp_target"))
+    temp_tolerance = _rounded_event_value(live.get("temp_tol"))
+    hum_target = _rounded_event_value(live.get("hum_target"))
+    hum_tolerance = _rounded_event_value(live.get("hum_tol"))
+
+    context = {
+        "sitzung": _ACTUATOR_EVENT_SESSION_ID,
+        "profil": profile,
+        "temperatur_c": temperature,
+        "luftfeuchte_pct": humidity,
+        "vpd_kpa": vpd,
+        "temperatur_soll_c": temp_target,
+        "temperatur_toleranz_c": temp_tolerance,
+        "feuchte_soll_pct": hum_target,
+        "feuchte_toleranz_pct": hum_tolerance,
+        "vpd_modus": str(
+            vpd_control.get("mode") or cfg.get("VPD_CONTROL_MODE") or "OFF"
+        ).upper(),
+    }
+    if mode == "ON":
+        context["relaisstrategie"] = "DAUERBETRIEB"
+    elif mode == "INTERVAL":
+        try:
+            from core.devices import get_device_params
+
+            context.update(_interval_relay_strategy(
+                get_device_params(device, runtime=runtime),
+                profile,
+            ))
+        except Exception:
+            context["relaisstrategie"] = "INTERVALL_UNBEKANNT"
+    elif mode == "TIME":
+        context["relaisstrategie"] = "ZEITPLAN"
+    elif mode == "TIMER":
+        context["relaisstrategie"] = "ZEITSCHALTUHR"
+    elif mode == "ENV":
+        context["relaisstrategie"] = "BEDARFSGESTEUERT"
+    if temperature is not None and temp_target is not None:
+        context["temperatur_abweichung_c"] = round(temperature - temp_target, 2)
+    if humidity is not None and hum_target is not None:
+        context["feuchte_abweichung_pct"] = round(humidity - hum_target, 2)
+    return {key: value for key, value in context.items() if value is not None}
 
 
 def _enqueue_actuator_transition(runtime, device, enabled, reason=""):
@@ -23,6 +122,13 @@ def _enqueue_actuator_transition(runtime, device, enabled, reason=""):
             + (f" Grund: {clean_reason}." if clean_reason else "")
         )
         occurred_at = int(time.time())
+        metadata = {
+            "geraet": str(device),
+            "zustand": "EIN" if enabled else "AUS",
+            "modus": mode,
+            "grund": clean_reason or None,
+        }
+        metadata.update(_actuator_event_context(runtime, device, mode))
         enqueue_event(
             station_id=runtime.tent_id,
             occurred_at=occurred_at,
@@ -37,12 +143,7 @@ def _enqueue_actuator_transition(runtime, device, enabled, reason=""):
                 f"actuator:{runtime.tent_id}:{device}:"
                 f"{'on' if enabled else 'off'}:{time.time_ns()}"
             ),
-            metadata={
-                "geraet": str(device),
-                "zustand": "EIN" if enabled else "AUS",
-                "modus": mode,
-                "grund": clean_reason or None,
-            },
+            metadata=metadata,
         )
     except Exception as exc:
         # Die Timeline darf einen erfolgreichen Hardwarepfad nie beeinflussen.

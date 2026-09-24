@@ -24,6 +24,7 @@ from core.devices import (
 )
 from core.vpd_control import apply_vpd_device_plan, vpd_manages_device
 from core.heating_predictive import decide as predictive_heating_decision, observe_target
+from core.timer_schedule import timer_is_on
 
 
 # =========================================
@@ -180,6 +181,11 @@ def control_device(device, runtime=None):
         )
         return
 
+    if mode == "TIMER":
+        state_name = "timer" if timer_is_on(params.get("timer_windows"), now_min) else "off"
+        apply_device_state(device, resolve_control_state(params, state_name), runtime=rt)
+        return
+
     if mode == "INTERVAL":
         night_profile = (
             bool(params.get("interval_night_enabled"))
@@ -220,7 +226,7 @@ def control_device(device, runtime=None):
     if mode == "ENV":
         # Die VPD-Zustandsmaschine übernimmt ausschließlich explizite
         # ENV-Geräte und wendet ihren Plan weiterhin über apply_device_state an.
-        # OFF/ON/TIME/INTERVAL bleiben jederzeit autoritativ beim Benutzer.
+        # OFF/ON/TIME/TIMER/INTERVAL bleiben jederzeit autoritativ beim Benutzer.
         if vpd_manages_device(device, runtime=rt):
             apply_vpd_device_plan(device, runtime=rt)
             return

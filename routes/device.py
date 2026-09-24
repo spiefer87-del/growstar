@@ -13,6 +13,7 @@ from core.controller_setpoints import (
     stored_controller_setpoints,
 )
 from core.controller_states import resolve_control_state
+from core.timer_schedule import validate_timer_windows
 from core.devices import (
     DeviceHardwareRequiredError,
     get_device_env_config,
@@ -35,6 +36,7 @@ from services.grow_events import enqueue_event
 _DEVICE_STATE_LABELS = {
     "on": "Dauerbetrieb",
     "time": "Zeitsteuerung",
+    "timer": "Zeitschaltuhr",
     "env": "ENV",
     "env_standby": "ENV-Standby",
     "interval_a": "Phase A · Tag",
@@ -47,6 +49,7 @@ _DEVICE_MODE_LABELS = {
     "OFF": "Deaktiviert",
     "ON": "Dauerbetrieb",
     "TIME": "Zeitsteuerung",
+    "TIMER": "Zeitschaltuhr",
     "INTERVAL": "Intervall",
     "ENV": "Umweltregelung",
 }
@@ -275,6 +278,7 @@ def _device_setting_snapshot(runtime, device, schema=None):
             params.get("predictive_heating") is True, "switch")
     add("start_min", "Startzeit", int(params.get("start_min", 0) or 0), "time")
     add("end_min", "Endzeit", int(params.get("end_min", 0) or 0), "time")
+    add("timer_windows", "Zeitschaltuhr-Fenster", params.get("timer_windows") or [], "windows")
     add("interval_on", "Phase A · Dauer", int(params.get("interval_on", 300) or 0), "duration")
     add("interval_off", "Phase B · Dauer", int(params.get("interval_off", 900) or 0), "duration")
     add(
@@ -332,6 +336,21 @@ def _format_device_setting(item):
     if kind == "time":
         minutes = max(0, min(1439, int(value)))
         return f"{minutes // 60:02d}:{minutes % 60:02d} Uhr"
+    if kind == "windows":
+        try:
+            windows = validate_timer_windows(value)
+        except ValueError:
+            return "ungültige Zeitfenster"
+        if not windows:
+            return "keine"
+        pairs = [
+            f"{window['start_min'] // 60:02d}:{window['start_min'] % 60:02d}–"
+            f"{window['end_min'] // 60:02d}:{window['end_min'] % 60:02d}"
+            for window in windows[:4]
+        ]
+        if len(windows) > 4:
+            pairs.append(f"+{len(windows) - 4} weitere")
+        return ", ".join(pairs)
     if kind == "duration":
         minutes = float(value) / 60.0
         text = f"{minutes:.2f}".rstrip("0").rstrip(".").replace(".", ",")

@@ -94,7 +94,7 @@ def resolve_control_state(params, name):
             "controller": {},
         }
 
-    if name in ("on", "time", "env"):
+    if name in ("on", "time", "timer", "env"):
         return {
             "power": bool(raw.get("power", True)),
             "controller": _mapping(raw.get("controller")) or base,
