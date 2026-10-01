@@ -647,7 +647,7 @@ def main():
 
     settings_page = (ROOT / "templates/settings.html").read_text(encoding="utf-8")
     profile_page = (ROOT / "templates/profiles.html").read_text(encoding="utf-8")
-    sensor_page = (ROOT / "templates/grow_control_sensors.html").read_text(encoding="utf-8")
+    sensor_page = (ROOT / "templates/grow_control_setup.html").read_text(encoding="utf-8")
     dashboard = (ROOT / "templates/grow_control.html").read_text(encoding="utf-8")
     require(
         'id="VPD_CONTROL_MODE"' in settings_page

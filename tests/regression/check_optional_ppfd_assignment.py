@@ -296,41 +296,42 @@ def main():
     else:
         raise AssertionError("Leere Temperaturzuweisung wurde unerwartet akzeptiert")
 
-    ui = (ROOT / "templates/sensoren.html").read_text(encoding="utf-8")
+    ui = (ROOT / "templates/grow_control_setup.html").read_text(encoding="utf-8")
+    detail = (ROOT / "templates/sensoren.html").read_text(encoding="utf-8")
     require(
-        'id="outside-temperature-source"' in ui
-        and 'id="outside-humidity-source"' in ui,
-        "Offsets-&-Details-Seite besitzt manuelle Dropdowns für beide Außenwerte",
+        '"outside_temperature"' in ui
+        and '"outside_humidity"' in ui,
+        "Setup besitzt Zuordnungsfelder für beide Außenwerte",
     )
     require(
-        'outside_temperature: outsideTempOption' in ui
-        and 'outside_humidity: outsideHumOption' in ui,
-        "Gemeinsames Speichern überträgt beide manuellen Außenzuweisungen",
+        'body:JSON.stringify(payload)' in ui
+        and 'field:sensorField(field)' in ui,
+        "Setup speichert Außenquellen mit dem richtigen Messfeld",
     )
     require(
-        'outside_temperature: "Keine Außen-Temperatur zugewiesen"' in ui
-        and 'outside_humidity: "Keine Außen-Luftfeuchte zugewiesen"' in ui,
-        "Beide optionalen Außenquellen lassen sich im Dropdown gezielt entfernen",
+        '["ppfd","outside_temperature","outside_humidity"]' in ui
+        and '".drop-clear"' in ui,
+        "Beide optionalen Außenquellen lassen sich im Setup gezielt entfernen",
     )
     require(
-        "gespeichert · derzeit nicht verfügbar" in ui,
-        "Vorübergehend offline Quellen bleiben beim Speichern unverändert erhalten",
+        "const a=tentAssignments.get(t.id)||{}" in ui
+        and "const payload={[field]:" in ui,
+        "Vorübergehend offline Quellen bleiben beim Teilupdate unverändert erhalten",
     )
     require(
-        "fmt(s.outside_temp)" in ui
-        and "fmt(s.outside_hum)" in ui,
+        "outside_temp_value:s.outside_temp" in detail
+        and "outside_hum_value:s.outside_hum" in detail,
         "Detailseite zeigt die aktuell angewendeten Außenmesswerte",
     )
     require(
-        'id="OUTSIDE_TEMP_OFFSET"' in ui
-        and 'id="OUTSIDE_HUM_OFFSET"' in ui
-        and "flushOffsetSave(\"OUTSIDE_TEMP_OFFSET\")" in ui
-        and "flushOffsetSave(\"OUTSIDE_HUM_OFFSET\")" in ui,
+        'id="OUTSIDE_TEMP_OFFSET"' in detail
+        and 'id="OUTSIDE_HUM_OFFSET"' in detail
+        and "OFFSET_KEYS.map(flushOffsetSave)" in detail,
         "Detailseite besitzt speicherbare Offset-Regler für beide Außenwerte",
     )
     require(
-        "fmt(s.outside_temp_raw)" in ui
-        and "fmt(s.outside_hum_raw)" in ui,
+        "outside_temp_raw:s.outside_temp_raw" in detail
+        and "outside_hum_raw:s.outside_hum_raw" in detail,
         "RAW- und korrigierte Außenwerte bleiben bei der Kalibrierung sichtbar",
     )
 
