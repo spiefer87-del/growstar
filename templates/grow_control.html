@@ -277,13 +277,6 @@ h3 {
 .vpd-card-slot { position: relative; min-width: 0; }
 .vpd-card-slot > .card-link { display: block; height: 100%; }
 .vpd-card-slot #vpd-card { height: 100%; }
-.vpd-card-slot #vpd-card { padding-bottom: 38px; }
-.vpd-chart-shortcut {
-    position:absolute;left:8px;bottom:8px;z-index:2;padding:4px 7px;
-    border:1px solid rgba(34,197,94,.4);border-radius:999px;
-    background:rgba(20,83,45,.6);color:#bbf7d0;
-    font-size:.61rem;font-weight:800;text-decoration:none;white-space:nowrap;
-}
 .vpd-log-shortcut {
     position: absolute;
     right: 8px;
@@ -597,7 +590,6 @@ h3 {
                 <div class="sub" id="vpd-control-summary">Soll: -- kPa</div>
             </div>
         </a>
-        <a class="vpd-chart-shortcut" href="{{ url_for('grow_control_tent_vpd_chart', tent_id=tent_id) }}" aria-label="VPD-Chart für {{ tent_name }} öffnen">▦ VPD-Chart</a>
         <a
             id="vpd-log-link"
             class="vpd-log-shortcut"

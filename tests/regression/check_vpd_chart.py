@@ -54,8 +54,10 @@ def main():
     hub = (ROOT / "templates/grow_control_dashboard.html").read_text()
     endpoints = (ROOT / "routes/dashboard.py").read_text()
     api = (ROOT / "routes/tents.py").read_text()
-    require("grow_control_tent_vpd_chart" in endpoints and "grow_control_tent_vpd_chart" in station,
-            "VPD-Chart ist pro Station aus der Zeltansicht erreichbar")
+    require("grow_control_tent_vpd_chart" in endpoints
+            and "grow_control_tent_vpd_chart" in (ROOT / "templates/environment_history.html").read_text()
+            and "vpd-chart-shortcut" not in station,
+            "VPD-Chart ist pro Station über die Diagrammreiter erreichbar")
     require("grow_control_tent_vpd_chart" in (ROOT / "templates/grow_control_diagrams.html").read_text(),
             "Diagrammübersicht führt zur neuen Chart")
     require("outside_temp_source" in chart and "outside_hum" in chart and "outside_temp" in station,

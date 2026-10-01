@@ -65,6 +65,23 @@ def _history_rows(tent_id, range_key, data_type):
                 if r[1] is not None
             ]
 
+        if data_type == "climate":
+            c.execute(
+                """
+                SELECT ts, temp, hum, temp_target, hum_target
+                FROM temp_history
+                WHERE tent_id = ? AND ts >= ?
+                  AND (temp IS NOT NULL OR hum IS NOT NULL)
+                ORDER BY ts ASC
+                """,
+                (tent_id, since),
+            )
+            return [
+                {"ts": ts, "temp": temp, "hum": hum,
+                 "temp_target": temp_target, "hum_target": hum_target}
+                for ts, temp, hum, temp_target, hum_target in c.fetchall()
+            ]
+
         if data_type == "vpd":
             c.execute(
                 """
