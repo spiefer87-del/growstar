@@ -29,12 +29,9 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
 .setup-tool-head{display:flex;align-items:center;gap:10px;font-size:1rem;font-weight:800}
 .setup-tool-icon{font-size:1.35rem}.setup-tool p{margin:8px 0 0;color:var(--muted);font-size:.82rem;line-height:1.5}.setup-tool-action{margin-top:11px;color:#fcd34d;font-size:.78rem;font-weight:800}
 .add-card{margin-top:24px;background:rgba(30,41,59,.75);border:1px dashed rgba(148,163,184,.28);border-radius:18px;padding:18px}.add-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.add-grid .field label{margin-top:0}.section-title{margin:0 0 13px;font-size:1.05rem}
-.sensor-palette{margin:0 0 20px;padding:17px;border:1px solid rgba(56,189,248,.23);border-radius:17px;background:rgba(14,165,233,.06)}
-.sensor-palette .section-title{margin-bottom:5px}.sensor-hint{color:var(--muted);font-size:.8rem;line-height:1.45;margin:5px 0 12px}
-.sensor-sources{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}.sensor-source{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid #334155;border-radius:11px;background:#111827;color:var(--text);font:inherit;font-size:.83rem;cursor:grab;user-select:none}.sensor-source.dragging{opacity:.45}.sensor-source:active{cursor:grabbing}.sensor-source small{color:var(--muted);font-size:.72rem}.sensor-source.active{border-color:var(--blue);background:rgba(56,189,248,.14)}.drag-handle{padding:6px;border-radius:8px;background:rgba(148,163,184,.16);touch-action:none;cursor:grab}
-.assignment-panel{margin-top:17px;padding-top:14px;border-top:1px solid rgba(148,163,184,.17)}.assignment-panel h3{margin:0;font-size:.9rem}.drop-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}.drop-zone{min-height:78px;padding:10px;border:2px dashed rgba(148,163,184,.3);border-radius:10px;background:#111827;overflow-wrap:anywhere}.drop-zone strong{display:block;margin-top:5px;font-size:.8rem}.drop-zone small{display:block;color:var(--muted);margin-top:3px;font-size:.69rem}.drop-zone.compatible{border-color:rgba(34,197,94,.6)}.drop-zone.over{border-color:var(--blue);background:rgba(56,189,248,.15)}.drop-zone.incompatible{opacity:.45}.drop-clear{margin-top:7px;padding:4px 7px;border:0;border-radius:7px;background:rgba(248,113,113,.13);color:#fca5a5;font-size:.7rem;cursor:pointer}.sensor-status{color:var(--muted);font-size:.75rem;min-height:18px;margin-top:9px}.sensor-status.err{color:#fca5a5}.sensor-status.ok{color:#86efac}.drag-ghost{position:fixed;z-index:9999;pointer-events:none;box-shadow:0 18px 40px #0008;opacity:.9}
+.assignment-panel{margin-top:17px;padding-top:14px;border-top:1px solid rgba(148,163,184,.17)}.assignment-panel h3{margin:0;font-size:.9rem}.assignment-panel p{color:var(--muted);font-size:.76rem;line-height:1.4;margin:5px 0 0}.assignment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.assignment-field{display:block;min-width:0;margin:0;padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:11px;background:#111827}.assignment-field span{display:block;margin-bottom:7px;font-size:.74rem;color:#cbd5e1;font-weight:700}.assignment-select{display:block;width:100%;min-width:0;min-height:42px;padding:8px 10px;border:1px solid #334155;border-radius:9px;background:#020617;color:var(--text);font:inherit;font-size:.84rem}.assignment-select:focus{outline:2px solid var(--blue);outline-offset:2px}.assignment-select:disabled{opacity:.65}.sensor-status{color:var(--muted);font-size:.75rem;min-height:18px;margin-top:9px}.sensor-status.err{color:#fca5a5}.sensor-status.ok{color:#86efac}
 @media(max-width:650px){body{padding:14px}.add-grid{grid-template-columns:1fr}.btn{width:100%}}
-@media(max-width:390px){.drop-grid{grid-template-columns:1fr}}
+@media(max-width:390px){.assignment-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 
@@ -66,12 +63,6 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         </a>
     </section>
 
-    <section class="sensor-palette" aria-label="Sensorquellen zuweisen">
-        <h2 class="section-title">🧪 Sensorquellen zuordnen</h2>
-        <p class="sensor-hint">Quelle auf ein Feld der Grow-Station ziehen. Am Handy die Quelle gedrückt halten und auf dem Feld loslassen. Antippen wählt eine Quelle zum anschließenden Antippen eines Feldes.</p>
-        <button type="button" id="refresh-sensor-sources" class="btn settings-btn">Quellen aktualisieren</button>
-        <div id="setup-sensor-sources" class="sensor-sources">Sensorquellen werden geladen …</div>
-    </section>
     <div id="station-grid" class="grid"><div class="card">Stationen werden geladen …</div></div>
 
     {% if has_permission('grow.configure') %}
@@ -94,24 +85,28 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     const CAN_LIVE = {{ (has_permission('grow.control') and has_permission('hardware.control'))|tojson }};
     const grid = document.getElementById("station-grid");
     let defaultTentId = "tent_1";
-    let sources = [], sourceById = new Map(), tentAssignments = new Map();
-    let selectedSource = null, pointerDrag = null;
+    let tentAssignments = new Map(), tentOptions = new Map();
     let stationRows = [];
 
     const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
     const sensorField = field => field === "outside_temperature" ? "temperature" : field === "outside_humidity" ? "humidity" : field;
-    const supports = (source,field) => Array.isArray(source?.fields) && source.fields.includes(sensorField(field));
     const labelFor = field => ({temperature:"Innentemperatur",humidity:"Innenfeuchte",ppfd:"Helligkeit / PPFD",outside_temperature:"Außentemperatur",outside_humidity:"Außenfeuchte"}[field] || field);
     function status(el,message,ok){el.textContent=message;el.className="sensor-status " + (ok ? "ok":"err")}
     function zone(tentId,field,assignment){
-        const name=assignment?.label || assignment?.source_id || "Keine Quelle zugewiesen";
-        const removable=["ppfd","outside_temperature","outside_humidity"].includes(field);
-        return `<div class="drop-zone" data-tent-id="${esc(tentId)}" data-field="${field}" role="button" tabindex="0" aria-label="${labelFor(field)} für ${esc(tentId)} zuweisen"><small>${labelFor(field)}</small><strong>${esc(name)}</strong>${removable && assignment?.source_id ? '<button class="drop-clear" type="button">Entfernen</button>' : ''}</div>`;
+        const options=tentOptions.get(tentId)?.[field]||[];
+        const selected=assignment?.source_id||"";
+        const optional=["ppfd","outside_temperature","outside_humidity"].includes(field);
+        const available=options.some(option=>option.source_id===selected);
+        const placeholder=optional?'Nicht zugewiesen':'Quelle auswählen';
+        const choices=`<option value="" ${selected?'':'selected'} ${optional?'':'disabled'}>${placeholder}</option>`
+            +(selected&&!available?`<option value="${esc(selected)}" selected>${esc(assignment.label||selected)} · gespeichert</option>`:'')
+            +options.map(option=>`<option value="${esc(option.source_id)}" ${option.source_id===selected?'selected':''}>${esc(option.label||option.source_id)}</option>`).join("");
+        return `<label class="assignment-field"><span>${labelFor(field)}</span><select class="assignment-select" data-tent-id="${esc(tentId)}" data-field="${field}" data-current="${esc(selected)}" ${CAN_CONFIGURE?'':'disabled'}>${choices}</select></label>`;
     }
     function assignmentPanel(t){
         if(!t.runtime_loaded)return '<div class="sensor-status">Zuordnung nach Neustart verfügbar.</div>';
         const a=tentAssignments.get(t.id)||{};
-        return `<section class="assignment-panel"><h3>Sensorzuordnung</h3><div class="drop-grid">${["temperature","humidity","ppfd","outside_temperature","outside_humidity"].map(field=>zone(t.id,field,a[field])).join("")}</div><div class="sensor-status js-sensor-status" aria-live="polite"></div></section>`;
+        return `<section class="assignment-panel"><h3>Sensorzuordnung</h3><p>Feld antippen und passende Quelle auswählen. Änderungen werden sofort gespeichert.</p><div class="assignment-grid">${["temperature","humidity","ppfd","outside_temperature","outside_humidity"].map(field=>zone(t.id,field,a[field])).join("")}</div><div class="sensor-status js-sensor-status" aria-live="polite"></div></section>`;
     }
 
     function mode(t){
@@ -179,60 +174,49 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         await Promise.all(stationRows.filter(t=>t.runtime_loaded).map(loadAssignments));
         grid.innerHTML = stationRows.map(t => card(t, defaultTentId)).join("") || '<div class="card">Keine Stationen.</div>';
         bind();
-        bindZones();
+        bindAssignments();
         refreshPreflights();
     }
 
     async function loadAssignments(t){
-        try{const response=await fetch(`${API}/${encodeURIComponent(t.id)}/sensors/assignments`);
-            if(response.ok){const data=await response.json();if(data.success)tentAssignments.set(t.id,data.assignments||{})}
+        try{
+            const response=await fetch(`${API}/${encodeURIComponent(t.id)}/sensors/assignments`,{cache:"no-store"});
+            if(!response.ok)return;
+            const data=await response.json();
+            if(data.success){
+                tentAssignments.set(t.id,data.assignments||{});
+                tentOptions.set(t.id,data.options||{});
+            }
         }catch(error){console.error(error)}
     }
-    async function loadSources(){
-        const box=document.getElementById("setup-sensor-sources");
-        try{const res=await fetch("/api/sensors/sources");if(!res.ok)throw new Error("Quellen nicht erreichbar");
-            const data=await res.json();sources=Array.isArray(data.sources)?data.sources:[];sourceById=new Map(sources.map(s=>[s.id,s]));
-            box.innerHTML=sources.map(s=>`<button type="button" class="sensor-source" draggable="${CAN_CONFIGURE}" data-source-id="${esc(s.id)}" ${CAN_CONFIGURE?'':'disabled'}><span class="drag-handle" aria-hidden="true">⠿</span><span>${esc(s.label||s.id)}<br><small>${esc(s.id)}</small></span><small>${s.online===false?'Offline':'●'} · ${[s.temperature!=null?`${esc(s.temperature)} °C`:null,s.humidity!=null?`${esc(s.humidity)} %`:null,s.ppfd!=null?`${esc(s.ppfd)} PPFD`:null].filter(Boolean).join(' · ')}</small></button>`).join("") || '<span class="sensor-hint">Keine Sensorquellen verfügbar.</span>';
-            box.querySelectorAll(".sensor-source").forEach(button=>{
-                button.addEventListener("click",()=>selectSource(button.dataset.sourceId));
-                button.addEventListener("dragstart",e=>{selectSource(button.dataset.sourceId);e.dataTransfer.setData("text/plain",button.dataset.sourceId);e.dataTransfer.effectAllowed="copy"});
-                button.querySelector(".drag-handle").addEventListener("pointerdown",e=>beginPointerDrag(e,button));
-            });
-        }catch(error){box.textContent="Sensorquellen konnten nicht geladen werden."}
-    }
-    function selectSource(id){selectedSource=id;document.querySelectorAll(".sensor-source").forEach(b=>b.classList.toggle("active",b.dataset.sourceId===id));highlightZones(sourceById.get(id))}
-    function highlightZones(source){document.querySelectorAll(".drop-zone").forEach(z=>{z.classList.toggle("compatible",!!source&&supports(source,z.dataset.field));z.classList.toggle("incompatible",!!source&&!supports(source,z.dataset.field))})}
-    function bindZones(){
-        grid.querySelectorAll(".drop-zone").forEach(z=>{
-            z.addEventListener("dragover",e=>{const source=sourceById.get(e.dataTransfer.getData("text/plain")||selectedSource);if(supports(source,z.dataset.field)){e.preventDefault();z.classList.add("over")}});
-            z.addEventListener("dragleave",()=>z.classList.remove("over"));
-            z.addEventListener("drop",e=>{e.preventDefault();z.classList.remove("over");assign(z,e.dataTransfer.getData("text/plain")||selectedSource)});
-            z.addEventListener("click",e=>{if(e.target.closest(".drop-clear")){e.stopPropagation();assign(z,null);return}if(selectedSource)assign(z,selectedSource)});
-            z.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&selectedSource){e.preventDefault();assign(z,selectedSource)}});
+    function bindAssignments(){
+        grid.querySelectorAll(".assignment-select").forEach(select=>{
+            select.addEventListener("change",()=>saveAssignment(select));
         });
-        highlightZones(sourceById.get(selectedSource));
     }
-    function beginPointerDrag(event,button){if(event.pointerType==="mouse"||!CAN_CONFIGURE)return;pointerDrag={id:button.dataset.sourceId,pointerId:event.pointerId,x:event.clientX,y:event.clientY,button,ghost:null};button.setPointerCapture(event.pointerId)}
-    document.addEventListener("pointermove",event=>{const d=pointerDrag;if(!d||d.pointerId!==event.pointerId)return;if(!d.ghost&&Math.hypot(event.clientX-d.x,event.clientY-d.y)<8)return;
-        if(!d.ghost){d.ghost=d.button.cloneNode(true);d.ghost.classList.add("drag-ghost");document.body.appendChild(d.ghost);d.button.classList.add("dragging");selectSource(d.id)}
-        event.preventDefault();d.ghost.style.left=`${event.clientX}px`;d.ghost.style.top=`${event.clientY}px`;
-        document.querySelectorAll(".drop-zone.over").forEach(z=>z.classList.remove("over"));const z=document.elementFromPoint(event.clientX,event.clientY)?.closest(".drop-zone");if(z&&supports(sourceById.get(d.id),z.dataset.field))z.classList.add("over");
-    },{passive:false});
-    document.addEventListener("pointerup",event=>{const d=pointerDrag;if(!d||d.pointerId!==event.pointerId)return;const z=document.elementFromPoint(event.clientX,event.clientY)?.closest(".drop-zone");const dragged=!!d.ghost;d.ghost?.remove();d.button.classList.remove("dragging");pointerDrag=null;document.querySelectorAll(".drop-zone.over").forEach(zone=>zone.classList.remove("over"));if(dragged&&z)assign(z,d.id)});
-    async function assign(z,id){
-        const tentId=z.dataset.tentId,field=z.dataset.field,source=sourceById.get(id),feedback=z.closest(".assignment-panel").querySelector(".js-sensor-status");
-        if(!CAN_CONFIGURE){status(feedback,"Keine Berechtigung zur Zuordnung.",false);return}
-        if(id&&!supports(source,field)){status(feedback,"Diese Quelle unterstützt das Feld nicht.",false);return}
-        if(!id&&!["ppfd","outside_temperature","outside_humidity"].includes(field))return;
-        const payload={[field]:id?{source_id:id,field:sensorField(field),label:source.label||id}:null};
-        status(feedback,"Speichere Zuordnung …",true);
-        try{const res=await fetch(`${API}/${encodeURIComponent(tentId)}/sensors/assignments`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
-            const data=await res.json();if(!res.ok||!data.success)throw new Error(data.message||data.error||"Speichern fehlgeschlagen");
-            await loadAssignments({id:tentId});const a=tentAssignments.get(tentId)||{};
-            z.querySelector("strong").textContent=a[field]?.label||a[field]?.source_id||"Keine Quelle zugewiesen";
-            z.querySelector(".drop-clear")?.remove();if(["ppfd","outside_temperature","outside_humidity"].includes(field)&&a[field]?.source_id){const b=document.createElement("button");b.type="button";b.className="drop-clear";b.textContent="Entfernen";z.appendChild(b)}
-            status(feedback,`${labelFor(field)} ${id?'zugewiesen':'entfernt'}.`,true);refreshPreflights();
-        }catch(error){status(feedback,error.message,false)}
+    async function saveAssignment(select){
+        const tentId=select.dataset.tentId,field=select.dataset.field;
+        const previous=select.dataset.current||"",id=select.value;
+        const feedback=select.closest(".assignment-panel").querySelector(".js-sensor-status");
+        if(!CAN_CONFIGURE||(!id&&!["ppfd","outside_temperature","outside_humidity"].includes(field))){
+            select.value=previous;return;
+        }
+        const option=(tentOptions.get(tentId)?.[field]||[]).find(item=>item.source_id===id);
+        if(id&&!option){select.value=previous;status(feedback,"Quelle nicht mehr verfügbar. Seite neu laden.",false);return}
+        const payload={[field]:id?{source_id:id,field:sensorField(field),label:option.label||id}:null};
+        select.disabled=true;status(feedback,"Speichere Zuordnung …",true);
+        try{
+            const res=await fetch(`${API}/${encodeURIComponent(tentId)}/sensors/assignments`,{
+                method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)
+            });
+            const data=await res.json().catch(()=>({}));
+            if(!res.ok||!data.success)throw new Error(data.message||data.error||"Speichern fehlgeschlagen");
+            select.dataset.current=id;
+            await loadAssignments({id:tentId});
+            status(feedback,`${labelFor(field)} ${id?'zugewiesen':'entfernt'}.`,true);
+            refreshPreflights();
+        }catch(error){select.value=previous;status(feedback,error.message,false)}
+        finally{select.disabled=!CAN_CONFIGURE}
     }
 
     function bind(){
@@ -355,8 +339,6 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     });
 
     load();
-    loadSources();
-    document.getElementById("refresh-sensor-sources").addEventListener("click",loadSources);
     setInterval(refreshPreflights, 5000);
 })();
 </script>

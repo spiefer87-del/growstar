@@ -310,7 +310,7 @@ def main():
     )
     require(
         '["ppfd","outside_temperature","outside_humidity"]' in ui
-        and '".drop-clear"' in ui,
+        and "'Nicht zugewiesen'" in ui,
         "Beide optionalen Außenquellen lassen sich im Setup gezielt entfernen",
     )
     require(

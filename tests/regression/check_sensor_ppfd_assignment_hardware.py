@@ -20,7 +20,7 @@ def main():
     require('assignments["ppfd"]' in sensors, "PPFD-Zuweisung wird stationsbezogen gespeichert")
     require('("temperature", "humidity", "ppfd")' in sensors, "PPFD erscheint in Sensorquellen-Feldern")
     require('ppfd_assignment = assignments.get("ppfd")' in tents, "Dashboard priorisiert explizite PPFD-Zuweisung")
-    require('"ppfd"' in setup and 'class="drop-zone"' in setup, "Setup besitzt eine PPFD-Zuordnung pro Station")
+    require('"ppfd"' in setup and 'class="assignment-select"' in setup, "Setup besitzt eine PPFD-Auswahl pro Station")
     require('Helligkeit / PPFD' in ui, "Sensorseite besitzt PPFD-Karte")
     require('body:JSON.stringify(payload)' in setup and '"ppfd"' in setup, "Setup speichert PPFD-Zuweisung")
     require('source.ppfd' in ui, "Verfügbare Quellen zeigen PPFD")
