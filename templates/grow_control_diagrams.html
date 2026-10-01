@@ -24,6 +24,7 @@ body{margin:0;padding:24px;background:radial-gradient(circle at top left,rgba(34
                 <a class="gd-metric" href="{{ url_for('grow_control_tent_temperature', tent_id=tent.id) }}"><strong>🌡️ Temperatur</strong><span>°C · Verlauf &amp; Sollwert</span></a>
                 <a class="gd-metric" href="{{ url_for('grow_control_tent_humidity', tent_id=tent.id) }}"><strong>💧 Luftfeuchtigkeit</strong><span>% · Verlauf &amp; Sollwert</span></a>
                 <a class="gd-metric" href="{{ url_for('grow_control_tent_vpd', tent_id=tent.id) }}"><strong>🌱 VPD</strong><span>kPa · Verlauf</span></a>
+                <a class="gd-metric" href="{{ url_for('grow_control_tent_vpd_chart', tent_id=tent.id) }}"><strong>▦ VPD-Chart</strong><span>Temperatur × Feuchte · Live-Punkte</span></a>
                 <a class="gd-metric" href="{{ url_for('grow_control_tent_ppfd', tent_id=tent.id) }}"><strong>☀️ Licht / PPFD</strong><span>µmol/m²/s · Verlauf</span></a>
             </div>
         </article>

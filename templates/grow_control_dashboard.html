@@ -222,6 +222,10 @@
         white-space: nowrap;
     }
 
+    .tent-outside{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:10px 13px;border:1px solid rgba(56,189,248,.24);border-radius:13px;background:rgba(14,165,233,.09)}
+    .tent-outside span{color:#bae6fd;font-size:.76rem;font-weight:800}
+    .tent-outside strong{font-size:.98rem;font-variant-numeric:tabular-nums}
+
     .tent-card-foot {
         display: flex;
         align-items: center;
@@ -561,6 +565,17 @@
         addValue(values, "Feuchte", fmt(tent.hum, 1, " %"));
         addValue(values, "VPD", fmt(tent.vpd, 2, ""));
 
+        const outside = document.createElement("div");
+        outside.className = "tent-outside";
+        const outsideLabel = document.createElement("span");
+        outsideLabel.textContent = "🌡️ Außen";
+        const outsideValue = document.createElement("strong");
+        outsideValue.textContent = tent.outside_temp == null
+            ? "kein Messwert" : fmt(tent.outside_temp, 1, " °C");
+        outside.title = tent.outside_temp == null
+            ? "Kein frischer Außensensorwert" : (tent.outside_temp_label || "Außensensor");
+        outside.append(outsideLabel, outsideValue);
+
         const foot = document.createElement("div");
         foot.className = "tent-card-foot";
 
@@ -583,7 +598,7 @@
             foot.appendChild(readOnly);
         }
 
-        card.append(head, values, foot);
+        card.append(head, values, outside, foot);
         return card;
     };
 

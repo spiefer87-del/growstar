@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}VPD-Chart · {{ tent_name }}{% endblock %}
+{% block head %}
+<style>
+*{box-sizing:border-box}:root{--bg:#0f172a;--panel:#1e293b;--muted:#94a3b8;--text:#e5e7eb;--line:rgba(148,163,184,.22)}
+body{margin:0;background:radial-gradient(circle at top left,rgba(34,197,94,.08),transparent 30rem),var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
+.vc-page{max-width:1150px;margin:auto;padding:20px 15px 36px}.vc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.vc-head h1{font-size:clamp(1.55rem,5vw,2.15rem);margin:0}.vc-head p{color:var(--muted);margin:5px 0 0}.vc-back,.vc-link{display:inline-flex;align-items:center;justify-content:center;padding:10px 13px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);text-decoration:none;white-space:nowrap;font-weight:700}
+.vc-tools{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:15px}.vc-tools select,.vc-tools button{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#111827;color:var(--text);font:inherit;font-weight:700}.vc-tools button{cursor:pointer}.vc-tools button[aria-pressed=true]{background:#166534;border-color:#22c55e}.vc-tools select{margin-right:auto;max-width:210px}
+.vc-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:15px}.vc-value{padding:17px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(140deg,#1e293b,#142136);min-width:0}.vc-value h2{margin:0 0 7px;font-size:.84rem;color:var(--muted);text-transform:uppercase}.vc-main{font-size:clamp(1.3rem,4vw,1.9rem);font-weight:850}.vc-meta{margin-top:6px;color:var(--muted);font-size:.84rem;overflow-wrap:anywhere}.vc-chart-card{padding:18px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(140deg,#1e293b,#111827)}.vc-chart-card h2{font-size:1.05rem;margin:0 0 5px}.vc-chart-card p{color:var(--muted);font-size:.84rem;line-height:1.45;margin:0 0 12px}.vc-canvas-wrap{position:relative;width:100%;height:480px;border-radius:12px;overflow:hidden;background:#0b1626}.vc-canvas-wrap canvas{width:100%;height:100%;display:block;touch-action:manipulation}.vc-legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.vc-legend span{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid var(--line);border-radius:999px;font-size:.74rem;color:#cbd5e1}.vc-legend i{display:inline-block;width:11px;height:11px;border-radius:50%}.vc-detail{margin-top:12px;min-height:23px;color:#cbd5e1;font-size:.82rem}.vc-foot{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:16px;color:var(--muted);font-size:.76rem;line-height:1.5}
+@media(max-width:650px){.vc-page{padding:12px 10px 25px}.vc-head{align-items:flex-start}.vc-values{gap:8px}.vc-value{padding:12px}.vc-canvas-wrap{height:430px}.vc-chart-card{padding:11px}.vc-foot{flex-direction:column;align-items:flex-start}.vc-tools select{max-width:100%}}
+</style>
+{% endblock %}
+{% block page %}
+<main class="vc-page">
+  <header class="vc-head"><div><h1>▦ VPD-Chart</h1><p>{{ tent_name }} · Temperatur und Luftfeuchtigkeit</p></div><a class="vc-back" href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← Zelt</a></header>
+  <div class="vc-tools">
+    <select id="vc-station" aria-label="Station wählen">
+      {% for tent in tents %}<option value="{{ tent.id }}" {% if tent.id == tent_id %}selected{% endif %}>{{ tent.name or tent.id }}</option>{% endfor %}
+    </select>
+    <button type="button" data-range="45m" aria-pressed="true">45 Min.</button>
+    <button type="button" data-range="6h" aria-pressed="false">6 Std.</button>
+    <button type="button" data-range="24h" aria-pressed="false">24 Std.</button>
+  </div>
+  <div class="vc-values">
+    <section class="vc-value"><h2>🌱 Innen</h2><div id="vc-inside" class="vc-main">-- kPa</div><div id="vc-inside-meta" class="vc-meta">Messwerte werden geladen …</div></section>
+    <section class="vc-value"><h2>🌤️ Außen</h2><div id="vc-outside" class="vc-main">-- °C</div><div id="vc-outside-meta" class="vc-meta">Messwerte werden geladen …</div></section>
+  </div>
+  <section class="vc-chart-card"><h2>VPD im Klimafeld</h2><p>Die Spur zeigt gespeicherte Innenwerte im gewählten Zeitraum. Grün markiert den aktuellen Innenwert, Blau den Außenwert, sofern dort Temperatur und Feuchte frisch vorliegen. Die gestrichelte Linie ist das aktuelle Stationsziel.</p>
+    <div class="vc-canvas-wrap"><canvas id="vc-canvas" role="img" aria-label="VPD-Klimakarte mit Temperatur, Luftfeuchte und aktuellen Messpunkten"></canvas></div>
+    <div class="vc-legend"><span><i style="background:#3676a8"></i>&lt; 0,4 kPa</span><span><i style="background:#259fa3"></i>0,4–0,8</span><span><i style="background:#4eae70"></i>0,8–1,2</span><span><i style="background:#c3a947"></i>1,2–1,6</span><span><i style="background:#ba624a"></i>&gt; 1,6</span></div>
+    <div id="vc-detail" class="vc-detail" aria-live="polite">Messpunkte werden geladen …</div>
+    <div class="vc-foot"><span>Farben sind feste Orientierungshilfen. Entscheidend sind deine eingestellten VPD-Ziele und Messwerte; die Chart schaltet keine Geräte.</span><a class="vc-link" href="{{ url_for('grow_control_tent_vpd', tent_id=tent_id) }}">VPD-Zeitverlauf →</a></div>
+  </section>
+</main>
+<script>
+(() => {
+  const TENT_ID={{ tent_id|tojson }};
+  const canvas=document.getElementById('vc-canvas'), ctx=canvas.getContext('2d');
+  const detail=document.getElementById('vc-detail');
+  const number=value=>value!==null&&value!==undefined&&value!==''&&Number.isFinite(Number(value))?Number(value):null;
+  const fmt=(value,d=1)=>number(value)===null?'--':number(value).toFixed(d).replace('.',',');
+  const vpd=(temp,hum)=>0.6108*Math.exp(17.27*temp/(temp+237.3))*(1-hum/100);
+  const humidityAt=(temp,kpa)=>100*(1-kpa/(0.6108*Math.exp(17.27*temp/(temp+237.3))));
+  let range='45m',state=null,historyRows=[],geometry=null,points=[];
+  const el=id=>document.getElementById(id);
+  el('vc-station').addEventListener('change',event=>{
+    if(event.target.value!==TENT_ID)location.href=`/grow-control/tents/${encodeURIComponent(event.target.value)}/vpd-chart`;
+  });
+  document.querySelectorAll('[data-range]').forEach(button=>button.addEventListener('click',()=>{
+    range=button.dataset.range;
+    document.querySelectorAll('[data-range]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));
+    load();
+  }));
+  function validPair(temp,hum){return temp!==null&&hum!==null&&temp>-30&&temp<60&&hum>=0&&hum<=100}
+  function renderValues(){
+    const temp=number(state?.temp),hum=number(state?.hum),outsideTemp=number(state?.outside_temp),outsideHum=number(state?.outside_hum);
+    const inside=validPair(temp,hum)?number(state.vpd)??vpd(temp,hum):null;
+    const outside=validPair(outsideTemp,outsideHum)?vpd(outsideTemp,outsideHum):null;
+    el('vc-inside').textContent=inside===null?'-- kPa':`${fmt(inside,2)} kPa`;
+    el('vc-inside-meta').textContent=validPair(temp,hum)?`${fmt(temp)} °C · ${fmt(hum)} % rF`:'Innenwerte nicht verfügbar';
+    el('vc-outside').textContent=outsideTemp===null?'-- °C':`${fmt(outsideTemp)} °C`;
+    el('vc-outside-meta').textContent=outsideTemp===null?'Kein frischer Außensensorwert':
+      `${state.outside_temp_source?.label||'Außensensor'} · ${outsideHum===null?'Feuchte nicht verfügbar':`${fmt(outsideHum)} % rF · VPD ${fmt(outside,2)} kPa`}`;
+  }
+  function draw(){
+    const rect=canvas.getBoundingClientRect(),width=Math.round(rect.width),height=Math.round(rect.height);
+    if(!width||!height)return;
+    const dpr=Math.min(window.devicePixelRatio||1,2);
+    canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.fillStyle='#0b1626';ctx.fillRect(0,0,width,height);
+    const bounds={left:Math.max(49,width<450?49:64),right:width-16,top:19,bottom:height-43};
+    const temps=[15,35],hums=[20,90];
+    const samples=[...historyRows.map(r=>[number(r.temp),number(r.hum)]),
+      [number(state?.temp),number(state?.hum)],[number(state?.outside_temp),number(state?.outside_hum)]];
+    for(const [temp,hum] of samples){if(!validPair(temp,hum))continue;temps.push(temp);hums.push(hum)}
+    const tMin=Math.max(-10,Math.floor(Math.min(...temps)/5)*5),tMax=Math.min(50,Math.ceil(Math.max(...temps)/5)*5);
+    const hMin=Math.max(0,Math.floor(Math.min(...hums)/10)*10),hMax=Math.min(100,Math.ceil(Math.max(...hums)/10)*10);
+    const x=hum=>bounds.left+(hum-hMin)/(hMax-hMin)*(bounds.right-bounds.left);
+    const y=temp=>bounds.bottom-(temp-tMin)/(tMax-tMin)*(bounds.bottom-bounds.top);
+    geometry={bounds,x,y};
+    ctx.save();ctx.beginPath();ctx.rect(bounds.left,bounds.top,bounds.right-bounds.left,bounds.bottom-bounds.top);ctx.clip();
+    const palette=['#ba624a','#c3a947','#4eae70','#259fa3','#3676a8'];
+    for(let row=Math.ceil(bounds.top);row<bounds.bottom;row++){
+      const temp=tMax-(row-bounds.top)/(bounds.bottom-bounds.top)*(tMax-tMin);
+      const edges=[hMin,humidityAt(temp,1.6),humidityAt(temp,1.2),humidityAt(temp,.8),humidityAt(temp,.4),hMax];
+      for(let band=0;band<5;band++){
+        ctx.fillStyle=palette[band];
+        ctx.fillRect(x(edges[band]),row,Math.max(0,x(edges[band+1])-x(edges[band])),1.2);
+      }
+    }
+    const targetControl=state?.vpd_control||{};
+    const target=number(String(targetControl.mode||'OFF').toUpperCase()!=='OFF'?targetControl.target:state?.classic_vpd_target);
+    if(target!==null&&target>0&&target<4){
+      ctx.beginPath();ctx.setLineDash([6,5]);ctx.lineWidth=2;ctx.strokeStyle='#f8fafc';
+      for(let temp=tMin,started=false;temp<=tMax;temp+=.25){const hx=x(humidityAt(temp,target)),ty=y(temp);if(!started){ctx.moveTo(hx,ty);started=true}else ctx.lineTo(hx,ty)}
+      ctx.stroke();ctx.setLineDash([]);
+    }
+    ctx.strokeStyle='rgba(226,232,240,.2)';ctx.lineWidth=1;ctx.font='12px system-ui';
+    for(let temp=Math.ceil(tMin/5)*5;temp<=tMax;temp+=5){const py=y(temp);ctx.beginPath();ctx.moveTo(bounds.left,py);ctx.lineTo(bounds.right,py);ctx.stroke()}
+    for(let hum=Math.ceil(hMin/10)*10;hum<=hMax;hum+=10){const px=x(hum);ctx.beginPath();ctx.moveTo(px,bounds.top);ctx.lineTo(px,bounds.bottom);ctx.stroke()}
+    points=[];let lastTs=null;
+    ctx.beginPath();ctx.lineWidth=2;ctx.strokeStyle='rgba(248,250,252,.75)';
+    for(const row of historyRows){const temp=number(row.temp),hum=number(row.hum),ts=number(row.ts);if(!validPair(temp,hum)||ts===null)continue;
+      if(lastTs===null||ts-lastTs>600){ctx.stroke();ctx.beginPath();ctx.moveTo(x(hum),y(temp))}else ctx.lineTo(x(hum),y(temp));
+      lastTs=ts;points.push({px:x(hum),py:y(temp),temp,hum,ts,label:'Innen · Verlauf'});
+    }
+    ctx.stroke();
+    const live=[{temp:number(state?.temp),hum:number(state?.hum),label:'Innen · jetzt',color:'#22c55e'},
+      {temp:number(state?.outside_temp),hum:number(state?.outside_hum),label:'Außen · jetzt',color:'#38bdf8'}];
+    for(const item of live){if(!validPair(item.temp,item.hum))continue;
+      const px=x(item.hum),py=y(item.temp);ctx.beginPath();ctx.arc(px,py,8,0,Math.PI*2);ctx.fillStyle=item.color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();
+      points.push({px,py,temp:item.temp,hum:item.hum,ts:Date.now()/1000,label:item.label});
+    }
+    ctx.restore();ctx.fillStyle='#cbd5e1';ctx.font='11px system-ui';ctx.textAlign='right';
+    for(let temp=Math.ceil(tMin/5)*5;temp<=tMax;temp+=5)ctx.fillText(`${temp}°`,bounds.left-7,y(temp)+4);
+    ctx.textAlign='center';for(let hum=Math.ceil(hMin/10)*10;hum<=hMax;hum+=10)ctx.fillText(`${hum}%`,x(hum),bounds.bottom+17);
+    ctx.font='12px system-ui';ctx.fillText('Luftfeuchtigkeit', (bounds.left+bounds.right)/2,height-7);
+    detail.textContent=points.length?`${historyRows.length} gespeicherte Innenpunkte · ${target===null?'kein VPD-Ziel verfügbar':`Stationsziel ${fmt(target,2)} kPa`}`:'Noch keine passenden Temperatur- und Feuchtewerte.';
+  }
+  function inspect(event){if(!geometry||!points.length)return;
+    const rect=canvas.getBoundingClientRect(),mx=event.clientX-rect.left,my=event.clientY-rect.top;
+    let chosen=null,distance=20*20;
+    for(const point of points){const d=(point.px-mx)**2+(point.py-my)**2;if(d<distance){chosen=point;distance=d}}
+    if(chosen)detail.textContent=`${chosen.label} · ${fmt(chosen.temp)} °C · ${fmt(chosen.hum)} % rF · VPD ${fmt(vpd(chosen.temp,chosen.hum),2)} kPa · ${new Date(chosen.ts*1000).toLocaleTimeString('de-DE')}`;
+  }
+  canvas.addEventListener('pointerdown',inspect);canvas.addEventListener('pointermove',event=>{if(event.pointerType==='mouse')inspect(event)});
+  async function load(){try{
+      const [stateResponse,historyResponse]=await Promise.all([
+        fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/state`,{cache:'no-store'}),
+        fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?type=vpd_chart&range=${range}`,{cache:'no-store'})
+      ]);
+      if(!stateResponse.ok||!historyResponse.ok)throw new Error('Messdaten konnten nicht geladen werden');
+      state=await stateResponse.json();historyRows=await historyResponse.json();
+      if(!Array.isArray(historyRows))throw new Error('Ungültige Verlaufspunkte');
+      if(historyRows.length>500){const step=Math.ceil(historyRows.length/500);const last=historyRows.at(-1);historyRows=historyRows.filter((_,i)=>i%step===0);if(historyRows.at(-1)!==last)historyRows.push(last)}
+      renderValues();draw();
+    }catch(error){state=null;historyRows=[];renderValues();draw();detail.textContent=error.message}}
+  new ResizeObserver(draw).observe(canvas.parentElement);
+  load();setInterval(load,30000);
+})();
+</script>
+{% endblock %}

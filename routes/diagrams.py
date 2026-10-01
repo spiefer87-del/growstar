@@ -7,6 +7,7 @@ from core.tents import DEFAULT_TENT_ID, manager as tent_manager, validate_tent_i
 
 
 _RANGE_MAP = {
+    "45m": 45 * 60,
     "1h": 1 * 3600,
     "6h": 6 * 3600,
     "24h": 24 * 3600,
@@ -78,6 +79,23 @@ def _history_rows(tent_id, range_key, data_type):
                 {"ts": r[0], "vpd": r[1]}
                 for r in c.fetchall()
                 if r[1] is not None
+            ]
+
+        if data_type == "vpd_chart":
+            c.execute(
+                """
+                SELECT ts, temp, hum, vpd
+                FROM temp_history
+                WHERE tent_id = ? AND ts >= ?
+                  AND temp IS NOT NULL AND hum IS NOT NULL
+                ORDER BY ts ASC
+                """,
+                (tent_id, since),
+            )
+            return [
+                {"ts": ts, "temp": temp, "hum": hum, "vpd": vpd}
+                for ts, temp, hum, vpd in c.fetchall()
+                if -30 <= temp <= 60 and 0 <= hum <= 100
             ]
 
         if data_type == "ppfd":

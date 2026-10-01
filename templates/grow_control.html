@@ -277,13 +277,19 @@ h3 {
 .vpd-card-slot { position: relative; min-width: 0; }
 .vpd-card-slot > .card-link { display: block; height: 100%; }
 .vpd-card-slot #vpd-card { height: 100%; }
-.vpd-card-slot.has-vpd-log #vpd-card { padding-bottom: 38px; }
+.vpd-card-slot #vpd-card { padding-bottom: 38px; }
+.vpd-chart-shortcut {
+    position:absolute;left:8px;bottom:8px;z-index:2;padding:4px 7px;
+    border:1px solid rgba(34,197,94,.4);border-radius:999px;
+    background:rgba(20,83,45,.6);color:#bbf7d0;
+    font-size:.61rem;font-weight:800;text-decoration:none;white-space:nowrap;
+}
 .vpd-log-shortcut {
     position: absolute;
-    left: 50%;
+    right: 8px;
     bottom: 8px;
     z-index: 2;
-    transform: translateX(-50%);
+    transform: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -300,6 +306,10 @@ h3 {
     white-space: nowrap;
 }
 .vpd-log-shortcut[hidden] { display: none; }
+.outside-summary{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0 18px;padding:15px 18px;border:1px solid rgba(56,189,248,.26);border-radius:16px;background:linear-gradient(135deg,rgba(14,165,233,.13),rgba(30,41,59,.8))}
+.outside-summary-label{color:#bae6fd;font-size:.8rem;font-weight:850;text-transform:uppercase;letter-spacing:.04em}
+.outside-summary-meta{margin-top:4px;color:var(--muted);font-size:.76rem;overflow-wrap:anywhere}
+.outside-summary-value{white-space:nowrap;font-size:1.5rem;font-weight:850;font-variant-numeric:tabular-nums}
 
 .grid {
     display: grid;
@@ -558,6 +568,10 @@ h3 {
 
 {% if has_permission('grow.view') %}
 <h3>Umgebungswerte</h3>
+<div class="outside-summary" role="status" aria-live="polite">
+    <div><div class="outside-summary-label">🌡️ Außentemperatur</div><div id="outside-temp-source" class="outside-summary-meta">Messwert wird geladen …</div></div>
+    <div id="outside-temp-value" class="outside-summary-value">-- °C</div>
+</div>
 <div class="grid" id="env-grid">
     <a href="{{ url_for('grow_control_tent_temperature', tent_id=tent_id) }}" class="card-link">
         <div class="card env" id="temp-card">
@@ -583,6 +597,7 @@ h3 {
                 <div class="sub" id="vpd-control-summary">Soll: -- kPa</div>
             </div>
         </a>
+        <a class="vpd-chart-shortcut" href="{{ url_for('grow_control_tent_vpd_chart', tent_id=tent_id) }}" aria-label="VPD-Chart für {{ tent_name }} öffnen">▦ VPD-Chart</a>
         <a
             id="vpd-log-link"
             class="vpd-log-shortcut"
@@ -655,6 +670,7 @@ h3 {
         OFF: "Deaktiviert",
         ON: "Dauerbetrieb",
         TIME: "Zeitgesteuert",
+        TIMER: "Zeitschaltuhr",
         INTERVAL: "Intervall",
         ENV: "Umgebung"
     };
@@ -1097,6 +1113,11 @@ h3 {
             safeText("hum-ist", formatNumber(state.hum, 1));
             safeText("hum-soll", formatNumber(state.hum_target, 1));
             safeText("vpd", formatNumber(state.vpd, 2));
+            const outside = optionalNumber(state.outside_temp);
+            safeText("outside-temp-value", Number.isFinite(outside) ? `${outside.toFixed(1)} °C` : "-- °C");
+            safeText("outside-temp-source", Number.isFinite(outside)
+                ? (state.outside_temp_source?.label || "Außensensor") + " · aktuell"
+                : "Kein aktueller Außensensorwert");
             safeText(
                 "light-level",
                 Number.isFinite(Number(state.light_ppfd))

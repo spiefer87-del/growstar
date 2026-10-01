@@ -501,6 +501,9 @@ def _tent_list_payload():
                 item["temp"] = runtime.state.live_state.get("temp")
                 item["hum"] = runtime.state.live_state.get("hum")
                 item["vpd"] = runtime.state.live_state.get("vpd")
+                item["outside_temp"] = runtime.state.live_state.get("outside_temp")
+                outside_source = runtime.state.live_state.get("outside_temp_source") or {}
+                item["outside_temp_label"] = outside_source.get("label") if isinstance(outside_source, dict) else None
 
         result.append(item)
 
