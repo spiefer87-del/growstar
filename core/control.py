@@ -108,6 +108,18 @@ def evaluate_env_conditions(device, runtime=None):
     logic = env_cfg.get("logic", "OR")
     direction = env_cfg.get("direction", "HIGH")
 
+    # Bei der klassischen Feuchteregelung ist die Toleranz die EIN-Schwelle.
+    # Nach einem bestätigten EIN bleibt der Auftrag bis zum Sollwert bestehen.
+    # Der tatsächliche Ausgangszustand ist dabei die Hysterese-Merkerstellung:
+    # fehlgeschlagene/gesperrte EIN-Befehle können keinen Zyklus vortäuschen.
+    # SHADOW verwendet stattdessen den getrennten simulierten Ausgang.
+    regulating = False
+    if device in ("humidifier", "dehumidifier"):
+        if getattr(rt, "control_enabled", True):
+            regulating = bool(getattr(st, f"{device}_on", False))
+        else:
+            regulating = bool(getattr(rt, "shadow_outputs", {}).get(device))
+
     results = []
 
     if use_temp:
@@ -117,9 +129,9 @@ def evaluate_env_conditions(device, runtime=None):
 
         if None not in (temp, target, tol):
             if direction == "HIGH":
-                results.append(temp > (target + tol))
+                results.append(temp > (target if regulating else target + tol))
             else:
-                results.append(temp < (target - tol))
+                results.append(temp < (target if regulating else target - tol))
 
     if use_hum:
         hum = st.live_state.get("hum")
@@ -128,9 +140,9 @@ def evaluate_env_conditions(device, runtime=None):
 
         if None not in (hum, target, tol):
             if direction == "HIGH":
-                results.append(hum > (target + tol))
+                results.append(hum > (target if regulating else target + tol))
             else:
-                results.append(hum < (target - tol))
+                results.append(hum < (target if regulating else target - tol))
 
     if not results:
         return False

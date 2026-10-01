@@ -5,10 +5,18 @@ from pathlib import Path
 from threading import RLock
 from types import SimpleNamespace
 import sys
+import types
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+if "requests" not in sys.modules:
+    requests_stub = types.ModuleType("requests")
+    requests_stub.RequestException = type("RequestException", (Exception,), {})
+    requests_stub.Timeout = requests_stub.ConnectionError = requests_stub.RequestException
+    requests_stub.get = requests_stub.post = lambda *args, **kwargs: None
+    sys.modules["requests"] = requests_stub
 
 import core.control as control
 from core.controller_states import resolve_control_state
