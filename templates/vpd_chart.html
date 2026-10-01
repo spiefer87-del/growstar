@@ -5,11 +5,13 @@
 *{box-sizing:border-box}:root{--bg:#0f172a;--panel:#1e293b;--muted:#94a3b8;--text:#e5e7eb;--line:rgba(148,163,184,.22)}
 body{margin:0;background:radial-gradient(circle at top left,rgba(34,197,94,.08),transparent 30rem),var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
 .vc-page{max-width:1150px;margin:auto;padding:20px 15px 36px}.vc-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.vc-head h1{font-size:clamp(1.55rem,5vw,2.15rem);margin:0}.vc-head p{color:var(--muted);margin:5px 0 0}.vc-back,.vc-link{display:inline-flex;align-items:center;justify-content:center;padding:10px 13px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);text-decoration:none;white-space:nowrap;font-weight:700}
-.vc-tools{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:15px}.vc-tools select,.vc-tools button{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#111827;color:var(--text);font:inherit;font-weight:700}.vc-tools button{cursor:pointer}.vc-tools button[aria-pressed=true]{background:#166534;border-color:#22c55e}.vc-tools select{margin-right:auto;max-width:210px}
+.vc-tools{display:grid;grid-template-columns:minmax(0,1fr) 132px;align-items:center;gap:9px;margin-bottom:15px}.vc-ranges{display:flex;gap:7px;min-width:0;overflow-x:auto;scrollbar-width:none}.vc-ranges::-webkit-scrollbar{display:none}.vc-tools select,.vc-tools button{padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#111827;color:var(--text);font:inherit;font-weight:700}.vc-tools button{flex:none;white-space:nowrap;cursor:pointer}.vc-tools button[aria-pressed=true]{background:#166534;border-color:#22c55e}.vc-tools select{grid-column:2;grid-row:1;width:100%;min-width:0}
+@media(min-width:721px){.vc-tools{grid-template-columns:minmax(0,1fr) 180px}}
 .vc-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;padding:7px;margin-bottom:15px;border:1px solid var(--line);border-radius:16px;background:rgba(15,23,42,.72)}.vc-tabs a{display:flex;align-items:center;justify-content:center;min-height:50px;padding:7px 8px;border-radius:12px;color:var(--muted);text-align:center;text-decoration:none;font-size:.85rem;font-weight:800}.vc-tabs a[aria-current=page]{color:var(--text);background:rgba(34,197,94,.14);box-shadow:inset 0 0 0 1px rgba(34,197,94,.28)}
 .vc-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:15px}.vc-value{padding:17px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(140deg,#1e293b,#142136);min-width:0}.vc-value h2{margin:0 0 7px;font-size:.84rem;color:var(--muted);text-transform:uppercase}.vc-main{font-size:clamp(1.3rem,4vw,1.9rem);font-weight:850}.vc-meta{margin-top:6px;color:var(--muted);font-size:.84rem;overflow-wrap:anywhere}.vc-chart-card{padding:18px;border:1px solid var(--line);border-radius:20px;background:linear-gradient(140deg,#1e293b,#111827)}.vc-chart-card h2{font-size:1.05rem;margin:0 0 5px}.vc-chart-card p{color:var(--muted);font-size:.84rem;line-height:1.45;margin:0 0 12px}.vc-canvas-wrap{position:relative;width:100%;height:480px;border-radius:12px;overflow:hidden;background:#0b1626}.vc-canvas-wrap canvas{width:100%;height:100%;display:block;touch-action:manipulation}.vc-legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.vc-legend span{display:inline-flex;align-items:center;gap:6px;padding:6px 9px;border:1px solid var(--line);border-radius:999px;font-size:.74rem;color:#cbd5e1}.vc-legend i{display:inline-block;width:11px;height:11px;border-radius:50%}.vc-detail{margin-top:12px;min-height:23px;color:#cbd5e1;font-size:.82rem}.vc-foot{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:16px;color:var(--muted);font-size:.76rem;line-height:1.5}
-@media(max-width:650px){.vc-page{padding:12px 10px 25px}.vc-head{align-items:flex-start}.vc-values{gap:8px}.vc-value{padding:12px}.vc-canvas-wrap{height:430px}.vc-chart-card{padding:11px}.vc-foot{flex-direction:column;align-items:flex-start}.vc-tools select{max-width:100%}.vc-tabs{gap:5px;padding:5px}.vc-tabs a{min-height:47px;padding:5px 3px;font-size:.76rem}}
+@media(max-width:650px){.vc-page{padding:12px 10px 25px}.vc-head{align-items:flex-start}.vc-values{gap:8px}.vc-value{padding:12px}.vc-canvas-wrap{height:430px}.vc-chart-card{padding:11px}.vc-foot{flex-direction:column;align-items:flex-start}.vc-tabs{gap:5px;padding:5px}.vc-tabs a{min-height:47px;padding:5px 3px;font-size:.76rem}}
 @media(max-width:420px){.vc-tabs a{font-size:.7rem;padding:5px 2px;overflow-wrap:anywhere}}
+@media(max-width:420px){.vc-tools{grid-template-columns:minmax(0,1fr) 116px}.vc-ranges{gap:5px}.vc-tools button{padding:9px 7px;font-size:.78rem}.vc-tools select{padding:9px 5px;font-size:.78rem}}
 </style>
 {% endblock %}
 {% block page %}
@@ -23,12 +25,14 @@ body{margin:0;background:radial-gradient(circle at top left,rgba(34,197,94,.08),
     <a href="{{ url_for('grow_control_tent_ppfd', tent_id=tent_id) }}">☀️ Licht</a>
   </nav>
   <div class="vc-tools">
+    <div class="vc-ranges">
+      <button type="button" data-range="45m" aria-pressed="true">45 Min.</button>
+      <button type="button" data-range="6h" aria-pressed="false">6 Std.</button>
+      <button type="button" data-range="24h" aria-pressed="false">24 Std.</button>
+    </div>
     <select id="vc-station" aria-label="Station wählen">
       {% for tent in tents %}<option value="{{ tent.id }}" {% if tent.id == tent_id %}selected{% endif %}>{{ tent.name or tent.id }}</option>{% endfor %}
     </select>
-    <button type="button" data-range="45m" aria-pressed="true">45 Min.</button>
-    <button type="button" data-range="6h" aria-pressed="false">6 Std.</button>
-    <button type="button" data-range="24h" aria-pressed="false">24 Std.</button>
   </div>
   <div class="vc-values">
     <section class="vc-value"><h2>🌱 Innen</h2><div id="vc-inside" class="vc-main">-- kPa</div><div id="vc-inside-meta" class="vc-meta">Messwerte werden geladen …</div></section>
