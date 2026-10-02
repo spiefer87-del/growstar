@@ -131,6 +131,15 @@ def _history_rows(tent_id, range_key, data_type):
                 if r[1] is not None
             ]
 
+        if data_type == "water_temp":
+            c.execute(
+                """SELECT ts, water_temp FROM temp_history
+                   WHERE tent_id = ? AND ts >= ? AND water_temp IS NOT NULL
+                   ORDER BY ts ASC""",
+                (tent_id, since),
+            )
+            return [{"ts": ts, "water_temp": value} for ts, value in c.fetchall()]
+
         return []
     finally:
         db.close()

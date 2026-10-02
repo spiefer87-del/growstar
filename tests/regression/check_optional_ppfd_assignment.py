@@ -309,7 +309,7 @@ def main():
         "Setup speichert Außenquellen mit dem richtigen Messfeld",
     )
     require(
-        '["ppfd","outside_temperature","outside_humidity"]' in ui
+        '["ppfd","outside_temperature","outside_humidity","water_temperature"]' in ui
         and "'Nicht zugewiesen'" in ui,
         "Beide optionalen Außenquellen lassen sich im Setup gezielt entfernen",
     )

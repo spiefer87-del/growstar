@@ -16,8 +16,8 @@ def check(condition,message):
 def main():
     check('class="assignment-select"' in setup and 'data-field="${field}"' in setup,
           'Setup bietet stationsbezogene Auswahlfelder')
-    check('"temperature","humidity","ppfd","outside_temperature","outside_humidity"' in setup,
-          'Innenwerte, PPFD und Außenwerte haben eigene Ziele')
+    check('"temperature","humidity","ppfd","outside_temperature","outside_humidity","water_temperature"' in setup,
+          'Innenwerte, PPFD, Außenwerte und Wassertemperatur haben eigene Ziele')
     check('sourceField' not in sources and 'drop-zone' not in sources and 'station-grid' not in sources,
           'Zentrale Sensorseite enthält weder Drag-and-Drop noch Stationen')
     check('setup-sensor-sources' not in setup and 'dragstart' not in setup and 'pointermove' not in setup,
@@ -28,7 +28,7 @@ def main():
     check('method:"POST"' in setup and 'body:JSON.stringify(payload)' in setup
           and 'field:sensorField(field)' in setup and 'refreshPreflights()' in setup,
           'Zuordnung verwendet bestehende API und aktualisiert LIVE-Preflight')
-    check('(!id&&!["ppfd","outside_temperature","outside_humidity"].includes(field))' in setup
+    check('(!id&&!["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field))' in setup
           and "'Nicht zugewiesen'" in setup,
           'Pflichtsensoren bleiben gesetzt, optionale Quellen lassen sich entfernen')
     check('select.addEventListener("change",()=>saveAssignment(select))' in setup

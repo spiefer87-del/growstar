@@ -21,10 +21,10 @@ def main():
     source = (ROOT / "db.py").read_text(encoding="utf-8")
 
     req("ppfd=None" in source, "insert_measurement akzeptiert PPFD")
-    req("VALUES (?, ?, ?, ?, ?, ?, ?, ?)" in source, "SQL besitzt exakt 8 Platzhalter")
+    req("VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)" in source, "SQL besitzt exakt 9 Platzhalter")
     req(
-        "            vpd,\n            ppfd\n" in source,
-        "Binding-Tupel enthält VPD und PPFD",
+        "            vpd,\n            ppfd,\n            water_temp\n" in source,
+        "Binding-Tupel enthält VPD, PPFD und Wassertemperatur",
     )
 
     old_db_file = grow_db.DB_FILE
@@ -43,13 +43,14 @@ def main():
                 hum_target=60.0,
                 vpd=1.12,
                 ppfd=245.0,
+                water_temp=21.4,
                 tent_id="tent_test",
             )
 
             con = sqlite3.connect(test_db)
             row = con.execute(
                 '''
-                SELECT tent_id, temp, temp_target, hum, hum_target, vpd, ppfd
+                SELECT tent_id, temp, temp_target, hum, hum_target, vpd, ppfd, water_temp
                 FROM temp_history
                 WHERE tent_id = ?
                 ORDER BY id DESC
@@ -67,6 +68,7 @@ def main():
             req(abs(row[4] - 60.0) < 0.001, "Feuchte-Sollwert wird korrekt gespeichert")
             req(abs(row[5] - 1.12) < 0.001, "VPD wird korrekt gespeichert")
             req(abs(row[6] - 245.0) < 0.001, "PPFD wird korrekt gespeichert")
+            req(abs(row[7] - 21.4) < 0.001, "Wassertemperatur wird korrekt gespeichert")
 
         finally:
             grow_db.DB_FILE = old_db_file

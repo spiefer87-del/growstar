@@ -620,8 +620,8 @@ h3 {
     <a href="/ec" class="card-link pending-detail-link" id="ec-link">
         <div class="card env" id="ec-card"><h2>EC-Wert</h2><div class="value"><span id="ec">--.-</span> mS</div><div class="sub">Nährlösung</div></div>
     </a>
-    <a href="/water-temp" class="card-link pending-detail-link" id="water-temp-link">
-        <div class="card env" id="water-temp-card"><h2>Wassertemp</h2><div class="value"><span id="water-temp">--.-</span> °C</div><div class="sub">Tank</div></div>
+    <a href="{{ url_for('grow_control_tent_water_temperature', tent_id=tent_id) }}" class="card-link" id="water-temp-link">
+        <div class="card env" id="water-temp-card"><h2>Wassertemperatur</h2><div class="value"><span id="water-temp">--.-</span> °C</div><div class="sub">Tank</div></div>
     </a>
     <a href="{{ url_for('grow_control_tent_ppfd', tent_id=tent_id) }}" class="card-link ppfd-card-shell" id="light-level-link">
         <div class="card env" id="light-level-card">
@@ -1104,6 +1104,8 @@ h3 {
             safeText("temp-soll", formatNumber(state.temp_target, 1));
             safeText("hum-ist", formatNumber(state.hum, 1));
             safeText("hum-soll", formatNumber(state.hum_target, 1));
+            safeText("water-temp", Number.isFinite(optionalNumber(state.water_temp))
+                ? formatNumber(state.water_temp, 1) : "--.-");
             safeText("vpd", formatNumber(state.vpd, 2));
             const outside = optionalNumber(state.outside_temp);
             safeText("outside-temp-value", Number.isFinite(outside) ? `${outside.toFixed(1)} °C` : "-- °C");

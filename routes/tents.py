@@ -328,6 +328,8 @@ def _state_snapshot(runtime):
         ),
         "light_ppfd": light_ppfd,
         "light_ppfd_source": light_ppfd_source,
+        "water_temp": live.get("water_temp"),
+        "water_temp_source": live.get("water_temp_source"),
         "temp_target": live.get("temp_target"),
         "temp_tol": live.get("temp_tol"),
         "hum_target": live.get("hum_target"),

@@ -189,6 +189,7 @@ def register(app):
             "hum": ("Luftfeuchtigkeit", "💧"),
             "vpd": ("VPD", "🌱"),
             "ppfd": ("Helligkeit", "☀️"),
+            "water_temp": ("Wassertemperatur", "🌡️"),
         }
         title, icon = meta[metric]
         return render_template(
@@ -229,6 +230,10 @@ def register(app):
     @app.route("/grow-control/tents/<tent_id>/ppfd")
     def grow_control_tent_ppfd(tent_id):
         return _environment_history_page(tent_id, "ppfd")
+
+    @app.route("/grow-control/tents/<tent_id>/water-temperature")
+    def grow_control_tent_water_temperature(tent_id):
+        return _environment_history_page(tent_id, "water_temp")
 
     @app.route("/grow-control/tents/<tent_id>/settings")
     def grow_control_tent_settings(tent_id):

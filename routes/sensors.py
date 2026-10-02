@@ -275,6 +275,7 @@ def _sensor_options():
         # API-Vertrag eindeutig und vermeiden UI-Sonderfälle.
         "outside_temperature": list(temperature),
         "outside_humidity": list(humidity),
+        "water_temperature": list(temperature),
     }
 
 
@@ -320,6 +321,7 @@ def _normalize_assignment(sensor_name, data):
         "ppfd": "ppfd",
         "outside_temperature": "temperature",
         "outside_humidity": "humidity",
+        "water_temperature": "temperature",
     }.get(sensor_name)
 
     if not field:
@@ -429,7 +431,7 @@ def _save_assignments(runtime, data):
         else:
             assignments["ppfd"] = ppfd_assignment
 
-    for sensor_name in ("outside_temperature", "outside_humidity"):
+    for sensor_name in ("outside_temperature", "outside_humidity", "water_temperature"):
         if sensor_name not in data:
             continue
         outside_assignment = _normalize_optional_assignment(
@@ -468,6 +470,7 @@ def _save_assignments(runtime, data):
             "ppfd",
             "outside_temperature",
             "outside_humidity",
+            "water_temperature",
         )
     ):
         runtime.config["SENSOR_ASSIGNMENTS"] = assignments

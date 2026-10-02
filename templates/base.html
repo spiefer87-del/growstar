@@ -181,7 +181,7 @@
                     <a class="{% if growstar_endpoint in ['grow_control_watchdog', 'watchdog_system_data'] %}active{% endif %}" href="{{ url_for('grow_control_watchdog') }}"><span>Watchdog</span><small>Überwachung</small></a>
                     {% endif %}
                     {% if has_permission('settings.view') %}
-                    <a class="{% if growstar_endpoint == 'grow_control_setup' %}active{% endif %}" href="{{ url_for('grow_control_setup') }}"><span>Setup</span><small>Stationen &amp; Neustart</small></a>
+                    <a class="{% if growstar_endpoint == 'grow_control_setup' %}active{% endif %}" href="{{ url_for('grow_control_setup') }}"><span>Grow Station Setup</span><small>Stationen &amp; Neustart</small></a>
                     <a class="{% if growstar_endpoint == 'system_network_page' %}active{% endif %}" href="{{ url_for('system_network_page') }}"><span>Netzwerk</span><small>Raspberry-Verbindung</small></a>
                     <a class="{% if growstar_endpoint == 'growstar_notifications_page' %}active{% endif %}" href="{{ url_for('growstar_notifications_page') }}"><span>Alarme</span><small>Telegram &amp; Meldungen</small></a>
                     {% endif %}

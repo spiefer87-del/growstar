@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Setup – Hardware & Setup{% endblock %}
+{% block title %}Grow Station Setup – Hardware & Setup{% endblock %}
 
 {% block head %}
 <style>
@@ -30,6 +30,7 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
 .setup-tool-icon{font-size:1.35rem}.setup-tool p{margin:8px 0 0;color:var(--muted);font-size:.82rem;line-height:1.5}.setup-tool-action{margin-top:11px;color:#fcd34d;font-size:.78rem;font-weight:800}
 .add-card{margin-top:24px;background:rgba(30,41,59,.75);border:1px dashed rgba(148,163,184,.28);border-radius:18px;padding:18px}.add-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.add-grid .field label{margin-top:0}.section-title{margin:0 0 13px;font-size:1.05rem}
 .assignment-panel{margin-top:17px;padding-top:14px;border-top:1px solid rgba(148,163,184,.17)}.assignment-panel h3{margin:0;font-size:.9rem}.assignment-panel p{color:var(--muted);font-size:.76rem;line-height:1.4;margin:5px 0 0}.assignment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.assignment-field{display:block;min-width:0;margin:0;padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:11px;background:#111827}.assignment-field span{display:block;margin-bottom:7px;font-size:.74rem;color:#cbd5e1;font-weight:700}.assignment-select{display:block;width:100%;min-width:0;min-height:42px;padding:8px 10px;border:1px solid #334155;border-radius:9px;background:#020617;color:var(--text);font:inherit;font-size:.84rem}.assignment-select:focus{outline:2px solid var(--blue);outline-offset:2px}.assignment-select:disabled{opacity:.65}.sensor-status{color:var(--muted);font-size:.75rem;min-height:18px;margin-top:9px}.sensor-status.err{color:#fca5a5}.sensor-status.ok{color:#86efac}
+.station-switch{margin-left:auto;min-width:128px;max-width:200px;min-height:43px;padding:8px 10px;border:1px solid #334155;border-radius:12px;background:var(--card);color:var(--text);font:inherit;font-weight:700;cursor:pointer}.topbar>div{min-width:0}
 @media(max-width:650px){body{padding:14px}.add-grid{grid-template-columns:1fr}.btn{width:100%}}
 @media(max-width:390px){.assignment-grid{grid-template-columns:1fr}}
 </style>
@@ -39,7 +40,8 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
 <div class="wrap">
     <div class="topbar">
         <a class="back" href="{{ url_for('hardware_management_dashboard') }}">←</a>
-        <div><h1>⚙️ Setup</h1><div class="subtitle">Grow-Stationen auf diesem Raspberry verwalten</div></div>
+        <div><h1>⚙️ Grow Station Setup</h1><div class="subtitle">Grow-Stationen auf diesem Raspberry verwalten</div></div>
+        <select id="station-switch" class="station-switch" aria-label="Grow-Station wählen"><option>Stationen laden …</option></select>
     </div>
 
     <div class="notice">
@@ -87,15 +89,17 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     let defaultTentId = "tent_1";
     let tentAssignments = new Map(), tentOptions = new Map();
     let stationRows = [];
+    const switcher = document.getElementById("station-switch");
+    let selectedTentId = new URLSearchParams(location.search).get("tent_id") || "";
 
     const esc = value => String(value ?? "").replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-    const sensorField = field => field === "outside_temperature" ? "temperature" : field === "outside_humidity" ? "humidity" : field;
-    const labelFor = field => ({temperature:"Innentemperatur",humidity:"Innenfeuchte",ppfd:"Helligkeit / PPFD",outside_temperature:"Außentemperatur",outside_humidity:"Außenfeuchte"}[field] || field);
+    const sensorField = field => ["outside_temperature","water_temperature"].includes(field) ? "temperature" : field === "outside_humidity" ? "humidity" : field;
+    const labelFor = field => ({temperature:"Innentemperatur",humidity:"Innenfeuchte",ppfd:"Helligkeit / PPFD",outside_temperature:"Außentemperatur",outside_humidity:"Außenfeuchte",water_temperature:"Wassertemperatur"}[field] || field);
     function status(el,message,ok){el.textContent=message;el.className="sensor-status " + (ok ? "ok":"err")}
     function zone(tentId,field,assignment){
         const options=tentOptions.get(tentId)?.[field]||[];
         const selected=assignment?.source_id||"";
-        const optional=["ppfd","outside_temperature","outside_humidity"].includes(field);
+        const optional=["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field);
         const available=options.some(option=>option.source_id===selected);
         const placeholder=optional?'Nicht zugewiesen':'Quelle auswählen';
         const choices=`<option value="" ${selected?'':'selected'} ${optional?'':'disabled'}>${placeholder}</option>`
@@ -106,7 +110,7 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     function assignmentPanel(t){
         if(!t.runtime_loaded)return '<div class="sensor-status">Zuordnung nach Neustart verfügbar.</div>';
         const a=tentAssignments.get(t.id)||{};
-        return `<section class="assignment-panel"><h3>Sensorzuordnung</h3><p>Feld antippen und passende Quelle auswählen. Änderungen werden sofort gespeichert.</p><div class="assignment-grid">${["temperature","humidity","ppfd","outside_temperature","outside_humidity"].map(field=>zone(t.id,field,a[field])).join("")}</div><div class="sensor-status js-sensor-status" aria-live="polite"></div></section>`;
+        return `<section class="assignment-panel"><h3>Sensorzuordnung</h3><p>Feld antippen und passende Quelle auswählen. Änderungen werden sofort gespeichert.</p><div class="assignment-grid">${["temperature","humidity","ppfd","outside_temperature","outside_humidity","water_temperature"].map(field=>zone(t.id,field,a[field])).join("")}</div><div class="sensor-status js-sensor-status" aria-live="polite"></div></section>`;
     }
 
     function mode(t){
@@ -171,8 +175,11 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         const data = await res.json();
         defaultTentId = data.default_tent_id || "tent_1";
         stationRows = data.tents || [];
-        await Promise.all(stationRows.filter(t=>t.runtime_loaded).map(loadAssignments));
-        grid.innerHTML = stationRows.map(t => card(t, defaultTentId)).join("") || '<div class="card">Keine Stationen.</div>';
+        if(!stationRows.some(t=>t.id===selectedTentId))selectedTentId=stationRows.find(t=>t.id===defaultTentId)?.id||stationRows[0]?.id||"";
+        switcher.innerHTML=stationRows.map(t=>`<option value="${esc(t.id)}" ${t.id===selectedTentId?'selected':''}>${esc(t.name||t.id)}</option>`).join("");
+        const selected=stationRows.find(t=>t.id===selectedTentId);
+        if(selected?.runtime_loaded)await loadAssignments(selected);
+        grid.innerHTML = selected ? card(selected, defaultTentId) : '<div class="card">Keine Stationen.</div>';
         bind();
         bindAssignments();
         refreshPreflights();
@@ -198,7 +205,7 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         const tentId=select.dataset.tentId,field=select.dataset.field;
         const previous=select.dataset.current||"",id=select.value;
         const feedback=select.closest(".assignment-panel").querySelector(".js-sensor-status");
-        if(!CAN_CONFIGURE||(!id&&!["ppfd","outside_temperature","outside_humidity"].includes(field))){
+        if(!CAN_CONFIGURE||(!id&&!["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field))){
             select.value=previous;return;
         }
         const option=(tentOptions.get(tentId)?.[field]||[]).find(item=>item.source_id===id);
@@ -335,6 +342,26 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
         if(!res.ok){ fb.className="feedback err"; fb.textContent=data.error || "Anlegen fehlgeschlagen"; return; }
         fb.className="feedback ok"; fb.textContent="Station angelegt · zunächst Shadow konfigurieren und Growstar neu starten";
         document.getElementById("new-id").value=""; document.getElementById("new-name").value="";
+        selectedTentId=data.tent?.id||id;
+        load();
+    });
+
+    switcher.addEventListener("change",()=>{
+        const cardEl=grid.querySelector(".card[data-id]");
+        const name=cardEl?.querySelector(".js-name");
+        const original=stationRows.find(t=>t.id===selectedTentId);
+        const draftChanged=original && (
+            (name && name.value.trim()!==(original.name||original.id)) ||
+            (cardEl?.querySelector(".js-enabled") && !cardEl.querySelector(".js-enabled").disabled &&
+                cardEl.querySelector(".js-enabled").checked !== Boolean(original.configured_enabled ?? original.enabled)) ||
+            (cardEl?.querySelector(".js-shadow") && !cardEl.querySelector(".js-shadow").disabled &&
+                cardEl.querySelector(".js-shadow").checked !== Boolean(original.configured_shadow_enabled ?? original.shadow_enabled))
+        );
+        if(draftChanged && !confirm("Ungespeicherte Stationseinstellungen gehen beim Wechsel verloren. Trotzdem wechseln?")){
+            switcher.value=selectedTentId;return;
+        }
+        selectedTentId=switcher.value;
+        history.replaceState(null,"",`${location.pathname}?tent_id=${encodeURIComponent(selectedTentId)}`);
         load();
     });
 

@@ -159,6 +159,8 @@ def _read_assigned_value(sensor_name, runtime=None):
             field = "temperature"
         elif sensor_name == "outside_humidity":
             field = "humidity"
+        elif sensor_name == "water_temperature":
+            field = "temperature"
 
     source = get_sensor_source(source_id)
 
@@ -232,6 +234,9 @@ def apply_sensor_assignments(runtime=None):
             runtime=rt,
         )
     )
+    water_raw, water_source, water_assignment = _read_assigned_value(
+        "water_temperature", runtime=rt,
+    )
 
     if ppfd_raw is None:
         assignments = cfg.get("SENSOR_ASSIGNMENTS", {})
@@ -272,10 +277,23 @@ def apply_sensor_assignments(runtime=None):
         outside_hum_raw is not None
         and _source_is_fresh(outside_hum_source, now)
     )
+    water_fresh = water_raw is not None and _source_is_fresh(water_source, now)
 
     changed = False
 
     with rt.state_lock:
+        if water_fresh and math.isfinite(water_raw) and -30 <= water_raw <= 100:
+            st.live_state["water_temp"] = water_raw
+            st.live_state["water_temp_source"] = {
+                "source_id": water_assignment.get("source_id"),
+                "label": water_assignment.get("label") or (water_source or {}).get("label")
+                    or water_assignment.get("source_id"),
+                "last_seen": _source_last_seen(water_source),
+            }
+            changed = True
+        else:
+            st.live_state["water_temp"] = None
+            st.live_state["water_temp_source"] = None
         # Den echten Empfangszeitpunkt auch dann übernehmen, wenn die Quelle
         # bereits stale ist. mark_stale_sensors() kann dadurch korrekt über
         # den Ausfall entscheiden, ohne dass alte Werte kurz wieder im UI

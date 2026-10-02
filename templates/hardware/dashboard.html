@@ -25,7 +25,7 @@ body{margin:0;padding:24px;background:radial-gradient(circle at top left,rgba(56
 
     {% if has_permission('settings.view') %}
     <section class="hm-section"><h2>Setup &amp; Raspberry</h2><p>Grundlegende Stations- und Systemdienste abseits der laufenden Grow-Regelung.</p><div class="hm-grid">
-        <a class="hm-card" href="{{ url_for('grow_control_setup') }}"><span class="hm-icon">⚙️</span><h3>Stations-Setup</h3><p>Stationen anlegen, benennen, Shadow/LIVE verwalten und Neustartverhalten festlegen.</p><div class="hm-action">Setup öffnen →</div></a>
+        <a class="hm-card" href="{{ url_for('grow_control_setup') }}"><span class="hm-icon">⚙️</span><h3>Grow Station Setup</h3><p>Stationen anlegen, benennen, Shadow/LIVE verwalten und Neustartverhalten festlegen.</p><div class="hm-action">Grow Station Setup öffnen →</div></a>
         <a class="hm-card" href="{{ url_for('system_network_page') }}"><span class="hm-icon">🌐</span><h3>Netzwerk</h3><p>LAN, WLAN, IP-Adressen und Erreichbarkeit des Raspberry Pi verwalten.</p><div class="hm-action">Netzwerk öffnen →</div></a>
         <a class="hm-card" href="{{ url_for('growstar_notifications_page') }}"><span class="hm-icon">🔔</span><h3>Alarme</h3><p>Telegram, Hardwarefehler, Safety- und Systemmeldungen konfigurieren.</p><div class="hm-action">Alarme öffnen →</div></a>
     </div></section>
