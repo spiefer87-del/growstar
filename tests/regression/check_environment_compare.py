@@ -81,7 +81,7 @@ def main():
     require('hum:{title:"Luftfeuchtigkeit' in chart and
             'vpd:{title:"VPD' in chart and 'ppfd:{title:"Licht' in chart and
             'spanGaps:false' in chart,
-            "Weitere Einheiten nutzen getrennte Bereiche und Datenlücken bleiben sichtbar")
+            "Weitere Einheiten behalten eigene Werte und Datenlücken bleiben sichtbar")
     require('type=all' in chart and 'grow_control_tent_compare' in tile,
             "Wassertemperatur-Kachel öffnet direkt den Stationsvergleich")
     print("✅ ENV.CHART.COMPARE.1 erfolgreich")
