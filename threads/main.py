@@ -98,6 +98,8 @@ def run_control_cycle(runtime=None, *, now=None, shadow=None):
         hum_val = st.live_state.get("hum")
         ppfd_val = st.live_state.get("light_ppfd")
         water_temp_val = st.live_state.get("water_temp")
+        outside_temp_val = st.live_state.get("outside_temp")
+        outside_hum_val = st.live_state.get("outside_hum")
 
     # =========================================
     # Datenbank
@@ -117,7 +119,9 @@ def run_control_cycle(runtime=None, *, now=None, shadow=None):
             with rt.state_lock:
                 st.live_state["vpd"] = vpd
 
-        if any(value is not None for value in (temp_val, hum_val, ppfd_val, water_temp_val)):
+        if any(value is not None for value in (
+            temp_val, hum_val, ppfd_val, water_temp_val, outside_temp_val, outside_hum_val,
+        )):
             try:
                 insert_measurement(
                     temp=temp_val,
@@ -127,6 +131,8 @@ def run_control_cycle(runtime=None, *, now=None, shadow=None):
                     vpd=vpd,
                     ppfd=ppfd_val,
                     water_temp=water_temp_val,
+                    outside_temp=outside_temp_val,
+                    outside_hum=outside_hum_val,
                     tent_id=rt.tent_id,
                 )
             except Exception as exc:

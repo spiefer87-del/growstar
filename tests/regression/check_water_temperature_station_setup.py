@@ -139,8 +139,8 @@ def main():
     require('water_temperature' in setup and 'Grow Station Setup' in setup,
             "Wassertemperatur ist im Grow Station Setup zuweisbar")
     require('safeText("water-temp", Number.isFinite(optionalNumber(state.water_temp))' in dashboard and
-            'grow_control_tent_water_temperature' in dashboard,
-            "Dashboard-Kachel zeigt den Livewert und öffnet den Stationsverlauf")
+            'grow_control_tent_compare' in dashboard,
+            "Dashboard-Kachel zeigt den Livewert und öffnet den Stationsvergleich")
     require('data-metric="water_temp"' in chart and 'water-temperature' in chart,
             "Diagrammseite besitzt den Wassertemperatur-Reiter")
     print("✅ WATER.TEMP.SETUP.1 erfolgreich")

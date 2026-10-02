@@ -140,6 +140,18 @@ def _history_rows(tent_id, range_key, data_type):
             )
             return [{"ts": ts, "water_temp": value} for ts, value in c.fetchall()]
 
+        if data_type == "all":
+            c.execute(
+                """SELECT ts, temp, hum, vpd, ppfd, water_temp,
+                          outside_temp, outside_hum
+                   FROM temp_history WHERE tent_id = ? AND ts >= ?
+                   ORDER BY ts ASC""",
+                (tent_id, since),
+            )
+            fields = ("ts", "temp", "hum", "vpd", "ppfd", "water_temp",
+                      "outside_temp", "outside_hum")
+            return [dict(zip(fields, row)) for row in c.fetchall()]
+
         return []
     finally:
         db.close()

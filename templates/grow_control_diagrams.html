@@ -27,6 +27,7 @@ body{margin:0;padding:24px;background:radial-gradient(circle at top left,rgba(34
                 <a class="gd-metric" href="{{ url_for('grow_control_tent_vpd_chart', tent_id=tent.id) }}"><strong>▦ VPD-Chart</strong><span>Temperatur × Feuchte · Live-Punkte</span></a>
                 <a class="gd-metric" href="{{ url_for('grow_control_tent_ppfd', tent_id=tent.id) }}"><strong>☀️ Licht / PPFD</strong><span>µmol/m²/s · Verlauf</span></a>
                 <a class="gd-metric" href="{{ url_for('grow_control_tent_water_temperature', tent_id=tent.id) }}"><strong>🌡️ Wassertemperatur</strong><span>°C · Verlauf</span></a>
+                <a class="gd-metric" href="{{ url_for('grow_control_tent_compare', tent_id=tent.id) }}"><strong>📊 Messwerte vergleichen</strong><span>Kurven frei wählen · gemeinsame Zeitachse</span></a>
             </div>
         </article>
     {% endfor %}

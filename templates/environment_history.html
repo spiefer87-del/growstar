@@ -8,13 +8,14 @@
 *{box-sizing:border-box} body{margin:0;min-height:100vh;background:radial-gradient(circle at top right,rgba(34,197,94,.06),transparent 28rem),var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .page{width:min(1120px,100%);margin:0 auto;padding:18px 14px 32px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:16px}.eyebrow{color:var(--muted);font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{margin:3px 0 0;font-size:clamp(1.5rem,5vw,2rem)}
 .back{display:inline-flex;align-items:center;gap:7px;color:var(--muted);text-decoration:none;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;white-space:nowrap}
-.metric-tabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;padding:7px;margin-bottom:12px;border:1px solid var(--border);border-radius:16px;background:rgba(15,23,42,.72);position:sticky;top:8px;z-index:5;backdrop-filter:blur(14px)}
+.metric-tabs{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;padding:7px;margin-bottom:12px;border:1px solid var(--border);border-radius:16px;background:rgba(15,23,42,.72);position:sticky;top:8px;z-index:5;backdrop-filter:blur(14px)}
 .metric-tab{border:0;min-height:50px;padding:7px 8px;border-radius:12px;background:transparent;color:var(--muted);font-weight:800;cursor:pointer}.metric-tab span{display:block;font-size:.72rem;font-weight:600;margin-top:2px;opacity:.8}.metric-tab.active{color:var(--text);background:var(--accent-soft);box-shadow:inset 0 0 0 1px rgba(34,197,94,.28)}
 .metric-tab-link{display:flex;align-items:center;justify-content:center;text-decoration:none;text-align:center}
 .toolbar{display:grid;grid-template-columns:minmax(0,1fr) 132px;align-items:center;column-gap:9px;row-gap:9px;margin-bottom:12px}.range-bar{display:flex;gap:7px;align-items:center;min-width:0;overflow-x:auto;scrollbar-width:none}.range-bar::-webkit-scrollbar{display:none}.chart-actions{grid-column:1/-1;display:flex;gap:7px;flex-wrap:wrap;align-items:center}.chart-actions[hidden]{display:none}.pill{flex:none;border:1px solid var(--border);padding:8px 12px;border-radius:999px;background:var(--card2);color:var(--text);cursor:pointer;font-size:.84rem;font-weight:700;white-space:nowrap}.pill.active{background:var(--accent);border-color:var(--accent);color:#022c22}.pill:disabled{display:none}.station-select{grid-column:2;grid-row:1;min-width:0;width:100%;min-height:36px;border:1px solid var(--border);border-radius:999px;background:var(--card2);color:var(--text);padding:7px 26px 7px 12px;font-size:.84rem;font-weight:700;cursor:pointer;outline:none}
 @media(min-width:721px){.toolbar{grid-template-columns:minmax(0,1fr) 180px}}
 .summary{display:grid;grid-template-columns:1.35fr repeat(3,1fr);gap:10px;margin-bottom:12px}.summary-card{min-width:0;padding:14px;border-radius:16px;background:linear-gradient(145deg,var(--card),var(--card2));border:1px solid var(--border)}.summary-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:800}.live-value{margin-top:5px;font-size:clamp(1.45rem,6vw,2.15rem);font-weight:800;line-height:1.05;white-space:nowrap}.stat-value{margin-top:7px;font-size:1.12rem;font-weight:800}.live-meta{display:flex;align-items:center;gap:7px;margin-top:7px;color:var(--muted);font-size:.78rem}.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px rgba(34,197,94,.65)}
 .chart-card{border:1px solid var(--border);border-radius:20px;padding:14px;background:linear-gradient(155deg,var(--card),#172338);box-shadow:0 18px 60px rgba(0,0,0,.22)}.chart-title{font-size:1rem;font-weight:800}.chart-subtitle{margin-top:2px;color:var(--muted);font-size:.8rem}.chart-wrap{position:relative;height:min(58vh,540px);min-height:330px}canvas{width:100%!important;height:100%!important}.empty{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted);pointer-events:none}.empty.show{display:flex}.footer-note{margin-top:10px;color:var(--muted);font-size:.75rem;text-align:right}
+.compare-picker{margin:0 0 12px;border:1px solid var(--border);border-radius:16px;background:var(--card2);padding:13px}.compare-picker summary{cursor:pointer;font-weight:800}.compare-picker p{color:var(--muted);font-size:.78rem;margin:8px 0}.compare-options{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.compare-options label{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:8px 11px;color:var(--text);font-size:.8rem;cursor:pointer}.compare-options input{accent-color:var(--accent)}.compare-views{display:grid;gap:14px;margin-top:12px}.compare-panel{border:1px solid var(--border);border-radius:15px;padding:12px;background:rgba(15,23,42,.5)}.compare-panel h3{font-size:.88rem;margin:0 0 5px}.compare-panel .compare-canvas{position:relative;height:250px}.compare-empty{color:var(--muted);font-size:.82rem;padding:20px;text-align:center}.compare-picker[hidden],.summary[hidden],.chart-wrap[hidden],.compare-views[hidden]{display:none!important}
 @media(max-width:720px){.page{padding:12px 10px 24px}.metric-tabs{display:flex;overflow-x:auto;scrollbar-width:none;gap:5px;padding:5px}.metric-tab{flex:0 0 auto;min-width:96px;font-size:.78rem;min-height:47px}.metric-tab span{display:none}.summary{grid-template-columns:repeat(3,1fr)}.summary-card.current{grid-column:1/-1}.chart-wrap{height:52vh;min-height:330px}.topbar{align-items:flex-start}.back{padding:9px 10px;font-size:.82rem}}
 @media(max-width:420px){.metric-tab{font-size:.7rem;padding:5px 2px;overflow-wrap:anywhere}}
 @media(max-width:420px){.toolbar{grid-template-columns:minmax(0,1fr) 116px}.range-bar{gap:5px}.range-bar .pill{padding:8px 9px;font-size:.77rem}.station-select{font-size:.78rem;padding-left:10px}}
@@ -30,24 +31,31 @@
 <a class="metric-tab metric-tab-link" href="{{ url_for('grow_control_tent_vpd_chart', tent_id=tent_id) }}">▦ VPD-Chart</a>
 <button class="metric-tab" data-metric="ppfd" onclick="selectMetric('ppfd')">☀️ Licht<span>PPFD</span></button>
 <button class="metric-tab" data-metric="water_temp" onclick="selectMetric('water_temp')">🌡️ Wasser<span>°C</span></button>
+<button class="metric-tab" data-metric="compare" onclick="selectMetric('compare')">📊 Vergleich<span>Kurven wählen</span></button>
 </div>
 <div class="toolbar"><div class="range-bar">
 <button class="pill" data-range="1h" onclick="setRange('1h')">1 h</button><button class="pill" data-range="6h" onclick="setRange('6h')">6 h</button><button class="pill active" data-range="24h" onclick="setRange('24h')">24 h</button><button class="pill" data-range="7d" onclick="setRange('7d')">7 Tage</button>
 </div><select id="station-select" class="station-select" aria-label="Station wechseln" onchange="changeStation(this.value)"><option value="{{ tent_id }}">{{ tent_name }}</option></select><div id="chart-actions" class="chart-actions"><button id="toggle-target" class="pill" onclick="toggleTarget()">Sollwert ausblenden</button><button id="toggle-secondary" class="pill" type="button" aria-pressed="false" onclick="toggleSecondary()" hidden>Feuchte einblenden</button></div></div>
-<div class="summary">
+<details id="compare-picker" class="compare-picker" hidden open><summary>Messwerte anzeigen · Kurven auswählen</summary><p>Gleiche Einheiten liegen zusammen. Weitere Einheiten erscheinen darunter auf derselben Zeitachse.</p><div id="compare-options" class="compare-options"></div></details>
+<div id="metric-summary" class="summary">
 <div class="summary-card current"><div class="summary-label">Aktuell</div><div class="live-value"><span id="current-value">--</span> <span id="current-unit"></span></div><div class="live-meta"><span class="dot"></span><span>Stationshistorie</span></div></div>
 <div class="summary-card"><div class="summary-label">Minimum</div><div class="stat-value"><span id="min">--</span> <span class="stat-unit"></span></div></div>
 <div class="summary-card"><div class="summary-label">Durchschnitt</div><div class="stat-value"><span id="avg">--</span> <span class="stat-unit"></span></div></div>
 <div class="summary-card"><div class="summary-label">Maximum</div><div class="stat-value"><span id="max">--</span> <span class="stat-unit"></span></div></div>
 </div>
-<div class="chart-card"><div><div class="chart-title" id="chart-title">Verlauf</div><div class="chart-subtitle" id="chart-subtitle">Letzte 24 Stunden</div></div><div class="chart-wrap"><canvas id="chart"></canvas><div id="empty" class="empty">Für diesen Zeitraum sind noch keine Messwerte gespeichert.</div></div><div class="footer-note">Automatische Aktualisierung alle 60 Sekunden</div></div>
+<div class="chart-card"><div><div class="chart-title" id="chart-title">Verlauf</div><div class="chart-subtitle" id="chart-subtitle">Letzte 24 Stunden</div></div><div id="single-chart" class="chart-wrap"><canvas id="chart"></canvas><div id="empty" class="empty">Für diesen Zeitraum sind noch keine Messwerte gespeichert.</div></div><div id="compare-views" class="compare-views" hidden></div><div class="footer-note">Automatische Aktualisierung alle 60 Sekunden</div></div>
 </div>
 <script>
 const TENT_ID={{ tent_id|tojson }}, INITIAL_METRIC={{ initial_metric|tojson }};
-const METRICS={temp:{title:"Temperatur",icon:"🌡️",unit:"°C",field:"temp",target:"target",decimals:1,dataset:"Temperatur",targetLabel:"Solltemperatur"},hum:{title:"Luftfeuchtigkeit",icon:"💧",unit:"%",field:"hum",target:"target",decimals:1,dataset:"Luftfeuchtigkeit",targetLabel:"Sollfeuchte"},vpd:{title:"VPD",icon:"🌱",unit:"kPa",field:"vpd",target:null,decimals:2,dataset:"VPD"},ppfd:{title:"Helligkeit",icon:"☀️",unit:"µmol/m²/s",field:"ppfd",target:null,decimals:0,dataset:"PPFD"},water_temp:{title:"Wassertemperatur",icon:"🌡️",unit:"°C",field:"water_temp",target:null,decimals:1,dataset:"Wassertemperatur"}};
+const METRICS={temp:{title:"Temperatur",icon:"🌡️",unit:"°C",field:"temp",target:"target",decimals:1,dataset:"Temperatur",targetLabel:"Solltemperatur"},hum:{title:"Luftfeuchtigkeit",icon:"💧",unit:"%",field:"hum",target:"target",decimals:1,dataset:"Luftfeuchtigkeit",targetLabel:"Sollfeuchte"},vpd:{title:"VPD",icon:"🌱",unit:"kPa",field:"vpd",target:null,decimals:2,dataset:"VPD"},ppfd:{title:"Helligkeit",icon:"☀️",unit:"µmol/m²/s",field:"ppfd",target:null,decimals:0,dataset:"PPFD"},water_temp:{title:"Wassertemperatur",icon:"🌡️",unit:"°C",field:"water_temp",target:null,decimals:1,dataset:"Wassertemperatur"},compare:{title:"Messwerte vergleichen",icon:"📊",unit:"",field:null,target:null}};
+const COMPARE_SERIES={temp:{label:"Zelt",group:"temp",color:"#22c55e"},water_temp:{label:"Wasser",group:"temp",color:"#38bdf8"},outside_temp:{label:"Außen",group:"temp",color:"#fbbf24"},hum:{label:"Zelt",group:"hum",color:"#22c55e"},outside_hum:{label:"Außen",group:"hum",color:"#fbbf24"},vpd:{label:"VPD",group:"vpd",color:"#a78bfa"},ppfd:{label:"Licht",group:"ppfd",color:"#facc15"}};
+const COMPARE_GROUPS={temp:{title:"Temperatur · °C",unit:"°C"},hum:{title:"Luftfeuchtigkeit · %",unit:"%"},vpd:{title:"VPD · kPa",unit:"kPa"},ppfd:{title:"Licht · µmol/m²/s",unit:"µmol/m²/s"}};
 const RANGES={"1h":{seconds:3600,label:"Letzte Stunde",maxPoints:180},"6h":{seconds:21600,label:"Letzte 6 Stunden",maxPoints:180},"24h":{seconds:86400,label:"Letzte 24 Stunden",maxPoints:180},"7d":{seconds:604800,label:"Letzte 7 Tage",maxPoints:220}};
 const TOOLTIP_AUTO_HIDE_MS=2500;
 let metric=METRICS[INITIAL_METRIC]?INITIAL_METRIC:"temp",currentRange="24h",showTarget=true,showSecondary=false,chart=null,tooltipHideTimer=null,loadGeneration=0;
+let comparisonCharts=[];
+const selectedSeries=new Set(["temp","water_temp","outside_temp"]);
+try{const saved=JSON.parse(localStorage.getItem(`growstar-chart-series:${TENT_ID}`));if(Array.isArray(saved)){selectedSeries.clear();saved.filter(key=>COMPARE_SERIES[key]).forEach(key=>selectedSeries.add(key))}}catch(_error){}
 const byId=id=>document.getElementById(id), fmt=(v,d)=>v!==null&&v!==undefined&&Number.isFinite(Number(v))?Number(v).toFixed(d):"--";
 function downsample(d,m){if(d.length<=m)return d;const s=Math.ceil(d.length/m),o=d.filter((_,i)=>i%s===0),last=d[d.length-1];if(o[o.length-1]!==last)o.push(last);return o}
 function vals(d,f){return d.map(r=>r[f]===null||r[f]===undefined?NaN:Number(r[f])).filter(Number.isFinite)}
@@ -69,8 +77,10 @@ function updateHeader(){
  const target=byId("toggle-target");target.disabled=!c.target;target.textContent=showTarget?"Sollwert ausblenden":"Sollwert einblenden";
  const secondary=byId("toggle-secondary");secondary.hidden=metric!=="temp"&&metric!=="hum";secondary.textContent=metric==="temp"?(showSecondary?"Feuchte ausblenden":"Feuchte einblenden"):(showSecondary?"Temperatur ausblenden":"Temperatur einblenden");secondary.setAttribute("aria-pressed",String(showSecondary));secondary.classList.toggle("active",showSecondary);
  byId("chart-actions").hidden=!c.target&&secondary.hidden;
+ byId("compare-picker").hidden=metric!=="compare";byId("metric-summary").hidden=metric==="compare";
+ byId("single-chart").hidden=metric==="compare";byId("compare-views").hidden=metric!=="compare";
 }
-function metricUrlForTent(tentId,m){const b=`/grow-control/tents/${encodeURIComponent(tentId)}`;return m==="temp"?`${b}/temperature`:m==="hum"?`${b}/humidity`:m==="vpd"?`${b}/vpd`:m==="water_temp"?`${b}/water-temperature`:`${b}/ppfd`}
+function metricUrlForTent(tentId,m){const b=`/grow-control/tents/${encodeURIComponent(tentId)}`;return m==="temp"?`${b}/temperature`:m==="hum"?`${b}/humidity`:m==="vpd"?`${b}/vpd`:m==="water_temp"?`${b}/water-temperature`:m==="compare"?`${b}/compare`:`${b}/ppfd`}
 function metricUrl(m){return metricUrlForTent(TENT_ID,m)}
 function selectMetric(m){if(!METRICS[m]||m===metric)return;clearTooltip();metric=m;if(metric!=="temp"&&metric!=="hum")showSecondary=false;updateTabs();updateHeader();history.replaceState(null,"",metricUrl(metric));load()}
 function changeStation(tentId){if(!tentId||tentId===TENT_ID)return;clearTooltip();window.location.href=metricUrlForTent(tentId,metric)}
@@ -78,6 +88,24 @@ async function loadStations(){const select=byId("station-select");if(!select)ret
 function setRange(r){if(!RANGES[r])return;clearTooltip();currentRange=r;updateTabs();updateHeader();load()}
 function toggleTarget(){if(!currentMetricConfig().target)return;showTarget=!showTarget;updateHeader();const target=chart?.data.datasets.find(dataset=>dataset.isTarget);if(target){target.hidden=!showTarget;chart.update("none")}}
 function toggleSecondary(){if(metric!=="temp"&&metric!=="hum")return;clearTooltip();showSecondary=!showSecondary;updateHeader();load()}
+function setupCompareOptions(){const container=byId("compare-options");Object.entries(COMPARE_SERIES).forEach(([key,item])=>{const label=document.createElement("label"),box=document.createElement("input");box.type="checkbox";box.checked=selectedSeries.has(key);box.setAttribute("aria-label",`${item.label} ${COMPARE_GROUPS[item.group].title}`);box.addEventListener("change",()=>{if(box.checked)selectedSeries.add(key);else selectedSeries.delete(key);try{localStorage.setItem(`growstar-chart-series:${TENT_ID}`,JSON.stringify([...selectedSeries]))}catch(_error){}load()});label.append(box,document.createTextNode(`${item.label} · ${COMPARE_GROUPS[item.group].title.split(" · ")[0]}`));container.appendChild(label)})}
+function renderComparison(rows){
+ comparisonCharts.forEach(item=>item.destroy());comparisonCharts=[];
+ const container=byId("compare-views");container.replaceChildren();
+ if(!selectedSeries.size){const message=document.createElement("p");message.className="compare-empty";message.textContent="Wähle oben mindestens einen Messwert aus.";container.appendChild(message);return}
+ const sampled=downsample(rows,RANGES[currentRange].maxPoints);
+ for(const [group,config] of Object.entries(COMPARE_GROUPS)){
+  const keys=Object.keys(COMPARE_SERIES).filter(key=>selectedSeries.has(key)&&COMPARE_SERIES[key].group===group);
+  if(!keys.length)continue;
+  const panel=document.createElement("section"),title=document.createElement("h3"),wrap=document.createElement("div"),canvas=document.createElement("canvas");
+  panel.className="compare-panel";wrap.className="compare-canvas";title.textContent=config.title;wrap.appendChild(canvas);panel.append(title,wrap);container.appendChild(panel);
+  if(!keys.some(key=>vals(rows,key).length)){
+   wrap.remove();const message=document.createElement("p");message.className="compare-empty";message.textContent="Für die gewählten Werte sind noch keine Messungen gespeichert.";panel.appendChild(message);continue;
+  }
+  const datasets=keys.map(key=>({label:`${COMPARE_SERIES[key].label} · ${config.unit}`,data:points(sampled,key),borderColor:COMPARE_SERIES[key].color,backgroundColor:"transparent",borderWidth:2.2,pointRadius:0,tension:.2,spanGaps:false,unit:config.unit,decimals:group==="ppfd"?0:group==="vpd"?2:1}));
+  comparisonCharts.push(new Chart(canvas,{type:"line",data:{datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,parsing:false,interaction:{mode:"nearest",intersect:false},scales:{x:xScale(),y:{beginAtZero:group==="ppfd",ticks:{color:"#cbd5e1"},title:{display:true,text:config.unit,color:"#cbd5e1"}}},plugins:{legend:{position:"bottom",labels:{color:"#e5e7eb"}},tooltip:{callbacks:{label:tooltipLabel}}}}}));
+ }
+}
 function updateStats(d){const c=currentMetricConfig(),v=vals(d,c.field);if(!v.length){["current-value","min","avg","max"].forEach(i=>byId(i).textContent="--");return}const sum=v.reduce((a,b)=>a+b,0);byId("current-value").textContent=fmt(v[v.length-1],c.decimals);byId("min").textContent=fmt(Math.min(...v),c.decimals);byId("avg").textContent=fmt(sum/v.length,c.decimals);byId("max").textContent=fmt(Math.max(...v),c.decimals)}
 function xScale(){const now=Date.now(),min=now-RANGES[currentRange].seconds*1000;const unit=currentRange==="1h"?"minute":currentRange==="7d"?"day":"hour";const maxTicks=currentRange==="1h"?7:currentRange==="7d"?7:8;return{type:"time",min,max:now,time:{unit,displayFormats:{minute:"HH:mm",hour:"HH:mm",day:"dd.MM"}},ticks:{color:"#94a3b8",maxTicksLimit:maxTicks}}}
 function points(rows,field){return rows.map(r=>({x:Number(r.ts)*1000,y:r[field]===null||r[field]===undefined||!Number.isFinite(Number(r[field]))?null:Number(r[field])}))}
@@ -97,6 +125,10 @@ function yScales(){const c=currentMetricConfig(),secondaryActive=showSecondary&&
 }
 async function load(){
  const generation=++loadGeneration,c=currentMetricConfig(),requestedMetric=metric,requestedRange=currentRange;
+ if(requestedMetric==="compare"){
+  try{const response=await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=all`,{cache:"no-store"});if(!response.ok)throw new Error(`HTTP ${response.status}`);const rows=await response.json();if(!Array.isArray(rows))throw new Error("Ungültige Historie");if(generation===loadGeneration)renderComparison(rows)}
+  catch(error){if(generation===loadGeneration){byId("compare-views").textContent=`Messwerte konnten nicht geladen werden (${error.message}).`}}return;
+ }
  const combined=showSecondary&&(requestedMetric==="temp"||requestedMetric==="hum");
  const type=combined?"climate":requestedMetric;
  const url=`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=${type}`;
@@ -116,6 +148,6 @@ async function load(){
   else{chart.data.datasets=ds;chart.options.scales={x:xScale(),...yScales()};chart.update("none")}
  }catch(e){console.error("Chart render:",e);byId("empty").textContent=`Diagramm konnte nicht gezeichnet werden (${e.message}).`;byId("empty").classList.add("show")}
 }
-updateTabs();updateHeader();loadStations();load();setInterval(load,60000);
+setupCompareOptions();updateTabs();updateHeader();loadStations();load();setInterval(load,60000);
 </script>
 {% endblock %}

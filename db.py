@@ -47,6 +47,10 @@ def init_db():
         c.execute("ALTER TABLE temp_history ADD COLUMN ppfd REAL")
     if "water_temp" not in existing_cols:
         c.execute("ALTER TABLE temp_history ADD COLUMN water_temp REAL")
+    if "outside_temp" not in existing_cols:
+        c.execute("ALTER TABLE temp_history ADD COLUMN outside_temp REAL")
+    if "outside_hum" not in existing_cols:
+        c.execute("ALTER TABLE temp_history ADD COLUMN outside_hum REAL")
 
     c.execute(
         "CREATE INDEX IF NOT EXISTS idx_temp_history_tent_ts "
@@ -65,6 +69,8 @@ def insert_measurement(
     vpd=None,
     ppfd=None,
     water_temp=None,
+    outside_temp=None,
+    outside_hum=None,
     tent_id=DEFAULT_TENT_ID,
 ):
     """
@@ -87,9 +93,11 @@ def insert_measurement(
             hum_target,
             vpd,
             ppfd,
-            water_temp
+            water_temp,
+            outside_temp,
+            outside_hum
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             tent_id,
@@ -100,7 +108,9 @@ def insert_measurement(
             hum_target,
             vpd,
             ppfd,
-            water_temp
+            water_temp,
+            outside_temp,
+            outside_hum
         )
     )
 
