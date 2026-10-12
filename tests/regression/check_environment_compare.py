@@ -66,6 +66,23 @@ def main():
             require(first[1]["water_temp"] == 21.2 and first[1]["outside_temp"] == 19.4 and
                     first[1]["outside_hum"] == 66 and first[1]["ppfd"] == 350,
                     "Ein Messzeitpunkt liefert Innen-, Wasser- und Außenwerte zusammen")
+            now = int(time.time())
+            with connect(path) as connection:
+                connection.executemany(
+                    "INSERT INTO temp_history(tent_id, ts, temp) VALUES (?, ?, ?)",
+                    [("tent_1", now - 36 * 3600, 22),
+                     ("tent_1", now - 20 * 24 * 3600, 23),
+                     ("tent_1", now - 31 * 24 * 3600, 24)],
+                )
+            with patch.object(diagrams.sqlite3, "connect", side_effect=lambda *_: connect(path)):
+                range_48h = diagrams._history_rows("tent_1", "48h", "temp")
+                range_30d = diagrams._history_rows("tent_1", "30d", "all")
+            require(any(row["temp"] == 22 for row in range_48h) and
+                    not any(row["temp"] == 23 for row in range_48h),
+                    "48 Stunden enthalten Messungen von gestern, aber keine älteren")
+            require(any(row["temp"] == 23 for row in range_30d) and
+                    not any(row["temp"] == 24 for row in range_30d),
+                    "30 Tage schließen ältere Messungen aus")
         finally:
             db.DB_FILE = old_file
 
@@ -84,6 +101,8 @@ def main():
             "Weitere Einheiten behalten eigene Werte und Datenlücken bleiben sichtbar")
     require('type=all' in chart and 'grow_control_tent_compare' in tile,
             "Wassertemperatur-Kachel öffnet direkt den Stationsvergleich")
+    require('data-range="48h"' in chart and 'data-range="30d"' in chart,
+            "48 Stunden und 30 Tage sind in der Zeitraumwahl vorhanden")
     print("✅ ENV.CHART.COMPARE.1 erfolgreich")
 
 

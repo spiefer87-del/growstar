@@ -15,7 +15,7 @@ def require(condition, message):
 def main():
     require('let comparisonChart=null' in chart and 'comparisonCharts' not in chart,
             "Vergleich verwaltet genau eine Chart-Instanz")
-    block = chart.split('function renderComparison(rows){', 1)[1].split('function updateStats(', 1)[0]
+    block = chart.split('function renderComparison(rows){', 1)[1].split('function liveMessage(', 1)[0]
     require(block.count('new Chart(') == 1 and 'for(const [group,config]' not in block,
             "Alle aktivierten Kurven werden in einem Diagramm gezeichnet")
     require('yAxisID:`y_${group}`' in block and 'group:`temp`' not in block and

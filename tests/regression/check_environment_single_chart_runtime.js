@@ -74,16 +74,23 @@ setImmediate(async () => {
     const before = datasets[0].data.length;
     vm.runInContext('toggleLive()', sandbox);
     await new Promise(resolve => setImmediate(resolve));
-    if (stateRequests !== 1 || datasets[0].data.length !== before + 1 ||
-        datasets[1].data.at(-1).y !== 22.1 || !chart.updates)
-        throw new Error('Live-Polling ergänzt die sieben Kurven nicht auf dem vorhandenen Canvas');
+    const live = calls[1];
+    if (stateRequests !== 1 || calls.length !== 2 || live === chart ||
+        datasets[0].data.length !== before || live.data.datasets[1].data.at(-1).y !== 22.1 || !live.updates)
+        throw new Error('Live-Polling muss auf einem eigenen Canvas zeichnen, ohne die Historie zu verändern');
+    const liveMin = live.options.scales.x.min;
+    vm.runInContext('setRange("30d")', sandbox);
+    await new Promise(resolve => setImmediate(resolve));
+    if (live.options.scales.x.min !== liveMin || calls.at(-1) === live ||
+        !chart.destroyed || !live.data.datasets[0].data.length)
+        throw new Error('30 Tage dürfen die unabhängige Live-Zeitachse nicht verändern');
     const activeTick = [...intervals.values()].at(-1);
     vm.runInContext('toggleLive()', sandbox);
     await new Promise(resolve => setImmediate(resolve));
     activeTick();
     await new Promise(resolve => setImmediate(resolve));
     if (stateRequests !== 1) throw new Error('Ausgeschaltete Live-Aufzeichnung fragt weiterhin Daten ab');
-    console.log('✅ Live ergänzt nur nach Aktivierung und stoppt die Abfrage wieder');
+    console.log('✅ Eigener Live-Canvas bleibt unabhängig vom Zeitraum und stoppt die Abfrage wieder');
     const stale = vm.runInContext('liveSample({snapshot_ts: 2000, last_loop_ts: 1999, temp_ok: false, hum_ok: false, temp: 28, hum: 70, water_temp: 24, water_temp_source: {last_seen: 1800}})', sandbox);
     if (stale.temp !== null || stale.hum !== null || stale.water_temp !== null)
         throw new Error('Veraltete Werte wurden als frische Live-Punkte gezeichnet');
