@@ -12,11 +12,11 @@ const code = page.match(/<script>([\s\S]*?)<\/script>/g).at(-1)
 const elements = new Map();
 function node(tag = 'div') {
     return {
-        tag, children: [], classList: {toggle() {}, add() {}, remove() {}},
+        tag, children: [], style: {}, classList: {toggle() {}, add() {}, remove() {}},
         append(...children) { this.children.push(...children); },
         appendChild(child) { this.children.push(child); return child; },
         replaceChildren(...children) { this.children = children; },
-        remove() {}, setAttribute() {}, addEventListener() {},
+        remove() {}, removeAttribute() {}, setAttribute(name, value) { this[name] = value; }, addEventListener() {},
     };
 }
 const document = {
@@ -46,7 +46,7 @@ const state = {snapshot_ts: now, last_loop_ts: now - 1, temp_ok: true, hum_ok: t
     outside_hum: 51, outside_hum_source: {last_seen: now - 1},
     light_ppfd: 420, light_ppfd_source: {last_seen: now - 1}};
 const context = {
-    document, Chart, console, Date, Set, Object, Number, String, JSON,
+    document, Chart, console, Date, Set, Object, Number, String, JSON, TextDecoder,
     localStorage: {getItem: () => JSON.stringify(series), setItem() {}},
     fetch: async url => {if (url.endsWith('/state')) stateRequests++;
         return {ok: true, json: async () => url === '/api/tents'
@@ -73,6 +73,35 @@ setImmediate(async () => {
     if (elements.get('compare-views').children.filter(item => item.className === 'compare-canvas').length !== 1)
         throw new Error('Mehr als eine Zeichenfläche erzeugt');
     console.log('✅ Sieben Kurven auf genau einer großen Zeichenfläche, korrekte Achsen und Messlücken');
+    const bytes = Buffer.from(JSON.stringify(rows));
+    const halfway = Math.floor(bytes.length / 2);
+    let releaseSecond;
+    let reads = 0;
+    context.streamResponse = {ok: true, headers: {get: name => name === 'Content-Length' ? String(bytes.length) : null}, body: {getReader: () => ({
+        read: () => ++reads === 1 ? Promise.resolve({done: false, value: bytes.subarray(0, halfway)})
+            : reads === 2 ? new Promise(resolve => { releaseSecond = () => resolve({done: false, value: bytes.subarray(halfway)}); })
+            : Promise.resolve({done: true}),
+    })}};
+    vm.runInContext('beginHistoryLoad(loadGeneration)', sandbox);
+    const streamed = vm.runInContext('readHistory(streamResponse, loadGeneration)', sandbox);
+    await new Promise(resolve => setImmediate(resolve));
+    if (elements.get('history-loading').hidden !== false ||
+        elements.get('loading-fill').style.width !== `${Math.floor(halfway / bytes.length * 100)}%`)
+        throw new Error('Ladebalken zeigt den tatsächlichen Fortschritt des Datenstroms nicht an');
+    releaseSecond();
+    const decoded = await streamed;
+    if (decoded.length !== rows.length || elements.get('loading-fill').style.width !== '100%')
+        throw new Error('Datenstrom wurde nicht vollständig gelesen');
+    vm.runInContext('finishHistoryLoad(loadGeneration)', sandbox);
+    if (elements.get('history-loading').hidden !== true)
+        throw new Error('Ladebalken bleibt nach dem Laden stehen');
+    vm.runInContext('beginHistoryLoad(loadGeneration); updateHistoryProgress(400, 0, loadGeneration); finishHistoryLoad(loadGeneration - 1)', sandbox);
+    if (elements.get('history-loading').hidden !== false ||
+        elements.get('loading-detail').textContent !== 'Daten werden übertragen' ||
+        elements.get('loading-fill').style.width !== '')
+        throw new Error('Unbekannte Größe oder alter Abruf erzeugt eine falsche Prozentanzeige');
+    vm.runInContext('finishHistoryLoad(loadGeneration)', sandbox);
+    console.log('✅ Ladebalken zeigt echte übertragenen Bytes und schließt nach Abschluss');
     if (stateRequests !== 0) throw new Error('Live startete ohne Benutzeraktion');
     vm.runInContext('selectMetric("live")', sandbox);
     await new Promise(resolve => setImmediate(resolve));

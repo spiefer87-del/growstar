@@ -17,6 +17,8 @@
 .chart-card{border:1px solid var(--border);border-radius:20px;padding:14px;background:linear-gradient(155deg,var(--card),#172338);box-shadow:0 18px 60px rgba(0,0,0,.22)}.chart-title{font-size:1rem;font-weight:800}.chart-subtitle{margin-top:2px;color:var(--muted);font-size:.8rem}.chart-wrap{position:relative;height:min(58vh,540px);min-height:330px}canvas{width:100%!important;height:100%!important}.empty{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted);pointer-events:none}.empty.show{display:flex}.footer-note{margin-top:10px;color:var(--muted);font-size:.75rem;text-align:right}
 .page.wide{width:min(1450px,100%)}.compare-picker{margin:0 0 12px;border:1px solid var(--border);border-radius:16px;background:var(--card2);padding:13px}.compare-picker summary{cursor:pointer;font-weight:800}.compare-picker p{color:var(--muted);font-size:.78rem;margin:8px 0}.compare-options{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.compare-options label{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:8px 11px;color:var(--text);font-size:.8rem;cursor:pointer}.compare-options input{accent-color:var(--accent)}.compare-views{margin-top:12px}.compare-canvas{position:relative;height:min(68vh,680px);min-height:470px}.compare-note{color:var(--muted);font-size:.76rem;line-height:1.5;margin:9px 0 0}.compare-empty{color:var(--muted);font-size:.82rem;padding:20px;text-align:center}.compare-picker[hidden],.summary[hidden],.chart-wrap[hidden],.compare-views[hidden]{display:none!important}
 .live-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}.live-controls[hidden],.live-panel[hidden],.range-bar[hidden],.chart-card[hidden]{display:none!important}.live-controls .pill[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#022c22}.live-status{color:var(--muted);font-size:.79rem}.live-status.running{color:#86efac}.live-status.err{color:#fca5a5}.live-panel{margin:0 0 14px;border:1px solid rgba(34,197,94,.32);border-radius:20px;padding:14px;background:linear-gradient(150deg,#172b32,#162238)}.live-panel-heading{display:flex;align-items:center;gap:9px;font-weight:800}.live-indicator{width:9px;height:9px;border-radius:50%;background:#64748b}.live-indicator.running{background:#22c55e;box-shadow:0 0 12px #22c55e;animation:live-pulse 1.5s ease-in-out infinite}@keyframes live-pulse{50%{opacity:.45}}.live-canvas{position:relative;height:340px;margin-top:12px}.live-note{color:var(--muted);font-size:.76rem;margin-top:10px;line-height:1.5}
+.history-loading{margin:0 0 12px;padding:12px 14px;border-radius:15px;border:1px solid rgba(34,197,94,.25);background:var(--card2)}.history-loading[hidden]{display:none!important}.loading-label{display:flex;justify-content:space-between;gap:12px;color:var(--text);font-size:.82rem;font-weight:700}.loading-detail{color:var(--muted);font-size:.76rem;white-space:nowrap}.loading-track{height:8px;margin-top:10px;overflow:hidden;border-radius:999px;background:rgba(148,163,184,.18)}.loading-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#16a34a,#4ade80);border-radius:inherit;transition:width .15s linear}.loading-fill.indeterminate{width:35%;animation:loading-sweep 1.35s ease-in-out infinite}@keyframes loading-sweep{0%{transform:translateX(-110%)}100%{transform:translateX(300%)}}
+@media(prefers-reduced-motion:reduce){.loading-fill.indeterminate{animation:none;width:100%;opacity:.6}}
 @media(max-width:720px){.page{padding:12px 10px 24px}.metric-tabs{display:flex;overflow-x:auto;scrollbar-width:none;gap:5px;padding:5px}.metric-tab{flex:0 0 auto;min-width:96px;font-size:.78rem;min-height:47px}.metric-tab span{display:none}.summary{grid-template-columns:repeat(3,1fr)}.summary-card.current{grid-column:1/-1}.chart-wrap{height:52vh;min-height:330px}.topbar{align-items:flex-start}.back{padding:9px 10px;font-size:.82rem}}
 @media(max-width:420px){.metric-tab{font-size:.7rem;padding:5px 2px;overflow-wrap:anywhere}}
 @media(max-width:420px){.toolbar{grid-template-columns:minmax(0,1fr) 116px}.range-bar{gap:5px}.range-bar .pill{padding:8px 9px;font-size:.77rem}.station-select{font-size:.78rem;padding-left:10px}}
@@ -39,6 +41,7 @@
 <div class="toolbar"><div id="range-bar" class="range-bar">
 <button class="pill" data-range="1h" onclick="setRange('1h')">1 h</button><button class="pill" data-range="6h" onclick="setRange('6h')">6 h</button><button class="pill active" data-range="24h" onclick="setRange('24h')">24 h</button><button class="pill" data-range="48h" onclick="setRange('48h')">48 h</button><button class="pill" data-range="7d" onclick="setRange('7d')">7 Tage</button><button class="pill" data-range="30d" onclick="setRange('30d')">30 Tage</button>
 </div><select id="station-select" class="station-select" aria-label="Station wechseln" onchange="changeStation(this.value)"><option value="{{ tent_id }}">{{ tent_name }}</option></select><div id="chart-actions" class="chart-actions"><button id="toggle-target" class="pill" onclick="toggleTarget()">Sollwert ausblenden</button><button id="toggle-secondary" class="pill" type="button" aria-pressed="false" onclick="toggleSecondary()" hidden>Feuchte einblenden</button></div></div>
+<div id="history-loading" class="history-loading" role="progressbar" aria-label="Messwerte laden" aria-valuemin="0" aria-valuemax="100" hidden><div class="loading-label"><span id="loading-message">Messwerte werden geladen …</span><span id="loading-detail" class="loading-detail"></span></div><div class="loading-track"><span id="loading-fill" class="loading-fill indeterminate"></span></div></div>
 <details id="compare-picker" class="compare-picker" hidden><summary id="compare-picker-title">Messwerte anzeigen · Kurven auswählen</summary><p>Die gewählten Kurven erscheinen im jeweiligen Diagramm. Innen-, Wasser- und Außentemperatur nutzen dieselbe °C-Achse.</p><div id="compare-options" class="compare-options"></div></details>
 <div id="live-controls" class="live-controls" hidden><button id="live-toggle" class="pill" type="button" aria-pressed="false" onclick="toggleLive()">● Live-Aufzeichnung starten</button><span id="live-status" class="live-status" role="status" aria-live="polite">Aus · eigene Live-Ansicht</span></div>
 <section id="live-panel" class="live-panel" aria-label="Live-Aufzeichnung" hidden><div class="live-panel-heading"><span id="live-indicator" class="live-indicator"></span>Live-Aufzeichnung · letzte 5 Minuten</div><div class="live-canvas"><canvas id="live-chart"></canvas></div><div class="live-note">Neue Messwerte erscheinen rechts. Werte lassen sich antippen und verschwinden nach zwei Sekunden. Diese Aufzeichnung bleibt nur während dieses Seitenbesuchs erhalten.</div></section>
@@ -60,6 +63,7 @@ const LIVE_WINDOW_MS=5*60*1000;
 const TOOLTIP_AUTO_HIDE_MS=2500;
 const LIVE_TOOLTIP_AUTO_HIDE_MS=2000;
 let metric=METRICS[INITIAL_METRIC]?INITIAL_METRIC:"temp",currentRange="24h",showTarget=true,showSecondary=false,chart=null,tooltipHideTimer=null,loadGeneration=0;
+let historyController=null;
 let comparisonChart=null,liveChart=null;
 let liveEnabled=false,liveTimer=null,liveBusy=false,liveGeneration=0,liveGapPending=false,liveRows=[],liveStart=0;
 const selectedSeries=new Set(["temp","water_temp","outside_temp"]);
@@ -99,6 +103,30 @@ function selectMetric(m){if(!METRICS[m]||m===metric)return;if(metric==="live")st
 function changeStation(tentId){if(!tentId||tentId===TENT_ID)return;stopLive(false);clearTooltip();window.location.href=metricUrlForTent(tentId,metric)}
 async function loadStations(){const select=byId("station-select");if(!select)return;try{const res=await fetch("/api/tents",{cache:"no-store"});if(!res.ok)throw new Error(`HTTP ${res.status}`);const payload=await res.json();const tents=Array.isArray(payload.tents)?payload.tents:[];if(!tents.length)return;select.innerHTML="";tents.forEach(tent=>{if(!tent||!tent.id)return;const option=document.createElement("option");option.value=tent.id;option.textContent=tent.name||tent.id;option.selected=tent.id===TENT_ID;option.disabled=tent.runtime_loaded===false;select.appendChild(option)})}catch(error){console.warn("Stationsliste konnte nicht geladen werden",error)}}
 function setRange(r){if(!RANGES[r]||metric==="live")return;clearTooltip();currentRange=r;updateTabs();updateHeader();load()}
+function beginHistoryLoad(generation){
+ if(generation!==loadGeneration)return;
+ const bar=byId("history-loading"),fill=byId("loading-fill");
+ bar.hidden=false;bar.removeAttribute("aria-valuenow");
+ byId("loading-message").textContent=`${RANGES[currentRange].label}: Messwerte werden geladen …`;
+ byId("loading-detail").textContent="";fill.style.width="";fill.classList.add("indeterminate");
+}
+function updateHistoryProgress(loaded,total,generation){
+ if(generation!==loadGeneration)return;
+ const bar=byId("history-loading"),fill=byId("loading-fill");
+ if(total>0){const percent=Math.min(100,Math.floor(loaded/total*100));fill.classList.remove("indeterminate");fill.style.width=`${percent}%`;bar.setAttribute("aria-valuenow",String(percent));byId("loading-detail").textContent=`${percent} % empfangen`}
+ else{bar.removeAttribute("aria-valuenow");byId("loading-detail").textContent="Daten werden übertragen"}
+}
+function finishHistoryLoad(generation){if(generation===loadGeneration){byId("history-loading").hidden=true;historyController=null}}
+async function readHistory(response,generation){
+ if(!response.ok)throw new Error(`HTTP ${response.status}`);
+ const encoding=response.headers?.get("Content-Encoding");
+ const total=encoding&&encoding!=="identity"?0:Number(response.headers?.get("Content-Length"))||0;
+ if(!response.body?.getReader){const data=await response.json();if(generation===loadGeneration)byId("loading-message").textContent="Diagramm wird gezeichnet …";return data}
+ const reader=response.body.getReader(),decoder=new TextDecoder();let json="",loaded=0;
+ while(true){const {done,value}=await reader.read();if(done)break;if(generation!==loadGeneration){await reader.cancel();return null}loaded+=value.byteLength;json+=decoder.decode(value,{stream:true});updateHistoryProgress(loaded,total,generation)}
+ json+=decoder.decode();if(generation===loadGeneration)byId("loading-message").textContent="Diagramm wird gezeichnet …";
+ return JSON.parse(json);
+}
 function toggleTarget(){if(!currentMetricConfig().target)return;showTarget=!showTarget;updateHeader();const target=chart?.data.datasets.find(dataset=>dataset.isTarget);if(target){target.hidden=!showTarget;chart.update("none")}}
 function toggleSecondary(){if(metric!=="temp"&&metric!=="hum")return;clearTooltip();showSecondary=!showSecondary;updateHeader();load()}
 function setupCompareOptions(){const container=byId("compare-options");Object.entries(COMPARE_SERIES).forEach(([key,item])=>{const label=document.createElement("label"),box=document.createElement("input");box.type="checkbox";box.checked=selectedSeries.has(key);box.setAttribute("aria-label",`${item.label} ${COMPARE_GROUPS[item.group].title}`);box.addEventListener("change",()=>{if(box.checked)selectedSeries.add(key);else selectedSeries.delete(key);try{localStorage.setItem(`growstar-chart-series:${TENT_ID}`,JSON.stringify([...selectedSeries]))}catch(_error){}if(metric==="live")renderLiveChart();else load()});label.append(box,document.createTextNode(`${item.label} · ${COMPARE_GROUPS[item.group].title.split(" · ")[0]}`));container.appendChild(label)})}
@@ -179,7 +207,7 @@ function toggleLive(){
 }
 document.addEventListener("visibilitychange",()=>{if(!liveEnabled)return;if(document.hidden)liveMessage("Live · pausiert im Hintergrund");else pollLive()});
 window.addEventListener("pagehide",()=>stopLive(false));
-function updateStats(d){const c=currentMetricConfig(),v=vals(d,c.field);if(!v.length){["current-value","min","avg","max"].forEach(i=>byId(i).textContent="--");return}const sum=v.reduce((a,b)=>a+b,0);byId("current-value").textContent=fmt(v[v.length-1],c.decimals);byId("min").textContent=fmt(Math.min(...v),c.decimals);byId("avg").textContent=fmt(sum/v.length,c.decimals);byId("max").textContent=fmt(Math.max(...v),c.decimals)}
+function updateStats(d){const c=currentMetricConfig(),v=vals(d,c.field);if(!v.length){["current-value","min","avg","max"].forEach(i=>byId(i).textContent="--");return}let sum=0,min=Infinity,max=-Infinity;for(const value of v){sum+=value;min=Math.min(min,value);max=Math.max(max,value)}byId("current-value").textContent=fmt(v[v.length-1],c.decimals);byId("min").textContent=fmt(min,c.decimals);byId("avg").textContent=fmt(sum/v.length,c.decimals);byId("max").textContent=fmt(max,c.decimals)}
 function xScale(){const now=Date.now(),min=now-RANGES[currentRange].seconds*1000;const unit=currentRange==="1h"?"minute":currentRange==="7d"||currentRange==="30d"?"day":"hour";const maxTicks=currentRange==="1h"?7:currentRange==="7d"||currentRange==="30d"?7:8;return{type:"time",min,max:now,time:{unit,displayFormats:{minute:"HH:mm",hour:"HH:mm",day:"dd.MM"}},ticks:{color:"#94a3b8",maxTicksLimit:maxTicks}}}
 function points(rows,field){return rows.map(r=>({x:Number(r.ts)*1000,y:r[field]===null||r[field]===undefined||!Number.isFinite(Number(r[field]))?null:Number(r[field])}))}
 function dataSets(d,secondaryRows){
@@ -198,29 +226,32 @@ function yScales(){const c=currentMetricConfig(),secondaryActive=showSecondary&&
 }
 async function load(){
  const generation=++loadGeneration,c=currentMetricConfig(),requestedMetric=metric,requestedRange=currentRange;
- if(requestedMetric==="live")return;
+ if(historyController)historyController.abort();historyController=null;
+ if(requestedMetric==="live"){byId("history-loading").hidden=true;return}
+ historyController=typeof AbortController==="function"?new AbortController():null;
+ beginHistoryLoad(generation);
  if(requestedMetric==="compare"){
-  try{const response=await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=all`,{cache:"no-store"});if(!response.ok)throw new Error(`HTTP ${response.status}`);const rows=await response.json();if(!Array.isArray(rows))throw new Error("Ungültige Historie");if(generation===loadGeneration)renderComparison(rows)}
-  catch(error){if(generation===loadGeneration){byId("compare-views").textContent=`Messwerte konnten nicht geladen werden (${error.message}).`}}return;
+  try{const response=await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=all`,{cache:"no-store",signal:historyController?.signal});const rows=await readHistory(response,generation);if(generation!==loadGeneration)return;if(!Array.isArray(rows))throw new Error("Ungültige Historie");renderComparison(rows)}
+  catch(error){if(generation===loadGeneration){byId("compare-views").textContent=`Messwerte konnten nicht geladen werden (${error.message}).`}}
+  finally{finishHistoryLoad(generation)}return;
  }
  const combined=showSecondary&&(requestedMetric==="temp"||requestedMetric==="hum");
  const type=combined?"climate":requestedMetric;
  const url=`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=${type}`;
  let d;
- try{const response=await fetch(url,{cache:"no-store"});if(!response.ok)throw new Error(`HTTP ${response.status}`);
-  d=await response.json();if(!Array.isArray(d))throw new Error("History API lieferte kein Array");
- }catch(e){if(generation!==loadGeneration)return;console.error("History API:",e);byId("empty").textContent=`Messwerte konnten nicht geladen werden (${e.message}).`;byId("empty").classList.add("show");return}
- if(generation!==loadGeneration)return;
- if(combined)d=d.map(row=>({...row,target:requestedMetric==="temp"?row.temp_target:row.hum_target}));
- updateStats(d);
- const hasValues=vals(d,c.field).length>0;
- d=downsample(d,RANGES[requestedRange].maxPoints);
- byId("empty").textContent="Für diesen Zeitraum sind noch keine Messwerte gespeichert.";byId("empty").classList.toggle("show",!hasValues);
- const ds=dataSets(d,d);
+ try{const response=await fetch(url,{cache:"no-store",signal:historyController?.signal});d=await readHistory(response,generation);if(generation!==loadGeneration)return;if(!Array.isArray(d))throw new Error("History API lieferte kein Array");
+ }catch(e){if(generation!==loadGeneration)return;console.error("History API:",e);byId("empty").textContent=`Messwerte konnten nicht geladen werden (${e.message}).`;byId("empty").classList.add("show");finishHistoryLoad(generation);return}
  try{
+  if(combined)d=d.map(row=>({...row,target:requestedMetric==="temp"?row.temp_target:row.hum_target}));
+  updateStats(d);
+  const hasValues=vals(d,c.field).length>0;
+  d=downsample(d,RANGES[requestedRange].maxPoints);
+  byId("empty").textContent="Für diesen Zeitraum sind noch keine Messwerte gespeichert.";byId("empty").classList.toggle("show",!hasValues);
+  const ds=dataSets(d,d);
   if(!chart){chart=new Chart(byId("chart"),{type:"line",data:{datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:"index",intersect:false},onClick:()=>scheduleTooltipHide(),scales:{x:xScale(),...yScales()},plugins:{legend:{position:"bottom",labels:{color:"#e5e7eb"}},tooltip:{callbacks:{label:tooltipLabel}}}}});const canvas=byId("chart");canvas.addEventListener("pointerup",scheduleTooltipHide,{passive:true});canvas.addEventListener("touchend",scheduleTooltipHide,{passive:true})}
   else{chart.data.datasets=ds;chart.options.scales={x:xScale(),...yScales()};chart.update("none")}
  }catch(e){console.error("Chart render:",e);byId("empty").textContent=`Diagramm konnte nicht gezeichnet werden (${e.message}).`;byId("empty").classList.add("show")}
+ finally{finishHistoryLoad(generation)}
 }
 setupCompareOptions();updateTabs();updateHeader();loadStations();load();setInterval(load,60000);
 </script>
