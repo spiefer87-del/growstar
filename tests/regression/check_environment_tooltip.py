@@ -27,8 +27,11 @@ def main():
         "Chart.js nutzt den dynamischen Tooltip-Formatter")
     req('const TOOLTIP_AUTO_HIDE_MS=2500' in page,
         "Tooltip schließt nach 2,5 Sekunden")
-    req('function clearTooltip()' in page and 'function scheduleTooltipHide()' in page,
+    req('function clearTooltip()' in page and 'function scheduleTooltipHide(live=false)' in page,
         "Tooltip-Close und Auto-Hide vorhanden")
+    req('const LIVE_TOOLTIP_AUTO_HIDE_MS=2000' in page and 'events:["click"]' in page and
+        'onClick:()=>scheduleTooltipHide(true)' in page,
+        "Live-Tooltip erscheint nur nach Antippen und schließt nach zwei Sekunden")
     req('clearTooltip();metric=m' in page,
         "Metrikwechsel schließt offenen Tooltip")
     req('clearTooltip();currentRange=r' in page,

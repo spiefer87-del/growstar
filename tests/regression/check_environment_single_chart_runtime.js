@@ -29,13 +29,14 @@ class Chart {
     constructor(canvas, config) { this.canvas = canvas; this.config = config; this.data = config.data; this.options = config.options; calls.push(this); }
     destroy() { this.destroyed = true; }
     update() { this.updates = (this.updates || 0) + 1; }
+    setActiveElements(items) { this.active = items; }
 }
 const series = ['temp', 'water_temp', 'outside_temp', 'hum', 'outside_hum', 'vpd', 'ppfd'];
 const rows = [
     {ts: 1000, temp: 26, water_temp: null, outside_temp: 21, hum: 60, outside_hum: 50, vpd: 1.2, ppfd: 400},
     {ts: 1100, temp: 25.8, water_temp: 22, outside_temp: 20, hum: 62, outside_hum: 52, vpd: 1.1, ppfd: 390},
 ];
-const intervals = new Map();
+const intervals = new Map(), timeouts = new Map();
 let nextInterval = 1, stateRequests = 0;
 const now = Date.now() / 1000;
 const state = {snapshot_ts: now, last_loop_ts: now - 1, temp_ok: true, hum_ok: true,
@@ -51,7 +52,9 @@ const context = {
         return {ok: true, json: async () => url === '/api/tents'
             ? {tents: [{id: 'tent_2', name: 'Zelt 2'}]} : url.endsWith('/state') ? state : rows};},
     setInterval(callback) {const id = nextInterval++; intervals.set(id, callback); return id;},
-    clearInterval(id) {intervals.delete(id);}, setTimeout() {}, clearTimeout() {},
+    clearInterval(id) {intervals.delete(id);},
+    setTimeout(callback, delay) {const id = nextInterval++; timeouts.set(id, {callback, delay}); return id;},
+    clearTimeout(id) {timeouts.delete(id);},
     history: {replaceState() {}}, window: {location: {href: ''}, addEventListener() {}},
 };
 const sandbox = vm.createContext(context);
@@ -71,6 +74,13 @@ setImmediate(async () => {
         throw new Error('Mehr als eine Zeichenfläche erzeugt');
     console.log('✅ Sieben Kurven auf genau einer großen Zeichenfläche, korrekte Achsen und Messlücken');
     if (stateRequests !== 0) throw new Error('Live startete ohne Benutzeraktion');
+    vm.runInContext('selectMetric("live")', sandbox);
+    await new Promise(resolve => setImmediate(resolve));
+    if (calls.length !== 1 || elements.get('history-card').hidden !== true ||
+        elements.get('range-bar').hidden !== true || elements.get('live-controls').hidden !== false ||
+        elements.get('compare-picker').hidden !== false || elements.get('compare-picker').open !== true ||
+        stateRequests !== 0)
+        throw new Error('Live-Reiter zeigt nur Live-Einstellungen ohne Historie und startet nicht selbstständig');
     const before = datasets[0].data.length;
     vm.runInContext('toggleLive()', sandbox);
     await new Promise(resolve => setImmediate(resolve));
@@ -78,12 +88,19 @@ setImmediate(async () => {
     if (stateRequests !== 1 || calls.length !== 2 || live === chart ||
         datasets[0].data.length !== before || live.data.datasets[1].data.at(-1).y !== 22.1 || !live.updates)
         throw new Error('Live-Polling muss auf einem eigenen Canvas zeichnen, ohne die Historie zu verändern');
+    if (live.options.events.length !== 1 || live.options.events[0] !== 'click')
+        throw new Error('Live-Werte dürfen beim Überfahren nicht automatisch erscheinen');
+    live.options.onClick();
+    const tooltipTimeout = [...timeouts.values()].at(-1);
+    if (tooltipTimeout.delay !== 2000) throw new Error('Live-Wert muss nach zwei Sekunden verschwinden');
+    tooltipTimeout.callback();
+    if (!Array.isArray(live.active) || live.active.length !== 0)
+        throw new Error('Live-Tooltip wurde nach zwei Sekunden nicht geschlossen');
     const liveMin = live.options.scales.x.min;
     vm.runInContext('setRange("30d")', sandbox);
     await new Promise(resolve => setImmediate(resolve));
-    if (live.options.scales.x.min !== liveMin || calls.at(-1) === live ||
-        !chart.destroyed || !live.data.datasets[0].data.length)
-        throw new Error('30 Tage dürfen die unabhängige Live-Zeitachse nicht verändern');
+    if (live.options.scales.x.min !== liveMin || calls.length !== 2)
+        throw new Error('30 Tage dürfen im Live-Reiter weder Historie noch Live-Zeitachse verändern');
     const activeTick = [...intervals.values()].at(-1);
     vm.runInContext('toggleLive()', sandbox);
     await new Promise(resolve => setImmediate(resolve));
@@ -99,6 +116,6 @@ setImmediate(async () => {
     const requestsBefore = stateRequests;
     [...intervals.values()].forEach(callback => callback());
     await new Promise(resolve => setImmediate(resolve));
-    if (stateRequests !== requestsBefore) throw new Error('Live läuft nach Verlassen des Vergleichs weiter');
+    if (stateRequests !== requestsBefore) throw new Error('Live läuft nach Verlassen des Live-Reiters weiter');
     console.log('✅ Veraltete Sensoren erzeugen Lücken und andere Reiter stoppen Live');
 });

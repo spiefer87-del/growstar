@@ -16,7 +16,7 @@ def main():
     require('.toolbar{display:grid;grid-template-columns:minmax(0,1fr) 132px' in series
             and '.station-select{grid-column:2;grid-row:1;' in series,
             'Stationswahl hat im Zeitverlauf eine feste rechte Spalte')
-    require(series.index('<div class="range-bar">')<series.index('<select id="station-select"')<series.index('<div id="chart-actions"'),
+    require(series.index('<div id="range-bar" class="range-bar">')<series.index('<select id="station-select"')<series.index('<div id="chart-actions"'),
             'Zeitraum und Station teilen Zeile 1; Zusatzschalter stehen darunter')
     require('.range-bar{display:flex;' in series and 'overflow-x:auto' in series
             and '@media(max-width:420px){.toolbar{grid-template-columns:minmax(0,1fr) 116px}' in series,

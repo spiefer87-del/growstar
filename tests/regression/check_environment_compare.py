@@ -103,6 +103,11 @@ def main():
             "Wassertemperatur-Kachel öffnet direkt den Stationsvergleich")
     require('data-range="48h"' in chart and 'data-range="30d"' in chart,
             "48 Stunden und 30 Tage sind in der Zeitraumwahl vorhanden")
+    dashboard = (ROOT / "routes/dashboard.py").read_text()
+    require('data-metric="live"' in chart and 'data-metric="compare"' in chart and
+            'id="history-card"' in chart and 'id="live-panel"' in chart and
+            '@app.route("/grow-control/tents/<tent_id>/live-chart")' in dashboard,
+            "Live besitzt einen eigenen Reiter, eine eigene URL und eine getrennte Ansicht")
     print("✅ ENV.CHART.COMPARE.1 erfolgreich")
 
 

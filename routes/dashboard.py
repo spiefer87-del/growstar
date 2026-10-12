@@ -191,6 +191,7 @@ def register(app):
             "ppfd": ("Helligkeit", "☀️"),
             "water_temp": ("Wassertemperatur", "🌡️"),
             "compare": ("Messwerte vergleichen", "📊"),
+            "live": ("Live-Aufzeichnung", "🔴"),
         }
         title, icon = meta[metric]
         return render_template(
@@ -239,6 +240,10 @@ def register(app):
     @app.route("/grow-control/tents/<tent_id>/compare")
     def grow_control_tent_compare(tent_id):
         return _environment_history_page(tent_id, "compare")
+
+    @app.route("/grow-control/tents/<tent_id>/live-chart")
+    def grow_control_tent_live_chart(tent_id):
+        return _environment_history_page(tent_id, "live")
 
     @app.route("/grow-control/tents/<tent_id>/settings")
     def grow_control_tent_settings(tent_id):
