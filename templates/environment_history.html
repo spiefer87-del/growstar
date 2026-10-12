@@ -16,6 +16,7 @@
 .summary{display:grid;grid-template-columns:1.35fr repeat(3,1fr);gap:10px;margin-bottom:12px}.summary-card{min-width:0;padding:14px;border-radius:16px;background:linear-gradient(145deg,var(--card),var(--card2));border:1px solid var(--border)}.summary-label{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:800}.live-value{margin-top:5px;font-size:clamp(1.45rem,6vw,2.15rem);font-weight:800;line-height:1.05;white-space:nowrap}.stat-value{margin-top:7px;font-size:1.12rem;font-weight:800}.live-meta{display:flex;align-items:center;gap:7px;margin-top:7px;color:var(--muted);font-size:.78rem}.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px rgba(34,197,94,.65)}
 .chart-card{border:1px solid var(--border);border-radius:20px;padding:14px;background:linear-gradient(155deg,var(--card),#172338);box-shadow:0 18px 60px rgba(0,0,0,.22)}.chart-title{font-size:1rem;font-weight:800}.chart-subtitle{margin-top:2px;color:var(--muted);font-size:.8rem}.chart-wrap{position:relative;height:min(58vh,540px);min-height:330px}canvas{width:100%!important;height:100%!important}.empty{display:none;position:absolute;inset:0;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted);pointer-events:none}.empty.show{display:flex}.footer-note{margin-top:10px;color:var(--muted);font-size:.75rem;text-align:right}
 .page.wide{width:min(1450px,100%)}.compare-picker{margin:0 0 12px;border:1px solid var(--border);border-radius:16px;background:var(--card2);padding:13px}.compare-picker summary{cursor:pointer;font-weight:800}.compare-picker p{color:var(--muted);font-size:.78rem;margin:8px 0}.compare-options{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.compare-options label{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:8px 11px;color:var(--text);font-size:.8rem;cursor:pointer}.compare-options input{accent-color:var(--accent)}.compare-views{margin-top:12px}.compare-canvas{position:relative;height:min(68vh,680px);min-height:470px}.compare-note{color:var(--muted);font-size:.76rem;line-height:1.5;margin:9px 0 0}.compare-empty{color:var(--muted);font-size:.82rem;padding:20px;text-align:center}.compare-picker[hidden],.summary[hidden],.chart-wrap[hidden],.compare-views[hidden]{display:none!important}
+.live-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}.live-controls[hidden]{display:none!important}.live-controls .pill[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#022c22}.live-status{color:var(--muted);font-size:.79rem}.live-status.running{color:#86efac}.live-status.err{color:#fca5a5}
 @media(max-width:720px){.page{padding:12px 10px 24px}.metric-tabs{display:flex;overflow-x:auto;scrollbar-width:none;gap:5px;padding:5px}.metric-tab{flex:0 0 auto;min-width:96px;font-size:.78rem;min-height:47px}.metric-tab span{display:none}.summary{grid-template-columns:repeat(3,1fr)}.summary-card.current{grid-column:1/-1}.chart-wrap{height:52vh;min-height:330px}.topbar{align-items:flex-start}.back{padding:9px 10px;font-size:.82rem}}
 @media(max-width:420px){.metric-tab{font-size:.7rem;padding:5px 2px;overflow-wrap:anywhere}}
 @media(max-width:420px){.toolbar{grid-template-columns:minmax(0,1fr) 116px}.range-bar{gap:5px}.range-bar .pill{padding:8px 9px;font-size:.77rem}.station-select{font-size:.78rem;padding-left:10px}}
@@ -38,6 +39,7 @@
 <button class="pill" data-range="1h" onclick="setRange('1h')">1 h</button><button class="pill" data-range="6h" onclick="setRange('6h')">6 h</button><button class="pill active" data-range="24h" onclick="setRange('24h')">24 h</button><button class="pill" data-range="7d" onclick="setRange('7d')">7 Tage</button>
 </div><select id="station-select" class="station-select" aria-label="Station wechseln" onchange="changeStation(this.value)"><option value="{{ tent_id }}">{{ tent_name }}</option></select><div id="chart-actions" class="chart-actions"><button id="toggle-target" class="pill" onclick="toggleTarget()">Sollwert ausblenden</button><button id="toggle-secondary" class="pill" type="button" aria-pressed="false" onclick="toggleSecondary()" hidden>Feuchte einblenden</button></div></div>
 <details id="compare-picker" class="compare-picker" hidden><summary>Messwerte anzeigen · Kurven auswählen</summary><p>Alle gewählten Kurven liegen in einem Diagramm. Innen-, Wasser- und Außentemperatur nutzen dieselbe °C-Achse.</p><div id="compare-options" class="compare-options"></div></details>
+<div id="live-controls" class="live-controls" hidden><button id="live-toggle" class="pill" type="button" aria-pressed="false" onclick="toggleLive()">● Live-Aufzeichnung starten</button><span id="live-status" class="live-status" role="status" aria-live="polite">Aus · aktualisiert alle 60 Sekunden</span></div>
 <div id="metric-summary" class="summary">
 <div class="summary-card current"><div class="summary-label">Aktuell</div><div class="live-value"><span id="current-value">--</span> <span id="current-unit"></span></div><div class="live-meta"><span class="dot"></span><span>Stationshistorie</span></div></div>
 <div class="summary-card"><div class="summary-label">Minimum</div><div class="stat-value"><span id="min">--</span> <span class="stat-unit"></span></div></div>
@@ -55,6 +57,7 @@ const RANGES={"1h":{seconds:3600,label:"Letzte Stunde",maxPoints:180},"6h":{seco
 const TOOLTIP_AUTO_HIDE_MS=2500;
 let metric=METRICS[INITIAL_METRIC]?INITIAL_METRIC:"temp",currentRange="24h",showTarget=true,showSecondary=false,chart=null,tooltipHideTimer=null,loadGeneration=0;
 let comparisonChart=null;
+let liveEnabled=false,liveTimer=null,liveBusy=false,liveGeneration=0,liveGapPending=false,compareLiveRows=[],lastHistoryRefresh=0;
 const selectedSeries=new Set(["temp","water_temp","outside_temp"]);
 try{const saved=JSON.parse(localStorage.getItem(`growstar-chart-series:${TENT_ID}`));if(Array.isArray(saved)){selectedSeries.clear();saved.filter(key=>COMPARE_SERIES[key]).forEach(key=>selectedSeries.add(key))}}catch(_error){}
 const byId=id=>document.getElementById(id), fmt=(v,d)=>v!==null&&v!==undefined&&Number.isFinite(Number(v))?Number(v).toFixed(d):"--";
@@ -80,12 +83,13 @@ function updateHeader(){
  byId("chart-actions").hidden=!c.target&&secondary.hidden;
  byId("compare-picker").hidden=metric!=="compare";byId("metric-summary").hidden=metric==="compare";
  byId("single-chart").hidden=metric==="compare";byId("compare-views").hidden=metric!=="compare";
+ byId("live-controls").hidden=metric!=="compare";
  document.querySelector(".page").classList.toggle("wide",metric==="compare");
 }
 function metricUrlForTent(tentId,m){const b=`/grow-control/tents/${encodeURIComponent(tentId)}`;return m==="temp"?`${b}/temperature`:m==="hum"?`${b}/humidity`:m==="vpd"?`${b}/vpd`:m==="water_temp"?`${b}/water-temperature`:m==="compare"?`${b}/compare`:`${b}/ppfd`}
 function metricUrl(m){return metricUrlForTent(TENT_ID,m)}
-function selectMetric(m){if(!METRICS[m]||m===metric)return;clearTooltip();metric=m;if(metric!=="temp"&&metric!=="hum")showSecondary=false;updateTabs();updateHeader();history.replaceState(null,"",metricUrl(metric));load()}
-function changeStation(tentId){if(!tentId||tentId===TENT_ID)return;clearTooltip();window.location.href=metricUrlForTent(tentId,metric)}
+function selectMetric(m){if(!METRICS[m]||m===metric)return;clearTooltip();if(metric==="compare")stopLive(false);metric=m;if(metric!=="temp"&&metric!=="hum")showSecondary=false;updateTabs();updateHeader();history.replaceState(null,"",metricUrl(metric));load()}
+function changeStation(tentId){if(!tentId||tentId===TENT_ID)return;stopLive(false);clearTooltip();window.location.href=metricUrlForTent(tentId,metric)}
 async function loadStations(){const select=byId("station-select");if(!select)return;try{const res=await fetch("/api/tents",{cache:"no-store"});if(!res.ok)throw new Error(`HTTP ${res.status}`);const payload=await res.json();const tents=Array.isArray(payload.tents)?payload.tents:[];if(!tents.length)return;select.innerHTML="";tents.forEach(tent=>{if(!tent||!tent.id)return;const option=document.createElement("option");option.value=tent.id;option.textContent=tent.name||tent.id;option.selected=tent.id===TENT_ID;option.disabled=tent.runtime_loaded===false;select.appendChild(option)})}catch(error){console.warn("Stationsliste konnte nicht geladen werden",error)}}
 function setRange(r){if(!RANGES[r])return;clearTooltip();currentRange=r;updateTabs();updateHeader();load()}
 function toggleTarget(){if(!currentMetricConfig().target)return;showTarget=!showTarget;updateHeader();const target=chart?.data.datasets.find(dataset=>dataset.isTarget);if(target){target.hidden=!showTarget;chart.update("none")}}
@@ -104,10 +108,62 @@ function renderComparison(rows){
  const visible=groups.slice(0,2);
  const scales={x:xScale()};
  groups.forEach(group=>{const unit=COMPARE_GROUPS[group].unit,shown=visible.includes(group),left=group===visible[0];scales[`y_${group}`]={display:shown,position:left?"left":"right",beginAtZero:group==="ppfd",grid:{drawOnChartArea:left},ticks:{color:group==="temp"?"#86efac":"#cbd5e1"},title:{display:shown,text:unit,color:"#cbd5e1"}}});
- const datasets=keys.map(key=>{const item=COMPARE_SERIES[key],group=item.group,unit=COMPARE_GROUPS[group].unit;return {label:`${item.label} · ${COMPARE_GROUPS[group].title}`,data:points(sampled,key),yAxisID:`y_${group}`,borderColor:item.color,backgroundColor:"transparent",borderWidth:2.4,pointRadius:0,tension:.2,spanGaps:false,unit,decimals:group==="ppfd"?0:group==="vpd"?2:1}});
- comparisonChart=new Chart(canvas,{type:"line",data:{datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,parsing:false,interaction:{mode:"nearest",intersect:false},scales,plugins:{legend:{position:"bottom",labels:{color:"#e5e7eb",boxWidth:14}},tooltip:{callbacks:{label:tooltipLabel}}}}});
+ const datasets=keys.map(key=>{const item=COMPARE_SERIES[key],group=item.group,unit=COMPARE_GROUPS[group].unit;return {seriesKey:key,label:`${item.label} · ${COMPARE_GROUPS[group].title}`,data:points(sampled,key),yAxisID:`y_${group}`,borderColor:item.color,backgroundColor:"transparent",borderWidth:2.4,pointRadius:0,tension:.2,spanGaps:false,unit,decimals:group==="ppfd"?0:group==="vpd"?2:1}});
+ comparisonChart=new Chart(canvas,{type:"line",data:{datasets},options:{responsive:true,maintainAspectRatio:false,animation:{duration:550,easing:"linear"},parsing:false,interaction:{mode:"nearest",intersect:false},scales,plugins:{legend:{position:"bottom",labels:{color:"#e5e7eb",boxWidth:14}},tooltip:{callbacks:{label:tooltipLabel}}}}});
  note.className="compare-note";note.textContent=groups.length>2?`Links und rechts stehen ${visible.map(group=>COMPARE_GROUPS[group].unit).join(" und ")}. Weitere Einheiten besitzen eine eigene, ausgeblendete Skala; genaue Werte beim Antippen.`:"Alle Kurven liegen auf derselben Zeitachse. Jede sichtbare Achse zeigt ihre eigene Einheit.";container.appendChild(note);
 }
+function liveMessage(message,kind=""){const element=byId("live-status");element.textContent=message;element.className=`live-status ${kind}`}
+function freshSource(source,now){const seen=Number(source?.last_seen);return source&&Number.isFinite(seen)&&seen>0&&now-seen>=-5&&now-seen<=120}
+function liveNumber(value){if(value===null||value===undefined||value==="")return null;const number=Number(value);return Number.isFinite(number)?number:null}
+function liveSample(state){
+ const now=liveNumber(state.snapshot_ts),loop=liveNumber(state.last_loop_ts);
+ const row={ts:now||Date.now()/1000,temp:null,water_temp:null,outside_temp:null,hum:null,outside_hum:null,vpd:null,ppfd:null};
+ if(!now||!loop||now-loop<0||now-loop>20)return row;
+ const tempReady=state.temp_ok===true&&state.temp_age!=null&&Number(state.temp_age)<=120;
+ const humReady=state.hum_ok===true&&state.hum_age!=null&&Number(state.hum_age)<=120;
+ if(tempReady)row.temp=liveNumber(state.temp);
+ if(humReady)row.hum=liveNumber(state.hum);
+ if(tempReady&&humReady)row.vpd=liveNumber(state.vpd);
+ if(freshSource(state.water_temp_source,now))row.water_temp=liveNumber(state.water_temp);
+ if(freshSource(state.outside_temp_source,now))row.outside_temp=liveNumber(state.outside_temp);
+ if(freshSource(state.outside_hum_source,now))row.outside_hum=liveNumber(state.outside_hum);
+ if(freshSource(state.light_ppfd_source,now))row.ppfd=liveNumber(state.light_ppfd);
+ return row;
+}
+async function pollLive(){
+ if(!liveEnabled||metric!=="compare"||document.hidden||liveBusy)return;
+ liveBusy=true;const generation=liveGeneration;
+ try{
+  const response=await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/state`,{cache:"no-store"});
+  if(!response.ok)throw new Error(`HTTP ${response.status}`);
+  const state=await response.json();
+  if(generation!==liveGeneration||!liveEnabled||metric!=="compare"||document.hidden)return;
+  const row=liveSample(state),previous=compareLiveRows.at(-1);
+  if(previous&&row.ts<=previous.ts)return;
+  if(liveGapPending){const gap={ts:row.ts-0.001};Object.keys(COMPARE_SERIES).forEach(key=>gap[key]=null);compareLiveRows.push(gap);if(comparisonChart)comparisonChart.data.datasets.forEach(dataset=>dataset.data.push({x:gap.ts*1000,y:null}));liveGapPending=false}
+  compareLiveRows.push(row);
+  compareLiveRows=compareLiveRows.filter(item=>item.ts>=row.ts-RANGES[currentRange].seconds).slice(-720);
+  if(comparisonChart){
+   comparisonChart.data.datasets.forEach(dataset=>{dataset.data.push({x:row.ts*1000,y:row[dataset.seriesKey]});if(dataset.data.length>950)dataset.data.shift()});
+   comparisonChart.options.scales.x=xScale();comparisonChart.update();
+  }else if(Object.keys(COMPARE_SERIES).some(key=>selectedSeries.has(key)&&row[key]!==null))renderComparison(compareLiveRows);
+  liveMessage(Object.keys(COMPARE_SERIES).some(key=>selectedSeries.has(key)&&row[key]!==null)?"Live · neue Punkte alle 5 Sekunden":"Live · warte auf frische Sensorwerte","running");
+ }catch(error){if(generation===liveGeneration&&liveEnabled){liveGapPending=true;liveMessage(`Live-Verbindung unterbrochen (${error.message})`,"err")}}
+ finally{liveBusy=false}
+}
+function stopLive(refresh=true){
+ liveEnabled=false;liveGeneration++;if(liveTimer){clearInterval(liveTimer);liveTimer=null}
+ compareLiveRows=[];liveGapPending=false;const button=byId("live-toggle");button.setAttribute("aria-pressed","false");button.textContent="● Live-Aufzeichnung starten";
+ liveMessage("Aus · aktualisiert alle 60 Sekunden");if(refresh&&metric==="compare")load();
+}
+function toggleLive(){
+ if(metric!=="compare")return;
+ if(liveEnabled){stopLive();return}
+ liveEnabled=true;liveGeneration++;byId("live-toggle").setAttribute("aria-pressed","true");byId("live-toggle").textContent="■ Live-Aufzeichnung stoppen";
+ liveMessage("Live · verbinde …","running");pollLive();liveTimer=setInterval(pollLive,5000);
+}
+document.addEventListener("visibilitychange",()=>{if(!liveEnabled)return;if(document.hidden)liveMessage("Live · pausiert im Hintergrund");else pollLive()});
+window.addEventListener("pagehide",()=>stopLive(false));
 function updateStats(d){const c=currentMetricConfig(),v=vals(d,c.field);if(!v.length){["current-value","min","avg","max"].forEach(i=>byId(i).textContent="--");return}const sum=v.reduce((a,b)=>a+b,0);byId("current-value").textContent=fmt(v[v.length-1],c.decimals);byId("min").textContent=fmt(Math.min(...v),c.decimals);byId("avg").textContent=fmt(sum/v.length,c.decimals);byId("max").textContent=fmt(Math.max(...v),c.decimals)}
 function xScale(){const now=Date.now(),min=now-RANGES[currentRange].seconds*1000;const unit=currentRange==="1h"?"minute":currentRange==="7d"?"day":"hour";const maxTicks=currentRange==="1h"?7:currentRange==="7d"?7:8;return{type:"time",min,max:now,time:{unit,displayFormats:{minute:"HH:mm",hour:"HH:mm",day:"dd.MM"}},ticks:{color:"#94a3b8",maxTicksLimit:maxTicks}}}
 function points(rows,field){return rows.map(r=>({x:Number(r.ts)*1000,y:r[field]===null||r[field]===undefined||!Number.isFinite(Number(r[field]))?null:Number(r[field])}))}
@@ -128,7 +184,7 @@ function yScales(){const c=currentMetricConfig(),secondaryActive=showSecondary&&
 async function load(){
  const generation=++loadGeneration,c=currentMetricConfig(),requestedMetric=metric,requestedRange=currentRange;
  if(requestedMetric==="compare"){
-  try{const response=await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=all`,{cache:"no-store"});if(!response.ok)throw new Error(`HTTP ${response.status}`);const rows=await response.json();if(!Array.isArray(rows))throw new Error("Ungültige Historie");if(generation===loadGeneration)renderComparison(rows)}
+  try{const response=await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=all`,{cache:"no-store"});if(!response.ok)throw new Error(`HTTP ${response.status}`);const rows=await response.json();if(!Array.isArray(rows))throw new Error("Ungültige Historie");if(generation===loadGeneration){lastHistoryRefresh=Date.now();const last=rows.at(-1)?.ts||0;compareLiveRows=compareLiveRows.filter(row=>row.ts>last);renderComparison([...rows,...compareLiveRows])}}
   catch(error){if(generation===loadGeneration){byId("compare-views").textContent=`Messwerte konnten nicht geladen werden (${error.message}).`}}return;
  }
  const combined=showSecondary&&(requestedMetric==="temp"||requestedMetric==="hum");
@@ -150,6 +206,6 @@ async function load(){
   else{chart.data.datasets=ds;chart.options.scales={x:xScale(),...yScales()};chart.update("none")}
  }catch(e){console.error("Chart render:",e);byId("empty").textContent=`Diagramm konnte nicht gezeichnet werden (${e.message}).`;byId("empty").classList.add("show")}
 }
-setupCompareOptions();updateTabs();updateHeader();loadStations();load();setInterval(load,60000);
+setupCompareOptions();updateTabs();updateHeader();loadStations();load();setInterval(()=>{if(metric==="compare"&&liveEnabled){if(Date.now()-lastHistoryRefresh>=300000)load()}else load()},60000);
 </script>
 {% endblock %}

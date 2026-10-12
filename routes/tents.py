@@ -310,6 +310,7 @@ def _state_snapshot(runtime):
         "controller_id": runtime.controller_id,
         "runtime_mode": runtime.loop_mode,
         "last_loop_ts": runtime.last_loop_ts,
+        "snapshot_ts": time.time(),
         "control_enabled": runtime.control_enabled,
         "shadow_enabled": runtime.shadow_enabled,
         "live_requested": bool(getattr(runtime, "live_requested", False)),
