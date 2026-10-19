@@ -124,13 +124,20 @@
     }
 
     .tent-card {
+        display: block;
         min-width: 0;
         padding: 22px;
         border-radius: 22px;
         border: 1px solid rgba(148,163,184,.14);
         background: linear-gradient(145deg, rgba(30,41,59,.98), rgba(15,23,42,.98));
         box-shadow: 0 16px 40px rgba(0,0,0,.23);
+        color: inherit;
+        text-decoration: none;
+        transition: border-color .18s ease, transform .18s ease;
     }
+
+    .tent-card:hover { border-color: rgba(34,197,94,.48); transform: translateY(-2px); }
+    .tent-card:focus-visible { outline: 3px solid var(--green); outline-offset: 3px; }
 
     .tent-card-head {
         display: flex;
@@ -222,9 +229,11 @@
         white-space: nowrap;
     }
 
-    .tent-outside{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:10px 13px;border:1px solid rgba(56,189,248,.24);border-radius:13px;background:rgba(14,165,233,.09)}
-    .tent-outside span{color:#bae6fd;font-size:.76rem;font-weight:800}
-    .tent-outside strong{font-size:.98rem;font-variant-numeric:tabular-nums}
+    .tent-outside-heading { margin-top: 16px; color: #7dd3fc; font-size: .75rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+    .tent-values-outside { margin-top: 8px; }
+    .tent-values-outside .tent-value { border: 1px solid rgba(56,189,248,.22); background: rgba(14,165,233,.10); }
+    .tent-values-outside .tent-value span { color: #bae6fd; }
+    .tent-values-outside .tent-value strong { color: #e0f2fe; }
 
     .tent-card-foot {
         display: flex;
@@ -234,21 +243,6 @@
         margin-top: 18px;
         color: var(--muted);
         font-size: .82rem;
-    }
-
-    .tent-open-link {
-        color: var(--green);
-        font-weight: 750;
-        text-decoration: none;
-    }
-
-    .tent-open-link:hover {
-        text-decoration: underline;
-    }
-
-    .tent-readonly {
-        color: #c4b5fd;
-        font-weight: 700;
     }
 
     .tent-loading,
@@ -495,8 +489,9 @@
         TENT_DETAIL_TEMPLATE.replace("__TENT_ID__", encodeURIComponent(tentId));
 
     const fmt = (value, digits, suffix) => {
+        if (value === null || value === undefined || value === "") return "—";
         const number = Number(value);
-        return Number.isFinite(number) ? `${number.toFixed(digits)}${suffix}` : "--";
+        return Number.isFinite(number) ? `${number.toFixed(digits)}${suffix}` : "—";
     };
 
     const modeInfo = (tent) => {
@@ -519,9 +514,10 @@
         return { text: "BEREIT", cls: "ready", detail: "Regelkreis nicht gestartet" };
     };
 
-    const addValue = (parent, label, value) => {
+    const addValue = (parent, label, value, title = "") => {
         const box = document.createElement("div");
         box.className = "tent-value";
+        if (title) box.title = title;
 
         const caption = document.createElement("span");
         caption.textContent = label;
@@ -534,8 +530,10 @@
     };
 
     const renderTent = (tent) => {
-        const card = document.createElement("article");
+        const card = document.createElement("a");
         card.className = "tent-card";
+        card.href = buildTentUrl(tent.id);
+        card.setAttribute("aria-label", `${tent.name || tent.id || "Zelt"} öffnen`);
 
         const head = document.createElement("div");
         head.className = "tent-card-head";
@@ -563,18 +561,16 @@
         values.className = "tent-values";
         addValue(values, "Temp", fmt(tent.temp, 1, " °C"));
         addValue(values, "Feuchte", fmt(tent.hum, 1, " %"));
-        addValue(values, "VPD", fmt(tent.vpd, 2, ""));
+        addValue(values, "VPD", fmt(tent.vpd, 2, " kPa"));
 
+        const outsideHeading = document.createElement("div");
+        outsideHeading.className = "tent-outside-heading";
+        outsideHeading.textContent = "Außenwerte";
         const outside = document.createElement("div");
-        outside.className = "tent-outside";
-        const outsideLabel = document.createElement("span");
-        outsideLabel.textContent = "🌡️ Außen";
-        const outsideValue = document.createElement("strong");
-        outsideValue.textContent = tent.outside_temp == null
-            ? "kein Messwert" : fmt(tent.outside_temp, 1, " °C");
-        outside.title = tent.outside_temp == null
-            ? "Kein frischer Außensensorwert" : (tent.outside_temp_label || "Außensensor");
-        outside.append(outsideLabel, outsideValue);
+        outside.className = "tent-values tent-values-outside";
+        addValue(outside, "Temp", fmt(tent.outside_temp, 1, " °C"), tent.outside_temp_label || "Außentemperatur");
+        addValue(outside, "Feuchte", fmt(tent.outside_hum, 1, " %"), tent.outside_hum_label || "Außenfeuchte");
+        addValue(outside, "VPD", fmt(tent.outside_vpd, 2, " kPa"));
 
         const foot = document.createElement("div");
         foot.className = "tent-card-foot";
@@ -583,22 +579,7 @@
         status.textContent = mode.detail;
         foot.appendChild(status);
 
-        if (tent.runtime_loaded) {
-            const open = document.createElement("a");
-            open.className = "tent-open-link";
-            // Keine fest verdrahteten Stations-IDs: jede Runtime nutzt
-            // dieselbe generische Detailroute.
-            open.href = buildTentUrl(tent.id);
-            open.textContent = "Öffnen →";
-            foot.appendChild(open);
-        } else {
-            const readOnly = document.createElement("span");
-            readOnly.className = "tent-readonly";
-            readOnly.textContent = "Runtime offline";
-            foot.appendChild(readOnly);
-        }
-
-        card.append(head, values, outside, foot);
+        card.append(head, values, outsideHeading, outside, foot);
         return card;
     };
 

@@ -505,8 +505,12 @@ def _tent_list_payload():
                 item["hum"] = runtime.state.live_state.get("hum")
                 item["vpd"] = runtime.state.live_state.get("vpd")
                 item["outside_temp"] = runtime.state.live_state.get("outside_temp")
+                item["outside_hum"] = runtime.state.live_state.get("outside_hum")
+                item["outside_vpd"] = calculate_target_vpd(item["outside_temp"], item["outside_hum"])
                 outside_source = runtime.state.live_state.get("outside_temp_source") or {}
                 item["outside_temp_label"] = outside_source.get("label") if isinstance(outside_source, dict) else None
+                outside_hum_source = runtime.state.live_state.get("outside_hum_source") or {}
+                item["outside_hum_label"] = outside_hum_source.get("label") if isinstance(outside_hum_source, dict) else None
 
         result.append(item)
 
