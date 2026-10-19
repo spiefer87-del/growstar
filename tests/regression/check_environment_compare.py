@@ -83,6 +83,24 @@ def main():
             require(any(row["temp"] == 23 for row in range_30d) and
                     not any(row["temp"] == 24 for row in range_30d),
                     "30 Tage schließen ältere Messungen aus")
+            with patch.object(diagrams.sqlite3, "connect", side_effect=lambda *_: connect(path)):
+                custom = diagrams._history_rows("tent_1", "custom", "all", (now - 21 * 86400, now - 19 * 86400))
+                custom_other = diagrams._history_rows("tent_2", "custom", "all", (now - 21 * 86400, now - 19 * 86400))
+            require([row["temp"] for row in custom] == [23] and not custom_other,
+                    "Eigener Zeitraum filtert beide Grenzen einschließlich und trennt Stationen")
+            with patch.object(diagrams.request, "args", {"from": str(now - 21 * 86400), "to": str(now - 19 * 86400)}):
+                require(diagrams._requested_bounds("custom") == (now - 21 * 86400, now - 19 * 86400),
+                        "Gültige benutzerdefinierte Grenzen werden übernommen")
+            for args in ({"from": "abc", "to": str(now)}, {"from": str(now), "to": str(now - 1)},
+                         {"from": str(now - 367 * 86400), "to": str(now)}):
+                with patch.object(diagrams.request, "args", args):
+                    try:
+                        diagrams._requested_bounds("custom")
+                    except ValueError:
+                        pass
+                    else:
+                        raise AssertionError("Ungültiger Zeitraum wurde akzeptiert")
+            print("✅ Falsche, umgedrehte und überlange Zeiträume werden abgelehnt")
         finally:
             db.DB_FILE = old_file
 
@@ -99,7 +117,7 @@ def main():
             'vpd:{title:"VPD' in chart and 'ppfd:{title:"Licht' in chart and
             'spanGaps:false' in chart,
             "Weitere Einheiten behalten eigene Werte und Datenlücken bleiben sichtbar")
-    require('type=all' in chart and 'grow_control_tent_compare' in tile,
+    require('historyUrl("all",requestedRange,requestedBounds)' in chart and 'grow_control_tent_compare' in tile,
             "Wassertemperatur-Kachel öffnet direkt den Stationsvergleich")
     require('data-range="48h"' in chart and 'data-range="30d"' in chart,
             "48 Stunden und 30 Tage sind in der Zeitraumwahl vorhanden")

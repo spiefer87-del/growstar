@@ -18,6 +18,7 @@
 .page.wide{width:min(1450px,100%)}.compare-picker{margin:0 0 12px;border:1px solid var(--border);border-radius:16px;background:var(--card2);padding:13px}.compare-picker summary{cursor:pointer;font-weight:800}.compare-picker p{color:var(--muted);font-size:.78rem;margin:8px 0}.compare-options{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.compare-options label{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--border);border-radius:999px;padding:8px 11px;color:var(--text);font-size:.8rem;cursor:pointer}.compare-options input{accent-color:var(--accent)}.compare-views{margin-top:12px}.compare-canvas{position:relative;height:min(68vh,680px);min-height:470px}.compare-note{color:var(--muted);font-size:.76rem;line-height:1.5;margin:9px 0 0}.compare-empty{color:var(--muted);font-size:.82rem;padding:20px;text-align:center}.compare-picker[hidden],.summary[hidden],.chart-wrap[hidden],.compare-views[hidden]{display:none!important}
 .live-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px}.live-controls[hidden],.live-panel[hidden],.range-bar[hidden],.chart-card[hidden]{display:none!important}.live-controls .pill[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#022c22}.live-status{color:var(--muted);font-size:.79rem}.live-status.running{color:#86efac}.live-status.err{color:#fca5a5}.live-panel{margin:0 0 14px;border:1px solid rgba(34,197,94,.32);border-radius:20px;padding:14px;background:linear-gradient(150deg,#172b32,#162238)}.live-panel-heading{display:flex;align-items:center;gap:9px;font-weight:800}.live-indicator{width:9px;height:9px;border-radius:50%;background:#64748b}.live-indicator.running{background:#22c55e;box-shadow:0 0 12px #22c55e;animation:live-pulse 1.5s ease-in-out infinite}@keyframes live-pulse{50%{opacity:.45}}.live-canvas{position:relative;height:340px;margin-top:12px}.live-note{color:var(--muted);font-size:.76rem;margin-top:10px;line-height:1.5}
 .history-loading{margin:0 0 12px;padding:12px 14px;border-radius:15px;border:1px solid rgba(34,197,94,.25);background:var(--card2)}.history-loading[hidden]{display:none!important}.loading-label{display:flex;justify-content:space-between;gap:12px;color:var(--text);font-size:.82rem;font-weight:700}.loading-detail{color:var(--muted);font-size:.76rem;white-space:nowrap}.loading-track{height:8px;margin-top:10px;overflow:hidden;border-radius:999px;background:rgba(148,163,184,.18)}.loading-fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#16a34a,#4ade80);border-radius:inherit;transition:width .15s linear}.loading-fill.indeterminate{width:35%;animation:loading-sweep 1.35s ease-in-out infinite}@keyframes loading-sweep{0%{transform:translateX(-110%)}100%{transform:translateX(300%)}}
+.range-dialog{width:min(420px,calc(100vw - 28px));max-height:calc(100dvh - 32px);overflow:auto;border:1px solid rgba(148,163,184,.3);border-radius:20px;padding:20px;background:#172338;color:var(--text);box-shadow:0 24px 70px rgba(0,0,0,.6)}.range-dialog::backdrop{background:rgba(2,6,23,.75)}.range-dialog h2{margin:0 0 8px;font-size:1.15rem}.range-dialog p{margin:0 0 16px;color:var(--muted);font-size:.83rem;line-height:1.5}.range-fields{display:grid;gap:13px}.range-fields label{display:grid;gap:6px;font-size:.82rem;font-weight:700}.range-fields input{width:100%;min-height:46px;border:1px solid var(--border);border-radius:11px;padding:9px 12px;background:#0f172a;color:var(--text);font:inherit;color-scheme:dark}.range-error{color:#fca5a5!important;min-height:1.2em;margin:8px 0!important}.range-dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}.range-dialog-actions .pill:last-child{background:var(--accent);color:#022c22}
 @media(prefers-reduced-motion:reduce){.loading-fill.indeterminate{animation:none;width:100%;opacity:.6}}
 @media(max-width:720px){.page{padding:12px 10px 24px}.metric-tabs{display:flex;overflow-x:auto;scrollbar-width:none;gap:5px;padding:5px}.metric-tab{flex:0 0 auto;min-width:96px;font-size:.78rem;min-height:47px}.metric-tab span{display:none}.summary{grid-template-columns:repeat(3,1fr)}.summary-card.current{grid-column:1/-1}.chart-wrap{height:52vh;min-height:330px}.topbar{align-items:flex-start}.back{padding:9px 10px;font-size:.82rem}}
 @media(max-width:420px){.metric-tab{font-size:.7rem;padding:5px 2px;overflow-wrap:anywhere}}
@@ -40,7 +41,9 @@
 </div>
 <div class="toolbar"><div id="range-bar" class="range-bar">
 <button class="pill" data-range="1h" onclick="setRange('1h')">1 h</button><button class="pill" data-range="6h" onclick="setRange('6h')">6 h</button><button class="pill active" data-range="24h" onclick="setRange('24h')">24 h</button><button class="pill" data-range="48h" onclick="setRange('48h')">48 h</button><button class="pill" data-range="7d" onclick="setRange('7d')">7 Tage</button><button class="pill" data-range="30d" onclick="setRange('30d')">30 Tage</button>
+<button class="pill" data-range="custom" type="button" onclick="openRangeDialog()">📅 Zeitraum wählen</button>
 </div><select id="station-select" class="station-select" aria-label="Station wechseln" onchange="changeStation(this.value)"><option value="{{ tent_id }}">{{ tent_name }}</option></select><div id="chart-actions" class="chart-actions"><button id="toggle-target" class="pill" onclick="toggleTarget()">Sollwert ausblenden</button><button id="toggle-secondary" class="pill" type="button" aria-pressed="false" onclick="toggleSecondary()" hidden>Feuchte einblenden</button></div></div>
+<dialog id="range-dialog" class="range-dialog" aria-labelledby="range-dialog-title"><form onsubmit="applyCustomRange(event)"><h2 id="range-dialog-title">📅 Zeitraum auswählen</h2><p>Start- und Endtag sind eingeschlossen. Wähle bis zu 366 Tage aus.</p><div class="range-fields"><label for="range-from">Startdatum<input id="range-from" type="date" required></label><label for="range-to">Enddatum<input id="range-to" type="date" required></label></div><p id="range-error" class="range-error" role="alert"></p><div class="range-dialog-actions"><button class="pill" type="button" onclick="closeRangeDialog()">Abbrechen</button><button class="pill" type="submit">Zeitraum anzeigen</button></div></form></dialog>
 <div id="history-loading" class="history-loading" role="progressbar" aria-label="Messwerte laden" aria-valuemin="0" aria-valuemax="100" hidden><div class="loading-label"><span id="loading-message">Messwerte werden geladen …</span><span id="loading-detail" class="loading-detail"></span></div><div class="loading-track"><span id="loading-fill" class="loading-fill indeterminate"></span></div></div>
 <details id="compare-picker" class="compare-picker" hidden><summary id="compare-picker-title">Messwerte anzeigen · Kurven auswählen</summary><p>Die gewählten Kurven erscheinen im jeweiligen Diagramm. Innen-, Wasser- und Außentemperatur nutzen dieselbe °C-Achse.</p><div id="compare-options" class="compare-options"></div></details>
 <div id="live-controls" class="live-controls" hidden><button id="live-toggle" class="pill" type="button" aria-pressed="false" onclick="toggleLive()">● Live-Aufzeichnung starten</button><span id="live-status" class="live-status" role="status" aria-live="polite">Aus · eigene Live-Ansicht</span></div>
@@ -58,12 +61,12 @@ const TENT_ID={{ tent_id|tojson }}, INITIAL_METRIC={{ initial_metric|tojson }};
 const METRICS={temp:{title:"Temperatur",icon:"🌡️",unit:"°C",field:"temp",target:"target",decimals:1,dataset:"Temperatur",targetLabel:"Solltemperatur"},hum:{title:"Luftfeuchtigkeit",icon:"💧",unit:"%",field:"hum",target:"target",decimals:1,dataset:"Luftfeuchtigkeit",targetLabel:"Sollfeuchte"},vpd:{title:"VPD",icon:"🌱",unit:"kPa",field:"vpd",target:null,decimals:2,dataset:"VPD"},ppfd:{title:"Helligkeit",icon:"☀️",unit:"µmol/m²/s",field:"ppfd",target:null,decimals:0,dataset:"PPFD"},water_temp:{title:"Wassertemperatur",icon:"🌡️",unit:"°C",field:"water_temp",target:null,decimals:1,dataset:"Wassertemperatur"},compare:{title:"Messwerte vergleichen",icon:"📊",unit:"",field:null,target:null},live:{title:"Live-Aufzeichnung",icon:"🔴",unit:"",field:null,target:null}};
 const COMPARE_SERIES={temp:{label:"Zelt",group:"temp",color:"#22c55e"},water_temp:{label:"Wasser",group:"temp",color:"#38bdf8"},outside_temp:{label:"Außen",group:"temp",color:"#fbbf24"},hum:{label:"Zelt",group:"hum",color:"#a78bfa"},outside_hum:{label:"Außen",group:"hum",color:"#fb7185"},vpd:{label:"VPD",group:"vpd",color:"#2dd4bf"},ppfd:{label:"Licht",group:"ppfd",color:"#facc15"}};
 const COMPARE_GROUPS={temp:{title:"Temperatur · °C",unit:"°C"},hum:{title:"Luftfeuchtigkeit · %",unit:"%"},vpd:{title:"VPD · kPa",unit:"kPa"},ppfd:{title:"Licht · µmol/m²/s",unit:"µmol/m²/s"}};
-const RANGES={"1h":{seconds:3600,label:"Letzte Stunde",maxPoints:180},"6h":{seconds:21600,label:"Letzte 6 Stunden",maxPoints:180},"24h":{seconds:86400,label:"Letzte 24 Stunden",maxPoints:180},"48h":{seconds:172800,label:"Letzte 48 Stunden",maxPoints:220},"7d":{seconds:604800,label:"Letzte 7 Tage",maxPoints:220},"30d":{seconds:2592000,label:"Letzte 30 Tage",maxPoints:300}};
+const RANGES={"1h":{seconds:3600,label:"Letzte Stunde",maxPoints:180},"6h":{seconds:21600,label:"Letzte 6 Stunden",maxPoints:180},"24h":{seconds:86400,label:"Letzte 24 Stunden",maxPoints:180},"48h":{seconds:172800,label:"Letzte 48 Stunden",maxPoints:220},"7d":{seconds:604800,label:"Letzte 7 Tage",maxPoints:220},"30d":{seconds:2592000,label:"Letzte 30 Tage",maxPoints:300},custom:{label:"Eigener Zeitraum",maxPoints:360}};
 const LIVE_WINDOW_MS=5*60*1000;
 const TOOLTIP_AUTO_HIDE_MS=2500;
 const LIVE_TOOLTIP_AUTO_HIDE_MS=2000;
 let metric=METRICS[INITIAL_METRIC]?INITIAL_METRIC:"temp",currentRange="24h",showTarget=true,showSecondary=false,chart=null,tooltipHideTimer=null,loadGeneration=0;
-let historyController=null;
+let historyController=null,customBounds=null;
 let comparisonChart=null,liveChart=null;
 let liveEnabled=false,liveTimer=null,liveBusy=false,liveGeneration=0,liveGapPending=false,liveRows=[],liveStart=0;
 const selectedSeries=new Set(["temp","water_temp","outside_temp"]);
@@ -72,6 +75,9 @@ const byId=id=>document.getElementById(id), fmt=(v,d)=>v!==null&&v!==undefined&&
 function downsample(d,m){if(d.length<=m)return d;const s=Math.ceil(d.length/m),o=d.filter((_,i)=>i%s===0),last=d[d.length-1];if(o[o.length-1]!==last)o.push(last);return o}
 function vals(d,f){return d.map(r=>r[f]===null||r[f]===undefined?NaN:Number(r[f])).filter(Number.isFinite)}
 function currentMetricConfig(){return METRICS[metric]}
+function localDateInput(date){return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`}
+function rangeLabel(){if(currentRange!=="custom"||!customBounds)return RANGES[currentRange].label;const display=new Intl.DateTimeFormat("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"});return `${display.format(new Date(customBounds.from*1000))} – ${display.format(new Date(customBounds.to*1000))}`}
+function historyUrl(type,range,bounds){let url=`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${range}&type=${type}`;if(range==="custom"&&bounds)url+=`&from=${bounds.from}&to=${bounds.to}`;return url}
 function clearTooltip(){
   if(tooltipHideTimer){clearTimeout(tooltipHideTimer);tooltipHideTimer=null}
   for(const current of [chart,liveChart]){
@@ -87,7 +93,7 @@ function scheduleTooltipHide(live=false){
 }
 function updateTabs(){document.querySelectorAll(".metric-tab").forEach(b=>b.classList.toggle("active",b.dataset.metric===metric));document.querySelectorAll("[data-range]").forEach(b=>b.classList.toggle("active",b.dataset.range===currentRange));if(metric==="live"){const bar=document.querySelector(".metric-tabs"),tab=document.querySelector('[data-metric="live"]');if(bar&&tab&&bar.scrollWidth>bar.clientWidth)bar.scrollLeft=Math.max(0,tab.offsetLeft+tab.offsetWidth-bar.offsetLeft-bar.clientWidth+8)}}
 function updateHeader(){
- const c=currentMetricConfig();byId("page-title").textContent=`${c.icon} ${c.title}`;byId("chart-title").textContent=`${c.title} · Verlauf`;byId("chart-subtitle").textContent=RANGES[currentRange].label;byId("current-unit").textContent=c.unit;document.querySelectorAll(".stat-unit").forEach(e=>e.textContent=c.unit);
+ const c=currentMetricConfig();byId("page-title").textContent=`${c.icon} ${c.title}`;byId("chart-title").textContent=`${c.title} · Verlauf`;byId("chart-subtitle").textContent=rangeLabel();byId("current-unit").textContent=c.unit;document.querySelectorAll(".stat-unit").forEach(e=>e.textContent=c.unit);
  const target=byId("toggle-target");target.disabled=!c.target;target.textContent=showTarget?"Sollwert ausblenden":"Sollwert einblenden";
  const secondary=byId("toggle-secondary");secondary.hidden=metric!=="temp"&&metric!=="hum";secondary.textContent=metric==="temp"?(showSecondary?"Feuchte ausblenden":"Feuchte einblenden"):(showSecondary?"Temperatur ausblenden":"Temperatur einblenden");secondary.setAttribute("aria-pressed",String(showSecondary));secondary.classList.toggle("active",showSecondary);
  byId("chart-actions").hidden=!c.target&&secondary.hidden;
@@ -102,12 +108,25 @@ function metricUrl(m){return metricUrlForTent(TENT_ID,m)}
 function selectMetric(m){if(!METRICS[m]||m===metric)return;if(metric==="live")stopLive();clearTooltip();metric=m;if(metric!=="temp"&&metric!=="hum")showSecondary=false;updateTabs();updateHeader();history.replaceState(null,"",metricUrl(metric));load()}
 function changeStation(tentId){if(!tentId||tentId===TENT_ID)return;stopLive(false);clearTooltip();window.location.href=metricUrlForTent(tentId,metric)}
 async function loadStations(){const select=byId("station-select");if(!select)return;try{const res=await fetch("/api/tents",{cache:"no-store"});if(!res.ok)throw new Error(`HTTP ${res.status}`);const payload=await res.json();const tents=Array.isArray(payload.tents)?payload.tents:[];if(!tents.length)return;select.innerHTML="";tents.forEach(tent=>{if(!tent||!tent.id)return;const option=document.createElement("option");option.value=tent.id;option.textContent=tent.name||tent.id;option.selected=tent.id===TENT_ID;option.disabled=tent.runtime_loaded===false;select.appendChild(option)})}catch(error){console.warn("Stationsliste konnte nicht geladen werden",error)}}
-function setRange(r){if(!RANGES[r]||metric==="live")return;clearTooltip();currentRange=r;updateTabs();updateHeader();load()}
+function setRange(r){if(r==="custom"){openRangeDialog();return}if(!RANGES[r]||metric==="live")return;clearTooltip();currentRange=r;updateTabs();updateHeader();load()}
+function openRangeDialog(){if(metric==="live")return;const dialog=byId("range-dialog"),today=new Date(),start=new Date();start.setDate(today.getDate()-6);byId("range-from").value=customBounds?localDateInput(new Date(customBounds.from*1000)):localDateInput(start);byId("range-to").value=customBounds?localDateInput(new Date(customBounds.to*1000)):localDateInput(today);byId("range-from").max=byId("range-to").max=localDateInput(today);byId("range-error").textContent="";if(dialog.showModal)dialog.showModal();else dialog.open=true}
+function closeRangeDialog(){const dialog=byId("range-dialog");if(dialog.close)dialog.close();else dialog.open=false}
+function applyCustomRange(event){
+ event.preventDefault();const startValue=byId("range-from").value,endValue=byId("range-to").value;
+ const start=new Date(`${startValue}T00:00:00`),end=new Date(`${endValue}T00:00:00`);
+ if(!startValue||!endValue||!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||start>end||end>new Date()){
+  byId("range-error").textContent="Bitte gültige Daten bis heute wählen; das Startdatum darf nicht nach dem Enddatum liegen.";return;
+ }
+ end.setDate(end.getDate()+1);
+ const from=Math.floor(start.getTime()/1000),to=Math.floor(end.getTime()/1000)-1;
+ if(to-from>366*86400){byId("range-error").textContent="Bitte höchstens 366 Tage auswählen.";return}
+ customBounds={from,to};currentRange="custom";closeRangeDialog();clearTooltip();updateTabs();updateHeader();load();
+}
 function beginHistoryLoad(generation){
  if(generation!==loadGeneration)return;
  const bar=byId("history-loading"),fill=byId("loading-fill");
  bar.hidden=false;bar.removeAttribute("aria-valuenow");
- byId("loading-message").textContent=`${RANGES[currentRange].label}: Messwerte werden geladen …`;
+ byId("loading-message").textContent=`${rangeLabel()}: Messwerte werden geladen …`;
  byId("loading-detail").textContent="";fill.style.width="";fill.classList.add("indeterminate");
 }
 function updateHistoryProgress(loaded,total,generation){
@@ -208,7 +227,7 @@ function toggleLive(){
 document.addEventListener("visibilitychange",()=>{if(!liveEnabled)return;if(document.hidden)liveMessage("Live · pausiert im Hintergrund");else pollLive()});
 window.addEventListener("pagehide",()=>stopLive(false));
 function updateStats(d){const c=currentMetricConfig(),v=vals(d,c.field);if(!v.length){["current-value","min","avg","max"].forEach(i=>byId(i).textContent="--");return}let sum=0,min=Infinity,max=-Infinity;for(const value of v){sum+=value;min=Math.min(min,value);max=Math.max(max,value)}byId("current-value").textContent=fmt(v[v.length-1],c.decimals);byId("min").textContent=fmt(min,c.decimals);byId("avg").textContent=fmt(sum/v.length,c.decimals);byId("max").textContent=fmt(max,c.decimals)}
-function xScale(){const now=Date.now(),min=now-RANGES[currentRange].seconds*1000;const unit=currentRange==="1h"?"minute":currentRange==="7d"||currentRange==="30d"?"day":"hour";const maxTicks=currentRange==="1h"?7:currentRange==="7d"||currentRange==="30d"?7:8;return{type:"time",min,max:now,time:{unit,displayFormats:{minute:"HH:mm",hour:"HH:mm",day:"dd.MM"}},ticks:{color:"#94a3b8",maxTicksLimit:maxTicks}}}
+function xScale(){const now=Date.now(),min=currentRange==="custom"&&customBounds?customBounds.from*1000:now-RANGES[currentRange].seconds*1000,max=currentRange==="custom"&&customBounds?customBounds.to*1000:now;const span=max-min,unit=span<=3600000?"minute":span>48*3600000?"day":"hour";return{type:"time",min,max,time:{unit,displayFormats:{minute:"HH:mm",hour:"HH:mm",day:"dd.MM"}},ticks:{color:"#94a3b8",maxTicksLimit:unit==="day"?7:8}}}
 function points(rows,field){return rows.map(r=>({x:Number(r.ts)*1000,y:r[field]===null||r[field]===undefined||!Number.isFinite(Number(r[field]))?null:Number(r[field])}))}
 function dataSets(d,secondaryRows){
  const c=currentMetricConfig(),out=[{label:c.dataset,data:points(d,c.field),yAxisID:"y",unit:c.unit,decimals:c.decimals,borderWidth:2.4,pointRadius:0,tension:.28,fill:true,backgroundColor:"rgba(34,197,94,.08)",borderColor:"#22c55e"}];
@@ -225,19 +244,19 @@ function yScales(){const c=currentMetricConfig(),secondaryActive=showSecondary&&
   ySecondary:{display:secondaryActive,position:"right",grid:{drawOnChartArea:false},ticks:{color:"#7dd3fc"},title:{display:secondaryActive,text:other.unit,color:"#7dd3fc"}}};
 }
 async function load(){
- const generation=++loadGeneration,c=currentMetricConfig(),requestedMetric=metric,requestedRange=currentRange;
+ const generation=++loadGeneration,c=currentMetricConfig(),requestedMetric=metric,requestedRange=currentRange,requestedBounds=customBounds;
  if(historyController)historyController.abort();historyController=null;
  if(requestedMetric==="live"){byId("history-loading").hidden=true;return}
  historyController=typeof AbortController==="function"?new AbortController():null;
  beginHistoryLoad(generation);
  if(requestedMetric==="compare"){
-  try{const response=await fetch(`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=all`,{cache:"no-store",signal:historyController?.signal});const rows=await readHistory(response,generation);if(generation!==loadGeneration)return;if(!Array.isArray(rows))throw new Error("Ungültige Historie");renderComparison(rows)}
+  try{const response=await fetch(historyUrl("all",requestedRange,requestedBounds),{cache:"no-store",signal:historyController?.signal});const rows=await readHistory(response,generation);if(generation!==loadGeneration)return;if(!Array.isArray(rows))throw new Error("Ungültige Historie");renderComparison(rows)}
   catch(error){if(generation===loadGeneration){byId("compare-views").textContent=`Messwerte konnten nicht geladen werden (${error.message}).`}}
   finally{finishHistoryLoad(generation)}return;
  }
  const combined=showSecondary&&(requestedMetric==="temp"||requestedMetric==="hum");
  const type=combined?"climate":requestedMetric;
- const url=`/api/tents/${encodeURIComponent(TENT_ID)}/history?range=${requestedRange}&type=${type}`;
+ const url=historyUrl(type,requestedRange,requestedBounds);
  let d;
  try{const response=await fetch(url,{cache:"no-store",signal:historyController?.signal});d=await readHistory(response,generation);if(generation!==loadGeneration)return;if(!Array.isArray(d))throw new Error("History API lieferte kein Array");
  }catch(e){if(generation!==loadGeneration)return;console.error("History API:",e);byId("empty").textContent=`Messwerte konnten nicht geladen werden (${e.message}).`;byId("empty").classList.add("show");finishHistoryLoad(generation);return}

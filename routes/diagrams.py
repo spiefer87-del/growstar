@@ -27,9 +27,9 @@ def _validated_tent_id(tent_id):
     return tent_id
 
 
-def _history_rows(tent_id, range_key, data_type):
+def _history_rows(tent_id, range_key, data_type, bounds=None):
     seconds = _RANGE_MAP.get(range_key, 24 * 3600)
-    since = int(time.time()) - seconds
+    since, until = bounds if bounds is not None else (int(time.time()) - seconds, int(time.time()))
 
     db = sqlite3.connect("data.db")
     c = db.cursor()
@@ -40,10 +40,10 @@ def _history_rows(tent_id, range_key, data_type):
                 """
                 SELECT ts, temp, temp_target
                 FROM temp_history
-                WHERE tent_id = ? AND ts >= ?
+                WHERE tent_id = ? AND ts BETWEEN ? AND ?
                 ORDER BY ts ASC
                 """,
-                (tent_id, since),
+                (tent_id, since, until),
             )
             return [
                 {"ts": r[0], "temp": r[1], "target": r[2]}
@@ -56,10 +56,10 @@ def _history_rows(tent_id, range_key, data_type):
                 """
                 SELECT ts, hum, hum_target
                 FROM temp_history
-                WHERE tent_id = ? AND ts >= ?
+                WHERE tent_id = ? AND ts BETWEEN ? AND ?
                 ORDER BY ts ASC
                 """,
-                (tent_id, since),
+                (tent_id, since, until),
             )
             return [
                 {"ts": r[0], "hum": r[1], "target": r[2]}
@@ -72,11 +72,11 @@ def _history_rows(tent_id, range_key, data_type):
                 """
                 SELECT ts, temp, hum, temp_target, hum_target
                 FROM temp_history
-                WHERE tent_id = ? AND ts >= ?
+                WHERE tent_id = ? AND ts BETWEEN ? AND ?
                   AND (temp IS NOT NULL OR hum IS NOT NULL)
                 ORDER BY ts ASC
                 """,
-                (tent_id, since),
+                (tent_id, since, until),
             )
             return [
                 {"ts": ts, "temp": temp, "hum": hum,
@@ -89,10 +89,10 @@ def _history_rows(tent_id, range_key, data_type):
                 """
                 SELECT ts, vpd
                 FROM temp_history
-                WHERE tent_id = ? AND ts >= ?
+                WHERE tent_id = ? AND ts BETWEEN ? AND ?
                 ORDER BY ts ASC
                 """,
-                (tent_id, since),
+                (tent_id, since, until),
             )
             return [
                 {"ts": r[0], "vpd": r[1]}
@@ -105,11 +105,11 @@ def _history_rows(tent_id, range_key, data_type):
                 """
                 SELECT ts, temp, hum, vpd
                 FROM temp_history
-                WHERE tent_id = ? AND ts >= ?
+                WHERE tent_id = ? AND ts BETWEEN ? AND ?
                   AND temp IS NOT NULL AND hum IS NOT NULL
                 ORDER BY ts ASC
                 """,
-                (tent_id, since),
+                (tent_id, since, until),
             )
             return [
                 {"ts": ts, "temp": temp, "hum": hum, "vpd": vpd}
@@ -122,10 +122,10 @@ def _history_rows(tent_id, range_key, data_type):
                 """
                 SELECT ts, ppfd
                 FROM temp_history
-                WHERE tent_id = ? AND ts >= ?
+                WHERE tent_id = ? AND ts BETWEEN ? AND ?
                 ORDER BY ts ASC
                 """,
-                (tent_id, since),
+                (tent_id, since, until),
             )
             return [
                 {"ts": r[0], "ppfd": r[1]}
@@ -136,9 +136,9 @@ def _history_rows(tent_id, range_key, data_type):
         if data_type == "water_temp":
             c.execute(
                 """SELECT ts, water_temp FROM temp_history
-                   WHERE tent_id = ? AND ts >= ? AND water_temp IS NOT NULL
+                   WHERE tent_id = ? AND ts BETWEEN ? AND ? AND water_temp IS NOT NULL
                    ORDER BY ts ASC""",
-                (tent_id, since),
+                (tent_id, since, until),
             )
             return [{"ts": ts, "water_temp": value} for ts, value in c.fetchall()]
 
@@ -146,9 +146,9 @@ def _history_rows(tent_id, range_key, data_type):
             c.execute(
                 """SELECT ts, temp, hum, vpd, ppfd, water_temp,
                           outside_temp, outside_hum
-                   FROM temp_history WHERE tent_id = ? AND ts >= ?
+                   FROM temp_history WHERE tent_id = ? AND ts BETWEEN ? AND ?
                    ORDER BY ts ASC""",
-                (tent_id, since),
+                (tent_id, since, until),
             )
             fields = ("ts", "temp", "hum", "vpd", "ppfd", "water_temp",
                       "outside_temp", "outside_hum")
@@ -159,16 +159,35 @@ def _history_rows(tent_id, range_key, data_type):
         db.close()
 
 
+def _requested_bounds(range_key):
+    if range_key != "custom":
+        return None
+    try:
+        start = int(request.args.get("from", ""))
+        end = int(request.args.get("to", ""))
+    except (TypeError, ValueError):
+        raise ValueError("invalid_custom_range")
+    if start < 0 or end < start or end - start > 366 * 24 * 3600 or end > int(time.time()) + 86400:
+        raise ValueError("invalid_custom_range")
+    return start, end
+
+
 def register(app):
 
     @app.route("/api/history")
     def api_history():
         """Legacy-Verlauf für tent_1."""
+        range_key = request.args.get("range", "24h")
+        try:
+            bounds = _requested_bounds(range_key)
+        except ValueError:
+            return jsonify(error="invalid_custom_range"), 400
         return jsonify(
             _history_rows(
                 DEFAULT_TENT_ID,
-                request.args.get("range", "24h"),
+                range_key,
                 request.args.get("type", "temp"),
+                bounds,
             )
         )
 
@@ -178,11 +197,17 @@ def register(app):
         if not tent_id:
             return jsonify(success=False, error="tent_not_found"), 404
 
+        range_key = request.args.get("range", "24h")
+        try:
+            bounds = _requested_bounds(range_key)
+        except ValueError:
+            return jsonify(error="invalid_custom_range"), 400
         return jsonify(
             _history_rows(
                 tent_id,
-                request.args.get("range", "24h"),
+                range_key,
                 request.args.get("type", "temp"),
+                bounds,
             )
         )
 

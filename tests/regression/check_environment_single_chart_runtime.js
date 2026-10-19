@@ -38,6 +38,7 @@ const rows = [
 ];
 const intervals = new Map(), timeouts = new Map();
 let nextInterval = 1, stateRequests = 0;
+const historyRequests = [];
 const now = Date.now() / 1000;
 const state = {snapshot_ts: now, last_loop_ts: now - 1, temp_ok: true, hum_ok: true,
     temp_age: 1, hum_age: 1, temp: 26.2, hum: 61, vpd: 1.15,
@@ -48,7 +49,7 @@ const state = {snapshot_ts: now, last_loop_ts: now - 1, temp_ok: true, hum_ok: t
 const context = {
     document, Chart, console, Date, Set, Object, Number, String, JSON, TextDecoder,
     localStorage: {getItem: () => JSON.stringify(series), setItem() {}},
-    fetch: async url => {if (url.endsWith('/state')) stateRequests++;
+    fetch: async url => {if (url.endsWith('/state')) stateRequests++;if (url.includes('/history?')) historyRequests.push(url);
         return {ok: true, json: async () => url === '/api/tents'
             ? {tents: [{id: 'tent_2', name: 'Zelt 2'}]} : url.endsWith('/state') ? state : rows};},
     setInterval(callback) {const id = nextInterval++; intervals.set(id, callback); return id;},
@@ -147,4 +148,25 @@ setImmediate(async () => {
     await new Promise(resolve => setImmediate(resolve));
     if (stateRequests !== requestsBefore) throw new Error('Live läuft nach Verlassen des Live-Reiters weiter');
     console.log('✅ Veraltete Sensoren erzeugen Lücken und andere Reiter stoppen Live');
+    vm.runInContext('openRangeDialog()', sandbox);
+    const today = vm.runInContext('localDateInput(new Date())', sandbox);
+    const yesterday = vm.runInContext('const d = new Date(); d.setDate(d.getDate()-1); localDateInput(d)', sandbox);
+    elements.get('range-from').value = today;
+    elements.get('range-to').value = yesterday;
+    const countBefore = historyRequests.length;
+    vm.runInContext('applyCustomRange({preventDefault(){}})', sandbox);
+    if (historyRequests.length !== countBefore || !elements.get('range-error').textContent)
+        throw new Error('Vertauschte Kalenderdaten dürfen keine Abfrage auslösen');
+    elements.get('range-from').value = yesterday;
+    elements.get('range-to').value = today;
+    vm.runInContext('applyCustomRange({preventDefault(){}})', sandbox);
+    await new Promise(resolve => setImmediate(resolve));
+    if (!historyRequests.at(-1).includes('range=custom') || !historyRequests.at(-1).includes('&from=') ||
+        !historyRequests.at(-1).includes('&to=') || !elements.get('chart-subtitle').textContent.includes('–'))
+        throw new Error('Kalenderauswahl wurde nicht im Diagramm und in der API-Abfrage übernommen');
+    vm.runInContext('selectMetric("compare")', sandbox);
+    await new Promise(resolve => setImmediate(resolve));
+    if (!historyRequests.at(-1).includes('range=custom') || !historyRequests.at(-1).includes('type=all'))
+        throw new Error('Der Vergleich übernimmt den ausgewählten Kalenderzeitraum nicht');
+    console.log('✅ Kalender prüft Daten und übernimmt denselben Zeitraum in Diagramm und Vergleich');
 });
