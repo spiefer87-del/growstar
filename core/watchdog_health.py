@@ -55,12 +55,17 @@ def _assignment(cfg, key):
     item = assignments.get(key) if isinstance(assignments, dict) else None
     if not isinstance(item, dict):
         item = {}
+    fallback = item.get("fallback")
+    if not isinstance(fallback, dict):
+        fallback = {}
 
     return {
         "configured": bool(item.get("source_id")),
         "source_id": item.get("source_id"),
         "label": item.get("label") or item.get("source_id"),
         "field": item.get("field") or key,
+        "fallback_source_id": fallback.get("source_id"),
+        "fallback_label": fallback.get("label") or fallback.get("source_id"),
     }
 
 
@@ -78,6 +83,14 @@ def _sensor_health(rt, key, *, now):
         value = st.live_state.get("hum")
 
     assignment = _assignment(cfg, key)
+    active_sources = st.live_state.get("sensor_active_sources") or {}
+    fallback_flags = st.live_state.get("sensor_fallbacks") or {}
+    active_source_id = active_sources.get(key)
+    fallback_active = bool(
+        assignment["fallback_source_id"]
+        and fallback_flags.get(key)
+        and active_source_id == assignment["fallback_source_id"]
+    )
     age = _safe_age(now, timestamp)
     stale = bool(
         assignment["configured"]
@@ -92,6 +105,8 @@ def _sensor_health(rt, key, *, now):
         state = "unconfigured"
     elif stale:
         state = "error"
+    elif fallback_active:
+        state = "warn"
     elif age is not None and age > min(10, max(1, SENSOR_TIMEOUT // 2)):
         state = "warn"
     else:
@@ -103,6 +118,31 @@ def _sensor_health(rt, key, *, now):
         "age": None if age is None else round(age, 1),
         "stale": stale,
         "state": state,
+        "active_source_id": active_source_id,
+        "fallback_active": fallback_active,
+        "fallback_since": (st.live_state.get("sensor_fallback_since") or {}).get(key) if fallback_active else None,
+    }
+
+
+def _fallback_health(rt, key, *, sensor=None):
+    assignment = _assignment(rt.config, key)
+    primary = assignment["source_id"]
+    secondary = assignment["fallback_source_id"]
+    live = rt.state.live_state
+    source_id = (live.get("sensor_active_sources") or {}).get(key)
+    active = bool(secondary and source_id == secondary and
+                  (live.get("sensor_fallbacks") or {}).get(key))
+    unavailable = bool(primary and secondary and not source_id)
+    return {
+        "configured": bool(primary and secondary),
+        "primary_source_id": primary,
+        "primary_label": assignment["label"],
+        "fallback_source_id": secondary,
+        "fallback_label": assignment["fallback_label"],
+        "active_source_id": source_id,
+        "active": active and not (sensor or {}).get("stale"),
+        "unavailable": unavailable,
+        "since": (live.get("sensor_fallback_since") or {}).get(key) if active else None,
     }
 
 
@@ -310,6 +350,10 @@ def station_health(rt, *, now=None):
 
     temperature = _sensor_health(rt, "temperature", now=now)
     humidity = _sensor_health(rt, "humidity", now=now)
+    fallbacks = {
+        key: _fallback_health(rt, key, sensor=(temperature if key == "temperature" else humidity if key == "humidity" else None))
+        for key in ("temperature", "humidity", "ppfd", "outside_temperature", "outside_humidity", "water_temperature")
+    }
     loop = _loop_health(rt, now=now)
     config = _config_health(rt)
     hardware = _hardware_health(rt, now=now)
@@ -320,6 +364,8 @@ def station_health(rt, *, now=None):
     sensor_failsafe = bool(temperature["stale"] or humidity["stale"])
 
     states = [loop["state"], temperature["state"], humidity["state"], config["state"]]
+    if any(item["active"] for item in fallbacks.values()):
+        states.append("warn")
     if hardware["state"] in ("error", "warn"):
         states.append(hardware["state"])
     if safety.get("state") in ("error", "warn"):
@@ -351,6 +397,7 @@ def station_health(rt, *, now=None):
         "loop": loop,
         "temperature": temperature,
         "humidity": humidity,
+        "sensor_fallbacks": fallbacks,
         "config": config,
         "hardware": hardware,
         "safety": safety,

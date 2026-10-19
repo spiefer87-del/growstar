@@ -173,6 +173,13 @@ def extract_alarm_candidates(snapshot):
                 if age is None
                 else f"Seit {int(float(age))} Sekunden keine frischen Sensordaten."
             )
+            fallback = (station.get("sensor_fallbacks") or {}).get(sensor_key) or {}
+            if fallback.get("configured") and fallback.get("unavailable"):
+                detail += (
+                    f" Primärsensor {fallback.get('primary_label') or fallback.get('primary_source_id')}"
+                    f" und Fallback {fallback.get('fallback_label') or fallback.get('fallback_source_id')}"
+                    " liefern beide keinen gültigen Wert."
+                )
             item = _candidate(
                 f"station:{station_id}:sensor:{sensor_key}:stale",
                 "sensor_stale",
@@ -183,6 +190,36 @@ def extract_alarm_candidates(snapshot):
                 station_name=station_name,
             )
             candidates[item["key"]] = item
+
+        fallback_labels = {
+            "temperature": "Temperatur", "humidity": "Luftfeuchte", "ppfd": "Helligkeit",
+            "outside_temperature": "Außentemperatur", "outside_humidity": "Außenfeuchte",
+            "water_temperature": "Wassertemperatur",
+        }
+        for sensor_key, fallback in (station.get("sensor_fallbacks") or {}).items():
+            if not fallback.get("configured"):
+                continue
+            label = fallback_labels.get(sensor_key, sensor_key)
+            primary = fallback.get("primary_label") or fallback.get("primary_source_id")
+            secondary = fallback.get("fallback_label") or fallback.get("fallback_source_id")
+            if fallback.get("active"):
+                since = fallback.get("since")
+                since_text = _time_text(float(since)) if since else "Zeitpunkt unbekannt"
+                item = _candidate(
+                    f"station:{station_id}:sensor:{sensor_key}:fallback",
+                    "sensor_fallback", "warning", f"{label}: Fallback-Sensor aktiv",
+                    f"Primärsensor {primary} ausgefallen; Ersatzsensor {secondary} liefert gültige Werte. Umschaltung: {since_text}.",
+                    station=station_id, station_name=station_name,
+                )
+                candidates[item["key"]] = item
+            elif fallback.get("unavailable") and sensor_key not in {"temperature", "humidity"}:
+                item = _candidate(
+                    f"station:{station_id}:sensor:{sensor_key}:fallback_unavailable",
+                    "sensor_stale", "error", f"{label}: beide Sensoren ohne Daten",
+                    f"Primärsensor {primary} und Fallback {secondary} liefern keinen gültigen Wert.",
+                    station=station_id, station_name=station_name,
+                )
+                candidates[item["key"]] = item
 
         limits = _station_alarm_config(station_id)
 
@@ -468,6 +505,15 @@ def _alarm_message(record, *, kind, now):
     station_line = f"\nStation: {station}" if station else ""
 
     if kind == "recovery":
+        if record.get("rule") == "sensor_fallback":
+            return (
+                "✅ Growstar Sensor-Fallback beendet"
+                f"{station_line}\n"
+                f"{record.get('title')}\n"
+                f"{record.get('recovery_reason') or 'Primärsensor liefert wieder gültige Werte.'}\n"
+                f"Dauer: {_duration_text(now - record.get('first_seen', now))}.\n"
+                f"Zeit: {_time_text(now)}"
+            )
         return (
             "✅ Growstar Entwarnung"
             f"{station_line}\n"
@@ -517,7 +563,7 @@ def _append_history(event, record, now):
 
 def _timeline_alarm(record, *, kind, now):
     rule = str(record.get("rule") or "")
-    if rule in {"sensor_stale", "sensor_limits"}:
+    if rule in {"sensor_stale", "sensor_limits", "sensor_fallback"}:
         category = "climate"
     elif rule == "hardware":
         category = "device"
@@ -635,6 +681,18 @@ def process_watchdog_snapshot(snapshot, *, now=None):
 
         for key in recovered_keys:
             record = _ACTIVE.pop(key)
+            if record.get("rule") == "sensor_fallback":
+                parts = key.split(":")
+                station = next((item for item in snapshot.get("stations") or [] if item.get("id") == record.get("station")), {})
+                fallback = (station.get("sensor_fallbacks") or {}).get(parts[3]) or {} if len(parts) > 4 else {}
+                if fallback.get("unavailable"):
+                    _append_history("fallback_unavailable", record, now)
+                    changed = True
+                    continue
+                if fallback.get("active_source_id") == fallback.get("primary_source_id") and fallback.get("primary_source_id"):
+                    record["recovery_reason"] = "Primärsensor liefert wieder gültige Werte."
+                else:
+                    record["recovery_reason"] = "Fallback ist nicht mehr aktiv."
             _append_history("recovered", record, now)
             _timeline_alarm(record, kind="recovered", now=now)
             changed = True

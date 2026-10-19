@@ -290,7 +290,7 @@ def apply_sensor_assignments(runtime=None):
     changed = False
 
     with rt.state_lock:
-        st.live_state["sensor_fallbacks"] = {
+        fallback_states = {
             name: bool(assignment.get("fallback_active"))
             for name, assignment in (
                 ("temperature", temp_assignment), ("humidity", hum_assignment),
@@ -300,7 +300,10 @@ def apply_sensor_assignments(runtime=None):
                 ("water_temperature", water_assignment),
             )
         }
-        st.live_state["sensor_active_sources"] = {
+        previous_fallbacks = st.live_state.get("sensor_fallbacks") or {}
+        previous_since = st.live_state.get("sensor_fallback_since") or {}
+        previous_sources = st.live_state.get("sensor_active_sources") or {}
+        selected_sources = {
             name: assignment.get("source_id") if value is not None else None
             for name, value, assignment in (
                 ("temperature", temp_raw, temp_assignment),
@@ -311,6 +314,14 @@ def apply_sensor_assignments(runtime=None):
                 ("water_temperature", water_raw, water_assignment),
             )
         }
+        st.live_state["sensor_fallbacks"] = fallback_states
+        st.live_state["sensor_fallback_since"] = {
+            name: previous_since.get(name)
+            if previous_fallbacks.get(name) and previous_since.get(name)
+            and previous_sources.get(name) == selected_sources.get(name) else now
+            for name, active in fallback_states.items() if active
+        }
+        st.live_state["sensor_active_sources"] = selected_sources
         if water_fresh and math.isfinite(water_raw) and -30 <= water_raw <= 100:
             st.live_state["water_temp"] = water_raw
             st.live_state["water_temp_source"] = {

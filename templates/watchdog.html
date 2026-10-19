@@ -175,6 +175,7 @@ function renderSummary(snapshot){
         (s.temperature && s.temperature.configured && s.temperature.stale) ||
         (s.humidity && s.humidity.configured && s.humidity.stale)
     ).length;
+    const fallbackCount = stations.reduce((count,s) => count + Object.values(s.sensor_fallbacks || {}).filter(item => item.active).length,0);
     const controller = snapshot.controller || {};
     const threads = Object.values(controller.threads || {});
     const stoppedThreads = threads.filter(t => !t.alive).length;
@@ -183,7 +184,7 @@ function renderSummary(snapshot){
     root.innerHTML = [
         `<div class="summary-card"><span>Stationen</span><strong>${stations.length}</strong><div class="summary-detail">${live} LIVE · ${shadow} SHADOW</div></div>`,
         `<div class="summary-card"><span>Safety</span><strong>${badge(safetyIssues ? `${safetyIssues} FEHLER` : "NORMAL", safetyIssues ? "error" : "ok")}</strong><div class="summary-detail">${safetyIssues ? "Mindestens eine Station braucht Aufmerksamkeit" : "Kein aktiver stationsbezogener Failsafe"}</div></div>`,
-        `<div class="summary-card"><span>Sensoren</span><strong>${badge(sensorIssues ? `${sensorIssues} STALE` : "FRISCH", sensorIssues ? "error" : "ok")}</strong><div class="summary-detail">Nur zugeordnete Temperatur-/Feuchtequellen</div></div>`,
+        `<div class="summary-card"><span>Sensoren</span><strong>${badge(sensorIssues ? `${sensorIssues} STALE` : (fallbackCount ? `${fallbackCount} FALLBACK` : "FRISCH"), sensorIssues ? "error" : (fallbackCount ? "warn" : "ok"))}</strong><div class="summary-detail">${fallbackCount ? "Ersatzsensor aktiv; Messwerte bleiben gültig" : "Nur zugeordnete Temperatur-/Feuchtequellen"}</div></div>`,
         `<div class="summary-card"><span>Controller</span><strong>${badge(stoppedThreads ? `${stoppedThreads} THREAD STOP` : "THREADS OK", controllerState)}</strong><div class="summary-detail">${threads.length} überwachte Worker</div></div>`,
         `<div class="summary-card"><span>MQTT</span><strong>${badge(controller.mqtt?.stale ? "STALE" : "AKTIV", controller.mqtt?.stale ? "warn" : "ok")}</strong><div class="summary-detail">Letzte Nachricht ${ageText(controller.mqtt?.age)}</div></div>`
     ].join("");
@@ -253,6 +254,10 @@ function renderStations(stations){
                 : ((runtimeMode === "arming" || runtimeMode === "disarming") ? "warn" : "inactive"));
         const modeText = modeLabels[runtimeMode] || runtimeMode.toUpperCase();
         const temp = s.temperature || {}, hum = s.humidity || {}, loop = s.loop || {}, cfg = s.config || {}, hw = s.hardware || {}, safety = s.safety || {};
+        const fallbackNames = {temperature:"Temperatur",humidity:"Feuchte",ppfd:"Helligkeit",outside_temperature:"Außentemperatur",outside_humidity:"Außenfeuchte",water_temperature:"Wassertemperatur"};
+        const fallbackDetails = Object.entries(s.sensor_fallbacks || {}).filter(([,item]) => item.active).map(([key,item]) =>
+            `<div class="endpoint-row"><div><div class="endpoint-name">${esc(fallbackNames[key] || key)} · Fallback aktiv</div><div class="endpoint-meta">Primär: ${esc(item.primary_label || item.primary_source_id)} → Ersatz: ${esc(item.fallback_label || item.fallback_source_id)} · seit ${item.since ? new Date(Number(item.since)*1000).toLocaleString("de-DE") : "unbekannt"}</div></div><div>${badge("ERSATZSENSOR", "warn")}</div></div>`
+        ).join("");
         const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";
 
         let hwText = "keine Zuordnung";
@@ -302,13 +307,14 @@ function renderStations(stations){
             </div>
             <div class="station-health">
                 <div class="health-cell"><span>Regelkreis</span><strong>${badge(loop.stale ? "STALE" : (loop.expected ? "OK" : "INAKTIV"), loop.state)}</strong><div class="health-detail">Heartbeat ${ageText(loop.age)}</div></div>
-                <div class="health-cell"><span>Temperatur</span><strong>${valueText(temp.value," °C")}</strong><div class="health-detail">${temp.configured ? `${esc(temp.label || temp.source_id || "Sensor")} · ${ageText(temp.age)}` : "nicht zugeordnet"}</div></div>
-                <div class="health-cell"><span>Feuchte</span><strong>${valueText(hum.value," %")}</strong><div class="health-detail">${hum.configured ? `${esc(hum.label || hum.source_id || "Sensor")} · ${ageText(hum.age)}` : "nicht zugeordnet"}</div></div>
+                <div class="health-cell"><span>Temperatur</span><strong>${valueText(temp.value," °C")}</strong><div class="health-detail">${temp.configured ? `${temp.fallback_active ? "Fallback: " : ""}${esc(temp.fallback_active ? temp.fallback_label : temp.label || temp.source_id || "Sensor")} · ${ageText(temp.age)}` : "nicht zugeordnet"}</div></div>
+                <div class="health-cell"><span>Feuchte</span><strong>${valueText(hum.value," %")}</strong><div class="health-detail">${hum.configured ? `${hum.fallback_active ? "Fallback: " : ""}${esc(hum.fallback_active ? hum.fallback_label : hum.label || hum.source_id || "Sensor")} · ${ageText(hum.age)}` : "nicht zugeordnet"}</div></div>
                 <div class="health-cell"><span>Hardware</span><strong>${badge(hwText, hwState)}</strong><div class="health-detail">${hw.actuation_blocked ? "Aktorik gesperrt" : "Aktorik freigegeben"}; zentraler Read-only Poll</div></div>
                 <div class="health-cell"><span>Safety</span><strong>${badge(safetyText, safetyState)}</strong><div class="health-detail">${safetyDetail}</div></div>
                 <div class="health-cell"><span>Config / Failsafe</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Legacy Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
             </div>
             ${endpoints ? `<div class="endpoint-list">${endpoints}</div>` : ""}
+            ${fallbackDetails ? `<div class="endpoint-list">${fallbackDetails}</div>` : ""}
             ${renderSafetyDiagnostics(s)}
         </article>`;
     }).join("");

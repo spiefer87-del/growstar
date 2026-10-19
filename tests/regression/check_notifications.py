@@ -3,6 +3,7 @@
 
 from pathlib import Path
 import ast
+import importlib
 import importlib.util
 import os
 import sys
@@ -87,7 +88,8 @@ def main():
         ast.parse(read(rel), filename=rel)
         print("✅ Python-Syntax", rel)
 
-    release = load_module("growstar_notifications_release", "core/release.py")
+    sys.path.insert(0, str(ROOT))
+    release = importlib.import_module("core.release")
     feature_release = next(
         (
             item
@@ -369,11 +371,11 @@ def main():
         "Notification-Routen verwenden settings.view/settings.manage",
     )
 
-    dashboard = read("templates/grow_control_dashboard.html")
+    dashboard = read("templates/base.html")
     require(
-        "Alarm & Benachrichtigungen" in dashboard
+        "Alarme" in dashboard
         and "growstar_notifications_page" in dashboard,
-        "Grow-Control-Dashboard enthält die Notification-Kachel",
+        "Grow-Control-Menü enthält den Weg zu den Benachrichtigungen",
     )
 
     template = read("templates/notifications.html")
@@ -407,7 +409,8 @@ def main():
     )
     require(
         "(nightStart - dayStart + 1440) % 1440" in climate_template
-        and '["DAY_START_TIME","NIGHT_START_TIME"]' in climate_template,
+        and 'document.querySelectorAll("input,select").forEach' in climate_template
+        and 'updateLightingDuration();' in climate_template,
         "Beleuchtungsdauer berücksichtigt Mitternacht und aktualisiert sich bei Zeitänderungen",
     )
     require(
