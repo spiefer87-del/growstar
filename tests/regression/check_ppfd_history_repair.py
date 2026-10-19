@@ -17,7 +17,7 @@ def main():
     dashboard=(ROOT/"templates/grow_control.html").read_text(encoding="utf-8")
     history=(ROOT/"templates/environment_history.html").read_text(encoding="utf-8")
 
-    req('elif sensor_name == "ppfd":' in sensor,"PPFD besitzt Feld-Default")
+    req('"ppfd": "ppfd"' in sensor,"PPFD besitzt Feld-Default")
     req('_read_assigned_value(\n        "ppfd"' in sensor,"Runtime liest PPFD-Zuweisung")
     req('st.live_state["light_ppfd"] = ppfd_raw' in sensor,"Runtime erhält PPFD-Livewert")
     req('st.live_state.pop("light_ppfd", None)' in sensor,"Stale PPFD wird entfernt")

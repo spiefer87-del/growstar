@@ -144,37 +144,42 @@ def _read_assignment(sensor_name, runtime=None):
 
 def _read_assigned_value(sensor_name, runtime=None):
     assignment = _read_assignment(sensor_name, runtime=runtime)
+    if not isinstance(assignment, dict):
+        assignment = {}
+    default_field = {
+        "temperature": "temperature", "humidity": "humidity", "ppfd": "ppfd",
+        "outside_temperature": "temperature", "outside_humidity": "humidity",
+        "water_temperature": "temperature",
+    }.get(sensor_name)
 
-    source_id = assignment.get("source_id")
-    field = assignment.get("field")
+    def candidate(configured):
+        source = get_sensor_source(configured.get("source_id"))
+        field = configured.get("field") or default_field
+        if not _source_is_fresh(source):
+            return None, source
+        try:
+            value = float(source.get(field))
+        except (TypeError, ValueError):
+            return None, source
+        if not math.isfinite(value):
+            return None, source
+        if field == "humidity" and not 0 <= value <= 100:
+            return None, source
+        if field == "temperature" and not -30 <= value <= 100:
+            return None, source
+        if field == "ppfd" and value < 0:
+            return None, source
+        return value, source
 
-    if not field:
-        if sensor_name == "temperature":
-            field = "temperature"
-        elif sensor_name == "humidity":
-            field = "humidity"
-        elif sensor_name == "ppfd":
-            field = "ppfd"
-        elif sensor_name == "outside_temperature":
-            field = "temperature"
-        elif sensor_name == "outside_humidity":
-            field = "humidity"
-        elif sensor_name == "water_temperature":
-            field = "temperature"
-
-    source = get_sensor_source(source_id)
-
-    if source is None:
-        return None, None, assignment
-
-    value = source.get(field)
-    if value is None:
-        return None, source, assignment
-
-    try:
-        return float(value), source, assignment
-    except Exception:
-        return None, source, assignment
+    value, source = candidate(assignment)
+    if value is not None:
+        return value, source, assignment
+    fallback = assignment.get("fallback")
+    if isinstance(fallback, dict) and fallback.get("source_id") != assignment.get("source_id"):
+        fallback_value, fallback_source = candidate(fallback)
+        if fallback_value is not None:
+            return fallback_value, fallback_source, {**fallback, "fallback_active": True}
+    return None, source, assignment
 
 
 # ----------------------------------------------------
@@ -246,11 +251,14 @@ def apply_sensor_assignments(runtime=None):
             if not source_id.startswith("spiderfarmer:"):
                 continue
             candidate = get_sensor_source(source_id)
-            if not isinstance(candidate, dict) or candidate.get("ppfd") is None:
+            if not isinstance(candidate, dict) or not _source_is_fresh(candidate, now=time.time()) or candidate.get("ppfd") is None:
                 continue
             try:
                 ppfd_raw = float(candidate.get("ppfd"))
             except (TypeError, ValueError):
+                continue
+            if not math.isfinite(ppfd_raw) or ppfd_raw < 0:
+                ppfd_raw = None
                 continue
             ppfd_source = candidate
             ppfd_assignment = {
@@ -282,6 +290,27 @@ def apply_sensor_assignments(runtime=None):
     changed = False
 
     with rt.state_lock:
+        st.live_state["sensor_fallbacks"] = {
+            name: bool(assignment.get("fallback_active"))
+            for name, assignment in (
+                ("temperature", temp_assignment), ("humidity", hum_assignment),
+                ("ppfd", ppfd_assignment),
+                ("outside_temperature", outside_temp_assignment),
+                ("outside_humidity", outside_hum_assignment),
+                ("water_temperature", water_assignment),
+            )
+        }
+        st.live_state["sensor_active_sources"] = {
+            name: assignment.get("source_id") if value is not None else None
+            for name, value, assignment in (
+                ("temperature", temp_raw, temp_assignment),
+                ("humidity", hum_raw, hum_assignment),
+                ("ppfd", ppfd_raw, ppfd_assignment),
+                ("outside_temperature", outside_temp_raw, outside_temp_assignment),
+                ("outside_humidity", outside_hum_raw, outside_hum_assignment),
+                ("water_temperature", water_raw, water_assignment),
+            )
+        }
         if water_fresh and math.isfinite(water_raw) and -30 <= water_raw <= 100:
             st.live_state["water_temp"] = water_raw
             st.live_state["water_temp_source"] = {
@@ -294,10 +323,9 @@ def apply_sensor_assignments(runtime=None):
         else:
             st.live_state["water_temp"] = None
             st.live_state["water_temp_source"] = None
-        # Den echten Empfangszeitpunkt auch dann übernehmen, wenn die Quelle
-        # bereits stale ist. mark_stale_sensors() kann dadurch korrekt über
-        # den Ausfall entscheiden, ohne dass alte Werte kurz wieder im UI
-        # auftauchen.
+        # Nur der Empfangszeitpunkt der tatsächlich verwendeten Quelle zählt.
+        # Falls beide Quellen ausfallen, wird der Zeitstempel unten gelöscht,
+        # damit auch der bestehende Hardware-Failsafe sicher greift.
         if temp_last_seen > 0:
             st.last_ds_time = temp_last_seen
 
@@ -322,6 +350,12 @@ def apply_sensor_assignments(runtime=None):
             )
 
             changed = True
+        else:
+            st.last_ds_time = 0
+            st.temp_stale = True
+            st.live_state["temp_raw"] = None
+            st.live_state["temp"] = None
+            st.live_state["temp_source"] = None
 
         if hum_fresh:
             hum_offset = float(cfg.get("HUM_OFFSET", 0.0))
@@ -341,6 +375,12 @@ def apply_sensor_assignments(runtime=None):
             )
 
             changed = True
+        else:
+            st.last_dht_time = 0
+            st.hum_stale = True
+            st.live_state["hum_raw"] = None
+            st.live_state["hum"] = None
+            st.live_state["hum_source"] = None
 
         if ppfd_fresh:
             st.live_state["light_ppfd"] = ppfd_raw

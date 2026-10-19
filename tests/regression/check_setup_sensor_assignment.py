@@ -28,7 +28,7 @@ def main():
     check('method:"POST"' in setup and 'body:JSON.stringify(payload)' in setup
           and 'field:sensorField(field)' in setup and 'refreshPreflights()' in setup,
           'Zuordnung verwendet bestehende API und aktualisiert LIVE-Preflight')
-    check('(!id&&!["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field))' in setup
+    check('!isFallback&&!id&&!["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field)' in setup
           and "'Nicht zugewiesen'" in setup,
           'Pflichtsensoren bleiben gesetzt, optionale Quellen lassen sich entfernen')
     check('select.addEventListener("change",()=>saveAssignment(select))' in setup

@@ -334,11 +334,23 @@ def _normalize_assignment(sensor_name, data):
             f"{sensor_name} benötigt das Sensorfeld {expected_field}"
         )
 
-    return {
+    normalized = {
         "source_id": str(source_id),
         "field": str(field),
         "label": str(label or source_id),
     }
+    fallback = data.get("fallback")
+    if fallback is not None:
+        if not isinstance(fallback, dict):
+            raise TypeError(f"Fallback für {sensor_name} muss ein JSON-Objekt sein")
+        if fallback.get("source_id"):
+            if "fallback" in fallback:
+                raise ValueError(f"Verschachtelter Fallback für {sensor_name} ist ungültig")
+            secondary = _normalize_assignment(sensor_name, fallback)
+            if secondary["source_id"] == normalized["source_id"]:
+                raise ValueError(f"Fallback für {sensor_name} muss ein anderer Sensor sein")
+            normalized["fallback"] = secondary
+    return normalized
 
 
 def _normalize_optional_assignment(sensor_name, data):
@@ -351,6 +363,8 @@ def _normalize_optional_assignment(sensor_name, data):
 
     source_id = str(data.get("source_id") or "").strip()
     if not source_id:
+        if data.get("fallback"):
+            raise ValueError(f"Fallback für {sensor_name} benötigt einen Primärsensor")
         return None
 
     normalized_data = dict(data)
@@ -388,6 +402,9 @@ def _offsets(runtime):
 
 def _assignments_payload(runtime):
     runtime.config.setdefault("SENSOR_ASSIGNMENTS", {})
+    with runtime.state_lock:
+        fallbacks = dict(runtime.state.live_state.get("sensor_fallbacks") or {})
+        active_sources = dict(runtime.state.live_state.get("sensor_active_sources") or {})
     return {
         "success": True,
         "tent_id": runtime.tent_id,
@@ -395,6 +412,8 @@ def _assignments_payload(runtime):
         "offsets": _offsets(runtime),
         "options": _sensor_options(),
         "sources": _sources_payload(),
+        "fallbacks": fallbacks,
+        "active_sources": active_sources,
     }
 
 

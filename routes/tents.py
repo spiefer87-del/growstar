@@ -347,6 +347,8 @@ def _state_snapshot(runtime):
             "sensor_assignments",
             cfg.get("SENSOR_ASSIGNMENTS", {}),
         ),
+        "sensor_fallbacks": live.get("sensor_fallbacks", {}),
+        "sensor_active_sources": live.get("sensor_active_sources", {}),
 
         # Profil / Rampe
         "profile": st.current_profile,

@@ -30,6 +30,7 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
 .setup-tool-icon{font-size:1.35rem}.setup-tool p{margin:8px 0 0;color:var(--muted);font-size:.82rem;line-height:1.5}.setup-tool-action{margin-top:11px;color:#fcd34d;font-size:.78rem;font-weight:800}
 .add-card{margin-top:24px;background:rgba(30,41,59,.75);border:1px dashed rgba(148,163,184,.28);border-radius:18px;padding:18px}.add-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end}.add-grid .field label{margin-top:0}.section-title{margin:0 0 13px;font-size:1.05rem}
 .assignment-panel{margin-top:17px;padding-top:14px;border-top:1px solid rgba(148,163,184,.17)}.assignment-panel h3{margin:0;font-size:.9rem}.assignment-panel p{color:var(--muted);font-size:.76rem;line-height:1.4;margin:5px 0 0}.assignment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.assignment-field{display:block;min-width:0;margin:0;padding:10px;border:1px solid rgba(148,163,184,.25);border-radius:11px;background:#111827}.assignment-field span{display:block;margin-bottom:7px;font-size:.74rem;color:#cbd5e1;font-weight:700}.assignment-select{display:block;width:100%;min-width:0;min-height:42px;padding:8px 10px;border:1px solid #334155;border-radius:9px;background:#020617;color:var(--text);font:inherit;font-size:.84rem}.assignment-select:focus{outline:2px solid var(--blue);outline-offset:2px}.assignment-select:disabled{opacity:.65}.sensor-status{color:var(--muted);font-size:.75rem;min-height:18px;margin-top:9px}.sensor-status.err{color:#fca5a5}.sensor-status.ok{color:#86efac}
+.fallback-select{display:block;width:100%;min-width:0;min-height:42px;padding:8px 10px;border:1px solid #334155;border-radius:9px;background:#020617;color:var(--text);font:inherit;font-size:.84rem}.fallback-select:focus{outline:2px solid var(--blue);outline-offset:2px}.fallback-select:disabled{opacity:.65}.fallback-label{margin-top:11px!important;color:#93c5fd!important}.fallback-indicator{display:block;margin-top:7px;color:#86efac;font-size:.74rem;font-weight:700}.fallback-help{margin:7px 0 0!important;font-size:.72rem!important}
 .station-switch{margin-left:auto;min-width:128px;max-width:200px;min-height:43px;padding:8px 10px;border:1px solid #334155;border-radius:12px;background:var(--card);color:var(--text);font:inherit;font-weight:700;cursor:pointer}.topbar>div{min-width:0}
 @media(max-width:650px){body{padding:14px}.add-grid{grid-template-columns:1fr}.btn{width:100%}}
 @media(max-width:390px){.assignment-grid{grid-template-columns:1fr}}
@@ -87,7 +88,7 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     const CAN_LIVE = {{ (has_permission('grow.control') and has_permission('hardware.control'))|tojson }};
     const grid = document.getElementById("station-grid");
     let defaultTentId = "tent_1";
-    let tentAssignments = new Map(), tentOptions = new Map();
+    let tentAssignments = new Map(), tentOptions = new Map(), tentFallbacks = new Map();
     let stationRows = [];
     const switcher = document.getElementById("station-switch");
     let selectedTentId = new URLSearchParams(location.search).get("tent_id") || "";
@@ -99,18 +100,24 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
     function zone(tentId,field,assignment){
         const options=tentOptions.get(tentId)?.[field]||[];
         const selected=assignment?.source_id||"";
+        const secondary=assignment?.fallback?.source_id||"";
         const optional=["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field);
         const available=options.some(option=>option.source_id===selected);
+        const fallbackAvailable=options.some(option=>option.source_id===secondary);
         const placeholder=optional?'Nicht zugewiesen':'Quelle auswählen';
         const choices=`<option value="" ${selected?'':'selected'} ${optional?'':'disabled'}>${placeholder}</option>`
             +(selected&&!available?`<option value="${esc(selected)}" selected>${esc(assignment.label||selected)} · gespeichert</option>`:'')
             +options.map(option=>`<option value="${esc(option.source_id)}" ${option.source_id===selected?'selected':''}>${esc(option.label||option.source_id)}</option>`).join("");
-        return `<label class="assignment-field"><span>${labelFor(field)}</span><select class="assignment-select" data-tent-id="${esc(tentId)}" data-field="${field}" data-current="${esc(selected)}" ${CAN_CONFIGURE?'':'disabled'}>${choices}</select></label>`;
+        const fallbackChoices=`<option value="" ${secondary?'':'selected'}>Kein Fallback</option>`
+            +(secondary&&!fallbackAvailable?`<option value="${esc(secondary)}" selected>${esc(assignment.fallback.label||secondary)} · gespeichert</option>`:'')
+            +options.filter(option=>option.source_id!==selected).map(option=>`<option value="${esc(option.source_id)}" ${option.source_id===secondary?'selected':''}>${esc(option.label||option.source_id)}</option>`).join("");
+        const active=tentFallbacks.get(tentId)?.[field];
+        return `<div class="assignment-field"><label for="primary-${esc(field)}"><span>${labelFor(field)} · Primärsensor</span></label><select id="primary-${esc(field)}" class="assignment-select" data-tent-id="${esc(tentId)}" data-field="${field}" data-current="${esc(selected)}" ${CAN_CONFIGURE?'':'disabled'}>${choices}</select><label for="fallback-${esc(field)}"><span class="fallback-label">Fallback-Sensor</span></label><select id="fallback-${esc(field)}" class="fallback-select" data-tent-id="${esc(tentId)}" data-field="${field}" data-current="${esc(secondary)}" ${CAN_CONFIGURE&&selected?'':'disabled'}>${fallbackChoices}</select>${active?'<span class="fallback-indicator">● Fallback gerade aktiv</span>':''}</div>`;
     }
     function assignmentPanel(t){
         if(!t.runtime_loaded)return '<div class="sensor-status">Zuordnung nach Neustart verfügbar.</div>';
         const a=tentAssignments.get(t.id)||{};
-        return `<section class="assignment-panel"><h3>Sensorzuordnung</h3><p>Feld antippen und passende Quelle auswählen. Änderungen werden sofort gespeichert.</p><div class="assignment-grid">${["temperature","humidity","ppfd","outside_temperature","outside_humidity","water_temperature"].map(field=>zone(t.id,field,a[field])).join("")}</div><div class="sensor-status js-sensor-status" aria-live="polite"></div></section>`;
+        return `<section class="assignment-panel"><h3>Sensorzuordnung</h3><p>Primärsensor und optional einen anderen Fallback-Sensor pro Messwert wählen. Änderungen werden sofort gespeichert.</p><p class="fallback-help">Bei fehlenden oder älter als 120 Sekunden alten Messwerten übernimmt der Fallback. Der Primärsensor wird automatisch wieder bevorzugt, sobald er gültige Daten sendet.</p><div class="assignment-grid">${["temperature","humidity","ppfd","outside_temperature","outside_humidity","water_temperature"].map(field=>zone(t.id,field,a[field])).join("")}</div><div class="sensor-status js-sensor-status" aria-live="polite"></div></section>`;
     }
 
     function mode(t){
@@ -193,24 +200,36 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
             if(data.success){
                 tentAssignments.set(t.id,data.assignments||{});
                 tentOptions.set(t.id,data.options||{});
+                tentFallbacks.set(t.id,data.fallbacks||{});
             }
         }catch(error){console.error(error)}
     }
     function bindAssignments(){
-        grid.querySelectorAll(".assignment-select").forEach(select=>{
+        grid.querySelectorAll(".assignment-select,.fallback-select").forEach(select=>{
             select.addEventListener("change",()=>saveAssignment(select));
         });
     }
     async function saveAssignment(select){
         const tentId=select.dataset.tentId,field=select.dataset.field;
         const previous=select.dataset.current||"",id=select.value;
+        const isFallback=select.classList.contains("fallback-select");
+        const card=select.closest(".assignment-field");
+        const primary=card.querySelector(".assignment-select");
+        const secondary=card.querySelector(".fallback-select");
+        const primaryId=isFallback?primary.value:id;
+        const secondaryId=isFallback?id:(secondary.value===id?"":secondary.value);
         const feedback=select.closest(".assignment-panel").querySelector(".js-sensor-status");
-        if(!CAN_CONFIGURE||(!id&&!["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field))){
+        if(!CAN_CONFIGURE||(!isFallback&&!id&&!["ppfd","outside_temperature","outside_humidity","water_temperature"].includes(field))){
             select.value=previous;return;
         }
+        if(isFallback&&(!primaryId||primaryId===id)){select.value=previous;status(feedback,"Bitte zuerst einen anderen Primärsensor wählen.",false);return}
         const option=(tentOptions.get(tentId)?.[field]||[]).find(item=>item.source_id===id);
         if(id&&!option){select.value=previous;status(feedback,"Quelle nicht mehr verfügbar. Seite neu laden.",false);return}
-        const payload={[field]:id?{source_id:id,field:sensorField(field),label:option.label||id}:null};
+        const current=tentAssignments.get(tentId)?.[field]||{};
+        const primaryOption=(tentOptions.get(tentId)?.[field]||[]).find(item=>item.source_id===primaryId);
+        const fallbackOption=(tentOptions.get(tentId)?.[field]||[]).find(item=>item.source_id===secondaryId);
+        const payload={[field]:primaryId?{source_id:primaryId,field:sensorField(field),label:primaryOption?.label||current.label||primaryId,
+            ...(secondaryId?{fallback:{source_id:secondaryId,field:sensorField(field),label:fallbackOption?.label||current.fallback?.label||secondaryId}}:{})}:null};
         select.disabled=true;status(feedback,"Speichere Zuordnung …",true);
         try{
             const res=await fetch(`${API}/${encodeURIComponent(tentId)}/sensors/assignments`,{
@@ -220,10 +239,16 @@ label{display:block;color:var(--muted);font-size:.78rem;margin:11px 0 5px}.name-
             if(!res.ok||!data.success)throw new Error(data.message||data.error||"Speichern fehlgeschlagen");
             select.dataset.current=id;
             await loadAssignments({id:tentId});
-            status(feedback,`${labelFor(field)} ${id?'zugewiesen':'entfernt'}.`,true);
+            secondary.value=secondaryId;
+            secondary.dataset.current=secondaryId;
+            secondary.disabled=!CAN_CONFIGURE||!primaryId;
+            if(!isFallback&&id){for(const item of secondary.options)item.disabled=item.value===id;}
+            card.querySelector(".fallback-indicator")?.remove();
+            if(tentFallbacks.get(tentId)?.[field])secondary.insertAdjacentHTML("afterend",'<span class="fallback-indicator">● Fallback gerade aktiv</span>');
+            status(feedback,`${labelFor(field)} ${isFallback?'Fallback':'Primärsensor'} ${id?'zugewiesen':'entfernt'}.`,true);
             refreshPreflights();
         }catch(error){select.value=previous;status(feedback,error.message,false)}
-        finally{select.disabled=!CAN_CONFIGURE}
+        finally{select.disabled=!CAN_CONFIGURE||(isFallback&&!primary.value)}
     }
 
     function bind(){
