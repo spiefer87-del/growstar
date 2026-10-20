@@ -13,8 +13,7 @@ body{margin:0;padding:18px;background:var(--bg);color:var(--text);font-family:sy
 .nav{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
 .nav a{color:var(--muted);text-decoration:none;font-size:.86rem}
 h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
-.subtitle{text-align:center;color:var(--muted);font-size:.8rem;margin-bottom:20px;line-height:1.5}
-.profile-station-switch{display:flex;align-items:center;gap:10px;margin:0 auto 16px;padding:11px 13px;max-width:430px;border:1px solid var(--border);border-radius:14px;background:rgba(30,41,59,.78)}.profile-station-switch label{color:var(--muted);font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}.profile-station-switch select{flex:1;min-width:0;height:42px;padding:7px 34px 7px 11px;border:1px solid #475569;border-radius:10px;background:#0f172a;color:var(--text);font:inherit;font-weight:750}.profile-station-switch select:disabled{opacity:.55}
+.profile-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(125px,185px);align-items:center;gap:12px;margin:16px 0 20px}.profile-header h1{min-width:0;margin:0;text-align:left;line-height:1.25}.profile-station-switch{min-width:0}.profile-station-switch select{width:100%;min-height:44px;padding:8px 10px;border:1px solid #475569;border-radius:12px;background:#1e293b;color:var(--text);font:inherit;font-weight:750}.profile-station-switch select:disabled{opacity:.55}
 .grid{display:grid;gap:16px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 .card h2{margin:0 0 12px;text-align:center;font-size:1rem;color:#cbd5e1;text-transform:uppercase;letter-spacing:.04em}
@@ -85,7 +84,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .help-modal.open{display:flex}
 .help-dialog{width:min(520px,100%);max-height:76vh;overflow:auto;padding:20px;border:1px solid rgba(56,189,248,.3);border-radius:18px;background:#172235;box-shadow:0 22px 60px rgba(0,0,0,.5)}
 .help-dialog-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}.help-dialog-head h2{flex:1;margin:0;text-align:left}.help-close{width:38px;height:38px;padding:0;font-size:1.2rem}.help-dialog-content{color:#cbd5e1;font-size:.84rem;line-height:1.6}
-@media(max-width:620px){body{padding:13px}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.vpd-phase-grid{grid-template-columns:1fr}.actions{position:static}.copy-button{min-width:0;width:100%}.accordion-head{padding:14px}.accordion-body{padding:3px 14px 15px}}
+@media(max-width:620px){body{padding:13px}.profile-header h1{font-size:1.32rem}.field{min-width:105px}.compact-input{width:86px}.status-grid{grid-template-columns:1fr}.vpd-phase-grid{grid-template-columns:1fr}.actions{position:static}.copy-button{min-width:0;width:100%}.accordion-head{padding:14px}.accordion-body{padding:3px 14px 15px}}
 </style>
 {% endblock %}
 {% block page %}
@@ -96,17 +95,13 @@ button:disabled{opacity:.48;cursor:not-allowed}
         <a href="{{ url_for('grow_control_setup', tent_id=tent_id) }}">⚙️ Grow Station Setup</a>
     </div>
 
-    <h1>🌱 {{ tent_name }} · Profile verwalten</h1>
-    <div class="subtitle">
-        Profile vorbereiten und speichern, ohne das laufende Profil zu verändern.
-        Aktiviert wird erst über eine eigene, bestätigte Aktion.
-    </div>
-
-    <div class="profile-station-switch">
-        <label for="profile-tent-switcher">Station</label>
-        <select id="profile-tent-switcher" aria-label="Grow-Station für die Profilverwaltung wechseln">
-            <option value="{{ tent_id }}">{{ tent_name }}</option>
-        </select>
+    <div class="profile-header">
+        <h1>🌱 {{ tent_name }} · Profile verwalten</h1>
+        <div class="profile-station-switch">
+            <select id="profile-tent-switcher" aria-label="Grow-Station für die Profilverwaltung wechseln">
+                <option value="{{ tent_id }}">{{ tent_name }}</option>
+            </select>
+        </div>
     </div>
 
     <div class="grid">
@@ -1282,6 +1277,7 @@ async function loadProfiles(){
 }
 
 document.querySelectorAll("input,select").forEach(input=>{
+    if(input.id === "profile-tent-switcher") return;
     const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
     input.addEventListener(eventName,()=>{
         syncVpdBoundsFromWindowEditors();

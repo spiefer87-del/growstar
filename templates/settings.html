@@ -13,7 +13,10 @@ body{margin:0;padding:18px;background:var(--bg);color:var(--text);font-family:sy
 .nav{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px}
 .nav a{color:var(--muted);text-decoration:none;font-size:.86rem}
 h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
-.subtitle{text-align:center;color:var(--muted);font-size:.8rem;margin-bottom:20px}
+.settings-header{display:grid;grid-template-columns:minmax(0,1fr) minmax(125px,185px);align-items:center;gap:12px;margin:16px 0 20px}
+.settings-header h1{min-width:0;margin:0;text-align:left;line-height:1.25}
+.settings-station-switch{width:100%;min-height:44px;padding:8px 10px;border:1px solid #475569;border-radius:12px;background:#1e293b;color:var(--text);font:inherit;font-weight:750}
+.settings-station-switch:disabled{opacity:.55}
 .grid{display:grid;gap:16px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,.28)}
 
@@ -45,7 +48,7 @@ h1{text-align:center;margin:12px 0 6px;font-size:1.55rem}
 .num-control button{display:inline-flex;width:28px;height:28px;border-radius:50%;border:0;background:#334155;color:var(--text);font-size:1rem;font-weight:700;align-items:center;justify-content:center;cursor:pointer}
 button{padding:8px 15px;border-radius:999px;border:0;background:#334155;color:var(--text);font-weight:650;cursor:pointer}
 button:hover{background:#475569}
-.profile-link{display:inline-block;padding:9px 16px;border-radius:999px;background:var(--blue);color:#082f49;text-decoration:none;font-weight:750}
+.profile-link{display:inline-flex;align-items:center;justify-content:center;padding:9px 16px;border-radius:999px;background:var(--blue);color:#082f49;text-decoration:none;font-weight:750}
 .active-profile{font-size:1.15rem;font-weight:800;text-align:center;color:#86efac;margin:4px 0 12px}
 .hint{color:var(--muted);font-size:.76rem;line-height:1.5;text-align:center}
 .info{margin:10px 0 14px;padding:11px 12px;border-radius:11px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.2);color:#bae6fd;font-size:.76rem;line-height:1.5}
@@ -170,7 +173,6 @@ button:disabled{opacity:.48;cursor:not-allowed}
 }
 .settings-vpd-log-link[hidden],
 [data-settings-panel][hidden]{display:none!important}
-.settings-view-hint{margin-top:10px;color:var(--muted);font-size:.7rem;line-height:1.45;text-align:center}
 .settings-help-row{display:flex;justify-content:center;margin-top:10px}
 .accordion-card{padding:0;overflow:hidden}
 .accordion-header{display:flex;align-items:center;border-bottom:1px solid transparent}.accordion-card.open .accordion-header{border-bottom-color:var(--border)}
@@ -186,6 +188,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 .help-dialog-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}.help-dialog-head h2{flex:1;margin:0;text-align:left}.help-close{width:38px;height:38px;padding:0;font-size:1.2rem}.help-dialog-content{color:#cbd5e1;font-size:.84rem;line-height:1.6}.help-dialog-content hr{border:0;border-top:1px solid var(--border);margin:14px 0}
 @media(max-width:620px){
     body{padding:13px}
+    .settings-header h1{font-size:1.32rem}
     .levels{grid-template-columns:1fr}
     .vpd-sequence{grid-template-columns:1fr}
     .vpd-phase-grid{grid-template-columns:1fr}
@@ -199,27 +202,22 @@ button:disabled{opacity:.48;cursor:not-allowed}
 <div class="wrap">
     <div class="nav">
         <a href="{{ url_for('grow_control_tent', tent_id=tent_id) }}">← {{ tent_name }}</a>
-        <a href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}">🌱 Profile verwalten</a>
         <a href="{{ url_for('grow_control_sensors_dashboard') }}">🧪 Sensoren</a>
         <a href="{{ url_for('grow_control_setup', tent_id=tent_id) }}">⚙️ Grow Station Setup</a>
     </div>
 
-    <h1>⚙️ {{ tent_name }} · Klima & Grenzwerte</h1>
-    <div class="subtitle">Änderungen werden erst nach „Einstellungen speichern“ übernommen</div>
+    <div class="settings-header">
+        <h1>⚙️ {{ tent_name }} · Klima &amp; Grenzwerte</h1>
+        <select id="settings-tent-switcher" class="settings-station-switch" aria-label="Grow-Station wechseln">
+            <option value="{{ tent_id }}">{{ tent_name }}</option>
+        </select>
+    </div>
 
     <div class="grid">
 
         <div class="card">
             <h2>🌱 Aktives Profil</h2>
             <div id="active-profile-name" class="active-profile">--</div>
-            <div class="row-inline">
-                <a class="profile-link" href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}">
-                    Profile bearbeiten oder wechseln
-                </a>
-            </div>
-            <div class="hint">
-                Profilvorlagen werden auf einer eigenen Seite vorbereitet. Ein Wechsel erfolgt dort erst nach ausdrücklicher Bestätigung.
-            </div>
         </div>
 
         <div class="card settings-mode-card">
@@ -261,10 +259,6 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     href="{{ url_for('grow_control_tent_vpd_control', tent_id=tent_id) }}"
                     hidden
                 >🧠 Live-Regellog öffnen</a>
-            </div>
-            <div class="settings-view-hint">
-                Die Auswahl wechselt nur die Ansicht. Die Betriebsart wird erst mit
-                „Einstellungen speichern“ übernommen.
             </div>
             <div class="settings-help-row">
                 <button type="button" class="info-trigger" aria-label="Hilfe zum Regelbereich" onclick="openSettingsHelp('settings-overview-help','Regelbereich')">i</button>
@@ -795,6 +789,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
             <button id="discard-settings-button" type="button" class="discard-button" onclick="discardChanges()" disabled>
                 Änderungen verwerfen
             </button>
+            <a class="profile-link" href="{{ url_for('grow_control_tent_profiles', tent_id=tent_id) }}">🌱 Profile verwalten</a>
         </div>
         <div id="save-feedback" class="feedback"></div>
         <div class="hint">
@@ -816,6 +811,7 @@ button:disabled{opacity:.48;cursor:not-allowed}
 <script>
 const TENT_ID = {{ tent_id|tojson }};
 const CONFIG_URL = `/api/tents/${encodeURIComponent(TENT_ID)}/config`;
+const SETTINGS_PAGE_TEMPLATE = {{ url_for('grow_control_tent_settings', tent_id='__TENT_ID__')|tojson }};
 
 let lightSunAvailable = false;
 let lightSunUnavailableReason = "";
@@ -825,6 +821,41 @@ let loadInFlight = false;
 let configLoaded = false;
 let settingsSection = "classic";
 let settingsSectionChosen = false;
+
+async function loadSettingsTentSwitcher(){
+    const select = document.getElementById("settings-tent-switcher");
+    if(!select) return;
+    try{
+        const response = await fetch("/api/tents",{cache:"no-store"});
+        if(!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const tents = Array.isArray(payload.tents) ? payload.tents : [];
+        const options = tents.filter(tent=>tent?.id);
+        if(!options.some(tent=>tent.id===TENT_ID)) return;
+        select.replaceChildren(...options.map(tent=>{
+            const option = document.createElement("option");
+            option.value = tent.id;
+            option.textContent = tent.name || tent.id;
+            option.selected = tent.id === TENT_ID;
+            option.disabled = !tent.runtime_loaded;
+            return option;
+        }));
+    }catch(error){
+        console.error("Stationsliste konnte nicht geladen werden:",error);
+    }
+    select.addEventListener("change",()=>{
+        const targetTent = select.value;
+        if(!targetTent || targetTent===TENT_ID) return;
+        if(loadInFlight || saveInFlight){select.value=TENT_ID;return;}
+        if(settingsDirty && !confirm("Ungespeicherte Einstellungen verwerfen und die Station wechseln?")){
+            select.value=TENT_ID;
+            return;
+        }
+        settingsDirty=false;
+        select.disabled=true;
+        window.location.assign(SETTINGS_PAGE_TEMPLATE.replace("__TENT_ID__",encodeURIComponent(targetTent)));
+    });
+}
 
 const PROFILE_LABELS = {
     veg: "Vegetation",
@@ -1740,6 +1771,7 @@ function step(id,delta){
 }
 
 document.querySelectorAll("input,select").forEach(input=>{
+    if(input.id === "settings-tent-switcher") return;
     const updateDraft = ()=>{
         if(input.id === "VPD_CONTROL_MODE") updateVpdModeUi();
         syncVpdBoundsFromWindowEditors();
@@ -1777,6 +1809,7 @@ window.addEventListener("beforeunload",event=>{
 
 setupSettingsAccordions();
 selectSettingsSection("classic",{remember:false});
+loadSettingsTentSwitcher();
 load();
 </script>
 {% endblock %}
