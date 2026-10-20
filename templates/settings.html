@@ -140,22 +140,11 @@ button:disabled{opacity:.48;cursor:not-allowed}
     color:#e0f2fe;
     box-shadow:0 5px 18px rgba(2,132,199,.12);
 }
-.settings-mode-status{
-    display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
-    gap:8px;
-    margin-top:10px;
-}
-.settings-mode-state{
-    padding:8px 10px;
-    border-radius:10px;
-    background:rgba(15,23,42,.58);
-    color:var(--muted);
-    font-size:.7rem;
-    line-height:1.4;
-    text-align:center;
-}
-.settings-mode-state strong{display:block;color:#e2e8f0;font-size:.74rem}
+.settings-mode-choice{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:14px}
+.settings-mode-choice label{color:#cbd5e1;font-size:.76rem;font-weight:750}
+.settings-mode-choice .mode-select{width:min(100%,300px)}
+.settings-mode-current{margin:10px 0 0;color:var(--muted);font-size:.75rem;text-align:center}
+.settings-mode-current strong{color:#e2e8f0}
 .settings-mode-actions{display:flex;justify-content:center;margin-top:12px}
 .settings-vpd-log-link{
     display:inline-flex;
@@ -242,16 +231,15 @@ button:disabled{opacity:.48;cursor:not-allowed}
                     aria-controls="vpd-control-card"
                 >🧠 Intelligente VPD-Regelung</button>
             </div>
-            <div class="settings-mode-status">
-                <div class="settings-mode-state">
-                    <strong>Klassisch</strong>
-                    <span id="classic-mode-state">wird geladen</span>
-                </div>
-                <div class="settings-mode-state">
-                    <strong>VPD intelligent</strong>
-                    <span id="vpd-mode-state">wird geladen</span>
-                </div>
+            <div class="settings-mode-choice">
+                <label for="VPD_CONTROL_MODE">Betriebsart wählen</label>
+                <select id="VPD_CONTROL_MODE" class="mode-select">
+                    <option value="OFF">Aus · klassische Regelung</option>
+                    <option value="MONITOR">Beobachten · keine Eingriffe</option>
+                    <option value="AUTO">Automatisch · ENV-Aktoren</option>
+                </select>
             </div>
+            <p class="settings-mode-current">Aktiv: <strong id="current-mode-state">wird geladen</strong></p>
             <div class="settings-mode-actions">
                 <a
                     id="settings-vpd-log-link"
@@ -512,17 +500,6 @@ button:disabled{opacity:.48;cursor:not-allowed}
                 Mit Priorität 2 wählst du, ob Growstar auf der VPD-Zielkurve bevorzugt den
                 Feuchte- oder Temperatur-Zielwert trifft. Die Range-Grenzen werden dabei
                 niemals überschritten.
-            </div>
-
-            <div class="row-inline">
-                <div class="field">
-                    <label for="VPD_CONTROL_MODE">Betriebsart</label>
-                    <select id="VPD_CONTROL_MODE" class="mode-select">
-                        <option value="OFF">Aus · klassische Regelung</option>
-                        <option value="MONITOR">Beobachten · keine Eingriffe</option>
-                        <option value="AUTO">Automatisch · ENV-Aktoren</option>
-                    </select>
-                </div>
             </div>
 
             <div class="vpd-phase-grid">
@@ -1013,26 +990,12 @@ function selectSettingsSection(section,{remember=true}={}){
 }
 
 function updateSettingsModeSummary(){
-    const mode = String(el("VPD_CONTROL_MODE")?.value || "OFF").toUpperCase();
     const savedMode = String(loadedConfig.VPD_CONTROL_MODE || "OFF").toUpperCase();
-    const draftSuffix = mode !== savedMode ? " · Entwurf" : "";
-    const classicState = el("classic-mode-state");
-    const vpdState = el("vpd-mode-state");
+    const currentState = el("current-mode-state");
     const logLink = el("settings-vpd-log-link");
-
-    if(classicState){
-        classicState.textContent = (mode === "AUTO"
-            ? "Fallback · Sollwerte gesperrt"
-            : "regelt weiterhin") + draftSuffix;
-    }
-    if(vpdState){
-        const modeLabel = mode === "AUTO"
-            ? (mode === savedMode ? "Automatisch aktiv" : "Automatik vorgesehen")
-            : mode === "MONITOR"
-                ? (mode === savedMode ? "Beobachten aktiv" : "Beobachten vorgesehen")
-                : (mode === savedMode ? "Aus" : "Ausschalten vorgesehen");
-        vpdState.textContent = modeLabel + draftSuffix;
-    }
+    if(currentState) currentState.textContent = savedMode === "AUTO"
+        ? "VPD intelligent · Automatisch"
+        : savedMode === "MONITOR" ? "VPD intelligent · Beobachten" : "Klassische Regelung";
     if(logLink) logLink.hidden = savedMode === "OFF";
 }
 
