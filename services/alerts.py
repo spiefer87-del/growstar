@@ -132,6 +132,30 @@ def _station_alarm_config(station_id):
 def extract_alarm_candidates(snapshot):
     candidates = {}
 
+    for camera in snapshot.get("cameras") or []:
+        camera_id = camera.get("camera_id")
+        station_id = camera.get("tent_id")
+        station = next((item for item in snapshot.get("stations") or [] if item.get("id") == station_id), {})
+        name = camera.get("name") or camera_id
+        for issue, title, detail in (
+            ("stale", "Kamera ohne neue Aufnahme", "Letzte Aufnahme"),
+            ("archive_stale", "Zeitraffer ohne neue Bilder", "Letztes Zeitrafferbild"),
+        ):
+            if not camera.get(issue):
+                continue
+            timestamp = camera.get("last_capture" if issue == "stale" else "last_archived_at")
+            last_seen = _time_text(float(timestamp)) if timestamp else "noch nie"
+            reason = camera.get("last_error") if issue == "stale" else None
+            description = f"{detail}: {last_seen}; seit {int(camera.get('age' if issue == 'stale' else 'archive_age') or 0)} Sekunden keine neuen Daten."
+            if reason:
+                description += f" Ursache: {reason}"
+            item = _candidate(
+                f"camera:{camera_id}:{issue}", "camera", "error",
+                f"{name}: {title}", description,
+                station=station_id, station_name=station.get("name") or station_id,
+            )
+            candidates[item["key"]] = item
+
     for station in snapshot.get("stations") or []:
         station_id = str(station.get("id") or "station")
         station_name = str(station.get("name") or station_id)
@@ -505,6 +529,15 @@ def _alarm_message(record, *, kind, now):
     station_line = f"\nStation: {station}" if station else ""
 
     if kind == "recovery":
+        if record.get("rule") == "camera":
+            return (
+                "✅ Growstar Kamera wieder aktiv"
+                f"{station_line}\n"
+                f"{record.get('title')}\n"
+                f"{record.get('recovery_reason')}\n"
+                f"Dauer: {_duration_text(now - record.get('first_seen', now))}.\n"
+                f"Zeit: {_time_text(now)}"
+            )
         if record.get("rule") == "sensor_fallback":
             return (
                 "✅ Growstar Sensor-Fallback beendet"
@@ -681,6 +714,17 @@ def process_watchdog_snapshot(snapshot, *, now=None):
 
         for key in recovered_keys:
             record = _ACTIVE.pop(key)
+            if record.get("rule") == "camera":
+                parts = key.split(":")
+                camera = next((item for item in snapshot.get("cameras") or []
+                               if item.get("camera_id") == (parts[1] if len(parts) > 1 else None)), {})
+                last_image = camera.get("last_archived_at" if key.endswith(":archive_stale") else "last_capture")
+                if last_image and float(last_image) > float(record.get("first_seen") or 0):
+                    record["recovery_reason"] = "Eine neue Kameraaufnahme ist eingetroffen."
+                else:
+                    _append_history("monitoring_ended", record, now)
+                    changed = True
+                    continue
             if record.get("rule") == "sensor_fallback":
                 parts = key.split(":")
                 station = next((item for item in snapshot.get("stations") or [] if item.get("id") == record.get("station")), {})

@@ -81,3 +81,17 @@ timeout 12 ffprobe \
 ```
 
 Die Beispiel-IP ist durch die tatsächliche reservierte Kamera-IP zu ersetzen.
+
+Wenn `401 Unauthorized` zurückkommt, antwortet ein RTSP-Dienst, verweigert
+aber den bisherigen Zugang. Das beweist weder ein geändertes Kennwort noch
+eine bestimmte Firmwareänderung. Zuerst in der VIVOSUN-App prüfen, ob beide
+Kameras live erreichbar sind und welche lokalen IP-Adressen sie aktuell haben.
+Auf dem Raspberry Pi die eingetragene IP und den obigen Test für jede Kamera
+separat prüfen; danach bei unveränderter IP den RTSP-Pfad in der
+Growstar-Verbindungsseite gegen den tatsächlich unterstützten Pfad der Kamera
+abgleichen. Die App-Anmeldedaten sind keine RTSP-Zugangsdaten.
+
+Unter **Grow Control → Watchdog** wird für jede aktive Kamera die letzte
+Aufnahme und ein ausgefallener Zeitraffer angezeigt. Die Telegram-Regel
+**Kamera und Zeitraffer** sendet einen Alarm und nach neuen Bildern eine
+Entwarnung, wenn Telegram im Benachrichtigungs-Setup verbunden und aktiviert ist.

@@ -21,6 +21,7 @@ from core.hardware_assignments import DEVICE_HARDWARE, device_display_label
 from core.runtime import list_runtimes
 from core.tents import DEFAULT_TENT_ID
 from core.timer_schedule import validate_timer_windows
+from services.growcam import camera_health_snapshot
 
 
 CONTROL_LOOP_STALE_SEC = 10
@@ -480,6 +481,9 @@ def build_watchdog_snapshot(*, now=None):
 
     runtimes = sorted(list_runtimes(), key=lambda runtime: runtime.tent_id)
     stations = [station_health(runtime, now=now) for runtime in runtimes]
+    cameras = camera_health_snapshot(now=now)
+    for station in stations:
+        station["cameras"] = [item for item in cameras if item["tent_id"] == station["id"]]
     controller = controller_health(now=now)
 
     default_station = next(
@@ -504,6 +508,7 @@ def build_watchdog_snapshot(*, now=None):
         "timestamp": now,
         "controller": controller,
         "stations": stations,
+        "cameras": cameras,
         "station_count": len(stations),
         "temp": legacy_temp,
         "hum": legacy_hum,

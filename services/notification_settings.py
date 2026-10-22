@@ -18,6 +18,7 @@ _LOCK = threading.RLock()
 RULE_KEYS = (
     "sensor_stale",
     "sensor_fallback",
+    "camera",
     "sensor_limits",
     "hardware",
     "safety",

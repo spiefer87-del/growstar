@@ -38,7 +38,7 @@ h1{margin:0;font-size:clamp(1.55rem,4vw,2rem)}
 .section h2{margin:0 0 5px;font-size:1.08rem}
 .section-intro{margin:0 0 14px;color:var(--muted);font-size:.87rem}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
-.summary-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .summary-card{background:linear-gradient(145deg,rgba(30,41,59,.98),rgba(15,23,42,.96));border:1px solid rgba(148,163,184,.14);border-radius:16px;padding:14px}
 .summary-card span{display:block;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em}
 .summary-card strong{display:block;margin-top:5px;font-size:1.12rem}
@@ -176,6 +176,8 @@ function renderSummary(snapshot){
         (s.humidity && s.humidity.configured && s.humidity.stale)
     ).length;
     const fallbackCount = stations.reduce((count,s) => count + Object.values(s.sensor_fallbacks || {}).filter(item => item.active).length,0);
+    const cameras = snapshot.cameras || [];
+    const cameraIssues = cameras.filter(c => c.stale || c.archive_stale).length;
     const controller = snapshot.controller || {};
     const threads = Object.values(controller.threads || {});
     const stoppedThreads = threads.filter(t => !t.alive).length;
@@ -185,6 +187,7 @@ function renderSummary(snapshot){
         `<div class="summary-card"><span>Stationen</span><strong>${stations.length}</strong><div class="summary-detail">${live} LIVE · ${shadow} SHADOW</div></div>`,
         `<div class="summary-card"><span>Safety</span><strong>${badge(safetyIssues ? `${safetyIssues} FEHLER` : "NORMAL", safetyIssues ? "error" : "ok")}</strong><div class="summary-detail">${safetyIssues ? "Mindestens eine Station braucht Aufmerksamkeit" : "Kein aktiver stationsbezogener Failsafe"}</div></div>`,
         `<div class="summary-card"><span>Sensoren</span><strong>${badge(sensorIssues ? `${sensorIssues} STALE` : (fallbackCount ? `${fallbackCount} FALLBACK` : "FRISCH"), sensorIssues ? "error" : (fallbackCount ? "warn" : "ok"))}</strong><div class="summary-detail">${fallbackCount ? "Ersatzsensor aktiv; Messwerte bleiben gültig" : "Nur zugeordnete Temperatur-/Feuchtequellen"}</div></div>`,
+        `<div class="summary-card"><span>Kameras</span><strong>${badge(cameraIssues ? `${cameraIssues} FEHLER` : (cameras.length ? "AKTIV" : "KEINE"), cameraIssues ? "error" : (cameras.length ? "ok" : "inactive"))}</strong><div class="summary-detail">${cameras.length} überwacht · Standbild und Zeitraffer</div></div>`,
         `<div class="summary-card"><span>Controller</span><strong>${badge(stoppedThreads ? `${stoppedThreads} THREAD STOP` : "THREADS OK", controllerState)}</strong><div class="summary-detail">${threads.length} überwachte Worker</div></div>`,
         `<div class="summary-card"><span>MQTT</span><strong>${badge(controller.mqtt?.stale ? "STALE" : "AKTIV", controller.mqtt?.stale ? "warn" : "ok")}</strong><div class="summary-detail">Letzte Nachricht ${ageText(controller.mqtt?.age)}</div></div>`
     ].join("");
@@ -258,6 +261,12 @@ function renderStations(stations){
         const fallbackDetails = Object.entries(s.sensor_fallbacks || {}).filter(([,item]) => item.active).map(([key,item]) =>
             `<div class="endpoint-row"><div><div class="endpoint-name">${esc(fallbackNames[key] || key)} · Fallback aktiv</div><div class="endpoint-meta">Primär: ${esc(item.primary_label || item.primary_source_id)} → Ersatz: ${esc(item.fallback_label || item.fallback_source_id)} · seit ${item.since ? new Date(Number(item.since)*1000).toLocaleString("de-DE") : "unbekannt"}</div></div><div>${badge("ERSATZSENSOR", "warn")}</div></div>`
         ).join("");
+        const cameraDetails = (s.cameras || []).map(camera => {
+            const failed = camera.stale || camera.archive_stale;
+            const last = camera.last_capture ? new Date(Number(camera.last_capture)*1000).toLocaleString("de-DE") : "noch nie";
+            const archive = camera.archive_expected ? ` · Zeitraffer ${camera.archive_stale ? "ohne neue Bilder" : "aktuell"}` : "";
+            return `<div class="endpoint-row"><div><div class="endpoint-name">📷 ${esc(camera.name)}</div><div class="endpoint-meta">Letzte Aufnahme: ${esc(last)}${archive}${camera.last_error ? ` · ${esc(camera.last_error)}` : ""}</div></div><div class="endpoint-address">${esc(camera.camera_id)}</div><div>${badge(failed ? "FEHLER" : "AKTIV", failed ? "error" : "ok")}</div></div>`;
+        }).join("");
         const issues = (cfg.issues || []).length ? `<ul class="issue-list">${cfg.issues.map(i=>`<li>${esc(i)}</li>`).join("")}</ul>` : "";
 
         let hwText = "keine Zuordnung";
@@ -314,6 +323,7 @@ function renderStations(stations){
                 <div class="health-cell"><span>Config / Failsafe</span><strong>${badge(cfg.ok ? "CONFIG OK" : "CONFIG FEHLER", cfg.state)}</strong><div class="health-detail">Legacy Sensor-Failsafe: ${s.sensor_failsafe?.active ? "AKTIV" : "aus"}</div>${issues}</div>
             </div>
             ${endpoints ? `<div class="endpoint-list">${endpoints}</div>` : ""}
+            ${cameraDetails ? `<div class="endpoint-list">${cameraDetails}</div>` : ""}
             ${fallbackDetails ? `<div class="endpoint-list">${fallbackDetails}</div>` : ""}
             ${renderSafetyDiagnostics(s)}
         </article>`;

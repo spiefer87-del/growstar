@@ -52,6 +52,16 @@ def watchdog_cycle(*, now=None):
 
     snapshot = build_watchdog_snapshot(now=now)
 
+    for camera in snapshot.get("cameras") or []:
+        if camera.get("stale") or camera.get("archive_stale"):
+            issue = "Aufnahme" if camera.get("stale") else "Zeitraffer"
+            _rate_limited_log(
+                ("camera", camera["camera_id"], issue),
+                f"[{camera.get('tent_id')}] KAMERA {camera.get('name')}: {issue} ausgefallen; "
+                f"letzter Fehler: {camera.get('last_error') or 'keine neuen Bilder'}",
+                level="ERROR", repeat=300, now=now,
+            )
+
     for station in snapshot["stations"]:
         tent_id = station["id"]
 
