@@ -509,6 +509,41 @@ def _latest_timelapse_frame_at(config):
         return None
 
 
+def next_timelapse_capture_label(config):
+    """Compatibility with existing media routes installed before date-range plans."""
+    if not config.get("enabled") or not config.get("host"):
+        return None
+    plan = timelapse_schedule_snapshot(config)
+    next_at = plan.get("next_capture_at")
+    return time.strftime("%d.%m.%Y, %H:%M", time.localtime(next_at)) if next_at else None
+
+
+def timelapse_frame_days(batch_id, *, camera_id=PRIMARY_CAMERA_ID):
+    """Compatibility with older media views showing counts by local day."""
+    counts = {}
+    if not batch_id:
+        return counts
+    for frame in _batch_dir(batch_id, camera_id).glob("frame-*.jpg"):
+        try:
+            day = time.strftime("%Y-%m-%d", time.localtime(frame.stat().st_mtime))
+        except OSError:
+            continue
+        counts[day] = counts.get(day, 0) + 1
+    return counts
+
+
+def timelapse_download_filename(video, tent_id, *, camera_id=PRIMARY_CAMERA_ID):
+    """Return a station-specific filename for previously rendered videos."""
+    if re.fullmatch(r"timelapse-.+-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}-\d{6}\.mp4", video.name):
+        return video.name
+    tent_id = str(tent_id or "").strip()
+    label = ("Zelt-" + tent_id[5:]) if re.fullmatch(r"tent_[1-9][0-9]*", tent_id) else (
+        re.sub(r"[^A-Za-z0-9]+", "-", tent_id).strip("-") or camera_id
+    )
+    stamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime(video.stat().st_mtime))
+    return f"timelapse-{label}-{stamp}.mp4"
+
+
 def _planned_timelapse_images(start_at, end_at, interval):
     if start_at is None or end_at is None or end_at < start_at:
         return None
@@ -1513,6 +1548,7 @@ __all__ = (
     "list_public_configs",
     "public_config",
     "mjpeg_stream",
+    "next_timelapse_capture_label",
     "recording_dir_path",
     "resolve_recording",
     "resolve_timelapse_video",
@@ -1523,4 +1559,6 @@ __all__ = (
     "timelapse_schedule_snapshot",
     "start_video_recording",
     "timelapse_summary",
+    "timelapse_frame_days",
+    "timelapse_download_filename",
 )
